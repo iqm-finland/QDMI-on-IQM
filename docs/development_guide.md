@@ -41,7 +41,7 @@ Ready to contribute to the project? This guide will get you started.
 
    The project uses [pre-commit](https://pre-commit.com/) hooks for running linters and formatting tools on each commit. These checks can be run automatically on every commit via [prek](https://prek.j178.dev) (recommended).
 
-   To set this up, install prek, e.g., via:
+   To set this up, install [prek](https://prek.j178.dev/), e.g., via:
 
    **macOS and Linux:**
 
