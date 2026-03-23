@@ -1,0 +1,281 @@
+/*
+ * Copyright (c) 2025 - 2026 IQM QDMI developers
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/** @file
+ * @brief cURL-based HTTP client implementation for IQM QDMI device
+ * communication.
+ */
+
+#include "curl_http_client.hpp"
+
+#include "logging.hpp"
+#include "qdmi/constants.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <curl/curl.h>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <string>
+
+namespace iqm {
+
+namespace {
+// Helper for CURL responses
+size_t Curl_write_callback(void *contents, const size_t size,
+                           const size_t nmemb, std::string *response) {
+  const size_t real_size = size * nmemb;
+  response->append(static_cast<char *>(contents), real_size);
+  return real_size;
+}
+
+curl_slist *Default_headers(const std::string &bearer_token) {
+  curl_slist *headers = nullptr;
+  headers = curl_slist_append(headers, "User-Agent: IQM QDMI C++ API");
+  if (!bearer_token.empty()) {
+    // Set the "Authorization" header with the bearer token
+    headers =
+        curl_slist_append(headers, ("Authorization: " + bearer_token).c_str());
+  }
+  return headers;
+}
+
+int Handle_response_code(CURL *curl, const std::string &url,
+                         const std::string &response) {
+  int64_t response_code{};
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+
+  // Parse JSON response for IQM-specific errors and messages
+  nlohmann::json json_response;
+  bool has_json = false;
+  if (!response.empty()) {
+    try {
+      json_response = nlohmann::json::parse(response);
+      has_json = true;
+    } catch (const nlohmann::json::exception &) {
+      LOG_DEBUG("Response is not valid JSON");
+      // Response is not JSON or invalid JSON, continue with plain text handling
+    }
+  }
+
+  // Handle response codes according to REST conventions
+  if (response_code >= 200 && response_code < 300) {
+    // 2xx Success
+    // Log IQM messages if present
+    if (has_json && json_response.contains("messages") &&
+        json_response["messages"].is_array() &&
+        !json_response["messages"].empty()) {
+      LOG_DEBUG("Response contains " +
+                std::to_string(json_response["messages"].size()) +
+                " message(s):");
+      for (const auto &message : json_response["messages"]) {
+        std::string msg_text;
+        if (message.contains("message") && message["message"].is_string()) {
+          msg_text = message["message"].get<std::string>();
+        }
+        if (!msg_text.empty()) {
+          LOG_DEBUG("  - " + msg_text);
+        }
+      }
+    }
+
+    LOG_INFO("Request successful (HTTP " + std::to_string(response_code) + ")");
+    return QDMI_SUCCESS;
+  }
+
+  // Handle error responses (4xx client errors, 5xx server errors, etc.)
+  std::string error_context = "Request to URL '" + url + "' failed with HTTP " +
+                              std::to_string(response_code);
+
+  if (response_code >= 400 && response_code < 500) {
+    // 4xx Client Error
+    error_context += " (Client Error)";
+  } else if (response_code >= 500 && response_code < 600) {
+    // 5xx Server Error
+    error_context += " (Server Error)";
+  } else if (response_code >= 300 && response_code < 400) {
+    // 3xx Redirection (unexpected since we follow redirects)
+    error_context += " (Unexpected Redirect)";
+  } else {
+    // Other non-success codes
+    error_context += " (Unexpected Response Code)";
+  }
+
+  LOG_ERROR(error_context);
+
+  // Log IQM-specific errors if present
+  bool logged_structured_error = false;
+
+  // Check for array of errors
+  if (has_json && json_response.contains("errors") &&
+      !json_response["errors"].is_null() &&
+      json_response["errors"].is_array() && !json_response["errors"].empty()) {
+    LOG_ERROR("Response contains " +
+              std::to_string(json_response["errors"].size()) + " error(s):");
+    for (const auto &error : json_response["errors"]) {
+      std::string error_msg;
+      if (error.contains("error_code") && error["error_code"].is_string()) {
+        error_msg = "[" + error["error_code"].get<std::string>() + "] ";
+      }
+      if (error.contains("message") && error["message"].is_string()) {
+        error_msg += error["message"].get<std::string>();
+      }
+      if (!error_msg.empty()) {
+        LOG_ERROR("  - " + error_msg);
+      }
+    }
+    logged_structured_error = true;
+  }
+
+  // Check for single error_code and message at root level
+  if (has_json && !logged_structured_error &&
+      (json_response.contains("error_code") ||
+       json_response.contains("message"))) {
+    std::string error_msg;
+    if (json_response.contains("error_code") &&
+        json_response["error_code"].is_string()) {
+      error_msg = "[" + json_response["error_code"].get<std::string>() + "] ";
+    }
+    if (json_response.contains("message") &&
+        json_response["message"].is_string()) {
+      error_msg += json_response["message"].get<std::string>();
+    }
+    if (!error_msg.empty()) {
+      LOG_ERROR("Error: " + error_msg);
+      logged_structured_error = true;
+    }
+  }
+
+  // Fall back to raw response if no structured errors are available
+  if (!logged_structured_error && !response.empty()) {
+    LOG_ERROR("Response: " + response);
+  }
+
+  // Log IQM messages if present (might contain additional context)
+  if (has_json && json_response.contains("messages") &&
+      json_response["messages"].is_array() &&
+      !json_response["messages"].empty()) {
+    LOG_DEBUG("Response contains " +
+              std::to_string(json_response["messages"].size()) +
+              " additional message(s):");
+    for (const auto &message : json_response["messages"]) {
+      std::string msg_text;
+      if (message.contains("message") && message["message"].is_string()) {
+        msg_text = message["message"].get<std::string>();
+      }
+      if (!msg_text.empty()) {
+        LOG_DEBUG("  - " + msg_text);
+      }
+    }
+  }
+
+  // Map HTTP status codes to QDMI error codes
+  if (response_code == 401 || response_code == 403) {
+    return QDMI_ERROR_PERMISSIONDENIED;
+  }
+  if (response_code == 404) {
+    return QDMI_ERROR_NOTFOUND;
+  }
+  if (response_code == 408 || response_code == 504) {
+    return QDMI_ERROR_TIMEOUT;
+  }
+  if (response_code == 400 || (response_code >= 402 && response_code < 500)) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+
+  return QDMI_ERROR_FATAL;
+}
+} // namespace
+
+int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
+                        std::string &response) {
+  LOG_INFO("Performing GET request to " + url);
+  CURL *curl = curl_easy_init(); // NOLINT(misc-include-cleaner)
+  if (curl == nullptr) {
+    LOG_ERROR("curl_easy_init() failed");
+    return QDMI_ERROR_FATAL;
+  }
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  auto *headers = Default_headers(bearer_token);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  // Perform the request
+  if (const auto res = curl_easy_perform(curl); // NOLINT(misc-include-cleaner)
+      res != CURLE_OK) {
+    LOG_ERROR("curl_easy_perform() failed: " +
+              std::string(curl_easy_strerror(res)));
+    curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
+    curl_slist_free_all(headers);
+    return QDMI_ERROR_FATAL;
+  }
+  const auto ret = Handle_response_code(curl, url, response);
+  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
+  curl_slist_free_all(headers);
+  return ret;
+}
+
+int CurlHttpClient::post(const std::string &url,
+                         const std::string &bearer_token, std::string &response,
+                         const std::string &data,
+                         const std::string &extra_header) {
+  LOG_INFO("Performing POST request to " + url);
+  CURL *curl = curl_easy_init();
+  if (curl == nullptr) {
+    LOG_ERROR("curl_easy_init() failed");
+    return QDMI_ERROR_FATAL;
+  }
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  auto *headers = Default_headers(bearer_token);
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+  if (!extra_header.empty()) {
+    headers = curl_slist_append(headers, extra_header.c_str());
+  }
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  if (!data.empty()) {
+    LOG_DEBUG("POST data: " + data);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+  } else {
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  }
+  // Perform the request
+  if (const auto res = curl_easy_perform(curl); res != CURLE_OK) {
+    LOG_ERROR("curl_easy_perform() failed: " +
+              std::string(curl_easy_strerror(res)));
+    curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
+    curl_slist_free_all(headers);
+    return QDMI_ERROR_FATAL;
+  }
+  const auto ret = Handle_response_code(curl, url, response);
+  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
+  curl_slist_free_all(headers);
+  return ret;
+}
+
+} // namespace iqm

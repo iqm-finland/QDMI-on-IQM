@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - iqm_base_url: "https://resonance.meetiqm.com"
+            iqm_qc_alias: "emerald:mock"
+          - iqm_base_url: "https://resonance.meetiqm.com"
+            iqm_qc_alias: "garnet:mock"
+
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
+        with:
+          variant: ccache
+          save: true
+          max-size: 10G
+
+      - name: Setup mold
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_IQM_QDMI_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        working-directory: build
+        env:
+          IQM_BASE_URL: ${{ matrix.iqm_base_url }}
+          IQM_QC_ALIAS: ${{ matrix.iqm_qc_alias }}
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+        run: ctest --verbose --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
+
+  test-install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
+        with:
+          variant: ccache
+          save: true
+          max-size: 10G
+
+      - name: Setup mold
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+
+      - name: Configure CMake for installation
+        run: cmake -S . -B build-install -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=OFF
+
+      - name: Build the project
+        run: cmake --build build-install
+
+      - name: Install the project
+        run: cmake --install build-install --prefix install-dir
+
+      - name: Configure CMake for using installed version
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUSE_INSTALLED_IQM_QDMI_DEVICE=ON -DCMAKE_PREFIX_PATH=install-dir
+
+      - name: Build with installed version
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test installed version
+        working-directory: build
+        env:
+          IQM_BASE_URL: "https://resonance.meetiqm.com"
+          IQM_QC_ALIAS: "emerald:mock"
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+        run: ctest -C Release --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
+
+  test-packaging:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: pypa/cibuildwheel@63fd63b352a9a8bdcc24791c9dbee952ee9a8abc # v3.3.0
+      - name: Verify clean directory
+        run: git diff --exit-code
+        shell: bash
+      - name: Upload wheels
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-wheels-${{ inputs.runs-on }}
+          path: wheelhouse/*.whl
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build SDist
+        run: uv build --sdist
+      - name: Check metadata
+        run: uvx twine check dist/*
+      - name: Run check-sdist
+        run: uvx check-sdist --inject-junk
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-sdist
+          path: dist/*.tar.gz
