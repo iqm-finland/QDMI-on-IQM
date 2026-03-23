@@ -1,0 +1,47 @@
+name: Documentation
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
+
+      - name: Install Doxygen
+        uses: ssciwr/doxygen-install@501e53b879da7648ab392ee226f5b90e42148449 # v1.6.4
+        with:
+          version: "1.15.0"
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_IQM_QDMI_DOCS=ON
+
+      - name: Build
+        run: cmake --build build --target iqm_qdmi_device_docs
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: iqm-qdmi-device-docs
+          path: build/docs/html
