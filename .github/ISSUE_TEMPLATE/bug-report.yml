@@ -8,8 +8,8 @@ body:
         **Thanks for taking the time to report an issue!**
 
         ⚠ Before submitting:
-        1. Search [existing issues](https://github.com/iqm-finland/QDMI/search?q=is%3Aissue&type=issues) to avoid duplicates
-        2. For questions or discussions, please use our [discussions forum](https://github.com/iqm-finland/QDMI/discussions)
+        1. Search [existing issues](https://github.com/iqm-finland/QDMI-on-IQM/search?q=is%3Aissue&type=issues) to avoid duplicates
+        2. For questions or discussions, please use our [discussions forum](https://github.com/iqm-finland/QDMI-on-IQM/discussions)
 
   - type: textarea
     attributes:

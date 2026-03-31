@@ -11,7 +11,7 @@ Security updates are applied only to the most recent releases.
 To report vulnerabilities, you can privately report a potential security issue
 via the GitHub security vulnerabilities feature. This can be done here:
 
-https://github.com/iqm-finland/QDMI/security/advisories
+https://github.com/iqm-finland/QDMI-on-IQM/security/advisories
 
 Please do **not** open a public issue about a potential security vulnerability.
 

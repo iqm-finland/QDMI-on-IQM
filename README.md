@@ -47,8 +47,8 @@ unified interface.
 $ sudo apt-get install cmake g++ libcurl4-openssl-dev
 
 # Clone the repository
-$ git clone https://github.com/iqm-finland/QDMI.git
-$ cd QDMI
+$ git clone https://github.com/iqm-finland/QDMI-on-IQM.git
+$ cd QDMI-on-IQM
 
 # Build the library
 $ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -185,8 +185,8 @@ Please see our [Contributing Guide](docs/contributing.md) for:
 ## Getting Help
 
 - **Documentation**: Check the [docs/](docs/) directory
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/iqm-finland/QDMI/discussions)
-- **Bug Reports**: Open an issue in [GitHub Issues](https://github.com/iqm-finland/QDMI/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/iqm-finland/QDMI-on-IQM/discussions)
+- **Bug Reports**: Open an issue in [GitHub Issues](https://github.com/iqm-finland/QDMI-on-IQM/issues)
 - **Security**: Report vulnerabilities via our [Security Policy](.github/SECURITY.md)
 
 ## License

@@ -13,7 +13,7 @@ You can save time by following this procedure when reporting a problem:
   It is much easier to identify the cause for the problem if a handful of lines suffice to show that something is not
   working.
 
-[Issues]: https://github.com/iqm-finland/QDMI/issues
-[Discussions]: https://github.com/iqm-finland/QDMI/discussions
+[Issues]: https://github.com/iqm-finland/QDMI-on-IQM/issues
+[Discussions]: https://github.com/iqm-finland/QDMI-on-IQM/discussions
 
 <!-- [DOXYGEN] -->

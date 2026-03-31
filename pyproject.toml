@@ -44,9 +44,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/iqm-finland/QDMI"
-Issues = "https://github.com/iqm-finland/QDMI/issues"
-Discussions = "https://github.com/iqm-finland/QDMI/discussions"
+Homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
+Issues = "https://github.com/iqm-finland/QDMI-on-IQM/issues"
+Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 
 [project.scripts]
 iqm-qdmi = "iqm.qdmi.__main__:main"

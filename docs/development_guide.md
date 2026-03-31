@@ -8,25 +8,25 @@ Ready to contribute to the project? This guide will get you started.
 
    **External Contribution**
 
-   If you do not have write access to the [iqm-finland/QDMI](https://github.com/iqm-finland/QDMI) repository, fork the repository on GitHub (see <https://docs.github.com/en/get-started/quickstart/fork-a-repo>) and clone your
+   If you do not have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, fork the repository on GitHub (see <https://docs.github.com/en/get-started/quickstart/fork-a-repo>) and clone your
    fork locally.
 
    ```bash
-   $ git clone git@github.com:your_name_here/QDMI.git
+   $ git clone git@github.com:your_name_here/QDMI-on-IQM.git
    ```
 
    **Internal Contribution**
 
-   If you do have write access to the [iqm-finland/QDMI](https://github.com/iqm-finland/QDMI) repository, clone the repository locally.
+   If you do have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, clone the repository locally.
 
    ```bash
-   $ git clone git@github.com/iqm-finland/QDMI.git
+   $ git clone git@github.com/iqm-finland/QDMI-on-IQM.git
    ```
 
 2. Change into the project directory
 
    ```bash
-   $ cd QDMI
+   $ cd QDMI-on-IQM
    ```
 
 3. Create a branch for local development
