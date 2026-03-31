@@ -2,22 +2,22 @@
 
 Thank you for your interest in contributing to the IQM QDMI Device implementation! This document outlines how to contribute and the development guidelines.
 
-We use GitHub to [host code](https://github.com/iqm-finland/QDMI), to [track issues and feature requests](https://github.com/iqm-finland/QDMI/issues), as well as accept [pull requests](https://github.com/iqm-finland/QDMI/pulls). See <https://docs.github.com/en/get-started/quickstart> for a general introduction to working with GitHub and contributing to projects.
+We use GitHub to [host code](https://github.com/iqm-finland/QDMI-on-IQM), to [track issues and feature requests](https://github.com/iqm-finland/QDMI-on-IQM/issues), as well as accept [pull requests](https://github.com/iqm-finland/QDMI-on-IQM/pulls). See <https://docs.github.com/en/get-started/quickstart> for a general introduction to working with GitHub and contributing to projects.
 
 ## Types of Contributions
 
 Pick the path that fits your time and interests:
 
 - 🐛 **Report bugs**:
-  Use the _🐛 Bug report_ template at <https://github.com/iqm-finland/QDMI/issues>.
+  Use the _🐛 Bug report_ template at <https://github.com/iqm-finland/QDMI-on-IQM/issues>.
   Include steps to reproduce, expected vs. actual behavior, environment details, and a minimal example.
 
 - 🛠️ **Fix bugs**:
-  Browse [issues](https://github.com/iqm-finland/QDMI/issues), especially those labeled "bug", "help wanted", or "good first issue".
+  Browse [issues](https://github.com/iqm-finland/QDMI-on-IQM/issues), especially those labeled "bug", "help wanted", or "good first issue".
   Open a draft PR early to get feedback.
 
 - 💡 **Propose features**:
-  Use the _✨ Feature request_ template at <https://github.com/iqm-finland/QDMI/issues>.
+  Use the _✨ Feature request_ template at <https://github.com/iqm-finland/QDMI-on-IQM/issues>.
   Describe the motivation, alternatives considered, and (optionally) a small API sketch.
 
 - ✨ **Implement features**:
@@ -36,7 +36,7 @@ Pick the path that fits your time and interests:
   Incremental tooling fixes have a big impact.
 
 - 🙌 **Community support**:
-  Triage issues, reproduce reports, and answer questions in [Discussions](https://github.com/iqm-finland/QDMI/discussions).
+  Triage issues, reproduce reports, and answer questions in [Discussions](https://github.com/iqm-finland/QDMI-on-IQM/discussions).
 
 ## Guidelines
 
@@ -89,24 +89,24 @@ Ready to contribute? We value contributions from people with all levels of exper
 
    **External Contribution**
 
-   If you do not have write access to the [iqm-finland/QDMI](https://github.com/iqm-finland/QDMI) repository, fork the repository on GitHub (see <https://docs.github.com/en/get-started/quickstart/fork-a-repo>) and clone your fork locally.
+   If you do not have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, fork the repository on GitHub (see <https://docs.github.com/en/get-started/quickstart/fork-a-repo>) and clone your fork locally.
 
    ```console
-   $ git clone git@github.com:your_name_here/QDMI.git
+   $ git clone git@github.com:your_name_here/QDMI-on-IQM.git
    ```
 
    **Internal Contribution**
 
-   If you do have write access to the [iqm-finland/QDMI](https://github.com/iqm-finland/QDMI) repository, clone the repository locally.
+   If you do have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, clone the repository locally.
 
    ```console
-   $ git clone git@github.com:iqm-finland/QDMI.git
+   $ git clone git@github.com:iqm-finland/QDMI-on-IQM.git
    ```
 
 2. **Change into the project directory**
 
    ```console
-   $ cd QDMI
+   $ cd QDMI-on-IQM
    ```
 
 3. **Create a branch for local development**
@@ -311,7 +311,7 @@ If you discover a security vulnerability, please follow the guidelines in our [S
 If you have any questions about contributing, feel free to:
 
 - Open an issue with the "question" label
-- Start a discussion in [GitHub Discussions](https://github.com/iqm-finland/QDMI/discussions)
+- Start a discussion in [GitHub Discussions](https://github.com/iqm-finland/QDMI-on-IQM/discussions)
 - Reach out to the maintainers directly
 
 Thank you for contributing to the IQM QDMI Device implementation! 🎉
