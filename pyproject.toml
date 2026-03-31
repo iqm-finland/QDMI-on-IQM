@@ -27,8 +27,7 @@ requires-python = ">=3.10"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 authors = [
-  { name = "Lukas Burgholzer", email = "lukas@munichquantum.software" },
-  { name = "Marcel Walter", email = "marcel@munichquantum.software" }
+  { name = "IQM Finland Oy", email = "developers@meetiqm.com" },
 ]
 
 license = "Apache-2.0 WITH LLVM-exception"
