@@ -21,8 +21,8 @@ from spack.package import *
 class IqmQdmi(CMakePackage):
     """IQM QDMI Device."""
 
-    homepage = "https://github.com/iqm-finland/QDMI"
-    git = "git@github.com:iqm-finland/QDMI.git"
+    homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
+    git = "git@github.com:iqm-finland/QDMI-on-IQM.git"
 
     maintainers("@burgholzer", "@marcelwa")
 
