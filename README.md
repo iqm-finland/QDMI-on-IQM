@@ -191,4 +191,4 @@ Please see our [Contributing Guide](docs/contributing.md) for:
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the Apache License 2.0 with LLVM exceptions. See the [LICENSE.md](LICENSE.md) file for details.
