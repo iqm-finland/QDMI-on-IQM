@@ -19,23 +19,28 @@ include(FetchContent)
 include(CMakeDependentOption)
 set(FETCH_PACKAGES "")
 
-# cmake-format: off
-set(QDMI_VERSION 1.2.1
-        CACHE STRING "QDMI version")
-set(QDMI_REV "d5e657c777b54c482b6fd372961ee59add2ded8b" # v1.2.1
-        CACHE STRING "QDMI identifier (tag, branch or commit hash)")
-set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
-        CACHE STRING "QDMI repository owner (change when using a fork)")
-set(QDMI_INSTALL
-    OFF
-    CACHE BOOL "Generate installation instructions for QDMI")
-# cmake-format: on
-FetchContent_Declare(
-  qdmi
-  GIT_REPOSITORY https://github.com/${QDMI_REPO_OWNER}/qdmi.git
-  GIT_TAG ${QDMI_REV}
-  FIND_PACKAGE_ARGS ${QDMI_VERSION})
-list(APPEND FETCH_PACKAGES qdmi)
+if(TARGET qdmi::qdmi)
+  message(STATUS "QDMI is already available.")
+else()
+  message(STATUS "QDMI will be included via FetchContent")
+  # cmake-format: off
+  set(QDMI_VERSION 1.2.1
+      CACHE STRING "QDMI version")
+  set(QDMI_REV "030f80c710e44e49162b5ca5c707b8e8637c36f1" # v1.2.1
+      CACHE STRING "QDMI identifier (tag, branch or commit hash)")
+  set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
+      CACHE STRING "QDMI repository owner (change when using a fork)")
+  set(QDMI_INSTALL
+      OFF
+      CACHE BOOL "Generate installation instructions for QDMI")
+  # cmake-format: on
+  FetchContent_Declare(
+    qdmi
+    GIT_REPOSITORY https://github.com/${QDMI_REPO_OWNER}/qdmi.git
+    GIT_TAG ${QDMI_REV}
+    FIND_PACKAGE_ARGS ${QDMI_VERSION})
+  list(APPEND FETCH_PACKAGES qdmi)
+endif()
 
 set(JSON_VERSION
     3.12.0
