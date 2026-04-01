@@ -78,10 +78,10 @@ if(BUILD_IQM_QDMI_DOCS)
       CACHE STRING
             "Set the default CMP0116 policy to NEW for documentation builds")
   set(DOXYGEN_VERSION
-      1.15.0
+      1.16.1
       CACHE STRING "Doxygen version")
   set(DOXYGEN_REV
-      "7cca38ba5185457e6d9495bf963d4cdeacebc25a"
+      "669aeeefca743c148e2d935b3d3c69535c7491e6"
       CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
   FetchContent_Declare(
     Doxygen
@@ -91,10 +91,10 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 
   set(DOXYGEN_AWESOME_VERSION
-      2.4.1
+      2.4.2
       CACHE STRING "Doxygen Awesome version")
   set(DOXYGEN_AWESOME_REV
-      "1f3620084ff75734ed192101acf40e9dff01d848"
+      "d52eafe3e9303399fda15661f3d7bb8fe3d7eabc"
       CACHE STRING "Doxygen Awesome identifier (tag, branch or commit hash)")
   FetchContent_Declare(
     doxygen-awesome-css
