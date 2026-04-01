@@ -15,15 +15,15 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_executable(integration_tests test_iqm_device_integration.cpp)
+add_executable(integration_tests ${CMAKE_SOURCE_DIR}/src/logging.cpp
+                                 test_iqm_device_integration.cpp)
 target_compile_features(integration_tests PRIVATE cxx_std_20)
 target_include_directories(
   integration_tests PRIVATE ${CMAKE_SOURCE_DIR}/include
                             ${CMAKE_SOURCE_DIR}/test/fomac)
 target_link_libraries(
-  integration_tests
-  PRIVATE gtest_main gtest qdmi::qdmi qdmi::qdmi_project_warnings
-          ${QDMI_TARGET_NAME} qdmi::iqm_fomac)
+  integration_tests PRIVATE gtest_main gtest qdmi::qdmi_project_warnings
+                            ${QDMI_TARGET_NAME} qdmi::iqm_fomac)
 add_dependencies(integration_tests qdmi_test_iqm_device_defs)
 gtest_discover_tests(
   integration_tests

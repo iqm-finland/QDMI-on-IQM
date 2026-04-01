@@ -24,8 +24,8 @@
 
 #include "curl_http_client.hpp"
 
+#include "iqm_qdmi/constants.h"
 #include "logging.hpp"
-#include "qdmi/constants.h"
 
 #include <cstddef>
 #include <cstdint>

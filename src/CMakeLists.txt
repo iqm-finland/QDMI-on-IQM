@@ -30,8 +30,13 @@ target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
 target_compile_definitions(${QDMI_TARGET_NAME}
                            PRIVATE QDMI_VERSION="${QDMI_VERSION}")
 target_compile_definitions(
+  ${QDMI_TARGET_NAME} PRIVATE IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
+                              IQM_QDMI_device_EXPORTS)
+set_target_properties(
   ${QDMI_TARGET_NAME}
-  PRIVATE IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}")
+  PROPERTIES C_VISIBILITY_PRESET hidden
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN 1)
 target_sources(${QDMI_TARGET_NAME} PRIVATE ${SRC_FILES})
 
 target_sources(
@@ -53,9 +58,17 @@ target_sources(
          FILES
          ${PUBLIC_HEADER_FILES})
 
+if(TARGET qdmi::qdmi)
+  get_target_property(QDMI_INCLUDE_DIRS qdmi::qdmi
+                      INTERFACE_INCLUDE_DIRECTORIES)
+  if(QDMI_INCLUDE_DIRS)
+    target_include_directories(${QDMI_TARGET_NAME} PUBLIC ${QDMI_INCLUDE_DIRS})
+  endif()
+endif()
+
 target_link_libraries(
-  ${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi qdmi::qdmi_project_warnings
-                              CURL::libcurl nlohmann_json::nlohmann_json)
+  ${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
+                              nlohmann_json::nlohmann_json)
 
 # ------------------------------------------------------------------------------
 # Coverage
