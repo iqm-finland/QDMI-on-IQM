@@ -1,0 +1,80 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  suppressNotifications: [
+    "prEditedNotification"
+  ],
+  minimumReleaseAge: "7 days",
+  extends: [
+    "config:recommended",
+    ":gitSignOff",
+    "helpers:pinGitHubActionDigestsToSemver",
+    ":automergeDigest",
+    ":automergeStableNonMajor",
+    ":combinePatchMinorReleases",
+    ":configMigration",
+    ":enablePreCommit",
+    ":prConcurrentLimitNone",
+    ":prHourlyLimitNone",
+  ],
+  enabledManagers: [
+    "github-actions",
+    "pep621",
+    "pre-commit",
+  ],
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+  },
+  labels: [
+    "dependencies"
+  ],
+  schedule: [
+    "every weekend"
+  ],
+  packageRules: [
+    {
+      matchManagers: [
+        "github-actions"
+      ],
+      addLabels: [
+        "github-actions"
+      ],
+      commitMessagePrefix: "⬆\uFE0F\uD83D\uDC68\u200D\uD83D\uDCBB",
+    },
+    {
+      matchManagers: [
+        "pep621",
+      ],
+      addLabels: [
+        "python"
+      ],
+      commitMessagePrefix: "⬆\uFE0F\uD83D\uDC0D",
+    },
+    {
+      matchManagers: [
+        "pre-commit"
+      ],
+      addLabels: [
+        "pre-commit"
+      ],
+      commitMessagePrefix: "⬆\uFE0F\uD83E\uDE9D",
+      versioning: "pep440",
+    },
+    {
+      matchUpdateTypes: [
+        "lockFileMaintenance"
+      ],
+      commitMessagePrefix: "⬆\uFE0F\uD83D\uDD12\uFE0F",
+    },
+    {
+      description: "Group and auto-merge all patch updates",
+      groupName: "patch updates",
+      matchUpdateTypes: [
+        "patch"
+      ],
+      matchCurrentVersion: "!/^0\.0/",
+      commitMessagePrefix: "⬆\uFE0F\uD83E\uDE79",
+      automerge: true,
+    },
+  ],
+}
