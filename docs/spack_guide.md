@@ -32,11 +32,8 @@ class IqmQdmi(CMakePackage):
     depends_on("curl", type=("build", "link", "run"))
     depends_on("nlohmann-json")
 
-
     def cmake_args(self):
-        args = [
-            self.define("BUILD_IQM_QDMI_TESTS", False)
-        ]
+        args = [self.define("BUILD_IQM_QDMI_TESTS", False)]
         return args
 ```
 

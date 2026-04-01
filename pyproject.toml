@@ -62,7 +62,7 @@ test = [
 dev = [
   {include-group = "test"},
   "nox>=2025.11.12",
-  "ty==0.0.4",
+  "ty==0.0.27",
 ]
 
 
@@ -154,9 +154,22 @@ known-first-party = ["iqm.qdmi"]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
+"python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
 
+
+[tool.typos]
+default.extend-ignore-re = [
+  "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$", # ignore line
+  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on", # ignore block
+  "FoMaC"
+]
+
+[tool.typos.default.extend-words]
+optin = "optin"
+recal = "recal"
+delocate = "delocate"
 
 [tool.cibuildwheel]
 build = "cp3*"
