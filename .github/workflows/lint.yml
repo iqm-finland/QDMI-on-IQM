@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+
       - name: Run pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
