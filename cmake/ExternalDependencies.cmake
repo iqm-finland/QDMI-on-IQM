@@ -19,23 +19,28 @@ include(FetchContent)
 include(CMakeDependentOption)
 set(FETCH_PACKAGES "")
 
-# cmake-format: off
-set(QDMI_VERSION 1.2.1
-        CACHE STRING "QDMI version")
-set(QDMI_REV "d5e657c777b54c482b6fd372961ee59add2ded8b" # v1.2.1
-        CACHE STRING "QDMI identifier (tag, branch or commit hash)")
-set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
-        CACHE STRING "QDMI repository owner (change when using a fork)")
-set(QDMI_INSTALL
-    OFF
-    CACHE BOOL "Generate installation instructions for QDMI")
-# cmake-format: on
-FetchContent_Declare(
-  qdmi
-  GIT_REPOSITORY https://github.com/${QDMI_REPO_OWNER}/qdmi.git
-  GIT_TAG ${QDMI_REV}
-  FIND_PACKAGE_ARGS ${QDMI_VERSION})
-list(APPEND FETCH_PACKAGES qdmi)
+if(TARGET qdmi::qdmi)
+  message(STATUS "QDMI is already available.")
+else()
+  message(STATUS "QDMI will be included via FetchContent")
+  # cmake-format: off
+  set(QDMI_VERSION 1.2.1
+      CACHE STRING "QDMI version")
+  set(QDMI_REV "030f80c710e44e49162b5ca5c707b8e8637c36f1" # v1.2.1
+      CACHE STRING "QDMI identifier (tag, branch or commit hash)")
+  set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
+      CACHE STRING "QDMI repository owner (change when using a fork)")
+  set(QDMI_INSTALL
+      OFF
+      CACHE BOOL "Generate installation instructions for QDMI")
+  # cmake-format: on
+  FetchContent_Declare(
+    qdmi
+    GIT_REPOSITORY https://github.com/${QDMI_REPO_OWNER}/qdmi.git
+    GIT_TAG ${QDMI_REV}
+    FIND_PACKAGE_ARGS ${QDMI_VERSION})
+  list(APPEND FETCH_PACKAGES qdmi)
+endif()
 
 set(JSON_VERSION
     3.12.0
@@ -73,10 +78,10 @@ if(BUILD_IQM_QDMI_DOCS)
       CACHE STRING
             "Set the default CMP0116 policy to NEW for documentation builds")
   set(DOXYGEN_VERSION
-      1.15.0
+      1.16.1
       CACHE STRING "Doxygen version")
   set(DOXYGEN_REV
-      "7cca38ba5185457e6d9495bf963d4cdeacebc25a"
+      "669aeeefca743c148e2d935b3d3c69535c7491e6"
       CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
   FetchContent_Declare(
     Doxygen
@@ -86,10 +91,10 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 
   set(DOXYGEN_AWESOME_VERSION
-      2.4.1
+      2.4.2
       CACHE STRING "Doxygen Awesome version")
   set(DOXYGEN_AWESOME_REV
-      "1f3620084ff75734ed192101acf40e9dff01d848"
+      "d52eafe3e9303399fda15661f3d7bb8fe3d7eabc"
       CACHE STRING "Doxygen Awesome identifier (tag, branch or commit hash)")
   FetchContent_Declare(
     doxygen-awesome-css
