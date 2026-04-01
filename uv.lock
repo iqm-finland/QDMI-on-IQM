@@ -256,7 +256,7 @@ test = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "nox", specifier = ">=2025.11.12" },
+    { name = "nox", specifier = ">=2026.2.9" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "pytest-console-scripts", specifier = ">=1.4.1" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
