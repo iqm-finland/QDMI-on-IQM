@@ -71,6 +71,35 @@ Ready to contribute to the project? This guide will get you started.
 
 Building the project requires a C++ compiler supporting _C++20_ and CMake with a minimum version of _3.24_.
 
+### Running workflows with nox
+
+The repository includes [nox](https://nox.thea.codes/) sessions for common development workflows.
+They are especially convenient for the Python-side checks and for building docs.
+
+**Run linting checks (same checks as prek):**
+
+```console
+$ nox -s lint
+```
+
+**Run Python tests across configured Python versions:**
+
+```console
+$ nox -s tests
+```
+
+To run tests only for one Python version:
+
+```console
+$ nox -s tests-3.12
+```
+
+**Build documentation via CMake/Doxygen through nox:**
+
+```console
+$ nox -s docs
+```
+
 ### Configure and Build
 
 This project uses _CMake_ as the main build configuration tool.
