@@ -93,7 +93,7 @@ repos:
 
   # Priority 1: Second-pass fixers
 
-  # Handling unwanted unicode characters
+  ## Handling unwanted unicode characters
   - repo: https://github.com/sirosen/texthooks
     rev: 0.7.1
     hooks:
