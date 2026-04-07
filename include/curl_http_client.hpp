@@ -25,6 +25,7 @@
 #pragma once
 
 #include "http_client.hpp"
+#include "iqm_qdmi/export.h"
 
 #include <string>
 
