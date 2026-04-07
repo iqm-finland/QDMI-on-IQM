@@ -15,23 +15,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_executable(
-  unit_tests
-  ${CMAKE_SOURCE_DIR}/src/curl_http_client.cpp
-  ${CMAKE_SOURCE_DIR}/src/iqm_api_config.cpp
-  ${CMAKE_SOURCE_DIR}/src/iqm_auth.cpp
-  ${CMAKE_SOURCE_DIR}/src/iqm_device.cpp
-  ${CMAKE_SOURCE_DIR}/src/logging.cpp
-  test_iqm_api_config.cpp
-  test_iqm_auth.cpp
-  test_iqm_device.cpp
-  test_logging.cpp)
+add_executable(unit_tests test_iqm_api_config.cpp test_iqm_auth.cpp
+                          test_iqm_device.cpp test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
-target_compile_definitions(
-  unit_tests
-  PRIVATE QDMI_VERSION="${QDMI_VERSION}"
-          IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
-          IQM_QDMI_device_EXPORTS)
 target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/include
                                               ${CMAKE_BINARY_DIR}/src/include)
 target_link_libraries(
@@ -41,7 +27,6 @@ target_link_libraries(
           gtest
           gmock
           qdmi::qdmi_project_warnings
-          CURL::libcurl
-          nlohmann_json::nlohmann_json
+          ${QDMI_TARGET_NAME}
           mocks)
 gtest_discover_tests(unit_tests)

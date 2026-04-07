@@ -27,11 +27,11 @@ file(GLOB_RECURSE PUBLIC_HEADER_FILES "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
-target_compile_definitions(${QDMI_TARGET_NAME}
-                           PRIVATE QDMI_VERSION="${QDMI_VERSION}")
 target_compile_definitions(
-  ${QDMI_TARGET_NAME} PRIVATE IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
-                              IQM_QDMI_device_EXPORTS)
+  ${QDMI_TARGET_NAME}
+  PRIVATE QDMI_VERSION="${QDMI_VERSION}"
+          IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
+          IQM_QDMI_device_EXPORTS)
 set_target_properties(
   ${QDMI_TARGET_NAME}
   PROPERTIES C_VISIBILITY_PRESET hidden
@@ -58,14 +58,6 @@ target_sources(
          FILES
          ${PUBLIC_HEADER_FILES})
 
-if(TARGET qdmi::qdmi)
-  get_target_property(QDMI_INCLUDE_DIRS qdmi::qdmi
-                      INTERFACE_INCLUDE_DIRECTORIES)
-  if(QDMI_INCLUDE_DIRS)
-    target_include_directories(${QDMI_TARGET_NAME} PUBLIC ${QDMI_INCLUDE_DIRS})
-  endif()
-endif()
-
 target_link_libraries(
   ${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
                               nlohmann_json::nlohmann_json)
@@ -76,10 +68,9 @@ target_link_libraries(
 option(IQM_QDMI_COVERAGE "Enable coverage reporting" OFF)
 
 if(IQM_QDMI_COVERAGE)
-  set(ENABLE_COVERAGE
-      ON
-      CACHE BOOL "Enable coverage reporting in fetched QDMI" FORCE)
-  target_link_libraries(${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi_coverage_flags)
+  if(TARGET qdmi::qdmi_coverage_flags)
+    target_link_libraries(${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi_coverage_flags)
+  endif()
 endif()
 
 set(IQM_QDMI_CONFIG_INSTALL_DIR

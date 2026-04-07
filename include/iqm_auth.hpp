@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "iqm_qdmi/export.h"
+
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -36,7 +38,8 @@ constexpr auto REFRESH_MARGIN_SECONDS = 60;
 /**
  * Authentication related errors.
  */
-class ClientAuthenticationError final : public std::runtime_error {
+class IQM_QDMI_EXPORT ClientAuthenticationError final
+    : public std::runtime_error {
 public:
   explicit ClientAuthenticationError(const std::string &message)
       : std::runtime_error(message) {}
@@ -45,7 +48,8 @@ public:
 /**
  * Configuration related errors.
  */
-class ClientConfigurationError final : public std::runtime_error {
+class IQM_QDMI_EXPORT ClientConfigurationError final
+    : public std::runtime_error {
 public:
   explicit ClientConfigurationError(const std::string &message)
       : std::runtime_error(message) {}
@@ -54,7 +58,7 @@ public:
 /**
  * Interface for token providers.
  */
-class TokenProviderInterface {
+class IQM_QDMI_EXPORT TokenProviderInterface {
 public:
   TokenProviderInterface() = default;
   TokenProviderInterface(const TokenProviderInterface &) = default;
@@ -73,7 +77,7 @@ public:
 /**
  * Holds an external token.
  */
-class ExternalToken final : public TokenProviderInterface {
+class IQM_QDMI_EXPORT ExternalToken final : public TokenProviderInterface {
 public:
   explicit ExternalToken(const std::string &token);
   std::string get_token() override;
@@ -85,7 +89,7 @@ private:
 /**
  * Reads token from a file.
  */
-class TokensFileReader final : public TokenProviderInterface {
+class IQM_QDMI_EXPORT TokensFileReader final : public TokenProviderInterface {
 public:
   explicit TokensFileReader(const std::string &tokens_file);
   std::string get_token() override;
@@ -97,7 +101,7 @@ private:
 /**
  * TokenManager manages the access token required for user authentication.
  */
-class TokenManager {
+class IQM_QDMI_EXPORT TokenManager {
 public:
   /**
    * Check how much time is left until the token expires.

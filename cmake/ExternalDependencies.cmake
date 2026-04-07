@@ -104,5 +104,12 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES doxygen-awesome-css)
 endif()
 
+# Propagate coverage option to fetched QDMI before dependency population.
+if(IQM_QDMI_COVERAGE)
+  set(ENABLE_COVERAGE
+      ON
+      CACHE BOOL "Enable coverage reporting in fetched QDMI" FORCE)
+endif()
+
 # Make all declared dependencies available.
 FetchContent_MakeAvailable(${FETCH_PACKAGES})

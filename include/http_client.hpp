@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "iqm_qdmi/export.h"
+
 #include <string>
 
 namespace iqm {
@@ -34,7 +36,7 @@ namespace iqm {
  * device to communicate with remote services. Implementations should handle
  * authentication, error handling, and proper HTTP protocol management.
  */
-class IHttpClient {
+class IQM_QDMI_EXPORT IHttpClient {
 public:
   IHttpClient() = default;
   IHttpClient(const IHttpClient &) = default;

@@ -15,8 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_executable(integration_tests ${CMAKE_SOURCE_DIR}/src/logging.cpp
-                                 test_iqm_device_integration.cpp)
+add_executable(integration_tests test_iqm_device_integration.cpp)
 target_compile_features(integration_tests PRIVATE cxx_std_20)
 target_include_directories(
   integration_tests PRIVATE ${CMAKE_SOURCE_DIR}/include

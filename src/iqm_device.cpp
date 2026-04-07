@@ -582,7 +582,7 @@ int IQM_QDMI_device_update_dynamic_quantum_architecture(
 } // namespace
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-int IQM_QDMI_device_session_init_with_http_client(
+IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
     IQM_QDMI_Device_Session session,
     std::unique_ptr<iqm::IHttpClient> http_client) {
   if (session == nullptr) {

@@ -44,7 +44,7 @@ namespace iqm {
  * - JSON content type for POST requests
  * - Custom headers support
  */
-class CurlHttpClient final : public IHttpClient {
+class IQM_QDMI_EXPORT CurlHttpClient final : public IHttpClient {
 public:
   /**
    * @brief Perform an HTTP GET request using cURL.

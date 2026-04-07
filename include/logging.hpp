@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "iqm_qdmi/export.h"
+
 #include <cstdint>
 #include <iostream>
 #include <mutex>
@@ -47,7 +49,7 @@ enum class LOG_LEVEL : uint8_t {
 /**
  * A simple logger for the IQM QDMI device.
  */
-class Logger {
+class IQM_QDMI_EXPORT Logger {
 public:
   /**
    * Get the singleton instance of the logger.
