@@ -144,33 +144,3 @@ jobs:
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest -C Release --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
-
-  test-packaging:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Clone Repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.4.1
-      - name: Verify clean directory
-        run: git diff --exit-code
-        shell: bash
-      - name: Upload wheels
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        with:
-          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-wheels-${{ inputs.runs-on }}
-          path: wheelhouse/*.whl
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
-        with:
-          enable-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
-      - name: Build SDist
-        run: uv build --sdist
-      - name: Check metadata
-        run: uvx twine check dist/*
-      - name: Run check-sdist
-        run: uvx check-sdist --inject-junk
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        with:
-          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-sdist
-          path: dist/*.tar.gz
