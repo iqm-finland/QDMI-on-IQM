@@ -20,36 +20,10 @@ include(GNUInstallDirs)
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})
 
-# Collect source files
-file(GLOB_RECURSE SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-file(GLOB_RECURSE PRIVATE_HEADER_FILES "${PROJECT_SOURCE_DIR}/include/*.hpp")
+# Collect public header files
 file(GLOB_RECURSE PUBLIC_HEADER_FILES "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 
-set(QDMI_DEVICE_API_SRC_FILES ${SRC_FILES})
-list(FILTER QDMI_DEVICE_API_SRC_FILES INCLUDE REGEX ".*/iqm_device\\.cpp$")
-
-set(QDMI_INTERNAL_SRC_FILES ${SRC_FILES})
-list(FILTER QDMI_INTERNAL_SRC_FILES EXCLUDE REGEX ".*/iqm_device\\.cpp$")
-
-set(QDMI_INTERNAL_TARGET_NAME iqm_qdmi_device_internals)
-
-add_library(${QDMI_INTERNAL_TARGET_NAME} STATIC)
-add_library(iqm::qdmi_device_internals ALIAS ${QDMI_INTERNAL_TARGET_NAME})
-target_compile_features(${QDMI_INTERNAL_TARGET_NAME} PRIVATE cxx_std_20)
-set_target_properties(
-  ${QDMI_INTERNAL_TARGET_NAME}
-  PROPERTIES POSITION_INDEPENDENT_CODE ON
-             C_VISIBILITY_PRESET hidden
-             CXX_VISIBILITY_PRESET hidden
-             VISIBILITY_INLINES_HIDDEN 1)
-target_sources(${QDMI_INTERNAL_TARGET_NAME} PRIVATE ${QDMI_INTERNAL_SRC_FILES})
-target_include_directories(
-  ${QDMI_INTERNAL_TARGET_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include
-                                       ${CMAKE_CURRENT_BINARY_DIR}/include)
-target_link_libraries(
-  ${QDMI_INTERNAL_TARGET_NAME}
-  PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
-          nlohmann_json::nlohmann_json)
+add_subdirectory(internal)
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
@@ -63,18 +37,9 @@ set_target_properties(
   PROPERTIES C_VISIBILITY_PRESET hidden
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN 1)
-target_sources(${QDMI_TARGET_NAME} PRIVATE ${QDMI_DEVICE_API_SRC_FILES})
-
 target_sources(
   ${QDMI_TARGET_NAME}
-  PRIVATE FILE_SET
-          private_headers
-          TYPE
-          HEADERS
-          BASE_DIRS
-          ${PROJECT_SOURCE_DIR}/include
-          FILES
-          ${PRIVATE_HEADER_FILES}
+  PRIVATE iqm_device.cpp
   PUBLIC FILE_SET
          public_headers
          TYPE
@@ -86,21 +51,8 @@ target_sources(
 
 target_link_libraries(
   ${QDMI_TARGET_NAME}
-  PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
-          nlohmann_json::nlohmann_json iqm::qdmi_device_internals)
-
-# ------------------------------------------------------------------------------
-# Coverage
-# ------------------------------------------------------------------------------
-option(IQM_QDMI_COVERAGE "Enable coverage reporting" OFF)
-
-if(IQM_QDMI_COVERAGE)
-  if(TARGET qdmi::qdmi_coverage_flags)
-    target_link_libraries(${QDMI_INTERNAL_TARGET_NAME}
-                          PRIVATE qdmi::qdmi_coverage_flags)
-    target_link_libraries(${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi_coverage_flags)
-  endif()
-endif()
+  PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json
+          iqm::qdmi_device_internals)
 
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"
