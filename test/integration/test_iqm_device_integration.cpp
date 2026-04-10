@@ -18,6 +18,7 @@
  */
 
 #include "fomac.hpp"
+#include "iqm_qdmi/device.h"
 
 #include <algorithm>
 #include <array>
@@ -27,8 +28,6 @@
 #include <exception>
 #include <gtest/gtest.h>
 #include <iostream>
-#include <iqm_qdmi/device.h>
-#include <logging.hpp>
 #include <map>
 #include <optional>
 #include <random>
@@ -49,7 +48,6 @@ protected:
   FoMaC fomac{};
 
   void SetUp() override {
-    iqm::Logger::get_instance().set_level(iqm::LOG_LEVEL::DEBUG);
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
     const auto *api_key_env = std::getenv("RESONANCE_API_KEY");
     if (api_key_env == nullptr) {
@@ -301,7 +299,7 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
       EXPECT_GT(t1, 0.0) << "T1 should be positive when available";
     } catch (const std::runtime_error &) {
       // T1 property is not supported - this is acceptable
-      LOG_INFO("T1 property not supported for site " + site_name);
+      GTEST_LOG_(INFO) << "T1 property not supported for site " + site_name;
     }
 
     try {
@@ -310,7 +308,7 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
       EXPECT_GT(t2, 0.0) << "T2 should be positive when available";
     } catch (const std::runtime_error &) {
       // T2 property is not supported - this is acceptable
-      LOG_INFO("T2 property not supported for site " + site_name);
+      GTEST_LOG_(INFO) << "T2 property not supported for site " + site_name;
     }
 
     // The MAX property is not a valid value for any device.
@@ -382,12 +380,13 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         } catch (const std::runtime_error &) {
           // Fidelity property is not supported - this is acceptable
           try {
-            LOG_INFO("Fidelity property not supported for operation " +
-                     gate_name + " on site " + fomac.get_site_name(site));
+            GTEST_LOG_(INFO)
+                << "Fidelity property not supported for operation " +
+                       gate_name + " on site " + fomac.get_site_name(site);
           } catch (...) {
             // If we can't get site names, just log without them
-            LOG_INFO("Fidelity property not supported for operation " +
-                     gate_name);
+            GTEST_LOG_(INFO)
+                << "Fidelity property not supported for operation " + gate_name;
           }
         }
 
@@ -400,12 +399,13 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         } catch (const std::runtime_error &) {
           // Duration property is not supported - this is acceptable
           try {
-            LOG_INFO("Duration property not supported for operation " +
-                     gate_name + " on site " + fomac.get_site_name(site));
+            GTEST_LOG_(INFO)
+                << "Duration property not supported for operation " +
+                       gate_name + " on site " + fomac.get_site_name(site);
           } catch (...) {
             // If we can't get site names, just log without them
-            LOG_INFO("Duration property not supported for operation " +
-                     gate_name);
+            GTEST_LOG_(INFO)
+                << "Duration property not supported for operation " + gate_name;
           }
         }
       }
@@ -465,13 +465,14 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         } catch (const std::runtime_error &) {
           // Fidelity property is not supported - this is acceptable
           try {
-            LOG_INFO("Fidelity property not supported for operation " +
-                     gate_name + " on sites " + fomac.get_site_name(control) +
-                     ", " + fomac.get_site_name(target));
+            GTEST_LOG_(INFO)
+                << "Fidelity property not supported for operation " +
+                       gate_name + " on sites " + fomac.get_site_name(control) +
+                       ", " + fomac.get_site_name(target);
           } catch (...) {
             // If we can't get site names, just log without them
-            LOG_INFO("Fidelity property not supported for operation " +
-                     gate_name);
+            GTEST_LOG_(INFO)
+                << "Fidelity property not supported for operation " + gate_name;
           }
         } catch (const std::exception &e) {
           // Catch any other standard exception
@@ -496,13 +497,14 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         } catch (const std::runtime_error &) {
           // Duration property is not supported - this is acceptable
           try {
-            LOG_INFO("Duration property not supported for operation " +
-                     gate_name + " on sites " + fomac.get_site_name(control) +
-                     ", " + fomac.get_site_name(target));
+            GTEST_LOG_(INFO)
+                << "Duration property not supported for operation " +
+                       gate_name + " on sites " + fomac.get_site_name(control) +
+                       ", " + fomac.get_site_name(target);
           } catch (...) {
             // If we can't get site names, just log without them
-            LOG_INFO("Duration property not supported for operation " +
-                     gate_name);
+            GTEST_LOG_(INFO)
+                << "Duration property not supported for operation " + gate_name;
           }
         } catch (const std::exception &e) {
           // Catch any other standard exception

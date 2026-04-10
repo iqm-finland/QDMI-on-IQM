@@ -24,8 +24,5 @@ target_sources(
   mocks INTERFACE FILE_SET HEADERS BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} FILES
                   ${MOCK_HEADERS})
 
-# Add include directories for dependencies
-target_include_directories(mocks INTERFACE ${CMAKE_SOURCE_DIR}/include)
-
 target_link_libraries(mocks INTERFACE gmock gtest)
 target_compile_features(mocks INTERFACE cxx_std_20)
