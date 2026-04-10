@@ -25,16 +25,14 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import os
 import shutil
-import tempfile
 from typing import TYPE_CHECKING
 
 import nox
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Sequence
 
 nox.needs_version = ">=2025.11.12"
 nox.options.default_venv_backend = "uv"
@@ -43,17 +41,6 @@ PYTHON_ALL_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
 if os.environ.get("CI", None):
     nox.options.error_on_missing_interpreters = True
-
-
-@contextlib.contextmanager
-def preserve_lockfile() -> Generator[None]:
-    """Preserve the lockfile by moving it to a temporary directory."""
-    with tempfile.TemporaryDirectory() as temp_dir_name:
-        shutil.move("uv.lock", f"{temp_dir_name}/uv.lock")
-        try:
-            yield
-        finally:
-            shutil.move(f"{temp_dir_name}/uv.lock", "uv.lock")
 
 
 @nox.session(reuse_venv=True, default=True)
