@@ -187,3 +187,11 @@ before-all = "yum install -y curl-devel"
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
 before-all = "apk add curl-dev"
+
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { git = { commit = true, tags = true } },
+    { file = "src/**/*" },
+]

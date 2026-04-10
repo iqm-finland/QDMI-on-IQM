@@ -58,6 +58,7 @@ jobs:
           IQM_BASE_URL: ${{ matrix.iqm_base_url }}
           IQM_QC_ALIAS: ${{ matrix.iqm_qc_alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest --verbose --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
 
   test-install:
@@ -100,6 +101,7 @@ jobs:
           IQM_BASE_URL: "https://resonance.meetiqm.com"
           IQM_QC_ALIAS: "emerald:mock"
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest -C Release --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
 
   test-packaging:

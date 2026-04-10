@@ -59,6 +59,7 @@ endif()
 option(BUILD_IQM_QDMI_TESTS "Build tests for the IQM QDMI device"
        ${IQM_QDMI_MASTER_PROJECT})
 option(BUILD_IQM_QDMI_DOCS "Build documentation for the IQM QDMI device" OFF)
+option(IQM_QDMI_COVERAGE "Enable coverage reporting" OFF)
 
 # Manage external dependencies
 include(cmake/ExternalDependencies.cmake)
