@@ -18,8 +18,7 @@
 add_executable(unit_tests test_iqm_api_config.cpp test_iqm_auth.cpp
                           test_iqm_device.cpp test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
-target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                              ${CMAKE_BINARY_DIR}/src/include)
+target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(
   unit_tests
   PRIVATE gtest_main
@@ -28,5 +27,6 @@ target_link_libraries(
           gmock
           qdmi::qdmi_project_warnings
           ${QDMI_TARGET_NAME}
+          iqm::qdmi_device_internals
           mocks)
 gtest_discover_tests(unit_tests)

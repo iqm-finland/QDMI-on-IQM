@@ -23,8 +23,6 @@
 
 #pragma once
 
-#include "iqm_qdmi/export.h"
-
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -59,7 +57,7 @@ enum class API_ENDPOINT : uint8_t {
 /**
  * Provides supported API endpoints for the unified IQM Server API.
  */
-class IQM_QDMI_EXPORT APIConfig {
+class APIConfig {
 public:
   /**
    * Constructor.
