@@ -11,6 +11,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  IQM_BASE_URL: "https://resonance.meetiqm.com"
+
 permissions:
   contents: read
 
@@ -20,23 +23,39 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        include:
-          - iqm_base_url: "https://resonance.meetiqm.com"
-            iqm_qc_alias: "emerald:mock"
-          - iqm_base_url: "https://resonance.meetiqm.com"
-            iqm_qc_alias: "garnet:mock"
+        runs-on:
+          [
+            ubuntu-24.04,
+            ubuntu-24.04-arm,
+            macos-26,
+            macos-26-intel,
+            windows-2025,
+            windows-11-arm,
+          ]
+        iqm_qc_alias: ["emerald:mock", "garnet:mock"]
 
     steps:
       - name: Clone Repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
-      - name: Install dependencies
+      - name: Install dependencies (Ubuntu)
+        if: startsWith(matrix.runs-on, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.runs-on, 'macos')
+        run: brew update && brew install curl
+
+      - name: Install dependencies (Windows)
+        if: startsWith(matrix.runs-on, 'windows')
+        shell: pwsh
+        run: choco install curl -y
+
       - name: Setup ccache
+        if: ${{ !startsWith(matrix.runs-on, 'windows') }}
         uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
         with:
           variant: ccache
@@ -44,6 +63,7 @@ jobs:
           max-size: 10G
 
       - name: Setup mold
+        if: matrix.runs-on == 'ubuntu-24.04'
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
 
       - name: Configure CMake
@@ -55,22 +75,43 @@ jobs:
       - name: Test
         working-directory: build
         env:
-          IQM_BASE_URL: ${{ matrix.iqm_base_url }}
           IQM_QC_ALIAS: ${{ matrix.iqm_qc_alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest --verbose --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
 
   test-install:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        runs-on:
+          [
+            ubuntu-24.04,
+            ubuntu-24.04-arm,
+            macos-26,
+            macos-26-intel,
+            windows-2025,
+            windows-11-arm,
+          ]
     steps:
       - name: Clone Repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
-      - name: Install dependencies
+      - name: Install dependencies (Ubuntu)
+        if: startsWith(matrix.runs-on, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.runs-on, 'macos')
+        run: brew update && brew install curl
+
+      - name: Install dependencies (Windows)
+        if: startsWith(matrix.runs-on, 'windows')
+        shell: pwsh
+        run: choco install curl -y
+
       - name: Setup ccache
+        if: ${{ !startsWith(matrix.runs-on, 'windows') }}
         uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
         with:
           variant: ccache
@@ -78,6 +119,7 @@ jobs:
           max-size: 10G
 
       - name: Setup mold
+        if: matrix.runs-on == 'ubuntu-24.04'
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
 
       - name: Configure CMake for installation
@@ -98,7 +140,6 @@ jobs:
       - name: Test installed version
         working-directory: build
         env:
-          IQM_BASE_URL: "https://resonance.meetiqm.com"
           IQM_QC_ALIAS: "emerald:mock"
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
