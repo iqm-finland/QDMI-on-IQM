@@ -79,25 +79,25 @@ They are especially convenient for the Python-side checks and for building docs.
 **Run linting checks (same checks as prek):**
 
 ```console
-$ nox -s lint
+$ uvx nox -s lint
 ```
 
 **Run Python tests across configured Python versions:**
 
 ```console
-$ nox -s tests
+$ uvx nox -s tests
 ```
 
 To run tests only for one Python version:
 
 ```console
-$ nox -s tests-3.12
+$ uvx nox -s tests-3.12
 ```
 
 **Build documentation via CMake/Doxygen through nox:**
 
 ```console
-$ nox -s docs
+$ uvx nox -s docs
 ```
 
 ### Configure and Build
