@@ -15,15 +15,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(install)
-
-if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
-  add_subdirectory(fomac)
-  add_subdirectory(mock)
-
-  set(QDMI_PREFIX "IQM")
-  generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
-
-  add_subdirectory(unit)
-  add_subdirectory(integration)
-endif()
+add_executable(install_public_tests test_iqm_device_public_install.cpp)
+target_compile_features(install_public_tests PRIVATE cxx_std_20)
+target_link_libraries(
+  install_public_tests PRIVATE gtest_main gtest qdmi::qdmi_project_warnings
+                               ${QDMI_TARGET_NAME})
+gtest_discover_tests(install_public_tests PROPERTIES LABELS "install-public")
