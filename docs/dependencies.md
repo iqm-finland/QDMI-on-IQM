@@ -39,10 +39,13 @@ Used for testing only, **not shipped** in any binary or wheel.
 
 Used to generate the API documentation, **not shipped** in any binary or wheel.
 
-| Dependency                                                             | Version | License     | Purpose                      |
-| :--------------------------------------------------------------------- | :------ | :---------- | :--------------------------- |
-| [Doxygen](https://github.com/doxygen/doxygen)                          | 1.16.1  | GNU GPL v2  | API documentation generation |
-| [doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) | 2.4.2   | MIT License | Modern Doxygen theme         |
+| Dependency                                                      | Version | License      | Purpose                      |
+| :-------------------------------------------------------------- | :------ | :----------- | :--------------------------- |
+| [Doxygen](https://github.com/doxygen/doxygen)                   | 1.16.1  | GNU GPL v2   | API documentation generation |
+| [Sphinx](https://github.com/sphinx-doc/sphinx)                  | ≥8.2.3  | BSD-2-Clause | Documentation site generator |
+| [MyST-NB](https://github.com/executablebooks/MyST-NB)           | ≥1.3.0  | BSD-3-Clause | Markdown + notebook pages    |
+| [Breathe](https://github.com/breathe-doc/breathe)               | ≥4.36.0 | BSD-2-Clause | Doxygen XML to Sphinx bridge |
+| [Sphinx AutoAPI](https://github.com/readthedocs/sphinx-autoapi) | ≥3.6.1  | MIT License  | Python API reference pages   |
 
 > [!NOTE]
 > Doxygen is licensed under GNU GPL v2, but [documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), and are therefore not affected by the GPL. The generated documentation remains under the project's own license terms.

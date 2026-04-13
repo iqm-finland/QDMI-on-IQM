@@ -59,7 +59,18 @@ test = [
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
 ]
+docs = [
+  "breathe>=4.36.0",
+  "furo>=2025.9.25",
+  "myst-nb>=1.3.0",
+  "setuptools-scm>=9.2.2",
+  "sphinx-autoapi>=3.6.1",
+  "sphinx-copybutton>=0.5.2",
+  "sphinx-design>=0.6.1",
+  "sphinx>=8.1.3,<9",
+]
 dev = [
+  {include-group = "docs"},
   {include-group = "test"},
   "nox>=2026.4.10",
   "ty==0.0.29",
@@ -86,7 +97,6 @@ sdist.exclude = [
 ]
 
 [tool.scikit-build.cmake.define]
-BUILD_IQM_QDMI_DOCS = "OFF"
 BUILD_IQM_QDMI_TESTS = "OFF"
 
 [[tool.scikit-build.generate]]
@@ -157,6 +167,7 @@ convention = "google"
 "python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
+"docs/**" = ["T20", "INP001"]
 
 
 [tool.typos]

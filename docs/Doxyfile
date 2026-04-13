@@ -61,37 +61,18 @@ DOXYFILE_ENCODING      = UTF-8
 
 PROJECT_NAME           = "IQM QDMI Device"
 
-# The PROJECT_NUMBER tag can be used to enter a project or revision number. This
-# could be handy for archiving the generated documentation or if some version
-# control system is used.
-
-PROJECT_NUMBER         = v@CMAKE_PROJECT_VERSION@
-
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = @CMAKE_PROJECT_DESCRIPTION@
-
-# With the PROJECT_LOGO tag one can specify a logo or an icon that is included
-# in the documentation. The maximum height of the logo should not exceed 55
-# pixels and the maximum width should not exceed 200 pixels. Doxygen will copy
-# the logo to the output directory.
-
-PROJECT_LOGO           = _static/@PROJECT_LOGO@
-
-# With the PROJECT_ICON tag one can specify an icon that is included in the tabs
-# when the HTML document is shown. Doxygen will copy the logo to the output
-# directory.
-
-PROJECT_ICON           =
+PROJECT_BRIEF          = "Implementation of a QDMI device for IQM Quantum Computers"
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path
 # into which the generated documentation will be written. If a relative path is
 # entered, it will be relative to the location where Doxygen was started. If
 # left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = @DOXYGEN_OUTPUT_DIR@
+OUTPUT_DIRECTORY       = _build/doxygen
 
 # If the CREATE_SUBDIRS tag is set to YES then Doxygen will create up to 4096
 # sub-directories (in 2 levels) under the output directory of each output format
@@ -196,18 +177,6 @@ INLINE_INHERITED_MEMB  = NO
 # The default value is: YES.
 
 FULL_PATH_NAMES        = YES
-
-# The STRIP_FROM_PATH tag can be used to strip a user-defined part of the path.
-# Stripping is only done if one of the specified strings matches the left-hand
-# part of the path. The tag can be used to show relative paths in the file list.
-# If left blank the directory from which Doxygen is run is used as the path to
-# strip.
-#
-# Note that you can specify absolute paths here, but also relative paths, which
-# will be relative from the directory where Doxygen is started.
-# This tag requires that the tag FULL_PATH_NAMES is set to YES.
-
-STRIP_FROM_PATH        = @PROJECT_SOURCE_DIR@/include @PROJECT_SOURCE_DIR@/src @PROJECT_SOURCE_DIR@ @PROJECT_BINARY_DIR@/src/include/iqm_qdmi
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of the
 # path mentioned in the documentation of a class, which tells the reader which
@@ -982,7 +951,7 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = @DOXYGEN_INPUT_DIRS@
+INPUT                  = ../include/
 
 # This tag can be used to specify the character encoding of the source files
 # that Doxygen parses. Internally Doxygen uses the UTF-8 encoding. Doxygen uses

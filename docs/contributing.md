@@ -169,7 +169,6 @@ This tells CMake to:
 Additional useful flags:
 
 - `-DIQM_QDMI_COVERAGE=ON` to enable code coverage support
-- `-DBUILD_IQM_QDMI_DOCS=ON` to enable building the documentation
 
 After configuring with CMake, the project can be built by calling:
 
@@ -258,7 +257,7 @@ Our CI pipeline will also run `clang-tidy` over the changes in your PR and repor
 
 ## Working on the Documentation
 
-The documentation is written in [Markdown](https://www.markdownguide.org/) and built using [Doxygen](https://www.doxygen.nl/index.html). The documentation source files can be found in the `docs/` directory.
+The documentation is written in [Markdown](https://www.markdownguide.org/) and built with Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and AutoAPI for the Python package. The documentation source files can be found in the `docs/` directory.
 
 ### Writing Documentation
 
@@ -275,13 +274,13 @@ Documentation improvements are highly valued! This includes:
 
 ### Building the Documentation
 
-To build the documentation, you need to have Doxygen installed. Then, after configuring the project with CMake and the `-DBUILD_IQM_QDMI_DOCS=ON` flag, you can build the documentation by running:
+To build the documentation locally, run the dedicated nox session (dependencies are installed automatically by the nox session):
 
 ```console
-$ cmake --build build --target iqm_qdmi_device_docs
+$ uvx nox -s docs
 ```
 
-The documentation will be generated in the `build/docs` directory as both HTML and LaTeX. You can view the HTML documentation by opening the `index.html` file in a web browser.
+The generated HTML site is written to `docs/_build/html/`.
 
 ## Tips for Development
 

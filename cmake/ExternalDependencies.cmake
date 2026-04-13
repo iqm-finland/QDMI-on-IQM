@@ -16,7 +16,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(FetchContent)
-include(CMakeDependentOption)
 set(FETCH_PACKAGES "")
 
 if(TARGET qdmi::qdmi)
@@ -142,38 +141,6 @@ if(BUILD_IQM_QDMI_TESTS)
   FetchContent_Declare(googletest URL ${GTEST_URL} FIND_PACKAGE_ARGS
                                       ${GTEST_VERSION} NAMES GTest)
   list(APPEND FETCH_PACKAGES googletest)
-endif()
-
-if(BUILD_IQM_QDMI_DOCS)
-  set(CMAKE_POLICY_DEFAULT_CMP0116
-      NEW
-      CACHE STRING
-            "Set the default CMP0116 policy to NEW for documentation builds")
-  set(DOXYGEN_VERSION
-      1.16.1
-      CACHE STRING "Doxygen version")
-  set(DOXYGEN_REV
-      "669aeeefca743c148e2d935b3d3c69535c7491e6"
-      CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
-  FetchContent_Declare(
-    Doxygen
-    GIT_REPOSITORY https://github.com/doxygen/doxygen.git
-    GIT_TAG ${DOXYGEN_REV}
-    FIND_PACKAGE_ARGS ${DOXYGEN_VERSION})
-  list(APPEND FETCH_PACKAGES Doxygen)
-
-  set(DOXYGEN_AWESOME_VERSION
-      2.4.2
-      CACHE STRING "Doxygen Awesome version")
-  set(DOXYGEN_AWESOME_REV
-      "d52eafe3e9303399fda15661f3d7bb8fe3d7eabc"
-      CACHE STRING "Doxygen Awesome identifier (tag, branch or commit hash)")
-  FetchContent_Declare(
-    doxygen-awesome-css
-    GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
-    GIT_TAG ${DOXYGEN_AWESOME_REV}
-    FIND_PACKAGE_ARGS ${DOXYGEN_AWESOME_VERSION})
-  list(APPEND FETCH_PACKAGES doxygen-awesome-css)
 endif()
 
 # Make all declared dependencies available.

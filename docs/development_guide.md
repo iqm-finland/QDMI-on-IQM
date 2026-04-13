@@ -88,7 +88,6 @@ This tells CMake to
 - the flag `-DCMAKE_BUILD_TYPE=Release` tells CMake to configure a _Release_ build (as opposed to, e.g., a _Debug_ build).
 - the flag `-DBUILD_IQM_QDMI_TESTS=ON` enables building the tests.
 - the flag `-DIQM_QDMI_COVERAGE=ON` can be added to enable code coverage support (see below).
-- the flag `-DBUILD_IQM_QDMI_DOCS=ON` can be added to enable building the documentation (see below).
 
 After configuring with CMake, the project can be built by calling
 
@@ -175,16 +174,16 @@ For some tips on how to write good Doxygen comments, see the [Doxygen Manual](ht
 
 ## Working on the Documentation
 
-The documentation is written in Markdown and built using [Doxygen](https://www.doxygen.nl/index.html).
-The documentation source files can be found in the `docs/` directory.
-You can use the `nox` session `docs` to build the documentation.
+The documentation source files are in the `docs/` directory and are built with
+Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and AutoAPI for the Python package.
+
+To build the documentation locally, run the dedicated nox session (dependencies are installed automatically by the nox session):
 
 ```console
 $ uvx nox -s docs
 ```
 
-The documentation will be generated in the `build/docs` directory as both HTML and LaTeX.
-You can view the HTML documentation by opening the `index.html` file in a web browser.
+The generated HTML site is written to `docs/_build/html/`.
 
 ## Working on the Python Package
 
