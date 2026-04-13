@@ -25,9 +25,11 @@
 from __future__ import annotations
 
 import contextlib
+import argparse
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nox
@@ -87,6 +89,7 @@ def _run_tests(
         "test",
         *install_args,
         "pytest",
+        "test/python",
         *pytest_run_args,
         *session.posargs,
         "--cov-config=pyproject.toml",
@@ -115,23 +118,59 @@ def minimums(session: nox.Session) -> None:
 
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
-    """Build docs via CMake."""
-    cmake = shutil.which("cmake") or shutil.which("cmake3")
-    if cmake is None:
-        session.install("cmake")
-        cmake = shutil.which("cmake") or shutil.which("cmake3") or "cmake"
+    """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-b", dest="builder", default="html", help="Build target (default: html)")
+    parser.add_argument("--serve", action="store_true", help="Serve docs with sphinx-autobuild")
+    args, posargs = parser.parse_known_args(session.posargs)
 
+    serve = args.builder == "html" and args.serve and session.interactive
+    if serve:
+        session.install("sphinx-autobuild")
+
+    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
     session.run(
-        cmake,
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DBUILD_IQM_QDMI_DOCS=ON",
-        "-DBUILD_IQM_QDMI_TESTS=OFF",
-        *session.posargs,
-        external=True,
+        "uv",
+        "sync",
+        "--inexact",
+        "--only-group",
+        "docs",
+        env=env,
+    )
+
+    with session.chdir("docs"):
+        if shutil.which("doxygen") is None:
+            session.error("doxygen is required to build the C++ API docs")
+
+        Path("_build/doxygen").mkdir(parents=True, exist_ok=True)
+        session.run("doxygen", "Doxyfile", external=True)
+        Path("api/cpp").mkdir(parents=True, exist_ok=True)
+        session.run(
+            "breathe-apidoc",
+            "-o",
+            "api/cpp",
+            "-m",
+            "-f",
+            "-g",
+            "namespace",
+            "_build/doxygen/xml/",
+        )
+
+    shared_args = [
+        "-n",
+        "-T",
+        f"-b={args.builder}",
+        "docs",
+        f"docs/_build/{args.builder}",
+        *posargs,
+    ]
+    session.run(
+        "uv",
+        "run",
+        "--no-dev",
+        "sphinx-autobuild" if serve else "sphinx-build",
+        *shared_args,
+        env=env,
     )
     session.run(cmake, "--build", "build", "--target", "iqm_qdmi_device_docs", "--parallel", external=True)
 
