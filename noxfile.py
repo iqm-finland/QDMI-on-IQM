@@ -24,23 +24,35 @@
 
 from __future__ import annotations
 
-import argparse
+import contextlib
 import os
 import shutil
+import tempfile
 from typing import TYPE_CHECKING
 
 import nox
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Generator, Sequence
 
-nox.needs_version = ">=2025.11.12"
+nox.needs_version = ">=2026.04.10"
 nox.options.default_venv_backend = "uv"
 
 PYTHON_ALL_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
 if os.environ.get("CI", None):
     nox.options.error_on_missing_interpreters = True
+
+
+@contextlib.contextmanager
+def preserve_lockfile() -> Generator[None]:
+    """Preserve the lockfile by moving it to a temporary directory."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        shutil.move("uv.lock", f"{temp_dir_name}/uv.lock")
+        try:
+            yield
+        finally:
+            shutil.move(f"{temp_dir_name}/uv.lock", "uv.lock")
 
 
 @nox.session(reuse_venv=True, default=True)
@@ -55,6 +67,7 @@ def lint(session: nox.Session) -> None:
 def _run_tests(
     session: nox.Session,
     *,
+    install_args: Sequence[str] = (),
     extra_command: Sequence[str] = (),
     pytest_run_args: Sequence[str] = (),
 ) -> None:
@@ -69,8 +82,11 @@ def _run_tests(
     session.run(
         "uv",
         "run",
+        "--no-dev",
+        "--group",
+        "test",
+        *install_args,
         "pytest",
-        "test/python",
         *pytest_run_args,
         *session.posargs,
         "--cov-config=pyproject.toml",
@@ -84,49 +100,40 @@ def tests(session: nox.Session) -> None:
     _run_tests(session)
 
 
+@nox.session(python=PYTHON_ALL_VERSIONS, reuse_venv=True, venv_backend="uv", default=True)
+def minimums(session: nox.Session) -> None:
+    """Test the minimum versions of dependencies."""
+    with preserve_lockfile():
+        _run_tests(
+            session,
+            install_args=["--resolution=lowest-direct"],
+            pytest_run_args=["-Wdefault"],
+        )
+        env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+        session.run("uv", "tree", "--frozen", env=env)
+
+
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
-    """Build docs via CMake (Doxygen target: iqm_qdmi_device_docs)."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--build-dir",
-        default="build/",
-        help="CMake build directory (default: build/)",
-    )
-    parser.add_argument(
-        "--build-type",
-        default="Release",
-        help="CMake build type (default: Release)",
-    )
-    parser.add_argument(
-        "--target",
-        default="iqm_qdmi_device_docs",
-        help="CMake target to build (default: iqm_qdmi_device_docs)",
-    )
-    args, posargs = parser.parse_known_args(session.posargs)
-
+    """Build docs via CMake."""
     cmake = shutil.which("cmake") or shutil.which("cmake3")
     if cmake is None:
         session.install("cmake")
         cmake = shutil.which("cmake") or shutil.which("cmake3") or "cmake"
-    if shutil.which("ninja") is None:
-        session.install("ninja")
-    if shutil.which("doxygen") is None:
-        session.error("Doxygen is required to build the docs")
 
     session.run(
         cmake,
         "-S",
         ".",
         "-B",
-        args.build_dir,
-        f"-DCMAKE_BUILD_TYPE={args.build_type}",
+        "build",
+        "-DCMAKE_BUILD_TYPE=Release",
         "-DBUILD_IQM_QDMI_DOCS=ON",
         "-DBUILD_IQM_QDMI_TESTS=OFF",
-        *posargs,
+        *session.posargs,
         external=True,
     )
-    session.run(cmake, "--build", args.build_dir, "--target", args.target, "--parallel", external=True)
+    session.run(cmake, "--build", "build", "--target", "iqm_qdmi_device_docs", "--parallel", external=True)
 
 
 if __name__ == "__main__":
