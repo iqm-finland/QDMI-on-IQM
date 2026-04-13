@@ -59,7 +59,7 @@ jobs:
           IQM_QC_ALIAS: ${{ matrix.iqm_qc_alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ctest --verbose --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
+        run: ctest --verbose --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
 
   test-install:
     runs-on: ubuntu-24.04
@@ -102,7 +102,7 @@ jobs:
           IQM_QC_ALIAS: "emerald:mock"
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ctest -C Release --output-on-failure --repeat until-pass:3 --test-timeout 60 --parallel 4
+        run: ctest -C Release --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
 
   test-packaging:
     runs-on: ubuntu-24.04

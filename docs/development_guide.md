@@ -158,6 +158,11 @@ To ensure the quality of the code and that it conforms to these guidelines, we u
 
 Our `pre-commit` configuration also includes `clang-format`.
 If you have installed `prek`, it will automatically run `clang-format` on your code before each commit.
+The respective checks can also be run via the `nox` session `lint`.
+
+```console
+$ uvx nox -s lint
+```
 
 Our CI pipeline will run clang-tidy over the changes in your pull request and report any issues it finds.
 
@@ -172,16 +177,37 @@ For some tips on how to write good Doxygen comments, see the [Doxygen Manual](ht
 
 The documentation is written in Markdown and built using [Doxygen](https://www.doxygen.nl/index.html).
 The documentation source files can be found in the `docs/` directory.
-
-To build the documentation locally, you need to have Doxygen installed.
-Then, after configuring the project with CMake and the `-DBUILD_IQM_QDMI_DOCS=ON` flag, you can build the documentation by running:
+You can use the `nox` session `docs` to build the documentation.
 
 ```console
-$ cmake --build build --target iqm_qdmi_device_docs
+$ uvx nox -s docs
 ```
 
 The documentation will be generated in the `build/docs` directory as both HTML and LaTeX.
 You can view the HTML documentation by opening the `index.html` file in a web browser.
+
+## Working on the Python Package
+
+The project also comes with a thin Python wrapper around the QDMI device implementation for easier distribution and integration.
+The Python package is located in the `python/` directory.
+
+To run the Python tests, you can use the `nox` session `tests`.
+
+```console
+$ uvx nox -s tests
+```
+
+Or, if you want to run only a specific version of Python:
+
+```console
+$ uvx nox -s tests-3.14
+```
+
+There is an additional `nox` session `minimums` that runs the tests against the minimum supported dependency versions for a specific Python version.
+
+```console
+$ uvx nox -s minimums-3.14
+```
 
 ## IQM API Usage in QDMI Device Implementation
 
