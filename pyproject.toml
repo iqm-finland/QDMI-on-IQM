@@ -61,7 +61,7 @@ test = [
 ]
 dev = [
   {include-group = "test"},
-  "nox>=2026.2.9",
+  "nox>=2026.4.10",
   "ty==0.0.27",
 ]
 
