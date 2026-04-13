@@ -1585,8 +1585,14 @@ int IQM_QDMI_device_session_query_device_property(
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
     return QDMI_ERROR_BADSTATE;
   }
-  ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_NAME, "IQM QDMI Device", prop, size,
-                      value, size_ret)
+  if (prop == QDMI_DEVICE_PROPERTY_NAME) {
+    if (!session->quantum_computer_alias_.has_value()) {
+      return QDMI_ERROR_BADSTATE;
+    }
+    ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_NAME,
+                        session->quantum_computer_alias_->c_str(), prop, size,
+                        value, size_ret)
+  }
   // NOLINTNEXTLINE(misc-include-cleaner)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_VERSION, IQM_QDMI_DEVICE_VERSION,
                       prop, size, value, size_ret)

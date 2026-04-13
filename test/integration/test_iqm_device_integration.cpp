@@ -46,6 +46,7 @@ class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
   FoMaC fomac{};
+  std::optional<std::string> requested_qc_alias = std::nullopt;
 
   void SetUp() override {
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
@@ -71,6 +72,7 @@ protected:
         (qc_alias_env != nullptr)
             ? std::make_optional<std::string>(qc_alias_env)
             : std::nullopt;
+    requested_qc_alias = qc_alias;
 
     session = FoMaC::get_iqm_session(base_url, api_key, std::nullopt, qc_id,
                                      qc_alias);
@@ -222,6 +224,10 @@ protected:
 TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   const auto device_name = fomac.get_name();
   ASSERT_FALSE(device_name.empty()) << "Device must provide a name";
+  if (requested_qc_alias.has_value()) {
+    EXPECT_EQ(device_name, *requested_qc_alias)
+        << "Device name must match the selected QC alias";
+  }
 
   const auto version = fomac.get_version();
   ASSERT_FALSE(version.empty()) << "Device must provide a version";
