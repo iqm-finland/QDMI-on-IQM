@@ -197,10 +197,16 @@ To run the Python tests, you can use the `nox` session `tests`.
 $ uvx nox -s tests
 ```
 
-or, if you want to run only a specific version of Python:
+Or, if you want to run only a specific version of Python:
 
 ```console
 $ uvx nox -s tests-3.14
+```
+
+There is an additional `nox` session `minimums` that runs the tests against the minimum supported dependency versions for a specific Python version.
+
+```console
+$ uvx nox -s minimums-3.14
 ```
 
 ## IQM API Usage in QDMI Device Implementation
