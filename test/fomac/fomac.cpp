@@ -26,10 +26,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <iqm_qdmi/constants.h>
 #include <iqm_qdmi/device.h>
 #include <map>
 #include <optional>
-#include <qdmi/constants.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>

@@ -16,10 +16,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(fomac)
-add_subdirectory(mock)
+add_subdirectory(integration)
 
 set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
 
-add_subdirectory(unit)
-add_subdirectory(integration)
+if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
+  add_subdirectory(mock)
+  add_subdirectory(unit)
+endif()

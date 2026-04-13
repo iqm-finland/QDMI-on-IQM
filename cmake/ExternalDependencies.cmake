@@ -24,9 +24,9 @@ if(TARGET qdmi::qdmi)
 else()
   message(STATUS "QDMI will be included via FetchContent")
   # cmake-format: off
-  set(QDMI_VERSION 1.2.1
+  set(QDMI_VERSION 1.2.2
       CACHE STRING "QDMI version")
-  set(QDMI_REV "030f80c710e44e49162b5ca5c707b8e8637c36f1" # v1.2.1
+  set(QDMI_REV "c5f71c63d5bf3b97c26c60efd367a4be3670d3a0" # v1.2.x
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -102,6 +102,13 @@ if(BUILD_IQM_QDMI_DOCS)
     GIT_TAG ${DOXYGEN_AWESOME_REV}
     FIND_PACKAGE_ARGS ${DOXYGEN_AWESOME_VERSION})
   list(APPEND FETCH_PACKAGES doxygen-awesome-css)
+endif()
+
+# Propagate coverage option to fetched QDMI before dependency population.
+if(IQM_QDMI_COVERAGE)
+  set(ENABLE_COVERAGE
+      ON
+      CACHE BOOL "Enable coverage reporting in fetched QDMI" FORCE)
 endif()
 
 # Make all declared dependencies available.

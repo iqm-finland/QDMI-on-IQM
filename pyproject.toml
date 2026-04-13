@@ -173,13 +173,11 @@ delocate = "delocate"
 
 [tool.cibuildwheel]
 build = "cp3*"
-skip = ["cp313t-*"]
 archs = "auto64"
 test-groups = ["test"]
 test-sources = ["test/python"]
 test-command = "pytest test/python"
-build-frontend = "build[uv]"
-enable = ["cpython-freethreading"]
+build-frontend = "uv"
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y curl-devel"
@@ -187,3 +185,11 @@ before-all = "yum install -y curl-devel"
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
 before-all = "apk add curl-dev"
+
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { git = { commit = true, tags = true } },
+    { file = "src/**/*" },
+]

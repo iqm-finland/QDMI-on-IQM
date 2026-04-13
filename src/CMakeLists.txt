@@ -20,30 +20,26 @@ include(GNUInstallDirs)
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})
 
-# Collect source files
-file(GLOB_RECURSE SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-file(GLOB_RECURSE PRIVATE_HEADER_FILES "${PROJECT_SOURCE_DIR}/include/*.hpp")
+# Collect public header files
 file(GLOB_RECURSE PUBLIC_HEADER_FILES "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
+
+add_subdirectory(internal)
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
-target_compile_definitions(${QDMI_TARGET_NAME}
-                           PRIVATE QDMI_VERSION="${QDMI_VERSION}")
 target_compile_definitions(
   ${QDMI_TARGET_NAME}
-  PRIVATE IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}")
-target_sources(${QDMI_TARGET_NAME} PRIVATE ${SRC_FILES})
-
+  PRIVATE QDMI_VERSION="${QDMI_VERSION}"
+          IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
+          IQM_QDMI_device_EXPORTS)
+set_target_properties(
+  ${QDMI_TARGET_NAME}
+  PROPERTIES C_VISIBILITY_PRESET hidden
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN 1)
 target_sources(
   ${QDMI_TARGET_NAME}
-  PRIVATE FILE_SET
-          private_headers
-          TYPE
-          HEADERS
-          BASE_DIRS
-          ${PROJECT_SOURCE_DIR}/include
-          FILES
-          ${PRIVATE_HEADER_FILES}
+  PRIVATE iqm_device.cpp
   PUBLIC FILE_SET
          public_headers
          TYPE
@@ -54,23 +50,9 @@ target_sources(
          ${PUBLIC_HEADER_FILES})
 
 target_link_libraries(
-  ${QDMI_TARGET_NAME} PRIVATE qdmi::qdmi qdmi::qdmi_project_warnings
-                              CURL::libcurl nlohmann_json::nlohmann_json)
-
-# ------------------------------------------------------------------------------
-# Coverage
-# ------------------------------------------------------------------------------
-option(IQM_QDMI_COVERAGE "Enable coverage instrumentation" OFF)
-
-if(IQM_QDMI_COVERAGE)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    message(STATUS "Building with coverage instrumentation")
-    target_compile_options(${QDMI_TARGET_NAME} PUBLIC --coverage -O0 -g)
-    target_link_options(${QDMI_TARGET_NAME} PUBLIC --coverage)
-  else()
-    message(WARNING "Coverage instrumentation is only supported with GCC/Clang")
-  endif()
-endif()
+  ${QDMI_TARGET_NAME}
+  PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json
+          iqm::qdmi_device_internals)
 
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"

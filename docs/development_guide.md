@@ -166,6 +166,15 @@ Before running the integration tests, make sure you have set the necessary envir
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
+**Running only install/public API tests:**
+
+The `install-test` setup in CI validates only the installed public API surface.
+It intentionally excludes tests that depend on private/internal symbols.
+
+```console
+$ ctest -C Release --test-dir build -L install-public --output-on-failure
+```
+
 To generate a code coverage report, you can configure the project with `-DIQM_QDMI_COVERAGE=ON` and then run `lcov` in the build directory.
 
 ### C++ Code Formatting and Linting
