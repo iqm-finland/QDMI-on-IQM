@@ -56,6 +56,7 @@ jobs:
           IQM_BASE_URL: "https://resonance.meetiqm.com"
           IQM_QC_ALIAS: "emerald:mock"
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest --verbose --output-on-failure --repeat until-pass:3 --parallel 4
 
       - name: Capture coverage info
