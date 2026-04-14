@@ -299,6 +299,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   }
   const auto json_response =
       nlohmann::json::parse(qc_list_response); // NOLINT(misc-include-cleaner)
+  LOG_DEBUG("Received quantum computers response: " + json_response.dump());
 
   // Extract the quantum_computers array from the response
   if (!json_response.contains("quantum_computers") ||
@@ -362,6 +363,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   }
   const auto arch_array =
       nlohmann::json::parse(arch_response); // NOLINT(misc-include-cleaner)
+  LOG_DEBUG("Received quantum architecture response: " + arch_array.dump());
 
   // Extract first element from array (API returns array with single object)
   if (!arch_array.is_array() || arch_array.empty()) {
@@ -411,6 +413,8 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
     return status;
   }
   const auto dynamic_architecture = nlohmann::json::parse(dyn_arch_response);
+  LOG_DEBUG("Received dynamic quantum architecture response: " +
+            dynamic_architecture.dump());
 
   session->calibration_set_id_ =
       dynamic_architecture["calibration_set_id"].get<std::string>();
@@ -467,6 +471,8 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   }
   const auto calibration_json_response =
       nlohmann::json::parse(calibration_response);
+  LOG_DEBUG("Received calibration set quality metrics response: " +
+            calibration_json_response.dump());
 
   const auto &observations = calibration_json_response["observations"];
   auto metrics = std::unordered_map<std::string, double>{};
@@ -938,6 +944,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   }
   const auto job_submission_json_response =
       nlohmann::json::parse(job_submission_response);
+  LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response["id"];
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
@@ -977,6 +984,8 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   }
   const auto job_submission_json_response =
       nlohmann::json::parse(job_submission_response);
+  LOG_DEBUG("Calibration job submission response:\n" +
+            job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response["id"];
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
@@ -1044,6 +1053,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
     return QDMI_ERROR_FATAL;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
+  LOG_DEBUG("Job cancellation response:\n" + job_abortion_response);
   LOG_INFO("Job with ID: " + job->job_id_ + " canceled");
   return QDMI_SUCCESS;
 }
@@ -1075,6 +1085,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   }
   const auto job_status_json_response =
       nlohmann::json::parse(job_status_response);
+  LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
   const auto job_status = job_status_json_response["status"].get<std::string>();
   if (job_status == "received") {
@@ -1206,6 +1217,8 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       }
       const auto job_results_json_response =
           nlohmann::json::parse(job_results_response);
+      LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
+
       // Response is an array with a single object containing counts
       for (const auto &counts = job_results_json_response[0]["counts"];
            const auto &[bitstring, count] : counts.items()) {
@@ -1287,6 +1300,9 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     }
     const auto job_calibration_json_response =
         nlohmann::json::parse(job_calibration_response);
+    LOG_DEBUG("Calibration job status response:\n" +
+              job_calibration_json_response.dump());
+
     if (!job_calibration_json_response["result"].contains("success") ||
         !job_calibration_json_response["result"]["success"].get<bool>()) {
       LOG_ERROR("Calibration job failed");
@@ -1350,6 +1366,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
 
     const auto job_measurements_json_response =
         nlohmann::json::parse(job_measurements_response);
+    LOG_DEBUG("Job measurements response:\n" +
+              job_measurements_json_response.dump());
 
     // API returns array format: [{"meas_key": [[0], [1], ...], ...}, ...]
     // The outer array typically contains a single object.
