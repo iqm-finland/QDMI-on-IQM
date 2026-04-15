@@ -45,15 +45,6 @@ jobs:
         if: startsWith(matrix.runs-on, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
-      - name: Install dependencies (macOS)
-        if: startsWith(matrix.runs-on, 'macos')
-        run: brew update && brew install curl
-
-      - name: Install dependencies (Windows)
-        if: startsWith(matrix.runs-on, 'windows')
-        shell: pwsh
-        run: choco install curl -y
-
       - name: Setup ccache
         if: ${{ !startsWith(matrix.runs-on, 'windows') }}
         uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
@@ -63,14 +54,13 @@ jobs:
           max-size: 10G
 
       - name: Setup mold
-        if: matrix.runs-on == 'ubuntu-24.04'
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
 
       - name: Configure CMake
-        run: cmake -S . -B build -DBUILD_IQM_QDMI_TESTS=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build build --config Release -j4
 
       - name: Test
         working-directory: build
@@ -78,7 +68,7 @@ jobs:
           IQM_QC_ALIAS: ${{ matrix.iqm_qc_alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ctest --verbose --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
+        run: ctest -C Release --verbose --output-on-failure --repeat until-pass:3 --timeout 180 --parallel 4
 
   test-install:
     runs-on: ${{ matrix.runs-on }}
@@ -101,15 +91,6 @@ jobs:
         if: startsWith(matrix.runs-on, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
-      - name: Install dependencies (macOS)
-        if: startsWith(matrix.runs-on, 'macos')
-        run: brew update && brew install curl
-
-      - name: Install dependencies (Windows)
-        if: startsWith(matrix.runs-on, 'windows')
-        shell: pwsh
-        run: choco install curl -y
-
       - name: Setup ccache
         if: ${{ !startsWith(matrix.runs-on, 'windows') }}
         uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
@@ -119,17 +100,16 @@ jobs:
           max-size: 10G
 
       - name: Setup mold
-        if: matrix.runs-on == 'ubuntu-24.04'
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
 
       - name: Configure CMake for installation
         run: cmake -S . -B build-install -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=OFF
 
       - name: Build the project
-        run: cmake --build build-install
+        run: cmake --build build-install --config Release --parallel 4
 
       - name: Install the project
-        run: cmake --install build-install --prefix install-dir
+        run: cmake --install build-install --prefix install-dir --config Release
 
       - name: Configure CMake for using installed version
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUSE_INSTALLED_IQM_QDMI_DEVICE=ON -DCMAKE_PREFIX_PATH=install-dir
