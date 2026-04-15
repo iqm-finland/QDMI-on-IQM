@@ -47,27 +47,6 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
           nlohmann_json::nlohmann_json)
 
-# CURL_STATICLIB must be defined when including curl headers against static
-# libcurl.
-set(_iqm_curl_location "")
-get_target_property(_iqm_curl_location CURL::libcurl IMPORTED_LOCATION)
-if(NOT _iqm_curl_location)
-  get_target_property(_iqm_curl_configs CURL::libcurl IMPORTED_CONFIGURATIONS)
-  foreach(_iqm_cfg IN LISTS _iqm_curl_configs)
-    string(TOUPPER "${_iqm_cfg}" _iqm_cfg_upper)
-    get_target_property(_iqm_curl_location CURL::libcurl
-                        "IMPORTED_LOCATION_${_iqm_cfg_upper}")
-    if(_iqm_curl_location)
-      break()
-    endif()
-  endforeach()
-endif()
-
-if(_iqm_curl_location MATCHES "(\\.a|_a\\.lib|libcurl_a\\.lib)$")
-  target_compile_definitions(${QDMI_INTERNAL_TARGET_NAME}
-                             PUBLIC CURL_STATICLIB=ON)
-endif()
-
 if(ENABLE_COVERAGE)
   if(TARGET qdmi::qdmi_coverage_flags)
     target_link_libraries(${QDMI_INTERNAL_TARGET_NAME}

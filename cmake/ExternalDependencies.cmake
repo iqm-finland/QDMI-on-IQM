@@ -55,7 +55,36 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
                                        ${JSON_VERSION})
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
-find_package(CURL REQUIRED)
+if(WIN32)
+  # Build libcurl from source on Windows for consistent toolchain compatibility.
+  set(CURL_REV
+      "curl-8_19_0"
+      CACHE STRING "curl identifier (tag, branch or commit hash)")
+  set(BUILD_CURL_EXE
+      OFF
+      CACHE BOOL "Disable curl executable for vendored builds" FORCE)
+  set(BUILD_LIBCURL_DOCS
+      OFF
+      CACHE BOOL "Disable libcurl docs for vendored builds" FORCE)
+  set(BUILD_MISC_DOCS
+      OFF
+      CACHE BOOL "Disable miscellaneous curl docs for vendored builds" FORCE)
+  set(CURL_USE_SCHANNEL
+      ON
+      CACHE BOOL "Use Schannel backend for vendored Windows curl" FORCE)
+  set(CURL_USE_OPENSSL
+      OFF
+      CACHE BOOL "Disable OpenSSL backend for vendored Windows curl" FORCE)
+
+  FetchContent_Declare(
+    CURL
+    GIT_REPOSITORY https://github.com/curl/curl.git
+    GIT_TAG ${CURL_REV}
+    FIND_PACKAGE_ARGS)
+  list(APPEND FETCH_PACKAGES CURL)
+else()
+  find_package(CURL REQUIRED)
+endif()
 
 if(BUILD_IQM_QDMI_TESTS)
   set(gtest_force_shared_crt

@@ -45,47 +45,12 @@ jobs:
           prepend_symlinks_to_path: false
           override_cache_key: c++-tests-${{ inputs.runs-on }}-${{ inputs.config }}
           windows_compile_environment: msvc
-      - name: Install prebuilt libcurl
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $arch = "${{ runner.arch }}".ToUpperInvariant()
-          switch ($arch) {
-            "X64" { $curlUrl = "https://curl.se/windows/latest.cgi?p=win64-mingw.zip" }
-            "ARM64" { $curlUrl = "https://curl.se/windows/latest.cgi?p=win64a-mingw.zip" }
-            default { throw "Unsupported Windows architecture: $arch" }
-          }
-
-          $curlRoot = Join-Path $env:RUNNER_TEMP "curl-prebuilt"
-          $zipPath = Join-Path $curlRoot "curl.zip"
-          New-Item -Path $curlRoot -ItemType Directory -Force | Out-Null
-          Invoke-WebRequest -Uri $curlUrl -OutFile $zipPath
-          Expand-Archive -Path $zipPath -DestinationPath $curlRoot -Force
-
-          $curlPrefix = Get-ChildItem -Path $curlRoot -Directory |
-            Where-Object { Test-Path (Join-Path $_.FullName "include/curl/curl.h") } |
-            Select-Object -First 1
-
-          if (-not $curlPrefix) {
-            throw "Failed to locate extracted libcurl include/lib directories"
-          }
-
-          $includeDir = Join-Path $curlPrefix.FullName "include"
-          $libDir = Join-Path $curlPrefix.FullName "lib"
-          $binDir = Join-Path $curlPrefix.FullName "bin"
-
-          Add-Content -Path $env:GITHUB_ENV -Value "CURL_ROOT=$($curlPrefix.FullName)"
-          Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_PREFIX_PATH=$($curlPrefix.FullName)"
-          Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_INCLUDE_PATH=$includeDir"
-          Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_LIBRARY_PATH=$libDir"
-          Add-Content -Path $env:GITHUB_ENV -Value "PATH=$binDir;$env:PATH"
       - name: Configure CMake
         env:
           CONFIG: ${{ inputs.config }}
         run: >
           cmake -S . -B build
           -DCMAKE_BUILD_TYPE="$env:CONFIG"
-          -DCURL_ROOT="$env:CURL_ROOT"
       - name: Build
         env:
           CONFIG: ${{ inputs.config }}
