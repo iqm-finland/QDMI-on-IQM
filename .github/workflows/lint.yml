@@ -25,22 +25,39 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
-
-      - name: Run pre-commit
-        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-
-      - name: Commit potential changes
-        uses: stefanzweifel/git-auto-commit-action@28e16e81777b558cc906c8750092100bbb34c5e3 # v7.0.0
-        with:
-          commit_message: ":hook: Apply pre-commit fixes"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "github-actions[bot]@users.noreply.github.com"
-          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+      - name: Set up Clang
+        env:
+          TEMP_DIR: ${{ runner.temp }}
+          CLANG_VERSION: 22
+        run: |
+          # Sanitize CLANG_VERSION: Remove any newlines and ensure it is numeric
+          clang_version="$(echo "$CLANG_VERSION" | tr -d '\n')"
+          if [[ -z "$clang_version" || ! "$clang_version" =~ ^[0-9]+$ ]]; then
+            echo "Error: Invalid clang-version input. Must be a non-empty numeric value."
+            exit 1
+          fi
+          wget https://apt.llvm.org/llvm.sh -O "$TEMP_DIR/llvm_install.sh"
+          chmod +x "$TEMP_DIR/llvm_install.sh"
+          if sudo "$TEMP_DIR/llvm_install.sh" "$clang_version"; then
+            sudo apt-get install -y clang-"$clang_version" \
+                                    clang-format-"$clang_version" \
+                                    clang-tidy-"$clang_version" \
+                                    clang-tools-"$clang_version" \
+            || exit 1
+          else
+            echo "Installation from script failed."
+            exit 1
+          fi
+          echo "CC=clang-$clang_version" >> $GITHUB_ENV
+          echo "CXX=clang++-$clang_version" >> $GITHUB_ENV
 
       - name: Generate compilation database
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          echo $CC
+          echo $CXX
+          $CC --version
+          $CXX --version
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
       - name: Run clang-tidy
         id: linter
@@ -53,8 +70,10 @@ jobs:
           database: "build"
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
           ignore: "build"
-          version: "21"
+          version: "22"
           files-changed-only: true
+          step-summary: true
+          extra-args: "-std=c++20"
 
       - if: steps.linter.outputs.checks-failed > 0
         run: exit 1
