@@ -36,6 +36,7 @@ jobs:
             windows-11-arm,
           ]
         iqm_qc_alias: ["emerald:mock", "garnet:mock"]
+      fail-fast: false
 
     steps:
       - name: Clone Repository
@@ -88,6 +89,7 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
+      fail-fast: false
     steps:
       - name: Clone Repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
