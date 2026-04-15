@@ -24,8 +24,8 @@
 
 from __future__ import annotations
 
-import contextlib
 import argparse
+import contextlib
 import os
 import shutil
 import tempfile
@@ -172,7 +172,6 @@ def docs(session: nox.Session) -> None:
         *shared_args,
         env=env,
     )
-    session.run(cmake, "--build", "build", "--target", "iqm_qdmi_device_docs", "--parallel", external=True)
 
 
 if __name__ == "__main__":
