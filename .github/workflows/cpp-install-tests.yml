@@ -45,7 +45,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Install dependencies (Windows)
-        if: startsWith(matrix.runs-on, 'windows')
+        if: startsWith(inputs.runs-on, 'windows')
         shell: pwsh
         run: choco install curl -y
 
