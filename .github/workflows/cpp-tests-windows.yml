@@ -85,7 +85,7 @@ jobs:
         run: >
           cmake -S . -B build
           -DCMAKE_BUILD_TYPE="$env:CONFIG"
-          -DCURL_ROOT="$env:CURL_ROOT" -DCURL_STATICLIB=ON
+          -DCURL_ROOT="$env:CURL_ROOT"
       - name: Build
         env:
           CONFIG: ${{ inputs.config }}

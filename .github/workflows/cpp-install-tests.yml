@@ -95,9 +95,7 @@ jobs:
 
       # Build and install the IQM QDMI library
       - name: Configure CMake for QDMI
-        env:
-          CURL_DEFINE: ${{ runner.os == 'Windows' && '-DCURL_STATICLIB=ON' }}
-        run: cmake -S . -B install-build -DCMAKE_BUILD_TYPE=Release ${{ env.CURL_DEFINE }}
+        run: cmake -S . -B install-build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build QDMI
         run: cmake --build install-build --config Release --target iqm-qdmi-device
