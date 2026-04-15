@@ -47,7 +47,7 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings CURL::libcurl
           nlohmann_json::nlohmann_json)
 
-if(IQM_QDMI_COVERAGE)
+if(ENABLE_COVERAGE)
   if(TARGET qdmi::qdmi_coverage_flags)
     target_link_libraries(${QDMI_INTERNAL_TARGET_NAME}
                           PUBLIC qdmi::qdmi_coverage_flags)
