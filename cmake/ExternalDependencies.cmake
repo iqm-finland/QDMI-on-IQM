@@ -56,7 +56,6 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
 if(WIN32)
-  # Build libcurl from source on Windows for consistent toolchain compatibility.
   set(CURL_REV
       "curl-8_19_0"
       CACHE STRING "curl identifier (tag, branch or commit hash)")
@@ -75,6 +74,30 @@ if(WIN32)
   set(CURL_USE_OPENSSL
       OFF
       CACHE BOOL "Disable OpenSSL backend for vendored Windows curl" FORCE)
+  set(CURL_USE_LIBPSL
+      OFF
+      CACHE BOOL "Disable libpsl for vendored Windows curl" FORCE)
+  set(USE_NGHTTP2
+      OFF
+      CACHE BOOL "Disable nghttp2 for vendored Windows curl" FORCE)
+  set(USE_LIBIDN2
+      OFF
+      CACHE BOOL "Disable libidn2 for vendored Windows curl" FORCE)
+  set(CURL_ZLIB
+      OFF
+      CACHE BOOL "Disable zlib for vendored Windows curl" FORCE)
+  set(CURL_BROTLI
+      OFF
+      CACHE BOOL "Disable brotli for vendored Windows curl" FORCE)
+  set(CURL_ZSTD
+      OFF
+      CACHE BOOL "Disable zstd for vendored Windows curl" FORCE)
+  set(CURL_DISABLE_LDAP
+      ON
+      CACHE BOOL "Disable LDAP for vendored Windows curl" FORCE)
+  set(CURL_DISABLE_LDAPS
+      ON
+      CACHE BOOL "Disable LDAPS for vendored Windows curl" FORCE)
 
   FetchContent_Declare(
     CURL
