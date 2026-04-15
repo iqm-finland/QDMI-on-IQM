@@ -1,113 +1,57 @@
-name: CD
-
+name: CD 🚀
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-  workflow_dispatch:
   release:
     types: [published]
-
-defaults:
-  run:
-    shell: bash
+  workflow_dispatch:
 
 permissions:
+  attestations: write
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  id-token: write
 
 jobs:
+  build-sdist:
+    name: 🐍 Packaging
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@b59d15aa4f266e713afad51e132bde6e3a28a6b3 # v1.18.1
+
+  # Builds wheels on all supported platforms using cibuildwheel.
+  # The wheels are uploaded as GitHub artifacts `dev-cibw-*` or `cibw-*`, depending on whether
+  # the workflow is triggered from a PR or a release, respectively.
   build-wheel:
-    name: Build wheel (${{ matrix.runs-on }})
-    runs-on: ${{ matrix.runs-on }}
+    name: 🐍 Packaging
     strategy:
+      fail-fast: false
       matrix:
         runs-on:
           [
             ubuntu-24.04,
             ubuntu-24.04-arm,
-            macos-26,
             macos-26-intel,
+            macos-26,
             windows-2025,
             windows-11-arm,
           ]
-      fail-fast: false
-    steps:
-      - name: Clone Repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@b59d15aa4f266e713afad51e132bde6e3a28a6b3 # v1.18.1
+    with:
+      runs-on: ${{ matrix.runs-on }}
 
-      - name: Install dependencies (Windows)
-        if: startsWith(matrix.runs-on, 'windows')
-        shell: pwsh
-        run: choco install curl -y
-
-      - name: Build wheel
-        uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.4.1
-
-      - name: Verify clean directory
-        run: git diff --exit-code
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        with:
-          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-wheels-${{ matrix.runs-on }}
-          path: wheelhouse/*.whl
-
-  build-sdist:
-    name: Build sdist
-    runs-on: ubuntu-slim
-    steps:
-      - name: Clone Repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
-        with:
-          enable-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build SDist
-        run: uv build --sdist
-
-      - name: Check metadata
-        run: uvx twine check dist/*
-
-      - name: Run check-sdist
-        run: uvx check-sdist --inject-junk
-
-      - name: Upload sdist
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        with:
-          name: ${{ github.event_name == 'pull_request' && 'dev-' || '' }}cibw-sdist
-          path: dist/*.tar.gz
-
+  # Downloads the previously generated artifacts and deploys to PyPI on published releases.
   deploy:
     if: github.event_name == 'release' && github.event.action == 'published'
-    name: Deploy to PyPI
+    name: 🚀 Deploy to PyPI
     runs-on: ubuntu-slim
     environment:
       name: pypi
       url: https://pypi.org/p/iqm-qdmi
     needs: [build-sdist, build-wheel]
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
-      - name: Download release artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: cibw-*
           path: dist
           merge-multiple: true
-
       - name: Generate artifact attestation for sdist and wheel(s)
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: dist/*
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0

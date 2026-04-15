@@ -1,0 +1,57 @@
+name: 🇨 • Tests • macos
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: >
+          The macOS runner image to use. Defaults to 'macos-latest'.
+          This can be any valid macOS runner image, such as 'macos-13', 'macos-14', or 'macos-15'.
+        default: "macos-latest"
+        type: string
+      config:
+        description: >
+          The build type to use. Defaults to 'Release'.
+          This can be any valid CMake build type, such as 'Debug' or 'Release'.
+        default: "Release"
+        type: string
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      RESONANCE_API_KEY:
+        required: true
+
+jobs:
+  cpp-tests-macos:
+    name: 🍎 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CTEST_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # Set up ccache for faster C++ builds
+      - name: Setup ccache
+        uses: Chocobo1/setup-ccache-action@f433cb1e0b3ed576864d7fc361ce43b23b181e67 # v1.5.4
+        with:
+          prepend_symlinks_to_path: false
+          override_cache_key: c++-tests-${{ inputs.runs-on }}-${{ inputs.config }}
+      - name: Configure CMake
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$CONFIG"
+      # build the project in the specified mode
+      - name: Build
+        run: cmake --build build
+      # run the tests (for retry for transient AWS connectivity failures)
+      - name: Test
+        env:
+          IQM_BASE_URL: "https://resonance.meetiqm.com"
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+        run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
