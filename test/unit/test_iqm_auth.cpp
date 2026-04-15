@@ -27,6 +27,58 @@
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 
+namespace {
+int Set_env_var_raw(const char *key, const char *value) {
+#ifdef _WIN32
+  return _putenv_s(key, value);
+#else
+  return setenv(key, value, 1);
+#endif
+}
+
+int Unset_env_var_raw(const char *key) {
+#ifdef _WIN32
+  return _putenv_s(key, "");
+#else
+  return unsetenv(key);
+#endif
+}
+
+void Set_env_var(const char *key, const char *value) {
+  ASSERT_EQ(Set_env_var_raw(key, value), 0);
+}
+
+class ScopedEnvVar {
+public:
+  ScopedEnvVar(const char *key, const char *value) : key_(key) {
+    if (const char *existing_value = std::getenv(key);
+        existing_value != nullptr) {
+      previous_value_ = existing_value;
+    }
+    EXPECT_EQ(Set_env_var_raw(key, value), 0);
+  }
+
+  ScopedEnvVar(const ScopedEnvVar &) = delete;
+  ScopedEnvVar &operator=(const ScopedEnvVar &) = delete;
+  ScopedEnvVar(ScopedEnvVar &&) = delete;
+  ScopedEnvVar &operator=(ScopedEnvVar &&) = delete;
+
+  ~ScopedEnvVar() {
+    // Restore original process env var state for test isolation.
+    if (previous_value_.has_value()) {
+      static_cast<void>(
+          Set_env_var_raw(key_.c_str(), previous_value_->c_str()));
+    } else {
+      static_cast<void>(Unset_env_var_raw(key_.c_str()));
+    }
+  }
+
+private:
+  std::string key_;
+  std::optional<std::string> previous_value_;
+};
+} // namespace
+
 TEST(TokenManagerTest, TimeLeftSeconds) {
   // A valid token with an expiration time in the future
   const std::string valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
@@ -52,20 +104,23 @@ TEST(TokenManagerTest, ConstructorWithToken) {
   iqm::TokenManager tm(std::make_optional("my_token"), std::nullopt);
   EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
 
-  setenv("IQM_TOKEN", "my_token", 1);
-  // Test with only the env var
-  tm = iqm::TokenManager(std::nullopt, std::nullopt);
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
+  {
+    const ScopedEnvVar env_token("IQM_TOKEN", "my_token");
+    // Test with only the env var
+    tm = iqm::TokenManager(std::nullopt, std::nullopt);
+    EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
 
-  // Test with parameter and env var set to the same value --> expected to work
-  tm = iqm::TokenManager(std::make_optional("my_token"), std::nullopt);
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
+    // Test with parameter and env var set to the same value --> expected to
+    // work
+    tm = iqm::TokenManager(std::make_optional("my_token"), std::nullopt);
+    EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
 
-  // Test with the env var set to a different value --> expected to fail
-  setenv("IQM_TOKEN", "different_token", 1);
-  EXPECT_THROW(iqm::TokenManager(std::make_optional("my_token"), std::nullopt),
-               iqm::ClientConfigurationError);
-  unsetenv("IQM_TOKEN");
+    // Test with the env var set to a different value --> expected to fail
+    Set_env_var("IQM_TOKEN", "different_token");
+    EXPECT_THROW(
+        iqm::TokenManager(std::make_optional("my_token"), std::nullopt),
+        iqm::ClientConfigurationError);
+  }
 }
 
 TEST(TokenManagerTest, ConstructorWithTokensFile) {
@@ -83,20 +138,22 @@ TEST(TokenManagerTest, ConstructorWithTokensFile) {
   iqm::TokenManager tm(std::nullopt, std::make_optional(filename));
   EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
 
-  setenv("IQM_TOKENS_FILE", filename.c_str(), 1);
-  // Test with only the env var
-  tm = iqm::TokenManager(std::nullopt, std::nullopt);
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
+  {
+    const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", filename.c_str());
+    // Test with only the env var
+    tm = iqm::TokenManager(std::nullopt, std::nullopt);
+    EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
 
-  // Test with parameter and env var set to the same value --> expected to work
-  tm = iqm::TokenManager(std::nullopt, std::make_optional(filename));
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
+    // Test with parameter and env var set to the same value --> expected to
+    // work
+    tm = iqm::TokenManager(std::nullopt, std::make_optional(filename));
+    EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
 
-  // Test with the env var set to a different value --> expected to fail
-  setenv("IQM_TOKENS_FILE", "different_file_token", 1);
-  EXPECT_THROW(iqm::TokenManager(std::nullopt, std::make_optional(filename)),
-               iqm::ClientConfigurationError);
-  unsetenv("IQM_TOKENS_FILE");
+    // Test with the env var set to a different value --> expected to fail
+    Set_env_var("IQM_TOKENS_FILE", "different_file_token");
+    EXPECT_THROW(iqm::TokenManager(std::nullopt, std::make_optional(filename)),
+                 iqm::ClientConfigurationError);
+  }
 
   // Clean up the temporary file
   std::remove(filename.c_str());
