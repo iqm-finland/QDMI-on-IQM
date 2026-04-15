@@ -29,7 +29,6 @@ import contextlib
 import os
 import shutil
 import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nox
@@ -121,56 +120,34 @@ def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", dest="builder", default="html", help="Build target (default: html)")
-    parser.add_argument("--serve", action="store_true", help="Serve docs with sphinx-autobuild")
     args, posargs = parser.parse_known_args(session.posargs)
 
-    serve = args.builder == "html" and args.serve and session.interactive
+    serve = args.builder == "html" and session.interactive
     if serve:
         session.install("sphinx-autobuild")
+    session.install("scikit-build-core")
 
-    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
     session.run(
         "uv",
-        "sync",
-        "--inexact",
-        "--only-group",
+        "run",
+        "--no-build-isolation-package",
+        "iqm-qdmi",
+        "--group",
         "docs",
-        env=env,
-    )
-
-    with session.chdir("docs"):
-        if shutil.which("doxygen") is None:
-            session.error("doxygen is required to build the C++ API docs")
-
-        Path("_build/doxygen").mkdir(parents=True, exist_ok=True)
-        session.run("doxygen", "Doxyfile", external=True)
-        Path("api/cpp").mkdir(parents=True, exist_ok=True)
-        session.run(
-            "breathe-apidoc",
-            "-o",
-            "api/cpp",
-            "-m",
-            "-f",
-            "-g",
-            "namespace",
-            "_build/doxygen/xml/",
-        )
-
-    shared_args = [
+        "--verbose",
+        "sphinx-autobuild" if serve else "sphinx-build",
         "-n",
         "-T",
         f"-b={args.builder}",
         "docs",
         f"docs/_build/{args.builder}",
         *posargs,
-    ]
-    session.run(
-        "uv",
-        "run",
-        "--no-dev",
-        "sphinx-autobuild" if serve else "sphinx-build",
-        *shared_args,
-        env=env,
+        env={
+            "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
+            "SKBUILD_CMAKE_DEFINE": "BUILD_IQM_QDMI_DOCS=ON",
+            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs",
+            "SKBUILD_BUILD_DIR": "build/docs",
+        },
     )
 
 

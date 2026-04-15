@@ -143,5 +143,24 @@ if(BUILD_IQM_QDMI_TESTS)
   list(APPEND FETCH_PACKAGES googletest)
 endif()
 
+if(BUILD_IQM_QDMI_DOCS)
+  set(CMAKE_POLICY_DEFAULT_CMP0116
+      NEW
+      CACHE STRING
+            "Set the default CMP0116 policy to NEW for documentation builds")
+  set(DOXYGEN_MIN_VERSION
+      1.15.0
+      CACHE STRING "Doxygen version")
+  set(DOXYGEN_REV
+      "669aeeefca743c148e2d935b3d3c69535c7491e6" # v1.16.1
+      CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
+  FetchContent_Declare(
+    Doxygen
+    GIT_REPOSITORY https://github.com/doxygen/doxygen.git
+    GIT_TAG ${DOXYGEN_REV}
+    FIND_PACKAGE_ARGS ${DOXYGEN_MIN_VERSION})
+  list(APPEND FETCH_PACKAGES Doxygen)
+endif()
+
 # Make all declared dependencies available.
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
