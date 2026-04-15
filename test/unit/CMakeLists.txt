@@ -19,7 +19,6 @@ add_executable(unit_tests test_iqm_api_config.cpp test_iqm_auth.cpp
                           test_iqm_device.cpp test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
-  unit_tests
-  PRIVATE GTest::gtest_main GTest::gmock_main qdmi::qdmi_project_warnings
-          ${QDMI_TARGET_NAME} iqm::qdmi_device_internals mocks)
+  unit_tests PRIVATE GTest::gmock_main GTest::gmock qdmi::qdmi_project_warnings
+                     ${QDMI_TARGET_NAME} iqm::qdmi_device_internals mocks)
 gtest_discover_tests(unit_tests)
