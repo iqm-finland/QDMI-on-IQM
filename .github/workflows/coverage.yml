@@ -4,7 +4,6 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
   merge_group:
 
 defaults:
@@ -24,7 +23,7 @@ jobs:
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev lcov gcovr llvm
+        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
@@ -37,15 +36,8 @@ jobs:
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
 
       - name: Configure CMake
-        env:
-          CC: clang
-          CXX: clang++
-        run: >
-          cmake -S . -B build
-          -DCMAKE_BUILD_TYPE=Debug
-          -DBUILD_IQM_QDMI_TESTS=ON
-          -DIQM_QDMI_COVERAGE=ON
-          -DCMAKE_GCOV=/usr/bin/llvm-cov
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_QDMI_TESTS=ON -DIQM_QDMI_COVERAGE=ON
 
       - name: Build
         run: cmake --build build  --config Debug -j4
@@ -57,21 +49,11 @@ jobs:
           IQM_QC_ALIAS: "emerald:mock"
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ctest --verbose --output-on-failure --repeat until-pass:3 --parallel 4
+        run: ctest --verbose --output-on-failure --repeat until-pass:3 --parallel 4 --timeout 600
 
-      - name: Capture coverage info
-        run: |
-          gcovr --gcov-executable 'llvm-cov gcov' \
-                --exclude '.*/_deps/.*' \
-                --exclude '.*/test/.*' \
-                --print-summary \
-                --lcov -o build/coverage.info \
-                build
-
-      - if: github.event_name == 'pull_request'
-        name: Report coverage
-        uses: romeovs/lcov-reporter-action@87a815f34ec27a5826abba44ce09bbc688da58fd # v0.4.0
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
         with:
-          lcov-file: ./build/coverage.info
-          github-token: ${{ github.token }}
-          delete-old-comments: true
+          fail_ci_if_error: true
+          flags: cpp
+          use_oidc: true
