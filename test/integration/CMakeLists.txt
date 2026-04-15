@@ -21,8 +21,20 @@ target_link_libraries(
   integration_tests PRIVATE GTest::gtest_main qdmi::qdmi_project_warnings
                             qdmi::iqm_fomac)
 add_dependencies(integration_tests qdmi_test_iqm_device_defs)
+
+if(WIN32)
+  add_custom_command(
+    TARGET integration_tests
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_RUNTIME_DLLS:integration_tests>
+      $<TARGET_FILE_DIR:integration_tests>
+    COMMAND_EXPAND_LISTS)
+endif()
+
 gtest_discover_tests(
   integration_tests
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-             DISCOVERY_TIMEOUT 60)
+  WORKING_DIRECTORY $<TARGET_FILE_DIR:integration_tests>
+  PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY
+             "$<TARGET_FILE_DIR:integration_tests>" DISCOVERY_TIMEOUT 60)
