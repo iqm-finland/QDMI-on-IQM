@@ -6,14 +6,15 @@ This project relies on several third-party libraries and tools. Below is a compr
 
 These dependencies are linked into the shared library and **shipped with every built wheel or binary**.
 
-| Dependency                                                         | Version          | License                        | Purpose                                       |
-| :----------------------------------------------------------------- | :--------------- | :----------------------------- | :-------------------------------------------- |
-| [MQSS QDMI](https://github.com/Munich-Quantum-Software-Stack/qdmi) | 1.2.x (@c5f71c6) | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
-| [nlohmann/json](https://github.com/nlohmann/json)                  | 3.12.0           | MIT License                    | JSON parsing and serialization                |
-| [cURL](https://github.com/curl/curl)                               | system-provided  | MIT/X derivative               | HTTP client library for backend communication |
+| Dependency                                                    | Version          | License                        | Purpose                                       |
+| :------------------------------------------------------------ | :--------------- | :----------------------------- | :-------------------------------------------- |
+| [QDMI](https://github.com/Munich-Quantum-Software-Stack/qdmi) | 1.2.x (@c5f71c6) | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
+| [nlohmann/json](https://github.com/nlohmann/json)             | 3.12.0           | MIT License                    | JSON parsing and serialization                |
+| [cURL](https://github.com/curl/curl)                          | system-provided  | MIT/X derivative               | HTTP client library for backend communication |
 
-> [!NOTE]
-> In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2, etc.) are automatically bundled by platform-specific repair tools: [`auditwheel`](https://github.com/pypa/auditwheel) on Linux, [`delocate`](https://github.com/matthew-brett/delocate) on macOS, and [`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux, the exact bundled versions correspond to those available in the [`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by [cibuildwheel](https://cibuildwheel.pypa.io/).
+```{note}
+In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2, etc.) are automatically bundled by platform-specific repair tools: [`auditwheel`](https://github.com/pypa/auditwheel) on Linux, [`delocate`](https://github.com/matthew-brett/delocate) on macOS, and [`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux, the exact bundled versions correspond to those available in the [`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by [cibuildwheel](https://cibuildwheel.pypa.io/).
+```
 
 ## Test Dependencies
 
@@ -47,5 +48,6 @@ Used to generate the API documentation, **not shipped** in any binary or wheel.
 | [Breathe](https://github.com/breathe-doc/breathe)               | ≥4.36.0 | BSD-2-Clause | Doxygen XML to Sphinx bridge |
 | [Sphinx AutoAPI](https://github.com/readthedocs/sphinx-autoapi) | ≥3.6.1  | MIT License  | Python API reference pages   |
 
-> [!NOTE]
-> Doxygen is licensed under GNU GPL v2, but [documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), and are therefore not affected by the GPL. The generated documentation remains under the project's own license terms.
+```{note}
+Doxygen is licensed under GNU GPL v2, but [documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), and are therefore not affected by the GPL. The generated documentation remains under the project's own license terms.
+```
