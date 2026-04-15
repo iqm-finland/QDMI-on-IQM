@@ -8,51 +8,56 @@ mystnb:
 
 # Python Package
 
-The Python package for this project is published on PyPI as `iqm.iqm-qdmi`.
+The Python package for this project is published on PyPI as `iqm-qdmi`.
 It provides a Python entry point for discovering installation paths that are useful
 when integrating the IQM QDMI Device into downstream build systems.
 
 ## Install From PyPI
 
-Use `uv pip` to install the package:
+Use `uv` to install the package:
 
 ```bash
-uv pip install iqm.iqm-qdmi
+uv pip install iqm-qdmi
 ```
 
 ## Quick Usage
 
-```{code-cell} ipython3
-import iqm.qdmi as qdmi
+The package itself makes the following variables available for import:
 
-qdmi.__version__
-```
-
-The package exports the following values from `iqm.qdmi`:
-
+- `__version__`: installed package version.
 - `IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
 - `IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
 - `IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
-- `__version__`: installed package version.
 
 ```{code-cell} ipython3
-import iqm.qdmi as qdmi
+from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH
 
-{
-    "version": qdmi.__version__,
-    "include_dir": str(qdmi.IQM_QDMI_INCLUDE_DIR),
-    "cmake_dir": str(qdmi.IQM_QDMI_CMAKE_DIR),
-    "library_path": str(qdmi.IQM_QDMI_LIBRARY_PATH),
-}
+print(f"QDMI on IQM version: {__version__}")
+print(f"Include directory: {IQM_QDMI_INCLUDE_DIR}")
+print(f"CMake directory: {IQM_QDMI_CMAKE_DIR}")
+print(f"Library path: {IQM_QDMI_LIBRARY_PATH}")
 ```
 
 ## Command Line Interface
 
-The package installs the `iqm-qdmi` command.
+The above values can also be conveniently queried from the command line via the `iqm-qdmi` entry point.
 
-```bash
-iqm-qdmi --version
-iqm-qdmi --include_dir
-iqm-qdmi --cmake_dir
-iqm-qdmi --lib_path
+```{code-cell} ipython3
+!iqm-qdmi --help
+```
+
+```{code-cell} ipython3
+!iqm-qdmi --version
+```
+
+```{code-cell} ipython3
+!iqm-qdmi --include_dir
+```
+
+```{code-cell} ipython3
+!iqm-qdmi --cmake_dir
+```
+
+```{code-cell} ipython3
+!iqm-qdmi --lib_path
 ```
