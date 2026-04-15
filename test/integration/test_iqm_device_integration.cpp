@@ -731,7 +731,7 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   constexpr size_t shots_num = 64;
-  const std::string heralding_mode = "zeros";
+  const std::string heralding_mode = "none";
   const std::string move_validation_mode = "allow_prx";
   const std::string move_gate_frame_tracking_mode = "no_detuning_correction";
   const std::string dd_mode = "enabled";
