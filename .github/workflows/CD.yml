@@ -38,13 +38,8 @@ jobs:
       - name: Clone Repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
-      - name: Install dependencies (Windows)
-        if: startsWith(matrix.runs-on, 'windows')
-        shell: pwsh
-        run: choco install curl -y
-
       - name: Build wheel
-        uses: pypa/cibuildwheel@63fd63b352a9a8bdcc24791c9dbee952ee9a8abc # v3.3.0
+        uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.4.1
 
       - name: Verify clean directory
         run: git diff --exit-code
@@ -57,7 +52,7 @@ jobs:
 
   build-sdist:
     name: Build sdist
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     steps:
       - name: Clone Repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -86,10 +81,10 @@ jobs:
   deploy:
     if: github.event_name == 'release' && github.event.action == 'published'
     name: Deploy to PyPI
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     environment:
       name: pypi
-      url: https://pypi.org/p/iqm-finland
+      url: https://pypi.org/p/iqm-qdmi
     needs: [build-sdist, build-wheel]
     permissions:
       contents: read
