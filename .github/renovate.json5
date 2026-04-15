@@ -14,7 +14,12 @@
     ":prConcurrentLimitNone",
     ":prHourlyLimitNone",
   ],
-  enabledManagers: ["github-actions", "pep621", "pre-commit"],
+  enabledManagers: [
+    "github-actions",
+    "pep621",
+    "pip_requirements",
+    "pre-commit",
+  ],
   lockFileMaintenance: {
     enabled: true,
     automerge: true,
@@ -28,7 +33,7 @@
       commitMessagePrefix: "⬆\uFE0F\uD83D\uDC68\u200D\uD83D\uDCBB",
     },
     {
-      matchManagers: ["pep621"],
+      matchManagers: ["pep621", "pip_requirements"],
       addLabels: ["python"],
       commitMessagePrefix: "⬆\uFE0F\uD83D\uDC0D",
     },
@@ -49,6 +54,34 @@
       matchCurrentVersion: "!/^0\.0/",
       commitMessagePrefix: "⬆\uFE0F\uD83E\uDE79",
       automerge: true,
+    },
+    {
+      description: "Group and auto-merge minor updates of stable dependencies",
+      groupName: "minor stable updates",
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "!/^0\./",
+      matchPackageNames: [
+        "!munich-quantum-toolkit/*",
+        "!munich-quantum-software/*",
+      ],
+      commitMessagePrefix: "⬆\uFE0F\uD83E\uDE79",
+      automerge: true,
+    },
+    {
+      description: "Disable minimum release age checks for closely affiliated GitHub Actions",
+      matchManagers: ["github-actions"],
+      matchPackageNames: [
+        "munich-quantum-toolkit/*",
+        "munich-quantum-software/*",
+        "iqm-finland/*",
+      ],
+      minimumReleaseAge: null,
+    },
+    {
+      description: "Disable minimum release age checks for closely affiliated Python packages",
+      matchDatasources: ["pypi"],
+      matchPackageNames: ["mqt*", "iqm*"],
+      minimumReleaseAge: null,
     },
   ],
 }
