@@ -8,7 +8,7 @@ These dependencies are linked into the shared library and **shipped with every b
 
 | Dependency      | Version          | License                        | Purpose                                       |
 | :-------------- | :--------------- | :----------------------------- | :-------------------------------------------- |
-| [QDMI]          | 1.2.x (@c5f71c6) | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
+| [QDMI]          | 1.2.x (@1843a1a) | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
 | [nlohmann/json] | 3.12.0           | MIT License                    | JSON parsing and serialization                |
 | [cURL]          | system-provided  | MIT/X derivative               | HTTP client library for backend communication |
 
