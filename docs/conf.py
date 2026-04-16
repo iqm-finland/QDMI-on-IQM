@@ -61,7 +61,12 @@ exclude_patterns = [
 templates_path = ["_templates"]
 html_theme = "furo"
 html_static_path = ["_static"]
-html_css_files = ["custom.css"]
+html_css_files = [
+    "custom.css",
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/fontawesome.min.css",
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/solid.min.css",
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/brands.min.css",
+]
 html_theme_options = {
     "light_logo": "iqm_logo.svg",
     "dark_logo": "iqm_logo_dark.svg",
@@ -69,6 +74,20 @@ html_theme_options = {
     "source_branch": "main",
     "source_directory": "docs/",
     "navigation_with_keys": True,
+    "footer_icons": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/iqm-finland/QDMI-on-IQM/",
+            "html": "",
+            "class": "fa-brands fa-solid fa-github fa-2x",
+        },
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/iqm-qdmi/",
+            "html": "",
+            "class": "fa-brands fa-solid fa-python fa-2x",
+        },
+    ],
 }
 
 intersphinx_mapping = {
