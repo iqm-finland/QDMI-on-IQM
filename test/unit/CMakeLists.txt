@@ -32,4 +32,4 @@ if(WIN32)
             $<TARGET_FILE_DIR:unit_tests>)
 endif()
 
-gtest_discover_tests(unit_tests)
+gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
