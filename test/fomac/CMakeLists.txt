@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_library(qdmi_iqm_fomac STATIC fomac.cpp)
+add_library(qdmi_iqm_fomac fomac.cpp)
 target_link_libraries(
   qdmi_iqm_fomac
   PRIVATE qdmi::qdmi_project_warnings

@@ -102,9 +102,29 @@ if(WIN32)
   FetchContent_Declare(
     CURL
     GIT_REPOSITORY https://github.com/curl/curl.git
-    GIT_TAG ${CURL_REV}
-    FIND_PACKAGE_ARGS)
-  list(APPEND FETCH_PACKAGES CURL)
+    GIT_TAG ${CURL_REV})
+
+  # curl's build system defines BUILD_SHARED_LIBS; keep that setting local to
+  # the curl subproject so it does not affect other dependencies.
+  set(_iqm_build_shared_libs_was_defined OFF)
+  if(DEFINED BUILD_SHARED_LIBS)
+    set(_iqm_build_shared_libs_was_defined ON)
+    set(_iqm_build_shared_libs_previous_value "${BUILD_SHARED_LIBS}")
+  endif()
+
+  set(BUILD_SHARED_LIBS
+      ON
+      CACHE BOOL "Build shared libraries" FORCE)
+  FetchContent_MakeAvailable(CURL)
+
+  if(_iqm_build_shared_libs_was_defined)
+    set(BUILD_SHARED_LIBS
+        "${_iqm_build_shared_libs_previous_value}"
+        CACHE BOOL "Build shared libraries" FORCE)
+  else()
+    unset(BUILD_SHARED_LIBS CACHE)
+    unset(BUILD_SHARED_LIBS)
+  endif()
 else()
   find_package(CURL REQUIRED)
 endif()
