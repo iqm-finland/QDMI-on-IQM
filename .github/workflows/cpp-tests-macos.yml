@@ -24,6 +24,9 @@ on:
       RESONANCE_API_KEY:
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   cpp-tests-macos:
     name: 🍎 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}

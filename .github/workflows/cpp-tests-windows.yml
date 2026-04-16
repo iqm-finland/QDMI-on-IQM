@@ -28,6 +28,9 @@ defaults:
   run:
     shell: pwsh
 
+permissions:
+  contents: read
+
 jobs:
   cpp-tests-windows:
     name: 🏁 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
