@@ -31,10 +31,20 @@ if(WIN32)
       $<TARGET_RUNTIME_DLLS:integration_tests>
       $<TARGET_FILE_DIR:integration_tests>
     COMMAND_EXPAND_LISTS)
-endif()
 
-gtest_discover_tests(
-  integration_tests
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-             DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(
+    integration_tests DISCOVERY_MODE PRE_TEST
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:integration_tests>
+    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY
+               "$<TARGET_FILE_DIR:integration_tests>"
+               ENVIRONMENT
+               "PATH=$<TARGET_FILE_DIR:integration_tests>;$ENV{PATH}"
+               DISCOVERY_TIMEOUT
+               60)
+else()
+  gtest_discover_tests(
+    integration_tests
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:integration_tests>
+    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY
+               "$<TARGET_FILE_DIR:integration_tests>" DISCOVERY_TIMEOUT 60)
+endif()
