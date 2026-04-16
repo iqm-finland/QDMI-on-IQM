@@ -14,7 +14,7 @@ when integrating the IQM QDMI Device into downstream build systems.
 
 ## Install From PyPI
 
-Use `uv` to install the package:
+Use `uv` (or your Python package manager of choice) to install the package:
 
 ```bash
 uv pip install iqm-qdmi

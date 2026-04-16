@@ -7,7 +7,7 @@
   </a>
 </p>
 
-# IQM QDMI Device
+# QDMI on IQM
 
 [![Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
