@@ -22,13 +22,4 @@ target_link_libraries(
   unit_tests PRIVATE GTest::gmock_main GTest::gtest qdmi::qdmi_project_warnings
                      ${QDMI_TARGET_NAME} iqm::qdmi_device_internals mocks)
 
-if(WIN32)
-  add_custom_command(
-    TARGET unit_tests
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:unit_tests> $<TARGET_FILE_DIR:unit_tests>
-    COMMAND_EXPAND_LISTS)
-endif()
-
 gtest_discover_tests(unit_tests)
