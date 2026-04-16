@@ -24,6 +24,7 @@ dependencies
 contributing
 support
 security
+CHANGELOG
 ```
 
 ```{toctree}
