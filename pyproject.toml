@@ -182,6 +182,13 @@ build-frontend = "uv"
 [tool.cibuildwheel.linux]
 before-all = "yum install -y curl-devel"
 
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+
+[tool.cibuildwheel.windows]
+before-build = "uv pip install delvewheel>=1.12.0"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg iqm"
+
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
 before-all = "apk add curl-dev"

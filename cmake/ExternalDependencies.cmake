@@ -55,7 +55,79 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
                                        ${JSON_VERSION})
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
-find_package(CURL REQUIRED)
+if(WIN32)
+  set(CURL_REV
+      "curl-8_19_0"
+      CACHE STRING "curl identifier (tag, branch or commit hash)")
+  set(BUILD_CURL_EXE
+      OFF
+      CACHE BOOL "Disable curl executable for vendored builds" FORCE)
+  set(BUILD_LIBCURL_DOCS
+      OFF
+      CACHE BOOL "Disable libcurl docs for vendored builds" FORCE)
+  set(BUILD_MISC_DOCS
+      OFF
+      CACHE BOOL "Disable miscellaneous curl docs for vendored builds" FORCE)
+  set(CURL_USE_SCHANNEL
+      ON
+      CACHE BOOL "Use Schannel backend for vendored Windows curl" FORCE)
+  set(CURL_USE_OPENSSL
+      OFF
+      CACHE BOOL "Disable OpenSSL backend for vendored Windows curl" FORCE)
+  set(CURL_USE_LIBPSL
+      OFF
+      CACHE BOOL "Disable libpsl for vendored Windows curl" FORCE)
+  set(USE_NGHTTP2
+      OFF
+      CACHE BOOL "Disable nghttp2 for vendored Windows curl" FORCE)
+  set(USE_LIBIDN2
+      OFF
+      CACHE BOOL "Disable libidn2 for vendored Windows curl" FORCE)
+  set(CURL_ZLIB
+      OFF
+      CACHE BOOL "Disable zlib for vendored Windows curl" FORCE)
+  set(CURL_BROTLI
+      OFF
+      CACHE BOOL "Disable brotli for vendored Windows curl" FORCE)
+  set(CURL_ZSTD
+      OFF
+      CACHE BOOL "Disable zstd for vendored Windows curl" FORCE)
+  set(CURL_DISABLE_LDAP
+      ON
+      CACHE BOOL "Disable LDAP for vendored Windows curl" FORCE)
+  set(CURL_DISABLE_LDAPS
+      ON
+      CACHE BOOL "Disable LDAPS for vendored Windows curl" FORCE)
+
+  FetchContent_Declare(
+    CURL
+    GIT_REPOSITORY https://github.com/curl/curl.git
+    GIT_TAG ${CURL_REV})
+
+  # curl's build system defines BUILD_SHARED_LIBS; keep that setting local to
+  # the curl subproject so it does not affect other dependencies.
+  set(_iqm_build_shared_libs_was_defined OFF)
+  if(DEFINED BUILD_SHARED_LIBS)
+    set(_iqm_build_shared_libs_was_defined ON)
+    set(_iqm_build_shared_libs_previous_value "${BUILD_SHARED_LIBS}")
+  endif()
+
+  set(BUILD_SHARED_LIBS
+      ON
+      CACHE BOOL "Build shared libraries" FORCE)
+  FetchContent_MakeAvailable(CURL)
+
+  if(_iqm_build_shared_libs_was_defined)
+    set(BUILD_SHARED_LIBS
+        "${_iqm_build_shared_libs_previous_value}"
+        CACHE BOOL "Build shared libraries" FORCE)
+  else()
+    unset(BUILD_SHARED_LIBS CACHE)
+    unset(BUILD_SHARED_LIBS)
+  endif()
+else()
+  find_package(CURL REQUIRED)
+endif()
 
 if(BUILD_IQM_QDMI_TESTS)
   set(gtest_force_shared_crt
@@ -102,13 +174,6 @@ if(BUILD_IQM_QDMI_DOCS)
     GIT_TAG ${DOXYGEN_AWESOME_REV}
     FIND_PACKAGE_ARGS ${DOXYGEN_AWESOME_VERSION})
   list(APPEND FETCH_PACKAGES doxygen-awesome-css)
-endif()
-
-# Propagate coverage option to fetched QDMI before dependency population.
-if(IQM_QDMI_COVERAGE)
-  set(ENABLE_COVERAGE
-      ON
-      CACHE BOOL "Enable coverage reporting in fetched QDMI" FORCE)
 endif()
 
 # Make all declared dependencies available.

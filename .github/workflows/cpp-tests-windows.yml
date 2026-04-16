@@ -1,0 +1,58 @@
+name: 🇨 • Tests • windows
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: >
+          The Windows runner image to use. Defaults to 'windows-latest'.
+          This can be any valid Windows runner image, such as 'windows-2022' or 'windows-2025'.
+        default: "windows-latest"
+        type: string
+      config:
+        description: >
+          The build type to use. Defaults to 'Release'.
+          This can be any valid CMake build type, such as 'Debug' or 'Release'.
+        default: "Release"
+        type: string
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      RESONANCE_API_KEY:
+        required: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  cpp-tests-windows:
+    name: 🏁 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CTEST_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Configure CMake
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE="$env:CONFIG"
+      - name: Build
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: cmake --build build --config $env:CONFIG --verbose
+      - name: Test
+        env:
+          CONFIG: ${{ inputs.config }}
+          IQM_BASE_URL: "https://resonance.meetiqm.com"
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+        run: ctest -C $env:CONFIG --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

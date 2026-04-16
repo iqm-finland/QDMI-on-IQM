@@ -21,6 +21,18 @@ target_link_libraries(
   integration_tests PRIVATE GTest::gtest_main qdmi::qdmi_project_warnings
                             qdmi::iqm_fomac)
 add_dependencies(integration_tests qdmi_test_iqm_device_defs)
+
+if(WIN32)
+  add_custom_command(
+    TARGET integration_tests
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
+      $<TARGET_FILE_DIR:integration_tests>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:CURL::libcurl>
+            $<TARGET_FILE_DIR:integration_tests>)
+endif()
+
 gtest_discover_tests(
   integration_tests
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

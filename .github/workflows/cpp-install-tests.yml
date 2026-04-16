@@ -1,0 +1,94 @@
+name: 📦 • Install and Test
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: >
+          The runner image to use.
+        default: "ubuntu-latest"
+        type: string
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      RESONANCE_API_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-tests-install:
+    name: 📦 ${{ inputs.runs-on }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CTEST_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+    steps:
+      # Very long directory paths can cause issues on Windows
+      - name: Enable long paths on Windows and Git
+        if: runner.os == 'Windows'
+        run: |
+          reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+          git config --system core.longpaths true
+
+      # Check out the repository
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Install build dependencies (Ubuntu only)
+      - name: Install Dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+
+      # Set up ccache for faster C++ builds
+      - name: Setup ccache
+        if: runner.os != 'Windows'
+        uses: Chocobo1/setup-ccache-action@f433cb1e0b3ed576864d7fc361ce43b23b181e67 # v1.5.4
+        with:
+          prepend_symlinks_to_path: false
+          override_cache_key: c++-tests-install-${{ inputs.runs-on }}
+          windows_compile_environment: msvc
+
+      # Set up mold as linker (Linux only)
+      - name: Set up mold as linker
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+
+      # Build and install the IQM QDMI library
+      - name: Configure CMake for QDMI
+        run: cmake -S . -B install-build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build QDMI
+        run: cmake --build install-build --config Release --target iqm-qdmi-device
+
+      - name: Install QDMI Runtime Component
+        run: >
+          cmake --install install-build --config Release
+          --prefix install-dir
+          --component iqm-qdmi-device_Runtime
+
+      - name: Install QDMI Development Component
+        run: >
+          cmake --install install-build --config Release
+          --prefix install-dir
+          --component iqm-qdmi-device_Development
+
+      # Build tests using the installed QDMI device library
+      - name: Configure tests with the installed library
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DUSE_INSTALLED_IQM_QDMI_DEVICE=ON
+          -DCMAKE_PREFIX_PATH=install-dir
+
+      - name: Build tests
+        run: cmake --build build --config Release
+
+      - name: Test
+        env:
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+        run: ctest -C Release --output-on-failure --test-dir build --repeat until-pass:3 --timeout 600

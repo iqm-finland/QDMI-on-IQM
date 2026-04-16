@@ -1,0 +1,111 @@
+name: 🇨 • Lint
+on:
+  workflow_call:
+    inputs:
+      clang-version:
+        description: "Clang version to use"
+        default: 22
+        type: number
+      files-changed-only:
+        description: "Whether to only lint files that have changed"
+        default: true
+        type: boolean
+      cpp-linter-extra-args:
+        description: "Extra arguments to pass to the cpp-linter"
+        default: "-std=c++20"
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-cpp-linter
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: 🚨 Lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # Needed to fetch code
+      pull-requests: write # Needed to post PR comments
+    env:
+      CLANG_VERSION: ${{ inputs.clang-version }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          python-version: 3.13
+          activate-environment: true
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Ninja
+        run: uv tool install ninja
+
+      # Install build dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Set up Clang ${{ inputs.clang-version }}
+        env:
+          TEMP_DIR: ${{ runner.temp }}
+        run: |
+          # Sanitize CLANG_VERSION: Remove any newlines and ensure it is numeric
+          clang_version="$(echo "$CLANG_VERSION" | tr -d '\n')"
+          if [[ -z "$clang_version" || ! "$clang_version" =~ ^[0-9]+$ ]]; then
+            echo "Error: Invalid clang-version input. Must be a non-empty numeric value."
+            exit 1
+          fi
+          wget https://apt.llvm.org/llvm.sh -O "$TEMP_DIR/llvm_install.sh"
+          chmod +x "$TEMP_DIR/llvm_install.sh"
+          if sudo "$TEMP_DIR/llvm_install.sh" "$clang_version"; then
+            sudo apt-get install -y clang-"$clang_version" \
+                                    clang-format-"$clang_version" \
+                                    clang-tidy-"$clang_version" \
+                                    clang-tools-"$clang_version" \
+            || exit 1
+          else
+            echo "Installation from script failed."
+            exit 1
+          fi
+          echo "CC=clang-$clang_version" >> $GITHUB_ENV
+          echo "CXX=clang++-$clang_version" >> $GITHUB_ENV
+
+      # generate a compilation database (assumes that the CMake project has `CMAKE_EXPORT_COMPILE_COMMANDS` set)
+      - name: Generate compilation database
+        run: |
+          echo $CC
+          echo $CXX
+          $CC --version
+          $CXX --version
+          cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      # runs the cpp-linter action using the generated compilation database and the specified clang version
+      - name: Run cpp-linter
+        uses: cpp-linter/cpp-linter-action@89288efe7a9b377406dcea651d756aa1ade3e4a3 # v2.17.1
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          style: ""
+          tidy-checks: ""
+          version: ${{ inputs.clang-version }}
+          ignore: "build"
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
+          step-summary: true
+          database: "build"
+          extra-args: ${{ inputs.cpp-linter-extra-args }}
+          files-changed-only: ${{ inputs.files-changed-only }}
+
+      - name: Fail if linter found errors
+        if: steps.linter.outputs.checks-failed > 0
+        run: echo "Linter found errors" && exit 1

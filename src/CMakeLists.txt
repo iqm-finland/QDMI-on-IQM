@@ -72,9 +72,9 @@ write_basic_package_version_file(
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/${QDMI_TARGET_NAME}-config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${QDMI_TARGET_NAME}-config-version.cmake"
-  DESTINATION ${IQM_QDMI_CONFIG_INSTALL_DIR})
+  DESTINATION ${IQM_QDMI_CONFIG_INSTALL_DIR}
+  COMPONENT ${QDMI_TARGET_NAME}_Development)
 
-# cmake-format: off
 install(
   TARGETS ${QDMI_TARGET_NAME}
   EXPORT ${QDMI_TARGET_NAME}-targets
@@ -85,9 +85,9 @@ install(
           NAMELINK_COMPONENT ${QDMI_TARGET_NAME}_Development
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
           COMPONENT ${QDMI_TARGET_NAME}_Development
-  FILE_SET public_headers
-          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-# cmake-format: on
+          FILE_SET public_headers
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+          COMPONENT ${QDMI_TARGET_NAME}_Development)
 
 install(
   EXPORT ${QDMI_TARGET_NAME}-targets
