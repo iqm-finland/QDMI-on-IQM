@@ -86,7 +86,7 @@ repos:
 
   ## Ensure uv lock file is up-to-date
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.2
+    rev: 0.11.5
     hooks:
       - id: uv-lock
         priority: 0
@@ -104,7 +104,7 @@ repos:
 
   ## Format C++ files with clang-format
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v22.1.2
+    rev: v22.1.3
     hooks:
       - id: clang-format
         types_or: [c++, c]
@@ -131,7 +131,7 @@ repos:
 
   ## Python linting using ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.8
+    rev: v0.15.9
     hooks:
       - id: ruff-format
         priority: 1
