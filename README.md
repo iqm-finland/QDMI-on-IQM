@@ -125,7 +125,7 @@ int main() {
 }
 ```
 
-For complete examples, see the [Usage Guide](docs/usage.md).
+For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html).
 
 ## How It Works
 
@@ -135,7 +135,7 @@ For complete examples, see the [Usage Guide](docs/usage.md).
 4. **Result Retrieval**: Poll for job completion and retrieve measurement results
 5. **Calibration Control**: Optionally trigger calibrations and update to new calibration sets
 
-The library interfaces with the [IQM Server API](https://resonance.meetiqm.com/docs) to provide complete device
+The library interfaces with the [IQM Server API](https://resonance.meetiqm.com/docs/api-reference) to provide complete device
 management through the standardized QDMI interface.
 
 ## Testing
@@ -164,7 +164,7 @@ $ ctest --test-dir build/test/integration --output-on-failure
 We welcome contributions! Whether you're fixing bugs, improving documentation, or proposing new features, your help is
 appreciated.
 
-Please see our [Contributing Guide](docs/contributing.md) for:
+Please see our [Contributing Guide](https://iqm-finland.github.io/QDMI-on-IQM/contributing.html) for:
 
 - How to report bugs and request features
 - Development workflow and coding standards
@@ -173,7 +173,7 @@ Please see our [Contributing Guide](docs/contributing.md) for:
 
 ## Getting Help
 
-- **Documentation**: Check the [docs/](docs/) directory
+- **Documentation**: Check the [documentation page](https://iqm-finland.github.io/QDMI-on-IQM)
 - **Discussions**: Ask questions in [GitHub Discussions](https://github.com/iqm-finland/QDMI-on-IQM/discussions)
 - **Bug Reports**: Open an issue in [GitHub Issues](https://github.com/iqm-finland/QDMI-on-IQM/issues)
 - **Security**: Report vulnerabilities via our [Security Policy](.github/SECURITY.md)
