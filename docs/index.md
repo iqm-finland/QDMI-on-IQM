@@ -27,16 +27,9 @@ security
 ```
 
 ```{toctree}
-:maxdepth: 3
-:caption: Python API Reference
+:maxdepth: 1
+:caption: API Reference
 
+capi/index
 api/iqm/qdmi/index
-```
-
-```{toctree}
-:glob:
-:maxdepth: 2
-:caption: C API Reference
-
-cpp_api/index
 ```
