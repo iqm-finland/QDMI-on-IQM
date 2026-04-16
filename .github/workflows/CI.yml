@@ -20,7 +20,7 @@ jobs:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@b59d15aa4f266e713afad51e132bde6e3a28a6b3 # v1.18.1
 
   cpp-tests-ubuntu:
-    name: 🇨‌ Test 🐧
+    name: 🇨 Test 🐧
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
@@ -45,7 +45,7 @@ jobs:
       RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-macos:
-    name: 🇨‌ Test 🍎
+    name: 🇨 Test 🍎
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
@@ -67,7 +67,7 @@ jobs:
       RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-windows:
-    name: 🇨‌ Test 🏁
+    name: 🇨 Test 🏁
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
@@ -103,7 +103,7 @@ jobs:
       RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-coverage:
-    name: 🇨‌ Coverage
+    name: 🇨 Coverage
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: ./.github/workflows/cpp-coverage.yml
@@ -114,7 +114,7 @@ jobs:
       RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-linter:
-    name: 🇨‌ Lint
+    name: 🇨 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-linter)
     uses: ./.github/workflows/cpp-linter.yml
