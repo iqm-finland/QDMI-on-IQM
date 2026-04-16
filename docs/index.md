@@ -1,19 +1,36 @@
-# IQM QDMI Device {#mainpage}
+# QDMI on IQM
 
-This project exposes IQM's quantum computing hardware via the QDMI interface.
-It connects to the unified IQM Server API and is implemented in C++20.
-The implementation builds on QDMI version 1.2.0.
+This project exposes IQM quantum computing hardware via the Quantum Device Management Interface ([QDMI](https://github.com/Munich-Quantum-Software-Stack/qdmi)) standard.
+It is implemented in C++20 and builds on the IQM Server API.
+A Python wrapper is provided for convenient distribution and consumption.
 
-This documentation provides a comprehensive guide for using the IQM QDMI device library, including setup instructions, usage examples, a development guide, and detailed C++ API documentation.
+This documentation combines user guides with generated API references for both C++ and Python.
 
-## Table of Contents
+```{toctree}
+:maxdepth: 2
+:caption: User Guide
 
-- [Usage](usage.md)
-- [Spack Package Guide](spack_guide.md)
-- [Development Guide](development_guide.md)
-- [Dependencies](dependencies.md)
-- [Contributing](contributing.md)
-- [Support](support.md)
-- [Security Policy](security.md)
-- [Interfaces](topics.html)
-- [API Reference](classes.html)
+usage
+python_package
+spack_guide
+development_guide
+dependencies
+contributing
+support
+security
+```
+
+```{toctree}
+:maxdepth: 3
+:caption: Python API Reference
+
+api/iqm/qdmi/index
+```
+
+```{toctree}
+:glob:
+:maxdepth: 2
+:caption: C API Reference
+
+cpp_api/index
+```

@@ -16,7 +16,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(FetchContent)
-include(CMakeDependentOption)
 set(FETCH_PACKAGES "")
 
 if(TARGET qdmi::qdmi)
@@ -26,7 +25,7 @@ else()
   # cmake-format: off
   set(QDMI_VERSION 1.2.2
       CACHE STRING "QDMI version")
-  set(QDMI_REV "c5f71c63d5bf3b97c26c60efd367a4be3670d3a0" # v1.2.x
+  set(QDMI_REV "1843a1a8a9c828d39fe01704675be5634153c969" # v1.2.x
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -149,31 +148,18 @@ if(BUILD_IQM_QDMI_DOCS)
       NEW
       CACHE STRING
             "Set the default CMP0116 policy to NEW for documentation builds")
-  set(DOXYGEN_VERSION
-      1.16.1
+  set(DOXYGEN_MIN_VERSION
+      1.15.0
       CACHE STRING "Doxygen version")
   set(DOXYGEN_REV
-      "669aeeefca743c148e2d935b3d3c69535c7491e6"
+      "669aeeefca743c148e2d935b3d3c69535c7491e6" # v1.16.1
       CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
   FetchContent_Declare(
     Doxygen
     GIT_REPOSITORY https://github.com/doxygen/doxygen.git
     GIT_TAG ${DOXYGEN_REV}
-    FIND_PACKAGE_ARGS ${DOXYGEN_VERSION})
+    FIND_PACKAGE_ARGS ${DOXYGEN_MIN_VERSION})
   list(APPEND FETCH_PACKAGES Doxygen)
-
-  set(DOXYGEN_AWESOME_VERSION
-      2.4.2
-      CACHE STRING "Doxygen Awesome version")
-  set(DOXYGEN_AWESOME_REV
-      "d52eafe3e9303399fda15661f3d7bb8fe3d7eabc"
-      CACHE STRING "Doxygen Awesome identifier (tag, branch or commit hash)")
-  FetchContent_Declare(
-    doxygen-awesome-css
-    GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
-    GIT_TAG ${DOXYGEN_AWESOME_REV}
-    FIND_PACKAGE_ARGS ${DOXYGEN_AWESOME_VERSION})
-  list(APPEND FETCH_PACKAGES doxygen-awesome-css)
 endif()
 
 # Make all declared dependencies available.

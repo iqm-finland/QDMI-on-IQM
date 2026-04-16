@@ -41,28 +41,29 @@ def main() -> None:
     - :code:`--lib_path`: Print the path to the iqm-qdmi shared library.
     """
     make_parser = partial(
-        argparse.ArgumentParser, prog="iqm-qdmi", description="Command line interface for the IQM QDMI device library."
+        argparse.ArgumentParser, prog="iqm-qdmi", description="Command line interface for the QDMI on IQM library."
     )
     if sys.version_info >= (3, 14):
         make_parser = partial(make_parser, suggest_on_error=True)
 
     parser = make_parser()
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--version",
         action="version",
         version=f"{__version__}",
     )
-    parser.add_argument(
+    group.add_argument(
         "--include_dir",
         action="store_true",
         help="Print the path to the iqm-qdmi C/C++ include directory",
     )
-    parser.add_argument(
+    group.add_argument(
         "--cmake_dir",
         action="store_true",
         help="Print the path to the iqm-qdmi CMake module directory",
     )
-    parser.add_argument(
+    group.add_argument(
         "--lib_path",
         action="store_true",
         help="Print the path to the iqm-qdmi shared library",

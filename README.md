@@ -7,7 +7,7 @@
   </a>
 </p>
 
-# IQM QDMI Device
+# QDMI on IQM
 
 [![Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
@@ -125,29 +125,6 @@ For complete examples, see the [Usage Guide](docs/usage.md).
 
 The library interfaces with the [IQM Server API](https://resonance.meetiqm.com/docs) to provide complete device
 management through the standardized QDMI interface.
-
-## Documentation
-
-📚 **Full documentation is available in the [`docs/`](docs/) directory.**
-
-- [Usage Guide](docs/usage.md) - Comprehensive guide with examples
-- [Development Guide](docs/development_guide.md) - Building from source
-- [Dependencies](docs/dependencies.md) - Required libraries and tools
-- [Contributing Guide](docs/contributing.md) - How to contribute to the project
-- [Support Guide](docs/support.md) - Getting help and reporting issues
-- [Spack Guide](docs/spack_guide.md) - Installing with the Spack package manager
-- [API Reference](#building-api-documentation) - Doxygen-generated C++ API docs
-
-### Building API Documentation
-
-Build the full API documentation with Doxygen:
-
-```console
-$ cmake -S . -B build -DBUILD_IQM_QDMI_DOCS=ON
-$ cmake --build build --target iqm_qdmi_device_docs
-```
-
-The documentation will be generated in `build/docs/html/`. Open `index.html` in a web browser to view.
 
 ## Testing
 

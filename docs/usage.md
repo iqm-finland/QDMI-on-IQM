@@ -76,19 +76,19 @@ FoMaC::get_iqm_session(const std::string &base_url,
 }
 ```
 
-The \ref IQM_QDMI_device_session_alloc function allocates a new session object, and the \ref IQM_QDMI_device_session_set_parameter function is used to set various parameters for the session:
+The {cpp:func}`IQM_QDMI_device_session_alloc` function allocates a new session object, and the {cpp:func}`IQM_QDMI_device_session_set_parameter` function is used to set various parameters for the session:
 
-- **Base URL** (`QDMI_DEVICE_SESSION_PARAMETER_BASEURL`): The URL of the IQM server.
-- **Quantum Computer ID** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1`): Optional ID of the specific quantum computer to use.
-- **Quantum Computer Alias** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional alias of the specific quantum computer to use.
-- **Authentication Token** (`QDMI_DEVICE_SESSION_PARAMETER_TOKEN`): Bearer token for authentication. If not set, falls back to the `IQM_TOKEN` environment variable.
-- **Tokens File** (`QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE`): Path to a file containing authentication tokens. If not set, falls back to the `IQM_TOKENS_FILE` environment variable.
+- **Base URL** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_BASEURL`): The URL of the IQM server.
+- **Quantum Computer ID** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1`): Optional ID of the specific quantum computer to use.
+- **Quantum Computer Alias** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional alias of the specific quantum computer to use.
+- **Authentication Token** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_TOKEN`): Bearer token for authentication. If not set, falls back to the `IQM_TOKEN` environment variable.
+- **Tokens File** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE`): Path to a file containing authentication tokens. If not set, falls back to the `IQM_TOKENS_FILE` environment variable.
 
 **Note on Authentication**: If you set either authentication parameter explicitly, the corresponding environment variable will be ignored. This allows you to override environment-based authentication when needed.
 
 If neither quantum computer ID nor alias is specified, the first available quantum computer from the server will be used.
 
-The session is initialized with \ref IQM_QDMI_device_session_init, which:
+The session is initialized with {cpp:func}`IQM_QDMI_device_session_init`, which:
 
 1. Fetches the list of available quantum computers from the server
 2. Selects the appropriate quantum computer (by ID, alias, or first available)
@@ -97,11 +97,11 @@ The session is initialized with \ref IQM_QDMI_device_session_init, which:
 5. Retrieves calibration metrics (T1/T2 times, gate fidelities) if available
 6. Checks whether calibration jobs are supported by the server
 
-At any time, `ret` is the `QDMI_STATUS` return value of the last function call, which can be checked for error codes.
+At any time, `ret` is the {cpp:enum}`QDMI_STATUS` return value of the last function call, which can be checked for error codes.
 
 ### Session Initialization Details
 
-When `IQM_QDMI_device_session_init` is called, the following steps occur:
+When {cpp:func}`IQM_QDMI_device_session_init` is called, the following steps occur:
 
 1. **Authentication Setup**: The token manager is initialized with the provided authentication credentials.
 
@@ -127,7 +127,7 @@ When `IQM_QDMI_device_session_init` is called, the following steps occur:
 
 6. **Calibration Job Support Check**:
    - The system checks if the server supports calibration jobs by querying the COCOS health endpoint.
-   - This determines whether `QDMI_PROGRAM_FORMAT_CALIBRATION` jobs can be submitted.
+   - This determines whether {cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION` jobs can be submitted.
 
 After initialization, the session is ready to submit jobs and query device information.
 
@@ -169,30 +169,30 @@ When you initialize a session, the system uses the "default" calibration set (ty
 The QDMI device allows you to query various information about the quantum computing hardware, such as the available qubits, operations, and their properties.
 All device information is fetched during session initialization and kept in memory for efficient querying.
 
-The following properties about the device can be queried via the \ref IQM_QDMI_device_session_query_device_property function:
+The following properties about the device can be queried via the {cpp:func}`IQM_QDMI_device_session_query_device_property` function:
 
-- `QDMI_DEVICE_PROPERTY_NAME`: The name/alias of the quantum computer.
-- `QDMI_DEVICE_PROPERTY_VERSION`: The version of the IQM QDMI device implementation.
-- `QDMI_DEVICE_PROPERTY_LIBRARYVERSION`: The version of the QDMI library.
-- `QDMI_DEVICE_PROPERTY_STATUS`: The current status of the device (e.g., idle, busy).
-- `QDMI_DEVICE_PROPERTY_QUBITSNUM`: The number of qubits available on the device.
-- `QDMI_DEVICE_PROPERTY_SITES`: The list of available qubit sites on the device.
-- `QDMI_DEVICE_PROPERTY_OPERATIONS`: The list of available calibrated operations on the device.
-- `QDMI_DEVICE_PROPERTY_COUPLINGMAP`: The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_NAME`: The name/alias of the quantum computer.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_VERSION`: The version of the IQM QDMI device implementation.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_LIBRARYVERSION`: The version of the QDMI library.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`: The current status of the device (e.g., idle, busy).
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM`: The number of qubits available on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_SITES`: The list of available qubit sites on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_OPERATIONS`: The list of available calibrated operations on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`: The coupling map between qubits on the device.
 
-The following properties about every site (qubit) can be queried via the \ref IQM_QDMI_device_session_query_site_property function:
+The following properties about every site (qubit) can be queried via the {cpp:func}`IQM_QDMI_device_session_query_site_property` function:
 
-- `QDMI_SITE_PROPERTY_NAME`: The name of the qubit (e.g., "QB1", "QB2").
-- `QDMI_SITE_PROPERTY_INDEX`: The index of the qubit.
-- `QDMI_SITE_PROPERTY_T1`: The T1 coherence time of the qubit in microseconds (if available).
-- `QDMI_SITE_PROPERTY_T2`: The T2 coherence time of the qubit in microseconds (if available).
+- {cpp:enumerator}`~QDMI_SITE_PROPERTY_T::QDMI_SITE_PROPERTY_NAME`: The name of the qubit (e.g., "QB1", "QB2").
+- {cpp:enumerator}`~QDMI_SITE_PROPERTY_T::QDMI_SITE_PROPERTY_INDEX`: The index of the qubit.
+- {cpp:enumerator}`~QDMI_SITE_PROPERTY_T::QDMI_SITE_PROPERTY_T1`: The T1 coherence time of the qubit in microseconds (if available).
+- {cpp:enumerator}`~QDMI_SITE_PROPERTY_T::QDMI_SITE_PROPERTY_T2`: The T2 coherence time of the qubit in microseconds (if available).
 
-The following properties about every operation can be queried via the \ref IQM_QDMI_device_session_query_operation_property function:
+The following properties about every operation can be queried via the {cpp:func}`IQM_QDMI_device_session_query_operation_property` function:
 
-- `QDMI_OPERATION_PROPERTY_NAME`: The name of the operation (e.g., "prx", "cz", "measure").
-- `QDMI_OPERATION_PROPERTY_QUBITSNUM`: The number of qubits the operation acts on.
-- `QDMI_OPERATION_PROPERTY_PARAMETERSNUM`: The number of parameters the operation has.
-- `QDMI_OPERATION_PROPERTY_FIDELITY`: The fidelity of the operation (if available, may be qubit-specific).
+- {cpp:enumerator}`~QDMI_OPERATION_PROPERTY_T::QDMI_OPERATION_PROPERTY_NAME`: The name of the operation (e.g., "prx", "cz", "measure").
+- {cpp:enumerator}`~QDMI_OPERATION_PROPERTY_T::QDMI_OPERATION_PROPERTY_QUBITSNUM`: The number of qubits the operation acts on.
+- {cpp:enumerator}`~QDMI_OPERATION_PROPERTY_T::QDMI_OPERATION_PROPERTY_PARAMETERSNUM`: The number of parameters the operation has.
+- {cpp:enumerator}`~QDMI_OPERATION_PROPERTY_T::QDMI_OPERATION_PROPERTY_FIDELITY`: The fidelity of the operation (if available, may be qubit-specific).
 
 **Note:** The available operations are determined by the current calibration set. Quality metrics (T1, T2, fidelities) are fetched from the server's calibration set quality metrics endpoint if available. The QDMI device does not support querying operation durations, as this information is not provided by the IQM Server API.
 
@@ -201,14 +201,14 @@ The following properties about every operation can be queried via the \ref IQM_Q
 The QDMI device allows you to submit jobs to the quantum computing hardware.
 The following code snippet demonstrates how to submit a job with various parameters, including the
 
-- **program**: The quantum program to be executed,
-- **program format**: The format used for the program,
-- **number of shots**: The number of shots to execute for a quantum circuit job,
-- **heralding mode**: Controls heralding behavior (valid values: "none", "zeros"), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`,
-- **move validation mode**: Validation level for moves (valid values: "strict", "allow_prx", "none"), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM2`,
-- **move gate frame tracking mode**: Frame tracking behavior (valid values: "full", "no_detuning_correction", "none"), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM3`,
-- **dynamical decoupling mode**: Enable/disable dynamical decoupling (valid values: "disabled", "enabled"), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM4`,
-- **qubit mapping**: Mapping of logical qubit names to physical qubit names (important for QIR programs), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5`,
+- **program**: The quantum program to be executed, set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`,
+- **program format**: The format used for the program, set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT`,
+- **number of shots**: The number of shots to execute for a quantum circuit job, set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`,
+- **heralding mode**: Controls heralding behavior (valid values: "none", "zeros"), set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`,
+- **move validation mode**: Validation level for moves (valid values: "strict", "allow_prx", "none"), set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM2`,
+- **move gate frame tracking mode**: Frame tracking behavior (valid values: "full", "no_detuning_correction", "none"), set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM3`,
+- **dynamical decoupling mode**: Enable/disable dynamical decoupling (valid values: "disabled", "enabled"), set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM4`,
+- **qubit mapping**: Mapping of logical qubit names to physical qubit names (important for QIR programs), set via {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM5`,
 - **maximum circuit duration over T2**: The maximum duration of a circuit over T2 time, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1`,
 - **number of active reset cycles**: The number of active reset cycles to perform, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2`, and
 - **dynamical decoupling strategy**: Strategy configuration as JSON string according to the [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791), set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
@@ -289,19 +289,19 @@ auto FoMaC::submit_job(
 }
 ```
 
-The \ref IQM_QDMI_device_session_create_device_job function creates a new job object, and the \ref IQM_QDMI_device_job_set_parameter function is used to set various parameters for the job.
-The job is submitted with \ref IQM_QDMI_device_job_submit, which sends the job to the quantum computing hardware for execution.
-As before, `ret` is the `QDMI_STATUS` return value of the last function call, which can be checked for error codes.
+The {cpp:func}`IQM_QDMI_device_session_create_device_job` function creates a new job object, and the {cpp:func}`IQM_QDMI_device_job_set_parameter` function is used to set various parameters for the job.
+The job is submitted with {cpp:func}`IQM_QDMI_device_job_submit`, which sends the job to the quantum computing hardware for execution.
+As before, `ret` is the {cpp:enum}`QDMI_STATUS` return value of the last function call, which can be checked for error codes.
 
 **Important:** When submitting circuit jobs (QIR or IQM JSON), the implementation automatically includes the current calibration set ID in the job submission. This ensures that the job uses the same calibrated gates that were available when the session was initialized or last updated.
 
 The QDMI device currently supports the following program formats:
 
-- **QIR Base Profile Strings** (`QDMI_PROGRAM_FORMAT_QIRBASESTRING`): QIR base profile programs as strings.
-- **IQM JSON** (`QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's native JSON circuit format.
-- **Calibration Configurations** (`QDMI_PROGRAM_FORMAT_CALIBRATION`): Calibration job configurations (only if server supports calibration jobs).
+- **QIR Base Profile Strings** ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_QIRBASESTRING`): QIR base profile programs as strings.
+- **IQM JSON** ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's native JSON circuit format.
+- **Calibration Configurations** ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION`): Calibration job configurations (only if server supports calibration jobs).
 
-For QIR and JSON formats, the program should be provided as a string via the `QDMI_DEVICE_JOB_PARAMETER_PROGRAM` parameter.
+For QIR and JSON formats, the program should be provided as a string via the {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM` parameter.
 
 ## Retrieving Job Results
 
@@ -311,9 +311,9 @@ After a job completes execution, you can retrieve the measurement results in dif
 
 The following result formats are supported:
 
-- **`QDMI_JOB_RESULT_HIST_KEYS`**: Returns the bitstring keys from the measurement histogram as a comma-separated string.
-- **`QDMI_JOB_RESULT_HIST_VALUES`**: Returns the corresponding count values as an array of `size_t`.
-- **`QDMI_JOB_RESULT_SHOTS`**: Returns individual shot measurements as a comma-separated string of bitstrings.
+- **{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_HIST_KEYS`**: Returns the bitstring keys from the measurement histogram as a comma-separated string.
+- **{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_HIST_VALUES`**: Returns the corresponding count values as an array of `size_t`.
+- **{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_SHOTS`**: Returns individual shot measurements as a comma-separated string of bitstrings.
 
 ### Retrieving Histogram Results
 
@@ -385,22 +385,22 @@ Each bitstring in the result represents the measurement outcome for one shot. Th
 
 ### Unsupported Result Formats
 
-The following QDMI standard result formats (see `QDMI_JOB_RESULT_T`) are **not supported** by the IQM QDMI device because IQM quantum computers return measurement data, not state vectors or probability distributions:
+The following QDMI standard result formats (see {cpp:enum}`QDMI_JOB_RESULT_T`) are **not supported** by the IQM QDMI device because IQM quantum computers return measurement data, not state vectors or probability distributions:
 
-- `QDMI_JOB_RESULT_STATEVECTOR_DENSE`
-- `QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS` / `QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES`
-- `QDMI_JOB_RESULT_PROBABILITIES_DENSE`
-- `QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS` / `QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES`
+- {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_STATEVECTOR_DENSE`
+- {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS` / {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES`
+- {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_PROBABILITIES_DENSE`
+- {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS` / {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES`
 
-Attempting to retrieve these formats will return `QDMI_ERROR_NOTSUPPORTED`.
+Attempting to retrieve these formats will return {cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`.
 
 ## Triggering Calibration Jobs
 
-Calibrations can be triggered using the `QDMI_PROGRAM_FORMAT_CALIBRATION` program format.
+Calibrations can be triggered using the {cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION` program format.
 This feature is only available if the IQM server supports calibration jobs (checked during session initialization).
 The payload should contain the calibration configuration as a JSON string according to the IQM Server API specification.
 
-The results can be retrieved via the `QDMI_JOB_RESULT_CUSTOM1` job result parameter on a calibration job, which returns the new calibration set ID.
+The results can be retrieved via the {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM1` job result parameter on a calibration job, which returns the new calibration set ID.
 
 **Important:** When querying the result of a calibration job, the system will:
 
@@ -409,7 +409,7 @@ The results can be retrieved via the `QDMI_JOB_RESULT_CUSTOM1` job result parame
 3. Fetch the updated dynamic quantum architecture with the new calibrated gates
 4. Retrieve the updated calibration metrics (T1/T2 times, gate fidelities)
 
-This automatic update invalidates all previously obtained `IQM_QDMI_Operation` pointers and the quality metrics associated with the qubits and operations. You should re-query device information after a calibration job completes.
+This automatic update invalidates all previously obtained {cpp:type}`IQM_QDMI_Operation` pointers and the quality metrics associated with the qubits and operations. You should re-query device information after a calibration job completes.
 
 Here's an example of submitting a calibration job:
 
@@ -434,7 +434,7 @@ const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
 If a submitted job fails, the QDMI device will automatically log detailed error information to help diagnose the problem.
 All errors are logged as ERROR level messages, and any informational messages are logged as DEBUG level messages.
 
-When you check a job's status using `IQM_QDMI_device_job_check()` and the job has failed, all errors and messages will be automatically logged:
+When you check a job's status using {cpp:func}`IQM_QDMI_device_job_check()` and the job has failed, all errors and messages will be automatically logged:
 
 ```cpp
 auto *job = fomac.submit_job(TEST_PROGRAM, QDMI_PROGRAM_FORMAT_QIRBASESTRING);
@@ -458,29 +458,3 @@ The following logging levels are available:
 - `DEBUG`: Log errors, info, and debug messages.
 
 By default, the logging level is set to `ERROR`.
-
-The following macros are available for logging:
-
-- `LOG_ERROR(msg)`: Log an error message.
-- `LOG_INFO(msg)`: Log an info message.
-- `LOG_DEBUG(msg)`: Log a debug message.
-
-By default, the logger prints to `std::cerr`. You can redirect the output to a file or any other stream using the `set_output` method of the `Logger` class.
-
-Here's an example of how to redirect the log output to a file and log info messages:
-
-```cpp
-#include "logging.hpp"
-
-#include <ofstream>
-
-int main() {
-  std::ofstream log_file("iqm_qdmi.log");
-  iqm::Logger::get_instance().set_output(log_file);
-  iqm::Logger::get_instance().set_level(iqm::Logger::Level::INFO);
-
-  LOG_INFO("This message will be written to iqm_qdmi.log");
-
-  return 0;
-}
-```

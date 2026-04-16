@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import os
 import shutil
@@ -87,6 +88,7 @@ def _run_tests(
         "test",
         *install_args,
         "pytest",
+        "test/python",
         *pytest_run_args,
         *session.posargs,
         "--cov-config=pyproject.toml",
@@ -115,25 +117,38 @@ def minimums(session: nox.Session) -> None:
 
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
-    """Build docs via CMake."""
-    cmake = shutil.which("cmake") or shutil.which("cmake3")
-    if cmake is None:
-        session.install("cmake")
-        cmake = shutil.which("cmake") or shutil.which("cmake3") or "cmake"
+    """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-b", dest="builder", default="html", help="Build target (default: html)")
+    args, posargs = parser.parse_known_args(session.posargs)
+
+    serve = args.builder == "html" and session.interactive
+    if serve:
+        session.install("sphinx-autobuild")
+    session.install("scikit-build-core")
 
     session.run(
-        cmake,
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DBUILD_IQM_QDMI_DOCS=ON",
-        "-DBUILD_IQM_QDMI_TESTS=OFF",
-        *session.posargs,
-        external=True,
+        "uv",
+        "run",
+        "--no-build-isolation-package",
+        "iqm-qdmi",
+        "--group",
+        "docs",
+        "--verbose",
+        "sphinx-autobuild" if serve else "sphinx-build",
+        "-n",
+        "-T",
+        f"-b={args.builder}",
+        "docs",
+        f"docs/_build/{args.builder}",
+        *posargs,
+        env={
+            "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
+            "SKBUILD_CMAKE_DEFINE": "BUILD_IQM_QDMI_DOCS=ON",
+            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs",
+            "SKBUILD_BUILD_DIR": "build/docs",
+        },
     )
-    session.run(cmake, "--build", "build", "--target", "iqm_qdmi_device_docs", "--parallel", external=True)
 
 
 if __name__ == "__main__":
