@@ -30,7 +30,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
       - name: Install Doxygen
-        uses: ssciwr/doxygen-install@501e53b879da7648ab392ee226f5b90e42148449 # v1.6.4
+        uses: ssciwr/doxygen-install@329d88f5a303066a5bd006db7516b1925b86350e # v2.0.1
         with:
           version: "1.15.0"
 
