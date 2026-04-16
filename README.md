@@ -13,9 +13,21 @@
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
 
-A C++20 library that implements
-the [QDMI (Quantum Device Management Interface)](https://github.com/Munich-Quantum-Software-Stack/qdmi) for IQM's
-quantum computers, enabling seamless communication with IQM quantum hardware through a standardized interface.
+**QDMI on IQM** is IQM's official, production-ready implementation of the [Quantum Device Management Interface (QDMI)](https://github.com/Munich-Quantum-Software-Stack/qdmi).
+
+By providing this officially supported implementation, we empower HPC centers and middleware developers to embed IQM processors via a stable, vendor-agnostic standard.
+This avoids the need for fragile, bespoke adapter chains and allows users to keep their familiar tools while operators maintain manageable workflows.
+
+The library seamlessly wraps backend orchestration—spanning persistent session control, calibration queries, and job semantics via the [IQM Server API](https://resonance.meetiqm.com/docs/api-reference)—to connect higher-level software and schedulers to both our cloud-hosted endpoints through [IQM Resonance](https://resonance.meetiqm.com) and our on-premise device deployments.
+
+The underlying library is written in C++20, providing a reliable foundation for long-lived integration code.
+Pre-compiled binaries for major OS and architecture configurations are provided alongside an official Python wrapper for straightforward installation via `uv` and direct use in Python workflows.
+
+<p align="center">
+  <a href="https://iqm-finland.github.io/QDMI-on-IQM/">
+  <img width=30% src="https://img.shields.io/badge/documentation-blue?style=for-the-badge&logo=read%20the%20docs" alt="Documentation" />
+  </a>
+</p>
 
 ## What is QDMI?
 
