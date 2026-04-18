@@ -46,7 +46,7 @@ repos:
 
   ## Check the pyproject.toml file
   - repo: https://github.com/henryiii/validate-pyproject-schema-store
-    rev: 2026.04.03
+    rev: 2026.04.10
     hooks:
       - id: validate-pyproject
         priority: 0
@@ -122,7 +122,7 @@ repos:
 
   ## Format configuration files with prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.8.1
+    rev: v3.8.2
     hooks:
       - id: prettier
         types_or: [yaml, markdown, html, css, scss, javascript, json, json5]
