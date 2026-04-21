@@ -23,13 +23,13 @@ if(TARGET qdmi::qdmi)
 else()
   message(STATUS "QDMI will be included via FetchContent")
   # cmake-format: off
-  set(QDMI_VERSION 1.2.2
+  set(QDMI_VERSION 1.3.0
       CACHE STRING "QDMI version")
-  set(QDMI_REV "1843a1a8a9c828d39fe01704675be5634153c969" # v1.2.x
+  set(QDMI_REV "0f7e08c58b72800d1022a01cfb618af67b9a9c30" # v1.3.0
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
-  set(QDMI_INSTALL
+  set(INSTALL_QDMI
       OFF
       CACHE BOOL "Generate installation instructions for QDMI")
   # cmake-format: on

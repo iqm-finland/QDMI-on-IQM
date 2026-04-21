@@ -9,7 +9,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
-Compatible with QDMI `v1.2`.
+Compatible with QDMI `v1.3.0`.
 
 - 🎉 Initial release ([**@burgholzer**], [**@marcelwa**])
 
