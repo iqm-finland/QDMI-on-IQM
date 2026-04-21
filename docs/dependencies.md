@@ -6,11 +6,11 @@ This project relies on several third-party libraries and tools. Below is a compr
 
 These dependencies are linked into the shared library and **shipped with every built wheel or binary**.
 
-| Dependency      | Version          | License                        | Purpose                                       |
-| :-------------- | :--------------- | :----------------------------- | :-------------------------------------------- |
-| [QDMI]          | 1.2.x (@1843a1a) | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
-| [nlohmann/json] | 3.12.0           | MIT License                    | JSON parsing and serialization                |
-| [cURL]          | system-provided  | MIT/X derivative               | HTTP client library for backend communication |
+| Dependency      | Version         | License                        | Purpose                                       |
+| :-------------- | :-------------- | :----------------------------- | :-------------------------------------------- |
+| [QDMI]          | 1.3.0           | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
+| [nlohmann/json] | 3.12.0          | MIT License                    | JSON parsing and serialization                |
+| [cURL]          | system-provided | MIT/X derivative               | HTTP client library for backend communication |
 
 [QDMI]: https://github.com/Munich-Quantum-Software-Stack/qdmi
 [nlohmann/json]: https://github.com/nlohmann/json
