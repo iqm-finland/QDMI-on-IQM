@@ -191,6 +191,10 @@ test-groups = ["test"]
 test-sources = ["test/python"]
 test-command = "pytest test/python"
 build-frontend = "uv"
+test-skip = [
+  "cp3??t-*", # no freethreading qiskit wheels
+  "cp*-win_arm64", # no numpy, qiskit, ... wheels
+]
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y curl-devel"
