@@ -42,13 +42,16 @@ pytestmark = [
 
 
 class _CircuitLike(Protocol):
-    def r(self, theta: float, phi: float, qubit: int) -> object: ...
+    def r(self, theta: float, phi: float, qubit: int) -> object:
+        pass
 
-    def measure_all(self) -> None: ...
+    def measure_all(self) -> None:
+        pass
 
 
 class _BitArrayLike(Protocol):
-    def get_counts(self) -> dict[str, int]: ...
+    def get_counts(self) -> dict[str, int]:
+        pass
 
 
 class _SamplerDataLike(Protocol):
@@ -56,7 +59,8 @@ class _SamplerDataLike(Protocol):
 
 
 class _ScalarLike(Protocol):
-    def __getitem__(self, key: tuple[()]) -> float: ...
+    def __getitem__(self, key: tuple[()]) -> float:
+        pass
 
 
 class _EstimatorDataLike(Protocol):
@@ -65,7 +69,8 @@ class _EstimatorDataLike(Protocol):
 
 
 class _CountsResultLike(Protocol):
-    def get_counts(self) -> dict[str, int]: ...
+    def get_counts(self) -> dict[str, int]:
+        pass
 
 
 def _load_quantum_circuit() -> Callable[[int], _CircuitLike]:
