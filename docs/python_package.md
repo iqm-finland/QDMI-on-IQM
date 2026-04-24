@@ -72,7 +72,7 @@ Core's sampler and estimator primitives with the IQM device.
 
 ### Backend Usage
 
-```{code-cell} ipython3
+```{code-block} python
 from math import pi
 
 from iqm.qdmi import IQMBackend
@@ -105,7 +105,7 @@ environment variables when available:
 `IQMBackend` provides small helpers for constructing sampler and estimator primitives bound
 to the backend instance.
 
-```{code-cell} ipython3
+```{code-block} python
 from math import pi
 
 from iqm.qdmi import IQMBackend
