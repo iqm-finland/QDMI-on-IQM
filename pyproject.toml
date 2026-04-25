@@ -195,7 +195,7 @@ skip = ["*-musllinux_*"]
 archs = "auto64"
 test-groups = ["test"]
 test-sources = ["test/python"]
-test-command = "pytest test/python"
+test-command = "pytest test/python -m integration"
 build-frontend = "uv"
 test-skip = [
   "cp3??t-*", # no freethreading qiskit wheels
