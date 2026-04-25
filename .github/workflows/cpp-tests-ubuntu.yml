@@ -49,7 +49,7 @@ jobs:
           override_cache_key: c++-tests-${{ inputs.runs-on }}-${{ inputs.config }}
       # Set up mold for faster C++ builds
       - name: Setup mold
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: Configure CMake
         env:
           CONFIG: ${{ inputs.config }}
