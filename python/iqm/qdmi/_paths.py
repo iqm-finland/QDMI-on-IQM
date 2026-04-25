@@ -20,12 +20,24 @@
 from importlib.metadata import distribution
 from pathlib import Path
 
+
+def _require_existing_path(path: Path, *, name: str) -> Path:
+    """Return ``path`` if it exists, otherwise raise a file-not-found error.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+    """
+    if not path.exists():
+        msg = f"{name} does not exist: {path}"
+        raise FileNotFoundError(msg)
+    return path
+
+
 dist = distribution("iqm-qdmi")
 located_include_dir = dist.locate_file("iqm/qdmi/data/include/iqm_qdmi")
 resolved_include_dir = Path(str(located_include_dir)).resolve(strict=True)
 
-IQM_QDMI_DATA = resolved_include_dir.parents[1]
-assert IQM_QDMI_DATA.exists(), f"IQM_QDMI_DATA does not exist: {IQM_QDMI_DATA}"
+IQM_QDMI_DATA = _require_existing_path(resolved_include_dir.parents[1], name="IQM_QDMI_DATA")
 
 
 def _resolve_library_dir() -> Path:
@@ -36,19 +48,21 @@ def _resolve_library_dir() -> Path:
     return IQM_QDMI_DATA / "lib64"
 
 
-IQM_QDMI_LIBRARY_DIR = _resolve_library_dir()
-assert IQM_QDMI_LIBRARY_DIR.exists(), f"IQM_QDMI_LIBRARY_DIR does not exist: {IQM_QDMI_LIBRARY_DIR}"
+IQM_QDMI_LIBRARY_DIR = _require_existing_path(_resolve_library_dir(), name="IQM_QDMI_LIBRARY_DIR")
 
-library_files = list(IQM_QDMI_LIBRARY_DIR.glob("*iqm-qdmi-device*"))
+library_files = sorted(IQM_QDMI_LIBRARY_DIR.glob("*iqm-qdmi-device*"), key=lambda path: path.name)
 if not library_files:
     msg = f"No IQM QDMI library found in: {IQM_QDMI_LIBRARY_DIR}"
     raise FileNotFoundError(msg)
+if len(library_files) > 1:
+    msg = (
+        f"Multiple IQM QDMI libraries found in {IQM_QDMI_LIBRARY_DIR}: {', '.join(str(path) for path in library_files)}"
+    )
+    raise RuntimeError(msg)
 IQM_QDMI_LIBRARY_PATH = library_files[0]
 
-IQM_QDMI_INCLUDE_DIR = IQM_QDMI_DATA / "include"
-assert IQM_QDMI_INCLUDE_DIR.exists(), f"IQM_QDMI_INCLUDE_DIR does not exist: {IQM_QDMI_INCLUDE_DIR}"
+IQM_QDMI_INCLUDE_DIR = _require_existing_path(IQM_QDMI_DATA / "include", name="IQM_QDMI_INCLUDE_DIR")
 
-IQM_QDMI_CMAKE_DIR = IQM_QDMI_DATA / "share" / "cmake"
-assert IQM_QDMI_CMAKE_DIR.exists(), f"IQM_QDMI_CMAKE_DIR does not exist: {IQM_QDMI_CMAKE_DIR}"
+IQM_QDMI_CMAKE_DIR = _require_existing_path(IQM_QDMI_DATA / "share" / "cmake", name="IQM_QDMI_CMAKE_DIR")
 
 del dist, located_include_dir, resolved_include_dir

@@ -113,7 +113,12 @@ minversion = "9.0"
 strict = true
 addopts = [
   "-ra",
+  "-m",
+  "not integration",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
+]
+markers = [
+  "integration: tests that require live external services or credentials",
 ]
 filterwarnings = [
   "error",

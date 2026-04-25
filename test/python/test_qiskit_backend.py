@@ -184,6 +184,7 @@ def test_iqm_backend_creates_bound_primitives(monkeypatch: pytest.MonkeyPatch) -
     assert estimator.backend is backend
 
 
+@pytest.mark.integration
 def test_iqm_backend_live_run() -> None:
     """A simple Qiskit circuit should execute through the live IQM backend."""
     _skip_without_iqm_access()
@@ -200,6 +201,7 @@ def test_iqm_backend_live_run() -> None:
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.integration
 def test_iqm_backend_live_sampler() -> None:
     """The bound sampler should execute a simple circuit on the live IQM backend."""
     _skip_without_iqm_access()
@@ -216,6 +218,7 @@ def test_iqm_backend_live_sampler() -> None:
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.integration
 def test_iqm_backend_live_estimator() -> None:
     """The bound estimator should execute a simple observable on the live IQM backend."""
     _skip_without_iqm_access()
