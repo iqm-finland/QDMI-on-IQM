@@ -60,6 +60,14 @@ repos:
       - id: check-readthedocs
         priority: 0
 
+  ## Check best practices for scientific Python code
+  - repo: https://github.com/scientific-python/cookie
+    rev: 2026.04.04
+    hooks:
+      - id: sp-repo-review
+        additional_dependencies: ["repo-review[cli]"]
+        priority: 0
+
   ## Catch common capitalization mistakes
   - repo: local
     hooks:
