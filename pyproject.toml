@@ -23,6 +23,9 @@ build-backend = "scikit_build_core.build"
 name = "iqm-qdmi"
 version = "1.0.0"
 requires-python = ">=3.10"
+dependencies = [
+  "mqt-core[qiskit]==3.5.1",
+]
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
@@ -110,7 +113,12 @@ minversion = "9.0"
 strict = true
 addopts = [
   "-ra",
+  "-m",
+  "not integration",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
+]
+markers = [
+  "integration: tests that require live external services or credentials",
 ]
 filterwarnings = [
   "error",
@@ -183,11 +191,16 @@ delocate = "delocate"
 
 [tool.cibuildwheel]
 build = "cp3*"
+skip = ["*-musllinux_*"]
 archs = "auto64"
 test-groups = ["test"]
 test-sources = ["test/python"]
-test-command = "pytest test/python"
+test-command = "pytest test/python -m integration"
 build-frontend = "uv"
+test-skip = [
+  "cp3??t-*", # no freethreading qiskit wheels
+  "cp*-win_arm64", # no numpy, qiskit, ... wheels
+]
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y curl-devel"

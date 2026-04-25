@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
+from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, IQMBackend, __version__
 
 
 def test_version_exists() -> None:
@@ -71,3 +71,8 @@ def test_paths_are_absolute() -> None:
     assert IQM_QDMI_INCLUDE_DIR.is_absolute()
     assert IQM_QDMI_CMAKE_DIR.is_absolute()
     assert IQM_QDMI_LIBRARY_PATH.is_absolute()
+
+
+def test_iqm_backend_is_exported() -> None:
+    """Test that IQMBackend is part of the public Python API."""
+    assert IQMBackend.__name__ == "IQMBackend"
