@@ -28,7 +28,6 @@ The package itself makes the following variables available for import:
 - `IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
 - `IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
 - `IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
-- `IQMBackend`: Qiskit-compatible backend.
 
 ```{code-cell} ipython3
 from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH
@@ -65,67 +64,59 @@ The above values can also be conveniently queried from the command line via the 
 
 ## Qiskit Integration
 
-The package also exposes `IQMBackend`, a thin wrapper around MQT Core's
-`QDMIBackend` that loads the packaged IQM QDMI shared library automatically.
-This gives you a direct Qiskit entry point for running circuits and using MQT
-Core's sampler and estimator primitives with the IQM device.
+The package includes a wrapper for the IQM QDMI Device library that integrates it with Qiskit.
+This wrapper is implemented in the {py:mod}`iqm.qdmi.qiskit` submodule and is based on the open-source, MIT-licensed MQT Core library.
+To use the wrapper, make sure to install the `iqm-qdmi` package with the `qiskit` extra:
 
-### Backend Usage
+```bash
+uv pip install iqm-qdmi[qiskit]
+```
 
-```{code-block} python
-from math import pi
+Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from {py:mod}`iqm.qdmi.qiskit` and used as a drop-in replacement for any Qiskit backend.
 
-from iqm.qdmi import IQMBackend
-from qiskit import QuantumCircuit
+```{code-cell} ipython3
+from iqm.qdmi.qiskit import IQMBackend
+from qiskit.circuit import QuantumCircuit
+from qiskit.compiler import transpile
 
 backend = IQMBackend(
   base_url="https://resonance.meetiqm.com",
-  token="your-api-token",
-  qc_alias="garnet:mock",
+  qc_alias="emerald:mock",
 )
+```
 
-qc = QuantumCircuit(1)
-qc.r(pi / 2, 0.0, 0)
+```{code-cell} ipython3
+qc = QuantumCircuit(2)
+qc.h(0)
+qc.cx(0, 1)
 qc.measure_all()
 
-result = backend.run(qc, shots=128).result()
+transpiled_qc = transpile(qc, backend)
+result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-If constructor arguments are omitted, `IQMBackend` falls back to the following
-environment variables when available:
-
-- `IQM_BASE_URL`
-- `RESONANCE_API_KEY`
-- `IQM_QC_ID`
-- `IQM_QC_ALIAS`
+If no API token is explicitly provided, like in the example above, the wrapper will attempt to read it from the `IQM_TOKEN` or `RESONANCE_API_KEY` environment variables.
 
 ### Sampler and Estimator Primitives
 
-`IQMBackend` provides small helpers for constructing sampler and estimator primitives bound
+{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing {py:class}`~qiskit.primitives.BaseSamplerV2` and {py:class}`~qiskit.primitives.BaseEstimatorV2` primitives bound
 to the backend instance.
 
-```{code-block} python
-from math import pi
+```{code-cell} ipython3
+sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
+counts = sampler_job.result()[0].data["meas"].get_counts()
+print(f"Counts: {counts}")
+```
 
-from iqm.qdmi import IQMBackend
-from qiskit import QuantumCircuit
+```{code-cell} ipython3
 from qiskit.quantum_info import SparsePauliOp
 
-backend = IQMBackend()
+transpiled_qc.remove_final_measurements(inplace=True)
+observable = SparsePauliOp("Z" * backend.num_qubits)
 
-sampler_circuit = QuantumCircuit(1)
-sampler_circuit.r(pi / 2, 0.0, 0)
-sampler_circuit.measure_all()
-
-sampler_result = backend.sampler().run([(sampler_circuit,)], shots=128).result()[0]
-print(sampler_result.data.meas.get_counts())
-
-estimator_circuit = QuantumCircuit(1)
-estimator_circuit.r(pi / 2, 0.0, 0)
-observable = SparsePauliOp("Z")
-
-estimator_result = backend.estimator().run([(estimator_circuit, observable)]).result()[0]
-print(estimator_result.data.evs)
-print(estimator_result.data.stds)
+estimator_job = backend.estimator().run([(transpiled_qc, observable)])
+data = estimator_job.result()[0].data
+print(f"Expectation values: {data['evs']}")
+print(f"Standard deviations: {data['stds']}")
 ```
