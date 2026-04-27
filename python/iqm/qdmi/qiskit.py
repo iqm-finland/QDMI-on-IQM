@@ -24,7 +24,9 @@ from typing import Any
 
 try:
     from mqt.core.fomac import add_dynamic_device_library
-    from mqt.core.plugins.qiskit import QDMIBackend, QDMIEstimator, QDMISampler
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
+    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
+    from mqt.core.plugins.qiskit.sampler import QDMISampler
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
