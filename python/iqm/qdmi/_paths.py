@@ -49,10 +49,7 @@ def _resolve_library_dir() -> Path:
     """
     if sys.platform == "win32":
         library_dir = IQM_QDMI_DATA / "bin"
-        if library_dir.exists():
-            return library_dir
-        msg = f"Expected 'bin' directory for IQM QDMI library on Windows, but it does not exist: {library_dir}"
-        raise FileNotFoundError(msg)
+        return _require_existing_path(library_dir, name="IQM_QDMI_LIBRARY_DIR")
 
     library_dir = IQM_QDMI_DATA / "lib"
     if library_dir.exists():
