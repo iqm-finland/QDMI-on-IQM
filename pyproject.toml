@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.0.0"
+version = "1.0.1"
 requires-python = ">=3.10"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
