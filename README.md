@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://www.meetiqm.com">
    <picture>
-     <source media="(prefers-color-scheme: dark)" srcset="docs/_static/iqm_logo_dark.svg">
-     <img src="docs/_static/iqm_logo.svg" alt="IQM Logo" width="40%">
+     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/iqm-finland/QDMI-on-IQM/raw/refs/heads/main/docs/_static/iqm_logo_dark.svg">
+     <img src="https://github.com/iqm-finland/QDMI-on-IQM/raw/refs/heads/main/docs/_static/iqm_logo.svg" alt="IQM Logo" width="40%">
    </picture>
   </a>
 </p>

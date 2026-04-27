@@ -9,13 +9,27 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-27
+
+### Fixed
+
+- 🐛 Fix CD workflow runner ([#49]) ([**@burgholzer**])
+
+## [1.0.0] - 2026-04-27
+
 Compatible with QDMI `v1.3.0`.
 
 - 🎉 Initial release ([**@burgholzer**], [**@marcelwa**])
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/...v1.0.0
+
+<!-- PR links -->
+
+[#49]: https://github.com/iqm-finland/QDMI-on_IQM/pull/49
 
 <!-- Contributor -->
 

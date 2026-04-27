@@ -19,7 +19,7 @@ cmake_minimum_required(VERSION 3.24...4.2)
 project(
   iqm-qdmi-device
   LANGUAGES C CXX
-  VERSION 1.0.0
+  VERSION 1.0.1
   DESCRIPTION "Implementation of a QDMI device for IQM Quantum Computers")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

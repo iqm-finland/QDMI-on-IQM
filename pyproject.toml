@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.0.0"
+version = "1.0.1"
 requires-python = ">=3.10"
 dependencies = [
   "mqt-core[qiskit]==3.5.1",
@@ -74,7 +74,7 @@ docs = [
 dev = [
   {include-group = "test"},
   "nox>=2026.4.10",
-  "ty==0.0.31",
+  "ty==0.0.32",
 ]
 
 
@@ -188,6 +188,15 @@ default.extend-ignore-re = [
 optin = "optin"
 recal = "recal"
 delocate = "delocate"
+
+
+[tool.repo-review.ignore]
+GH200 = "We use Renovate instead of Dependabot"
+MY100 = "We use ty instead of mypy"
+PC140 = "We use ty instead of mypy"
+PC160 = "We use a mirror of crate-ci/typos"
+PC170 = "We do not use rST files"
+
 
 [tool.cibuildwheel]
 build = "cp3*"
