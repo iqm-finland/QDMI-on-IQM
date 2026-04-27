@@ -889,7 +889,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "mqt-core", extras = ["qiskit"], marker = "extra == 'qiskit'", specifier = "~=3.5.0" },
-    { name = "qiskit", marker = "extra == 'qiskit'", specifier = ">=1.0" },
+    { name = "qiskit", marker = "extra == 'qiskit'", specifier = ">=1.1" },
 ]
 provides-extras = ["qiskit"]
 
