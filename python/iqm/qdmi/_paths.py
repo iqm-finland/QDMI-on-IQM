@@ -17,6 +17,7 @@
 
 """Resolved install paths for the packaged IQM QDMI device library."""
 
+import sys
 from importlib.metadata import distribution
 from pathlib import Path
 
@@ -41,11 +42,29 @@ IQM_QDMI_DATA = _require_existing_path(resolved_include_dir.parents[1], name="IQ
 
 
 def _resolve_library_dir() -> Path:
-    """Return the directory containing the packaged IQM QDMI shared library."""
+    """Return the directory containing the packaged IQM QDMI shared library.
+
+    Raises:
+        FileNotFoundError: If the expected library directory does not exist.
+    """
+    if sys.platform == "win32":
+        library_dir = IQM_QDMI_DATA / "bin"
+        if library_dir.exists():
+            return library_dir
+        msg = f"Expected 'bin' directory for IQM QDMI library on Windows, but it does not exist: {library_dir}"
+        raise FileNotFoundError(msg)
+
     library_dir = IQM_QDMI_DATA / "lib"
     if library_dir.exists():
         return library_dir
-    return IQM_QDMI_DATA / "lib64"
+    library_dir = IQM_QDMI_DATA / "lib64"
+    if library_dir.exists():
+        return library_dir
+    msg = (
+        f"Expected 'lib' or 'lib64' directory for IQM QDMI library on Unix-like systems, "
+        f"but neither exists: {library_dir}"
+    )
+    raise FileNotFoundError(msg)
 
 
 IQM_QDMI_LIBRARY_DIR = _require_existing_path(_resolve_library_dir(), name="IQM_QDMI_LIBRARY_DIR")
