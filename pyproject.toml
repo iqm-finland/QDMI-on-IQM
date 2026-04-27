@@ -23,9 +23,6 @@ build-backend = "scikit_build_core.build"
 name = "iqm-qdmi"
 version = "1.0.1"
 requires-python = ">=3.10"
-dependencies = [
-  "mqt-core[qiskit]==3.5.1",
-]
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
@@ -46,6 +43,12 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+qiskit = [
+  "mqt-core[qiskit]~=3.5.0",
+  "qiskit>=1.0"
+]
+
 [project.urls]
 Homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
 Issues = "https://github.com/iqm-finland/QDMI-on-IQM/issues"
@@ -55,12 +58,17 @@ Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 iqm-qdmi = "iqm.qdmi.__main__:main"
 
 [dependency-groups]
+qiskit = [
+    "mqt-core[qiskit]~=3.5.0",
+    "qiskit>=1.0"
+]
 test = [
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.0.0",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
+  {include-group = "qiskit"},
 ]
 docs = [
   "breathe>=4.36.0",
