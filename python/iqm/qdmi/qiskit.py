@@ -22,8 +22,15 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from mqt.core import fomac
-from mqt.core.plugins.qiskit import QDMIBackend, QDMIEstimator, QDMISampler
+try:
+    from mqt.core.fomac import add_dynamic_device_library
+    from mqt.core.plugins.qiskit import QDMIBackend, QDMIEstimator, QDMISampler
+except ImportError as e:
+    msg = (
+        "Failed to import Qiskit plugin. "
+        "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
+    )
+    raise ImportError(msg) from e
 
 from ._paths import IQM_QDMI_LIBRARY_PATH
 
@@ -37,17 +44,14 @@ def __dir__() -> list[str]:
 class IQMBackend(QDMIBackend):
     """Qiskit backend for the packaged IQM QDMI device library.
 
-    This backend loads the shared library distributed with ``iqm-qdmi`` and
+    This backend loads the shared library distributed with `iqm-qdmi` and
     exposes it through MQT Core's Qiskit-compatible QDMI backend.
 
     Args:
-        base_url: Base URL of the IQM service. Defaults to ``IQM_BASE_URL`` or
+        base_url: Base URL of the IQM service. Defaults to `IQM_BASE_URL` or
             the standard Resonance endpoint.
-        token: Authentication token. Defaults to ``RESONANCE_API_KEY``.
-        auth_file: Path to an authentication file.
-        auth_url: Authentication server URL.
-        username: Username for authentication.
-        password: Password for authentication.
+        token: Authentication token. Defaults to `IQM_TOKEN` or `RESONANCE_API_KEY`.
+        tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier.
         qc_alias: Optional IQM quantum computer alias.
     """
@@ -57,23 +61,17 @@ class IQMBackend(QDMIBackend):
         *,
         base_url: str | None = None,
         token: str | None = None,
-        auth_file: str | None = None,
-        auth_url: str | None = None,
-        username: str | None = None,
-        password: str | None = None,
+        tokens_file: str | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
-        device = fomac.add_dynamic_device_library(
+        device = add_dynamic_device_library(
             library_path=str(IQM_QDMI_LIBRARY_PATH),
             prefix="IQM",
             base_url=base_url or os.getenv("IQM_BASE_URL") or "https://resonance.meetiqm.com",
-            token=token or os.getenv("RESONANCE_API_KEY"),
-            auth_file=auth_file,
-            auth_url=auth_url,
-            username=username,
-            password=password,
+            token=token or os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY"),
+            auth_file=tokens_file or os.getenv("IQM_TOKENS_FILE"),
             custom1=qc_id or os.getenv("IQM_QC_ID"),
             custom2=qc_alias or os.getenv("IQM_QC_ALIAS"),
         )
@@ -85,11 +83,7 @@ class IQMBackend(QDMIBackend):
         default_shots: int = 1024,
         options: dict[str, Any] | None = None,
     ) -> QDMISampler:
-        """Create a sampler primitive bound to this backend.
-
-        Returns:
-            A sampler primitive configured to submit circuits through this backend.
-        """
+        """Returns SamplerV2 primitive bound to this backend."""
         return QDMISampler(self, default_shots=default_shots, options=options)
 
     def estimator(
@@ -98,9 +92,5 @@ class IQMBackend(QDMIBackend):
         default_precision: float = 0.0,
         options: dict[str, Any] | None = None,
     ) -> QDMIEstimator:
-        """Create an estimator primitive bound to this backend.
-
-        Returns:
-            An estimator primitive configured to submit observables through this backend.
-        """
+        """Returns an EstimatorV2 primitive bound to this backend."""
         return QDMIEstimator(self, default_precision=default_precision, options=options)
