@@ -161,6 +161,8 @@ jobs:
     uses: ./.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
+    secrets:
+      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
   # this job does nothing and is only used for branch protection
   required-checks-pass:
