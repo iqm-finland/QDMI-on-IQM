@@ -43,6 +43,12 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+qiskit = [
+  "mqt-core[qiskit]~=3.5.0",
+  "qiskit>=1.1"
+]
+
 [project.urls]
 Homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
 Issues = "https://github.com/iqm-finland/QDMI-on-IQM/issues"
@@ -52,12 +58,19 @@ Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 iqm-qdmi = "iqm.qdmi.__main__:main"
 
 [dependency-groups]
+qiskit = [
+  "mqt-core[qiskit]~=3.5.0",
+  "qiskit>=1.1",
+  "numpy>=2.1; python_version >= '3.13'",
+  "numpy>=2.3.2; python_version >= '3.14'",
+]
 test = [
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.0.0",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
+  {include-group = "qiskit"},
 ]
 docs = [
   "breathe>=4.36.0",
@@ -197,6 +210,17 @@ test-groups = ["test"]
 test-sources = ["test/python"]
 test-command = "pytest test/python"
 build-frontend = "uv"
+test-skip = [
+  "cp3??t-*", # no freethreading qiskit wheels
+  "cp*-win_arm64", # no numpy, qiskit, ... wheels
+  "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
+]
+environment-pass = [
+  "IQM_BASE_URL",
+  "IQM_QC_ALIAS",
+  "IQM_TOKEN",
+  "IQM_CPP_API_LOG_LEVEL",
+]
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y curl-devel"
