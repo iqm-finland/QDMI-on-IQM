@@ -37,6 +37,19 @@
 namespace iqm {
 
 namespace {
+enum class ERROR_LOG_POLICY : uint8_t {
+  ERROR,
+  DEBUG,
+};
+
+void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
+  if (policy == ERROR_LOG_POLICY::DEBUG) {
+    LOG_DEBUG(message);
+    return;
+  }
+  LOG_ERROR(message);
+}
+
 // Helper for CURL responses
 size_t Curl_write_callback(void *contents, const size_t size,
                            const size_t nmemb, std::string *response) {
@@ -57,7 +70,8 @@ curl_slist *Default_headers(const std::string &bearer_token) {
 }
 
 int Handle_response_code(CURL *curl, const std::string &url,
-                         const std::string &response) {
+                         const std::string &response,
+                         const ERROR_LOG_POLICY error_log_policy) {
   int64_t response_code{};
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
@@ -117,7 +131,7 @@ int Handle_response_code(CURL *curl, const std::string &url,
     error_context += " (Unexpected Response Code)";
   }
 
-  LOG_ERROR(error_context);
+  Log_error(error_log_policy, error_context);
 
   // Log IQM-specific errors if present
   bool logged_structured_error = false;
@@ -126,8 +140,10 @@ int Handle_response_code(CURL *curl, const std::string &url,
   if (has_json && json_response.contains("errors") &&
       !json_response["errors"].is_null() &&
       json_response["errors"].is_array() && !json_response["errors"].empty()) {
-    LOG_ERROR("Response contains " +
-              std::to_string(json_response["errors"].size()) + " error(s):");
+    Log_error(error_log_policy,
+              "Response contains " +
+                  std::to_string(json_response["errors"].size()) +
+                  " error(s):");
     for (const auto &error : json_response["errors"]) {
       std::string error_msg;
       if (error.contains("error_code") && error["error_code"].is_string()) {
@@ -137,7 +153,7 @@ int Handle_response_code(CURL *curl, const std::string &url,
         error_msg += error["message"].get<std::string>();
       }
       if (!error_msg.empty()) {
-        LOG_ERROR("  - " + error_msg);
+        Log_error(error_log_policy, "  - " + error_msg);
       }
     }
     logged_structured_error = true;
@@ -157,14 +173,14 @@ int Handle_response_code(CURL *curl, const std::string &url,
       error_msg += json_response["message"].get<std::string>();
     }
     if (!error_msg.empty()) {
-      LOG_ERROR("Error: " + error_msg);
+      Log_error(error_log_policy, "Error: " + error_msg);
       logged_structured_error = true;
     }
   }
 
   // Fall back to raw response if no structured errors are available
   if (!logged_structured_error && !response.empty()) {
-    LOG_ERROR("Response: " + response);
+    Log_error(error_log_policy, "Response: " + response);
   }
 
   // Log IQM messages if present (might contain additional context)
@@ -201,10 +217,10 @@ int Handle_response_code(CURL *curl, const std::string &url,
 
   return QDMI_ERROR_FATAL;
 }
-} // namespace
 
-int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
-                        std::string &response) {
+int Perform_get_request(const std::string &url, const std::string &bearer_token,
+                        std::string &response,
+                        const ERROR_LOG_POLICY error_log_policy) {
   LOG_INFO("Performing GET request to " + url);
   CURL *curl = curl_easy_init(); // NOLINT(misc-include-cleaner)
   if (curl == nullptr) {
@@ -220,19 +236,32 @@ int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
   auto *headers = Default_headers(bearer_token);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-  // Perform the request
   if (const auto res = curl_easy_perform(curl); // NOLINT(misc-include-cleaner)
       res != CURLE_OK) {
-    LOG_ERROR("curl_easy_perform() failed: " +
-              std::string(curl_easy_strerror(res)));
+    Log_error(error_log_policy, "curl_easy_perform() failed: " +
+                                    std::string(curl_easy_strerror(res)));
     curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
     curl_slist_free_all(headers);
     return QDMI_ERROR_FATAL;
   }
-  const auto ret = Handle_response_code(curl, url, response);
+  const auto ret = Handle_response_code(curl, url, response, error_log_policy);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;
+}
+} // namespace
+
+int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
+                        std::string &response) {
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::ERROR);
+}
+
+int CurlHttpClient::get_optional(const std::string &url,
+                                 const std::string &bearer_token,
+                                 std::string &response) {
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::DEBUG);
 }
 
 int CurlHttpClient::post(const std::string &url,
@@ -272,7 +301,8 @@ int CurlHttpClient::post(const std::string &url,
     curl_slist_free_all(headers);
     return QDMI_ERROR_FATAL;
   }
-  const auto ret = Handle_response_code(curl, url, response);
+  const auto ret =
+      Handle_response_code(curl, url, response, ERROR_LOG_POLICY::ERROR);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;

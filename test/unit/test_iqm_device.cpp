@@ -28,7 +28,9 @@
 #include <exception>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +44,8 @@ using testing::SetArgReferee;
 int IQM_QDMI_device_session_init_with_http_client(
     IQM_QDMI_Device_Session session,
     std::unique_ptr<iqm::IHttpClient> http_client);
+
+namespace {
 
 // ============================================================================
 // TEST FIXTURES
@@ -71,67 +75,6 @@ protected:
   std::unique_ptr<iqm::MockHttpClient> mock_http_client_;
   iqm::MockHttpClient *mock_handle_{};
 
-  void SetUp() override {
-    EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
-    mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
-    mock_handle_ = mock_http_client_.get();
-    EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
-    const std::string base_url = "https://localhost";
-    EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                  session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
-                  base_url.size() + 1, base_url.c_str()),
-              QDMI_SUCCESS);
-  }
-
-  void TearDown() override {
-    if (session != nullptr) {
-      IQM_QDMI_device_session_free(session);
-    }
-    EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
-  }
-
-  static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
-    {
-      "name": "test_circuit",
-      "instructions": [
-        {
-          "name": "prx",
-          "locus": [
-            "QB1"
-          ],
-          "args": {
-            "angle_t": 0.25,
-            "phase_t": 0.75
-          }
-        },
-        {
-          "name": "cz",
-          "locus": [
-            "QB1",
-            "QB2"
-          ],
-          "args": {}
-        },
-        {
-          "name": "measure",
-          "locus": [
-            "QB1"
-          ],
-          "args": {
-            "key": "meas_2_0_0"
-          }
-        }
-      ],
-      "metadata": {}
-    }
-  )";
-};
-
-class DeviceJobMockTest : public DeviceIntegrationMockTest {
-protected:
-  IQM_QDMI_Device_Job job = nullptr;
-
-  // Mock initialization responses for unified API
   const std::string list_quantum_computers_response = R"({
       "quantum_computers": [
         {
@@ -426,6 +369,66 @@ protected:
       ],
       "warnings": []
     })";
+
+  void SetUp() override {
+    EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
+    mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
+    mock_handle_ = mock_http_client_.get();
+    EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
+    const std::string base_url = "https://localhost";
+    EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                  session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                  base_url.size() + 1, base_url.c_str()),
+              QDMI_SUCCESS);
+  }
+
+  void TearDown() override {
+    if (session != nullptr) {
+      IQM_QDMI_device_session_free(session);
+    }
+    EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
+  }
+
+  static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
+    {
+      "name": "test_circuit",
+      "instructions": [
+        {
+          "name": "prx",
+          "locus": [
+            "QB1"
+          ],
+          "args": {
+            "angle_t": 0.25,
+            "phase_t": 0.75
+          }
+        },
+        {
+          "name": "cz",
+          "locus": [
+            "QB1",
+            "QB2"
+          ],
+          "args": {}
+        },
+        {
+          "name": "measure",
+          "locus": [
+            "QB1"
+          ],
+          "args": {
+            "key": "meas_2_0_0"
+          }
+        }
+      ],
+      "metadata": {}
+    }
+  )";
+};
+
+class DeviceJobMockTest : public DeviceIntegrationMockTest {
+protected:
+  IQM_QDMI_Device_Job job = nullptr;
 
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
@@ -862,7 +865,7 @@ TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   EXPECT_TRUE(result.empty());
 }
 
-static constexpr auto TEST_CALIBRATION_CONFIG = R"(
+constexpr auto TEST_CALIBRATION_CONFIG = R"(
     {
       "procedure_config": {
         "excluded_qubits": [],
@@ -965,6 +968,66 @@ TEST_F(DeviceIntegrationMockTest, HTTPAuthenticationFailure) {
             QDMI_ERROR_PERMISSIONDENIED);
 }
 
+TEST_F(DeviceIntegrationMockTest,
+       MissingCocosHealthEndpointDisablesCalibrationJobs) {
+  struct Logger_guard {
+    iqm::Logger *logger;
+    iqm::LOG_LEVEL original_level;
+
+    Logger_guard(iqm::Logger *logger_in, const iqm::LOG_LEVEL level)
+        : logger(logger_in), original_level(level) {}
+
+    Logger_guard(const Logger_guard &) = delete;
+    Logger_guard &operator=(const Logger_guard &) = delete;
+    Logger_guard(Logger_guard &&) = delete;
+    Logger_guard &operator=(Logger_guard &&) = delete;
+
+    ~Logger_guard() {
+      logger->set_output(std::cerr);
+      logger->set_level(original_level);
+    }
+  };
+
+  std::stringstream log_stream{};
+  auto &logger = iqm::Logger::get_instance();
+  const Logger_guard logger_guard{&logger, logger.get_level()};
+  logger.set_level(iqm::LOG_LEVEL::DEBUG);
+  logger.set_output(log_stream);
+
+  EXPECT_CALL(*mock_http_client_, get(_, _, _))
+      .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
+                      Return(QDMI_SUCCESS)))
+      .WillOnce(
+          DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
+                Return(QDMI_SUCCESS)))
+      .WillOnce(
+          DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
+                Return(QDMI_SUCCESS)))
+      .WillOnce(
+          DoAll(SetArgReferee<2>(get_calibration_set_quality_metrics_response),
+                Return(QDMI_SUCCESS)))
+      .WillOnce(Return(QDMI_ERROR_NOTFOUND));
+
+  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
+                session, std::move(mock_http_client_)),
+            QDMI_SUCCESS);
+
+  IQM_QDMI_Device_Job job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+            QDMI_SUCCESS);
+
+  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
+                sizeof(QDMI_Program_Format), &format),
+            QDMI_ERROR_NOTSUPPORTED);
+
+  const auto logs = log_stream.str();
+  EXPECT_EQ(logs.find("ERROR"), std::string::npos);
+
+  IQM_QDMI_device_job_free(job);
+}
+
 TEST_F(DeviceIntegrationMockTest, MalformedJSONResponse) {
 
   // Test malformed JSON responses
@@ -1005,6 +1068,8 @@ TEST_F(DeviceJobMockTest, JobSubmissionFailure) {
 // ============================================================================
 // JOB HANDLING TESTS
 // ============================================================================
+
+} // namespace
 
 TEST_F(DeviceJobMockTest, JobParameterValidation) {
   // Test null job parameter

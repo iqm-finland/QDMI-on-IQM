@@ -62,6 +62,20 @@ public:
           std::string &response) override;
 
   /**
+   * @brief Perform an optional HTTP GET request using cURL.
+   *
+   * Behaves like get(), but downgrades non-success logging for capability
+   * probes where missing endpoints are expected.
+   *
+   * @param url The target URL for the GET request.
+   * @param bearer_token The bearer token for authentication (can be empty).
+   * @param response Reference to string that will contain the response body.
+   * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+   */
+  int get_optional(const std::string &url, const std::string &bearer_token,
+                   std::string &response) override;
+
+  /**
    * @brief Perform an HTTP POST request using cURL.
    *
    * Sends an HTTP POST request to the specified URL with optional data payload.

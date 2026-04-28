@@ -58,6 +58,24 @@ public:
                   std::string &response) = 0;
 
   /**
+   * @brief Perform an optional HTTP GET request.
+   *
+   * Uses the same request semantics as get(), but callers may use this for
+   * capability probes where a non-success response is expected and should not
+   * be surfaced as an error log.
+   *
+   * @param url The target URL for the GET request.
+   * @param bearer_token The bearer token for authentication (can be empty).
+   * @param response Reference to string that will contain the response body.
+   * @return HTTP status code or error code from qdmi/constants.h.
+   */
+  virtual int get_optional(const std::string &url,
+                           const std::string &bearer_token,
+                           std::string &response) {
+    return get(url, bearer_token, response);
+  }
+
+  /**
    * @brief Perform an HTTP POST request.
    *
    * Sends an HTTP POST request to the specified URL with optional data payload,
