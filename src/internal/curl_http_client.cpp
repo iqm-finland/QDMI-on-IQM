@@ -38,12 +38,12 @@ namespace iqm {
 
 namespace {
 enum class ERROR_LOG_POLICY : uint8_t {
-  ERROR,
-  DEBUG,
+  LOG_AS_ERROR,
+  LOG_AS_DEBUG,
 };
 
 void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
-  if (policy == ERROR_LOG_POLICY::DEBUG) {
+  if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
     LOG_DEBUG(message);
     return;
   }
@@ -254,14 +254,14 @@ int Perform_get_request(const std::string &url, const std::string &bearer_token,
 int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
                         std::string &response) {
   return Perform_get_request(url, bearer_token, response,
-                             ERROR_LOG_POLICY::ERROR);
+                             ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
 int CurlHttpClient::get_optional(const std::string &url,
                                  const std::string &bearer_token,
                                  std::string &response) {
   return Perform_get_request(url, bearer_token, response,
-                             ERROR_LOG_POLICY::DEBUG);
+                             ERROR_LOG_POLICY::LOG_AS_DEBUG);
 }
 
 int CurlHttpClient::post(const std::string &url,
@@ -302,7 +302,7 @@ int CurlHttpClient::post(const std::string &url,
     return QDMI_ERROR_FATAL;
   }
   const auto ret =
-      Handle_response_code(curl, url, response, ERROR_LOG_POLICY::ERROR);
+      Handle_response_code(curl, url, response, ERROR_LOG_POLICY::LOG_AS_ERROR);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;
