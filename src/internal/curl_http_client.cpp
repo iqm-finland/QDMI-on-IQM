@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <curl/curl.h>
+#include <curl/easy.h>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <string>
@@ -341,7 +342,7 @@ int CurlHttpClient::post(const std::string &url,
 
 namespace test_support {
 
-// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 int Handle_response_code_for_testing(const int64_t response_code,
                                      const std::string &url,
                                      const std::string &response,
@@ -352,7 +353,7 @@ int Handle_response_code_for_testing(const int64_t response_code,
                                   : ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
-// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
                                     CURLcode (*easy_perform)(CURL *)) {
   auto &curl_api_hooks = Get_curl_api_hooks();
@@ -361,12 +362,12 @@ void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
       easy_perform != nullptr ? easy_perform : curl_easy_perform;
 }
 
-// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void Enable_curl_easy_init_failure_for_testing() {
   Set_curl_api_hooks_for_testing(Fail_curl_easy_init, nullptr);
 }
 
-// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void Reset_curl_api_hooks_for_testing() {
   Set_curl_api_hooks_for_testing(nullptr, nullptr);
 }

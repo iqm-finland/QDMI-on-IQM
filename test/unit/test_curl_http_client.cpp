@@ -96,7 +96,7 @@ public:
 };
 
 TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
       200, "https://example.test/jobs",
@@ -112,7 +112,7 @@ TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
 }
 
 TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
       503, "https://example.test/jobs", "not-json", false);
@@ -127,7 +127,7 @@ TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
 }
 
 TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
       302, "https://example.test/jobs",
@@ -147,7 +147,7 @@ TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
 }
 
 TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
       600, "https://example.test/jobs",
@@ -166,8 +166,8 @@ TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
 }
 
 TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
-  LoggerCapture logger_capture;
-  CurlApiHookGuard curl_api_hook_guard;
+  const LoggerCapture logger_capture;
+  const CurlApiHookGuard curl_api_hook_guard;
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -178,8 +178,8 @@ TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
 }
 
 TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
-  LoggerCapture logger_capture;
-  CurlApiHookGuard curl_api_hook_guard;
+  const LoggerCapture logger_capture;
+  const CurlApiHookGuard curl_api_hook_guard;
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -191,7 +191,7 @@ TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
 }
 
 TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlPerformFails) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -203,7 +203,7 @@ TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlPerformFails) {
 }
 
 TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlPerformFails) {
-  LoggerCapture logger_capture;
+  const LoggerCapture logger_capture;
   iqm::CurlHttpClient http_client;
   std::string response;
 
