@@ -111,6 +111,7 @@ myst_heading_anchors = 3
 
 nb_execution_mode = "cache"
 nb_execution_raise_on_error = True
+nb_execution_timeout = 60
 nb_mime_priority_overrides = [("latex", "image/svg+xml", 15)]
 
 copybutton_prompt_text = r"(?:\(\.?venv\) )?(?:\[.*\] )?\$ "

@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <curl/curl.h>
+#include <curl/easy.h>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <string>
@@ -37,6 +38,51 @@
 namespace iqm {
 
 namespace {
+/**
+ * @brief Logging policy used for non-success HTTP response handling.
+ *
+ * This enum controls whether response failures are surfaced at ERROR level for
+ * required requests or downgraded to DEBUG for optional capability probes.
+ */
+enum class ERROR_LOG_POLICY : uint8_t {
+  /// Log all errors at ERROR level (default for required requests)
+  LOG_AS_ERROR,
+  /// Log errors at DEBUG level (use for optional capability checks to avoid
+  /// alarming users with expected failures)
+  LOG_AS_DEBUG,
+};
+
+/**
+ * @brief Function hooks used to override selected libcurl entry points.
+ *
+ * Tests use these hooks to force specific failure paths without requiring a
+ * live network interaction.
+ */
+struct Curl_api_hooks {
+  /// Hook for curl_easy_init.
+  CURL *(*easy_init)() = curl_easy_init;
+  /// Hook for curl_easy_perform.
+  CURLcode (*easy_perform)(CURL *) = curl_easy_perform;
+};
+
+// Helper for access to the mutable curl hook set
+Curl_api_hooks &Get_curl_api_hooks() {
+  static Curl_api_hooks curl_api_hooks{};
+  return curl_api_hooks;
+}
+
+// Helper to simulate curl_easy_init failure in tests
+CURL *Fail_curl_easy_init() { return nullptr; }
+
+// Helper for policy-aware error logging
+void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
+  if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
+    LOG_DEBUG(message);
+    return;
+  }
+  LOG_ERROR(message);
+}
+
 // Helper for CURL responses
 size_t Curl_write_callback(void *contents, const size_t size,
                            const size_t nmemb, std::string *response) {
@@ -45,6 +91,7 @@ size_t Curl_write_callback(void *contents, const size_t size,
   return real_size;
 }
 
+// Helper for default HTTP request headers
 curl_slist *Default_headers(const std::string &bearer_token) {
   curl_slist *headers = nullptr;
   headers = curl_slist_append(headers, "User-Agent: IQM QDMI C++ API");
@@ -56,11 +103,10 @@ curl_slist *Default_headers(const std::string &bearer_token) {
   return headers;
 }
 
-int Handle_response_code(CURL *curl, const std::string &url,
-                         const std::string &response) {
-  int64_t response_code{};
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-
+// Helper for HTTP response code handling and logging
+int Handle_response_code(const int64_t response_code, const std::string &url,
+                         const std::string &response,
+                         const ERROR_LOG_POLICY error_log_policy) {
   // Parse JSON response for IQM-specific errors and messages
   nlohmann::json json_response;
   bool has_json = false;
@@ -117,7 +163,7 @@ int Handle_response_code(CURL *curl, const std::string &url,
     error_context += " (Unexpected Response Code)";
   }
 
-  LOG_ERROR(error_context);
+  Log_error(error_log_policy, error_context);
 
   // Log IQM-specific errors if present
   bool logged_structured_error = false;
@@ -126,8 +172,10 @@ int Handle_response_code(CURL *curl, const std::string &url,
   if (has_json && json_response.contains("errors") &&
       !json_response["errors"].is_null() &&
       json_response["errors"].is_array() && !json_response["errors"].empty()) {
-    LOG_ERROR("Response contains " +
-              std::to_string(json_response["errors"].size()) + " error(s):");
+    Log_error(error_log_policy,
+              "Response contains " +
+                  std::to_string(json_response["errors"].size()) +
+                  " error(s):");
     for (const auto &error : json_response["errors"]) {
       std::string error_msg;
       if (error.contains("error_code") && error["error_code"].is_string()) {
@@ -137,7 +185,7 @@ int Handle_response_code(CURL *curl, const std::string &url,
         error_msg += error["message"].get<std::string>();
       }
       if (!error_msg.empty()) {
-        LOG_ERROR("  - " + error_msg);
+        Log_error(error_log_policy, "  - " + error_msg);
       }
     }
     logged_structured_error = true;
@@ -157,14 +205,14 @@ int Handle_response_code(CURL *curl, const std::string &url,
       error_msg += json_response["message"].get<std::string>();
     }
     if (!error_msg.empty()) {
-      LOG_ERROR("Error: " + error_msg);
+      Log_error(error_log_policy, "Error: " + error_msg);
       logged_structured_error = true;
     }
   }
 
   // Fall back to raw response if no structured errors are available
   if (!logged_structured_error && !response.empty()) {
-    LOG_ERROR("Response: " + response);
+    Log_error(error_log_policy, "Response: " + response);
   }
 
   // Log IQM messages if present (might contain additional context)
@@ -201,12 +249,22 @@ int Handle_response_code(CURL *curl, const std::string &url,
 
   return QDMI_ERROR_FATAL;
 }
-} // namespace
 
-int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
-                        std::string &response) {
+// Helper overload to allow passing CURL* for response code extraction
+int Handle_response_code(CURL *curl, const std::string &url,
+                         const std::string &response,
+                         const ERROR_LOG_POLICY error_log_policy) {
+  int64_t response_code{};
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+  return Handle_response_code(response_code, url, response, error_log_policy);
+}
+
+int Perform_get_request(const std::string &url, const std::string &bearer_token,
+                        std::string &response,
+                        const ERROR_LOG_POLICY error_log_policy) {
   LOG_INFO("Performing GET request to " + url);
-  CURL *curl = curl_easy_init(); // NOLINT(misc-include-cleaner)
+  auto &curl_api_hooks = Get_curl_api_hooks();
+  CURL *curl = curl_api_hooks.easy_init();
   if (curl == nullptr) {
     LOG_ERROR("curl_easy_init() failed");
     return QDMI_ERROR_FATAL;
@@ -220,27 +278,53 @@ int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
   auto *headers = Default_headers(bearer_token);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-  // Perform the request
-  if (const auto res = curl_easy_perform(curl); // NOLINT(misc-include-cleaner)
-      res != CURLE_OK) {
-    LOG_ERROR("curl_easy_perform() failed: " +
-              std::string(curl_easy_strerror(res)));
+  if (const auto res = curl_api_hooks.easy_perform(curl); res != CURLE_OK) {
+    Log_error(error_log_policy, "curl_easy_perform() failed: " +
+                                    std::string(curl_easy_strerror(res)));
     curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
     curl_slist_free_all(headers);
     return QDMI_ERROR_FATAL;
   }
-  const auto ret = Handle_response_code(curl, url, response);
+  const auto ret = Handle_response_code(curl, url, response, error_log_policy);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;
 }
+} // namespace
 
+int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
+                        std::string &response) {
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::LOG_AS_ERROR);
+}
+
+int CurlHttpClient::get_optional(const std::string &url,
+                                 const std::string &bearer_token,
+                                 std::string &response) {
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::LOG_AS_DEBUG);
+}
+
+/**
+ * @brief Perform an HTTP POST request using cURL.
+ *
+ * Sends an authenticated POST request, attaches a JSON content type header,
+ * and appends an optional extra header when provided.
+ *
+ * @param url The target URL for the POST request.
+ * @param bearer_token The bearer token for authentication.
+ * @param response Reference to the response body buffer.
+ * @param data The request payload to send.
+ * @param extra_header An optional extra HTTP header.
+ * @return The mapped QDMI status code for the request outcome.
+ */
 int CurlHttpClient::post(const std::string &url,
                          const std::string &bearer_token, std::string &response,
                          const std::string &data,
                          const std::string &extra_header) {
   LOG_INFO("Performing POST request to " + url);
-  CURL *curl = curl_easy_init();
+  auto &curl_api_hooks = Get_curl_api_hooks();
+  CURL *curl = curl_api_hooks.easy_init();
   if (curl == nullptr) {
     LOG_ERROR("curl_easy_init() failed");
     return QDMI_ERROR_FATAL;
@@ -265,17 +349,52 @@ int CurlHttpClient::post(const std::string &url,
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   }
   // Perform the request
-  if (const auto res = curl_easy_perform(curl); res != CURLE_OK) {
+  if (const auto res = curl_api_hooks.easy_perform(curl); res != CURLE_OK) {
     LOG_ERROR("curl_easy_perform() failed: " +
               std::string(curl_easy_strerror(res)));
     curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
     curl_slist_free_all(headers);
     return QDMI_ERROR_FATAL;
   }
-  const auto ret = Handle_response_code(curl, url, response);
+  const auto ret =
+      Handle_response_code(curl, url, response, ERROR_LOG_POLICY::LOG_AS_ERROR);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;
 }
+
+namespace test_support {
+
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+int Handle_response_code_for_testing(const int64_t response_code,
+                                     const std::string &url,
+                                     const std::string &response,
+                                     const bool use_debug_logging) {
+  return Handle_response_code(response_code, url, response,
+                              use_debug_logging
+                                  ? ERROR_LOG_POLICY::LOG_AS_DEBUG
+                                  : ERROR_LOG_POLICY::LOG_AS_ERROR);
+}
+
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
+                                    CURLcode (*easy_perform)(CURL *)) {
+  auto &curl_api_hooks = Get_curl_api_hooks();
+  curl_api_hooks.easy_init = easy_init != nullptr ? easy_init : curl_easy_init;
+  curl_api_hooks.easy_perform =
+      easy_perform != nullptr ? easy_perform : curl_easy_perform;
+}
+
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+void Enable_curl_easy_init_failure_for_testing() {
+  Set_curl_api_hooks_for_testing(Fail_curl_easy_init, nullptr);
+}
+
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+void Reset_curl_api_hooks_for_testing() {
+  Set_curl_api_hooks_for_testing(nullptr, nullptr);
+}
+
+} // namespace test_support
 
 } // namespace iqm
