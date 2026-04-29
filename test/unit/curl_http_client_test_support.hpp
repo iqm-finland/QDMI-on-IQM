@@ -20,7 +20,6 @@
 #pragma once
 
 #include <cstdint>
-#include <curl/curl.h>
 #include <string>
 
 namespace iqm::test_support {
@@ -44,15 +43,12 @@ int Handle_response_code_for_testing(int64_t response_code,
                                      bool use_debug_logging);
 
 /**
- * @brief Override the CURL entry points used by CurlHttpClient in tests.
+ * @brief Make CurlHttpClient behave as if curl_easy_init failed.
  *
- * Passing nullptr for a hook restores the default libcurl function.
- *
- * @param easy_init Replacement for curl_easy_init.
- * @param easy_perform Replacement for curl_easy_perform.
+ * This helper is used to cover the GET and POST error paths that return
+ * QDMI_ERROR_FATAL when no CURL handle can be created.
  */
-void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
-                                    CURLcode (*easy_perform)(CURL *));
+void Enable_curl_easy_init_failure_for_testing();
 
 /**
  * @brief Restore the default libcurl hooks after a test override.

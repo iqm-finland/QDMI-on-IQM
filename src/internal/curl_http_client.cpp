@@ -61,6 +61,8 @@ Curl_api_hooks &Get_curl_api_hooks() {
   return curl_api_hooks;
 }
 
+CURL *Fail_curl_easy_init() { return nullptr; }
+
 // Helper for policy-aware error logging
 void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
@@ -357,6 +359,11 @@ void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
   curl_api_hooks.easy_init = easy_init != nullptr ? easy_init : curl_easy_init;
   curl_api_hooks.easy_perform =
       easy_perform != nullptr ? easy_perform : curl_easy_perform;
+}
+
+// NOLINTNEXTLINE(misc-use-anonymous-namespace)
+void Enable_curl_easy_init_failure_for_testing() {
+  Set_curl_api_hooks_for_testing(Fail_curl_easy_init, nullptr);
 }
 
 // NOLINTNEXTLINE(misc-use-anonymous-namespace)

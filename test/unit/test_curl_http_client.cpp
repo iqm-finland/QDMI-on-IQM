@@ -22,7 +22,6 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
-#include <curl/curl.h>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <sstream>
@@ -79,12 +78,10 @@ private:
 class CurlApiHookGuard {
 public:
   /**
-   * @brief Install temporary curl hook overrides.
-   * @param easy_init Replacement function for curl_easy_init.
-   * @param easy_perform Replacement function for curl_easy_perform.
+   * @brief Install a temporary curl_easy_init failure hook.
    */
-  CurlApiHookGuard(CURL *(*easy_init)(), CURLcode (*easy_perform)(CURL *)) {
-    iqm::test_support::Set_curl_api_hooks_for_testing(easy_init, easy_perform);
+  CurlApiHookGuard() {
+    iqm::test_support::Enable_curl_easy_init_failure_for_testing();
   }
 
   CurlApiHookGuard(const CurlApiHookGuard &) = delete;
@@ -97,12 +94,6 @@ public:
    */
   ~CurlApiHookGuard() { iqm::test_support::Reset_curl_api_hooks_for_testing(); }
 };
-
-/**
- * @brief Test helper that simulates curl_easy_init failure.
- * @return nullptr to emulate a failed CURL handle allocation.
- */
-CURL *Failing_curl_easy_init() { return nullptr; }
 
 TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
   LoggerCapture logger_capture;
@@ -176,7 +167,7 @@ TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
 
 TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
   LoggerCapture logger_capture;
-  CurlApiHookGuard curl_api_hook_guard(Failing_curl_easy_init, nullptr);
+  CurlApiHookGuard curl_api_hook_guard;
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -188,7 +179,7 @@ TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
 
 TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
   LoggerCapture logger_capture;
-  CurlApiHookGuard curl_api_hook_guard(Failing_curl_easy_init, nullptr);
+  CurlApiHookGuard curl_api_hook_guard;
   iqm::CurlHttpClient http_client;
   std::string response;
 
