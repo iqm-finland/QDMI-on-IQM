@@ -87,18 +87,8 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Test
-        if: runner.os != 'Windows'
         env:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: bash .github/scripts/run_ctest_with_retries.sh -C Release --output-on-failure --test-dir build --timeout 600
-
-      - name: Test
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
-          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
-          IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ./.github/scripts/run_ctest_with_retries.ps1 -C Release --output-on-failure --test-dir build --timeout 600
+        run: ctest -C Release --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

@@ -76,7 +76,7 @@ jobs:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: bash .github/scripts/run_ctest_with_retries.sh -C Debug --output-on-failure --test-dir build --timeout 600
+        run: ctest -C Debug --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
