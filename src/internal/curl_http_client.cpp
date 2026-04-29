@@ -52,16 +52,26 @@ enum class ERROR_LOG_POLICY : uint8_t {
   LOG_AS_DEBUG,
 };
 
+/**
+ * @brief Function hooks used to override selected libcurl entry points.
+ *
+ * Tests use these hooks to force specific failure paths without requiring a
+ * live network interaction.
+ */
 struct Curl_api_hooks {
+  /// Hook for curl_easy_init.
   CURL *(*easy_init)() = curl_easy_init;
+  /// Hook for curl_easy_perform.
   CURLcode (*easy_perform)(CURL *) = curl_easy_perform;
 };
 
+// Helper for access to the mutable curl hook set
 Curl_api_hooks &Get_curl_api_hooks() {
   static Curl_api_hooks curl_api_hooks{};
   return curl_api_hooks;
 }
 
+// Helper to simulate curl_easy_init failure in tests
 CURL *Fail_curl_easy_init() { return nullptr; }
 
 // Helper for policy-aware error logging
@@ -295,6 +305,19 @@ int CurlHttpClient::get_optional(const std::string &url,
                              ERROR_LOG_POLICY::LOG_AS_DEBUG);
 }
 
+/**
+ * @brief Perform an HTTP POST request using cURL.
+ *
+ * Sends an authenticated POST request, attaches a JSON content type header,
+ * and appends an optional extra header when provided.
+ *
+ * @param url The target URL for the POST request.
+ * @param bearer_token The bearer token for authentication.
+ * @param response Reference to the response body buffer.
+ * @param data The request payload to send.
+ * @param extra_header An optional extra HTTP header.
+ * @return The mapped QDMI status code for the request outcome.
+ */
 int CurlHttpClient::post(const std::string &url,
                          const std::string &bearer_token, std::string &response,
                          const std::string &data,
