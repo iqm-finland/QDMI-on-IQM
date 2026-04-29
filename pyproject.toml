@@ -68,6 +68,7 @@ test = [
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.0.0",
+  "pytest-rerunfailures>=16.1",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
   {include-group = "qiskit"},
@@ -123,6 +124,8 @@ minversion = "9.0"
 strict = true
 addopts = [
   "-ra",
+  "--reruns=3",
+  "--reruns-delay=2",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
 filterwarnings = [
