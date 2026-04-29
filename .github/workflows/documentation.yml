@@ -39,6 +39,8 @@ jobs:
 
       - name: Build documentation with nox
         run: uvx nox -s docs
+        env:
+          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
 
       - name: Configure GitHub Pages
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
