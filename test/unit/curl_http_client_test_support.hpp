@@ -19,8 +19,10 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace iqm::test_support {
 
@@ -49,6 +51,25 @@ int Handle_response_code_for_testing(int64_t response_code,
  * QDMI_ERROR_FATAL when no CURL handle can be created.
  */
 void Enable_curl_easy_init_failure_for_testing();
+
+/**
+ * @brief Configure a synthetic HTTP response-code sequence for retry tests.
+ *
+ * This helper makes curl request execution succeed and returns the provided
+ * response codes in order when CurlHttpClient queries the HTTP status.
+ * Retry delays are recorded instead of sleeping.
+ *
+ * @param response_codes The sequence of HTTP status codes to return.
+ */
+void Enable_rate_limit_response_codes_for_testing(
+    const std::vector<int64_t> &response_codes);
+
+/**
+ * @brief Return how many retry-delay calls were recorded in test mode.
+ *
+ * @return The number of recorded retry sleep calls.
+ */
+size_t Get_recorded_sleep_call_count_for_testing();
 
 /**
  * @brief Restore the default libcurl hooks after a test override.
