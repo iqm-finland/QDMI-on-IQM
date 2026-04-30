@@ -136,6 +136,27 @@ Before running the integration tests, make sure you have set the necessary envir
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
+### Python Use-Case Workflows
+
+The repository also contains a Python use-case workflow layer in `test/use_cases/`.
+These tests exercise higher-level workflows through {py::class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler workflow.
+
+Install the test dependencies and run the workflow suite explicitly:
+
+```console
+$ uv run --group test pytest test/use_cases
+```
+
+To focus on one showcase family:
+
+```console
+$ uv run --group test pytest test/use_cases -m mqt_bench
+$ uv run --group test pytest test/use_cases -m qsci
+```
+
+Target selection remains environment-driven.
+Set `IQM_BASE_URL` together with either `IQM_TOKEN` or `RESONANCE_API_KEY`, and optionally pin a backend with `IQM_QC_ALIAS` or `IQM_QC_ID`.
+
 **Running only install/public API tests:**
 
 The `install-test` setup in CI validates only the installed public API surface.

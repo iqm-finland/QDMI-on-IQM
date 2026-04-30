@@ -220,6 +220,25 @@ $ export RESONANCE_API_KEY="your-api-key"
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
+**Running the Python use-case workflows:**
+
+The use-case workflows in `test/use_cases/` are not part of the default Python test path because they exercise longer-running showcase flows.
+
+```console
+$ export IQM_BASE_URL="https://desired-iqm-server.com"
+$ export RESONANCE_API_KEY="your-api-key"
+$ uv run --group test pytest test/use_cases
+```
+
+To focus on one workflow family, filter with the dedicated markers:
+
+```console
+$ uv run --group test pytest test/use_cases -m mqt_bench
+$ uv run --group test pytest test/use_cases -m qsci
+```
+
+If you touch one of these showcase workflows, update the corresponding documentation in `docs/use_cases.md` as part of the same change.
+
 **Generating code coverage:**
 
 To generate a code coverage report, configure the project with `-DIQM_QDMI_COVERAGE=ON`, build, run the tests, and then use `lcov`:

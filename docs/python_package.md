@@ -120,3 +120,18 @@ data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
+
+### End-to-End Workflow Examples
+
+The repository also ships larger, workflow examples built on top of these primitives.
+See the [workflow guide](use_cases.md) for:
+
+- MQT Bench sampler workflows in `test/use_cases/mqt_bench/test_mqt_bench.py`
+- A QSCI estimator-and-sampler workflow in `test/use_cases/qsci/test_qsci.py`
+
+Those use-case workflows are intentionally separate from the lightweight tests in `test/python/`.
+Run them explicitly with:
+
+```bash
+uv run --group test pytest test/use_cases
+```
