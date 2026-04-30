@@ -125,7 +125,7 @@ int main() {
 }
 ```
 
-For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html).
+For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [Workflow Guide](https://iqm-finland.github.io/QDMI-on-IQM/use_cases.html).
 
 ## How It Works
 
@@ -157,6 +157,17 @@ $ ctest --test-dir build/test/unit --output-on-failure
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
 $ ctest --test-dir build/test/integration --output-on-failure
+```
+
+```console
+# Run the optional Python use-case workflows
+$ uv run --group test pytest test/use_cases
+
+# Run only the MQT Bench showcase workflows
+$ uv run --group test pytest test/use_cases -m mqt_bench
+
+# Run only the QSCI showcase workflow
+$ uv run --group test pytest test/use_cases -m qsci
 ```
 
 ## Contributing
