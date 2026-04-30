@@ -72,6 +72,10 @@ test = [
   "pytest-cov>=7.0.0",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
+  "qiskit-algorithms>=0.3.0,<0.4.0",
+  "qiskit>=1.1,<2.0",
+  "qiskit-nature>=0.7.2",
+  "scipy>=1.14.0",
   {include-group = "qiskit"},
 ]
 docs = [
