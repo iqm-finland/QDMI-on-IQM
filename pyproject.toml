@@ -65,6 +65,8 @@ qiskit = [
   "numpy>=2.3.2; python_version >= '3.14'",
 ]
 test = [
+  "mqt-bench>=2.0.0",
+  "pyscf>=2.11.0",
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.0.0",
@@ -125,6 +127,10 @@ addopts = [
   "-ra",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
+markers = [
+  "mqt_bench: marks MQT Bench use-case workflows",
+  "qsci: marks QSCI use-case workflows",
+]
 filterwarnings = [
   "error",
 ]
@@ -179,6 +185,7 @@ convention = "google"
 "python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
+"test/use_cases/**" = ["T20", "INP001"]
 "docs/**" = ["T20", "INP001"]
 
 

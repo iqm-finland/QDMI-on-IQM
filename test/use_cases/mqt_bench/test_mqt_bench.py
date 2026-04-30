@@ -1,0 +1,175 @@
+# Copyright (c) 2025 - 2026 IQM Finland Oy
+# All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+"""Use-case workflow tests using benchmark circuits from MQT Bench."""
+
+from __future__ import annotations
+
+import os
+import warnings
+from typing import TYPE_CHECKING
+
+import pytest
+from qiskit.quantum_info import hellinger_fidelity
+
+from ..support import sample_counts, selected_target_is_mock, skip_if_backend_too_small
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from iqm.qdmi.qiskit import IQMBackend
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message=r"qiskit\.providers\.models is deprecated since Qiskit 1\.2.*",
+        category=DeprecationWarning,
+    )
+    from mqt.bench import BenchmarkLevel, get_benchmark
+
+MQT_BENCH_SHOTS = int(os.getenv("IQM_MQT_BENCH_SHOTS", "1024"))
+
+
+def validate_ghz_state_fidelity(counts: dict[str, int], *, num_qubits: int, threshold: float) -> None:
+    """Validate that a GHZ-state measurement shows the expected parity pattern."""
+    total_shots = sum(counts.values())
+    expected_dist = {
+        "0" * num_qubits: total_shots // 2,
+        "1" * num_qubits: total_shots // 2,
+    }
+    fidelity = hellinger_fidelity(counts, expected_dist)
+    assert fidelity >= threshold, f"GHZ-state fidelity {fidelity:.2%} below threshold {threshold:.2%}."
+
+
+def validate_wstate_fidelity(counts: dict[str, int], *, num_qubits: int, threshold: float) -> None:
+    """Validate that a W-state measurement emphasizes single-excitation outcomes."""
+    total_shots = sum(counts.values())
+    expected_states = ["0" * index + "1" + "0" * (num_qubits - index - 1) for index in range(num_qubits)]
+    expected_count_per_state = total_shots // num_qubits
+    expected_dist = dict.fromkeys(expected_states, expected_count_per_state)
+    fidelity = hellinger_fidelity(counts, expected_dist)
+    assert fidelity >= threshold, f"W-state fidelity {fidelity:.2%} below threshold {threshold:.2%}."
+
+
+def validate_deutsch_jozsa(counts: dict[str, int], *, max_zero_probability: float) -> None:
+    """Validate that the balanced Deutsch-Jozsa circuit avoids the all-zero outcome."""
+    total_shots = sum(counts.values())
+    all_zeros = "0" * len(next(iter(counts)))
+    zero_probability = counts.get(all_zeros, 0) / total_shots
+    assert zero_probability <= max_zero_probability, (
+        f"Balanced Deutsch-Jozsa should not collapse to all zeros with probability {zero_probability:.2%}."
+    )
+
+
+def validate_qft(counts: dict[str, int], *, min_states: int) -> None:
+    """Validate that QFT yields a diverse measurement distribution."""
+    assert len(counts) >= min_states, f"QFT should expose at least {min_states} states, got {len(counts)}."
+
+
+def validate_graphstate(counts: dict[str, int], *, min_states: int) -> None:
+    """Validate that graph-state generation produces more than one outcome."""
+    assert len(counts) >= min_states, f"Graph-state circuit should expose at least {min_states} states."
+
+
+def run_mqt_bench_test(
+    backend: IQMBackend,
+    benchmark: str,
+    circuit_size: int,
+    validation_func: Callable[[dict[str, int]], None],
+    *,
+    shots: int = MQT_BENCH_SHOTS,
+) -> None:
+    """Generate, execute, and validate an MQT Bench circuit."""
+    skip_if_backend_too_small(backend, required_qubits=circuit_size)
+    circuit = get_benchmark(
+        benchmark=benchmark,
+        level=BenchmarkLevel.ALG,
+        circuit_size=circuit_size,
+    )
+    counts = sample_counts(backend, circuit, shots=shots)
+    assert sum(counts.values()) == shots
+    validation_func(counts)
+
+
+@pytest.mark.mqt_bench
+def test_ghz_workflow(backend: IQMBackend) -> None:
+    """Run the GHZ-state showcase workflow through the backend sampler."""
+    target_is_mock = selected_target_is_mock()
+    run_mqt_bench_test(
+        backend,
+        benchmark="ghz",
+        circuit_size=3,
+        validation_func=lambda counts: validate_ghz_state_fidelity(
+            counts,
+            num_qubits=3,
+            threshold=0.5 if target_is_mock else 0.2,
+        ),
+    )
+
+
+@pytest.mark.mqt_bench
+def test_deutsch_jozsa_workflow(backend: IQMBackend) -> None:
+    """Run the balanced Deutsch-Jozsa showcase workflow through the backend sampler."""
+    target_is_mock = selected_target_is_mock()
+    run_mqt_bench_test(
+        backend,
+        benchmark="dj",
+        circuit_size=4,
+        validation_func=lambda counts: validate_deutsch_jozsa(
+            counts,
+            max_zero_probability=0.2 if target_is_mock else 0.6,
+        ),
+    )
+
+
+@pytest.mark.mqt_bench
+def test_qft_workflow(backend: IQMBackend) -> None:
+    """Run the QFT showcase workflow through the backend sampler."""
+    target_is_mock = selected_target_is_mock()
+    run_mqt_bench_test(
+        backend,
+        benchmark="qft",
+        circuit_size=3,
+        validation_func=lambda counts: validate_qft(counts, min_states=4 if target_is_mock else 2),
+    )
+
+
+@pytest.mark.mqt_bench
+def test_graphstate_workflow(backend: IQMBackend) -> None:
+    """Run the graph-state showcase workflow through the backend sampler."""
+    run_mqt_bench_test(
+        backend,
+        benchmark="graphstate",
+        circuit_size=4,
+        validation_func=lambda counts: validate_graphstate(counts, min_states=2),
+    )
+
+
+@pytest.mark.mqt_bench
+def test_wstate_workflow(backend: IQMBackend) -> None:
+    """Run the W-state showcase workflow through the backend sampler."""
+    target_is_mock = selected_target_is_mock()
+    run_mqt_bench_test(
+        backend,
+        benchmark="wstate",
+        circuit_size=3,
+        validation_func=lambda counts: validate_wstate_fidelity(
+            counts,
+            num_qubits=3,
+            threshold=0.6 if target_is_mock else 0.25,
+        ),
+    )
