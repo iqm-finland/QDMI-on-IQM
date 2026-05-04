@@ -19,19 +19,63 @@
 
 from __future__ import annotations
 
+import importlib
 import os
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from qiskit_algorithms import VQE, NumPyMinimumEigensolver
-from qiskit_algorithms.optimizers import L_BFGS_B
-from qiskit_nature.second_q.algorithms import GroundStateEigensolver
-from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock
-from qiskit_nature.second_q.drivers import PySCFDriver
-from qiskit_nature.second_q.mappers import JordanWignerMapper
 
-from ..support import sample_counts, selected_target_is_mock, skip_if_backend_too_small
-from .postprocess import postprocess_counts
+THIS_DIR = Path(__file__).resolve().parent
+USE_CASES_DIR = THIS_DIR.parent
+for path in (THIS_DIR, USE_CASES_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
+QSCI_PY314_REASON = (
+    "QSCI requires the pinned Qiskit 1.x, Qiskit Algorithms, and Qiskit Nature stack. "
+    "Install the showcase dependencies on Python < 3.14 to run it."
+)
+QSCI_WINDOWS_REASON = (
+    "QSCI requires PySCF, which is not supported on Windows. "
+    "Install the showcase dependencies on a non-Windows platform to run it."
+)
+
+pytest.importorskip(
+    "qiskit_algorithms",
+    reason=QSCI_PY314_REASON,
+)
+qiskit_algorithms_optimizers = pytest.importorskip("qiskit_algorithms.optimizers", reason=QSCI_PY314_REASON)
+pytest.importorskip(
+    "qiskit_nature",
+    reason=QSCI_PY314_REASON,
+)
+qiskit_nature_algorithms = pytest.importorskip("qiskit_nature.second_q.algorithms", reason=QSCI_PY314_REASON)
+qiskit_nature_circuit_library = pytest.importorskip("qiskit_nature.second_q.circuit.library", reason=QSCI_PY314_REASON)
+qiskit_nature_drivers = pytest.importorskip("qiskit_nature.second_q.drivers", reason=QSCI_PY314_REASON)
+qiskit_nature_mappers = pytest.importorskip("qiskit_nature.second_q.mappers", reason=QSCI_PY314_REASON)
+pytest.importorskip(
+    "pyscf",
+    reason=QSCI_WINDOWS_REASON,
+)
+
+qiskit_algorithms = importlib.import_module("qiskit_algorithms")
+postprocess_module = importlib.import_module("postprocess")
+support_module = importlib.import_module("support")
+
+VQE = qiskit_algorithms.VQE
+NumPyMinimumEigensolver = qiskit_algorithms.NumPyMinimumEigensolver
+L_BFGS_B = qiskit_algorithms_optimizers.L_BFGS_B
+GroundStateEigensolver = qiskit_nature_algorithms.GroundStateEigensolver
+UCCSD = qiskit_nature_circuit_library.UCCSD
+HartreeFock = qiskit_nature_circuit_library.HartreeFock
+PySCFDriver = qiskit_nature_drivers.PySCFDriver
+JordanWignerMapper = qiskit_nature_mappers.JordanWignerMapper
+postprocess_counts = postprocess_module.postprocess_counts
+sample_counts = support_module.sample_counts
+selected_target_is_mock = support_module.selected_target_is_mock
+skip_if_backend_too_small = support_module.skip_if_backend_too_small
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

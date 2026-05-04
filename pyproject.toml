@@ -65,18 +65,20 @@ qiskit = [
   "numpy>=2.3.2; python_version >= '3.14'",
 ]
 test = [
-  "mqt-bench>=2.0.0",
-  "pyscf>=2.11.0",
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.0.0",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
-  "qiskit-algorithms>=0.3.0,<0.4.0",
-  "qiskit>=1.1,<2.0",
-  "qiskit-nature>=0.7.2",
-  "scipy>=1.14.0",
   {include-group = "qiskit"},
+]
+showcase = [
+  {include-group = "test"},
+  "mqt-bench>=2.0.0",
+  "pyscf>=2.11.0; platform_system != 'Windows'",
+  "qiskit-algorithms>=0.3.0,<0.4.0; python_version < '3.14'",
+  "qiskit>=1.1,<2.0; python_version < '3.14'",
+  "qiskit-nature>=0.7.2; python_version < '3.14'",
 ]
 docs = [
   "breathe>=4.36.0",

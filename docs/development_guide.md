@@ -144,15 +144,19 @@ These tests exercise higher-level workflows through {py::class}`~iqm.qdmi.qiskit
 Install the test dependencies and run the workflow suite explicitly:
 
 ```console
-$ uv run --group test pytest test/use_cases
+$ uv run --group showcase pytest test/use_cases
 ```
 
 To focus on one showcase family:
 
 ```console
-$ uv run --group test pytest test/use_cases -m mqt_bench
-$ uv run --group test pytest test/use_cases -m qsci
+$ uv run --group showcase pytest test/use_cases -m mqt_bench
+$ uv run --group showcase pytest test/use_cases -m qsci
 ```
+
+:::note
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
 
 Target selection remains environment-driven.
 Set `IQM_BASE_URL` together with either `IQM_TOKEN` or `RESONANCE_API_KEY`, and optionally pin a backend with `IQM_QC_ALIAS` or `IQM_QC_ID`.

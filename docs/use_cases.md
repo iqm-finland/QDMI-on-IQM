@@ -20,18 +20,22 @@ Both workflows use the same environment-variable contract as the rest of the pac
 - `IQM_TOKENS_FILE`: optional authentication file.
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: optional explicit target selection.
 
-Install the test dependencies and run the workflow suite explicitly with `uv`:
+Install the showcase dependencies and run the workflow suite explicitly with `uv`:
 
 ```bash
-uv run --group test pytest test/use_cases
+uv run --group showcase pytest test/use_cases
 ```
 
 You can also focus on one showcase family at a time:
 
 ```bash
-uv run --group test pytest test/use_cases -m mqt_bench
-uv run --group test pytest test/use_cases -m qsci
+uv run --group showcase pytest test/use_cases -m mqt_bench
+uv run --group showcase pytest test/use_cases -m qsci
 ```
+
+:::note
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
 
 ## MQT Bench Showcase
 

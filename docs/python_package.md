@@ -133,5 +133,9 @@ Those use-case workflows are intentionally separate from the lightweight tests i
 Run them explicitly with:
 
 ```bash
-uv run --group test pytest test/use_cases
+uv run --group showcase pytest test/use_cases
 ```
+
+:::note
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::

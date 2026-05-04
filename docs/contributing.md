@@ -227,15 +227,19 @@ The use-case workflows in `test/use_cases/` are not part of the default Python t
 ```console
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
-$ uv run --group test pytest test/use_cases
+$ uv run --group showcase pytest test/use_cases
 ```
 
 To focus on one workflow family, filter with the dedicated markers:
 
 ```console
-$ uv run --group test pytest test/use_cases -m mqt_bench
-$ uv run --group test pytest test/use_cases -m qsci
+$ uv run --group showcase pytest test/use_cases -m mqt_bench
+$ uv run --group showcase pytest test/use_cases -m qsci
 ```
+
+:::note
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
 
 If you touch one of these showcase workflows, update the corresponding documentation in `docs/use_cases.md` as part of the same change.
 

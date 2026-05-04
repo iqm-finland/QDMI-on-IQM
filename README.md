@@ -161,14 +161,18 @@ $ ctest --test-dir build/test/integration --output-on-failure
 
 ```console
 # Run the optional Python use-case workflows
-$ uv run --group test pytest test/use_cases
+$ uv run --group showcase pytest test/use_cases
 
 # Run only the MQT Bench showcase workflows
-$ uv run --group test pytest test/use_cases -m mqt_bench
+$ uv run --group showcase pytest test/use_cases -m mqt_bench
 
 # Run only the QSCI showcase workflow
-$ uv run --group test pytest test/use_cases -m qsci
+$ uv run --group showcase pytest test/use_cases -m qsci
 ```
+
+:::note
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
 
 ## Contributing
 

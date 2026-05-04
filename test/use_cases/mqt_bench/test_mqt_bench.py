@@ -25,8 +25,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from qiskit.quantum_info import hellinger_fidelity
-
-from ..support import sample_counts, selected_target_is_mock, skip_if_backend_too_small
+from support import sample_counts, selected_target_is_mock, skip_if_backend_too_small
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -38,6 +37,10 @@ with warnings.catch_warnings():
         "ignore",
         message=r"qiskit\.providers\.models is deprecated since Qiskit 1\.2.*",
         category=DeprecationWarning,
+    )
+    pytest.importorskip(
+        "mqt.bench",
+        reason="Install the showcase dependencies with `uv run --group showcase ...` to run the MQT Bench workflows.",
     )
     from mqt.bench import BenchmarkLevel, get_benchmark
 

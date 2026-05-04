@@ -19,13 +19,21 @@
 
 from __future__ import annotations
 
+import importlib
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
 from iqm.qdmi.qiskit import IQMBackend
 
-from .support import require_iqm_access
+THIS_DIR = Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
+
+support_module = importlib.import_module("support")
+require_iqm_access = support_module.require_iqm_access
 
 
 @pytest.fixture(scope="session")
