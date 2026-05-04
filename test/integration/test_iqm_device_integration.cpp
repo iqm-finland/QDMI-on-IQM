@@ -42,6 +42,7 @@
 // time for real job execution on the quantum computer.
 constexpr size_t DEFAULT_JOB_WAIT_TIMEOUT = 300; // seconds
 
+namespace {
 class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
@@ -219,6 +220,7 @@ protected:
       "graph_definition": null,
     })";
 };
+} // namespace
 
 TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   const auto device_name = fomac.get_name();
