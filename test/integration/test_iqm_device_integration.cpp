@@ -58,9 +58,8 @@ protected:
     const std::string api_key{(api_key_env != nullptr) ? api_key_env : ""};
 
     const auto *base_url_env = std::getenv("IQM_BASE_URL");
-    const std::string base_url = (base_url_env != nullptr)
-                                     ? base_url_env
-                                     : "https://resonance.iqm.tech";
+    const std::string base_url =
+        (base_url_env != nullptr) ? base_url_env : "https://resonance.iqm.tech";
 
     const auto *qc_id_env = std::getenv("IQM_QC_ID");
     const std::optional<std::string> qc_id =
