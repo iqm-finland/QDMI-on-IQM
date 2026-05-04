@@ -38,7 +38,7 @@ jobs:
       # run cibuildwheel to build wheels for the specified Python version
       - uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.4.1
         env:
-          IQM_BASE_URL: "https://resonance.meetiqm.com"
+          IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"
           IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"

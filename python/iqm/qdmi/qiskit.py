@@ -71,7 +71,7 @@ class IQMBackend(QDMIBackend):
         device = add_dynamic_device_library(
             library_path=str(IQM_QDMI_LIBRARY_PATH),
             prefix="IQM",
-            base_url=base_url or os.getenv("IQM_BASE_URL") or "https://resonance.meetiqm.com",
+            base_url=base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech",
             token=token or os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY"),
             auth_file=tokens_file or os.getenv("IQM_TOKENS_FILE"),
             custom1=qc_id or os.getenv("IQM_QC_ID"),

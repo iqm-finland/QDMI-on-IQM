@@ -80,7 +80,7 @@ from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
 backend = IQMBackend(
-  base_url="https://resonance.meetiqm.com",
+  base_url="https://resonance.iqm.tech",
   qc_alias="emerald:mock",
 )
 ```
