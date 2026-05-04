@@ -54,7 +54,7 @@ jobs:
       - name: Test
         env:
           CONFIG: ${{ inputs.config }}
-          IQM_BASE_URL: "https://resonance.meetiqm.com"
+          IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
