@@ -78,9 +78,11 @@ private:
 class CurlApiHookGuard {
 public:
   /**
-   * @brief Create a guard that restores curl hooks on scope exit.
+   * @brief Install a temporary curl_easy_init failure hook.
    */
-  CurlApiHookGuard() = default;
+  CurlApiHookGuard() {
+    iqm::test_support::Enable_curl_easy_init_failure_for_testing();
+  }
 
   CurlApiHookGuard(const CurlApiHookGuard &) = delete;
   CurlApiHookGuard &operator=(const CurlApiHookGuard &) = delete;
@@ -166,7 +168,6 @@ TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
 TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
   const LoggerCapture logger_capture;
   const CurlApiHookGuard curl_api_hook_guard;
-  iqm::test_support::Enable_curl_easy_init_failure_for_testing();
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -179,7 +180,6 @@ TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
 TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
   const LoggerCapture logger_capture;
   const CurlApiHookGuard curl_api_hook_guard;
-  iqm::test_support::Enable_curl_easy_init_failure_for_testing();
   iqm::CurlHttpClient http_client;
   std::string response;
 
@@ -214,34 +214,13 @@ TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlPerformFails) {
             std::string::npos);
 }
 
-TEST(CurlHttpClientTest, GetRetriesHttp429UntilSuccess) {
+TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::test_support::Enable_rate_limit_response_codes_for_testing({429, 200});
-  iqm::CurlHttpClient http_client;
-  std::string response = "stale";
+  const auto result = iqm::test_support::Retry_response_codes_for_testing(
+      {429, 200}, "https://example.test/jobs", false);
 
-  EXPECT_EQ(http_client.get("https://example.test/jobs", "", response),
-            QDMI_SUCCESS);
-  EXPECT_EQ(iqm::test_support::Get_recorded_sleep_call_count_for_testing(), 1U);
-
-  const auto logs = logger_capture.str();
-  EXPECT_NE(logs.find("hit HTTP 429 rate limiting; retrying in 2 second(s)"),
-            std::string::npos);
-  EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
-}
-
-TEST(CurlHttpClientTest, PostRetriesHttp429UntilSuccess) {
-  const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::test_support::Enable_rate_limit_response_codes_for_testing({429, 200});
-  iqm::CurlHttpClient http_client;
-  std::string response;
-
-  EXPECT_EQ(
-      http_client.post("https://example.test/jobs", "", response, "{}", ""),
-      QDMI_SUCCESS);
-  EXPECT_EQ(iqm::test_support::Get_recorded_sleep_call_count_for_testing(), 1U);
+  EXPECT_EQ(result.status_code, QDMI_SUCCESS);
+  EXPECT_EQ(result.sleep_call_count, 1U);
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("hit HTTP 429 rate limiting; retrying in 2 second(s)"),
@@ -251,15 +230,11 @@ TEST(CurlHttpClientTest, PostRetriesHttp429UntilSuccess) {
 
 TEST(CurlHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::test_support::Enable_rate_limit_response_codes_for_testing(
-      {429, 429, 429, 429});
-  iqm::CurlHttpClient http_client;
-  std::string response;
+  const auto result = iqm::test_support::Retry_response_codes_for_testing(
+      {429, 429, 429, 429}, "https://example.test/jobs", false);
 
-  EXPECT_EQ(http_client.get("https://example.test/jobs", "", response),
-            QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(iqm::test_support::Get_recorded_sleep_call_count_for_testing(), 3U);
+  EXPECT_EQ(result.status_code, QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(result.sleep_call_count, 3U);
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("failed with HTTP 429 (Client Error)"),

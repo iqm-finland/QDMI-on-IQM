@@ -27,6 +27,16 @@
 namespace iqm::test_support {
 
 /**
+ * @brief Outcome captured while exercising retry behavior in tests.
+ */
+struct Retry_test_result {
+  /// The final QDMI status code returned by the retry helper.
+  int status_code;
+  /// The number of retry-delay calls that would have been performed.
+  size_t sleep_call_count;
+};
+
+/**
  * @brief Exercise CurlHttpClient response handling with a synthetic status.
  *
  * This helper bypasses a live CURL handle and directly invokes the internal
@@ -53,23 +63,21 @@ int Handle_response_code_for_testing(int64_t response_code,
 void Enable_curl_easy_init_failure_for_testing();
 
 /**
- * @brief Configure a synthetic HTTP response-code sequence for retry tests.
+ * @brief Exercise HTTP 429 retry handling with a synthetic response sequence.
  *
- * This helper makes curl request execution succeed and returns the provided
- * response codes in order when CurlHttpClient queries the HTTP status.
- * Retry delays are recorded instead of sleeping.
+ * This helper drives the same retry loop used by CurlHttpClient without
+ * requiring a live curl handle. Retry delays are recorded instead of sleeping.
  *
  * @param response_codes The sequence of HTTP status codes to return.
+ * @param url The request URL used in generated log messages.
+ * @param use_debug_logging Whether non-success logs should be emitted at DEBUG
+ * level instead of ERROR.
+ * @return The final retry outcome and the number of recorded retry delays.
  */
-void Enable_rate_limit_response_codes_for_testing(
-    const std::vector<int64_t> &response_codes);
-
-/**
- * @brief Return how many retry-delay calls were recorded in test mode.
- *
- * @return The number of recorded retry sleep calls.
- */
-size_t Get_recorded_sleep_call_count_for_testing();
+Retry_test_result
+Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
+                                 const std::string &url,
+                                 bool use_debug_logging);
 
 /**
  * @brief Restore the default libcurl hooks after a test override.

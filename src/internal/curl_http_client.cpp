@@ -40,6 +40,20 @@
 
 namespace iqm {
 
+namespace test_support {
+
+/**
+ * @brief Outcome captured while exercising retry behavior in tests.
+ */
+struct Retry_test_result {
+  /// The final QDMI status code returned by the retry helper.
+  int status_code;
+  /// The number of retry-delay calls that would have been performed.
+  size_t sleep_call_count;
+};
+
+} // namespace test_support
+
 namespace {
 /**
  * @brief Logging policy used for non-success HTTP response handling.
@@ -55,11 +69,6 @@ enum class ERROR_LOG_POLICY : uint8_t {
   LOG_AS_DEBUG,
 };
 
-/**
- * @brief HTTP verbs supported by the shared request helper.
- */
-enum class HTTP_METHOD : uint8_t { GET, POST };
-
 /// Number of retries to attempt after receiving HTTP 429.
 constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 3;
 
@@ -67,17 +76,13 @@ constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 3;
 constexpr uint8_t RATE_LIMIT_RETRY_DELAY_SECONDS = 2;
 
 /**
- * @brief Mutable retry test state used by curl hook overrides.
+ * @brief Result of a single CURL request attempt.
  */
-struct Curl_retry_test_state {
-  /// Sequence of mocked HTTP response codes returned by the test hook.
-  std::vector<int64_t> response_codes;
-
-  /// Index of the next mocked response code to return.
-  size_t next_response_code_index = 0;
-
-  /// Number of times the retry-delay hook has been invoked.
-  size_t sleep_call_count = 0;
+struct Request_attempt_result {
+  /// The result returned by curl_easy_perform.
+  CURLcode curl_result;
+  /// The HTTP response code observed for the completed request.
+  int64_t response_code = 0;
 };
 
 /**
@@ -86,7 +91,7 @@ struct Curl_retry_test_state {
  * @param curl The curl handle associated with the completed request.
  * @return The HTTP response code reported by libcurl.
  */
-int64_t Curl_getinfo_response_code(CURL *curl) {
+int64_t Get_response_code(CURL *curl) {
   int64_t response_code{};
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
   return response_code;
@@ -102,56 +107,6 @@ void Sleep_for_seconds(const uint8_t seconds) {
 }
 
 /**
- * @brief Access the shared retry test state.
- *
- * @return Reference to the singleton retry test state instance.
- */
-Curl_retry_test_state &Get_curl_retry_test_state() {
-  static Curl_retry_test_state retry_test_state{};
-  return retry_test_state;
-}
-
-/**
- * @brief Return the next configured mock response code for retry tests.
- *
- * @param curl Unused curl handle placeholder kept for hook signature parity.
- * @return The next configured response code, or `0` if the sequence is
- * exhausted.
- */
-int64_t Return_configured_response_code([[maybe_unused]] CURL *curl) {
-  auto &retry_test_state = Get_curl_retry_test_state();
-  if (retry_test_state.next_response_code_index >=
-      retry_test_state.response_codes.size()) {
-    return 0;
-  }
-  const auto response_code =
-      retry_test_state
-          .response_codes[retry_test_state.next_response_code_index];
-  retry_test_state.next_response_code_index++;
-  return response_code;
-}
-
-/**
- * @brief Record that a retry delay would have been performed in a test.
- *
- * @param seconds Unused delay value supplied through the sleep hook.
- */
-void Record_sleep_call([[maybe_unused]] const uint8_t seconds) {
-  auto &retry_test_state = Get_curl_retry_test_state();
-  retry_test_state.sleep_call_count++;
-}
-
-/**
- * @brief Reset the shared retry test state to its default values.
- */
-void Reset_curl_retry_test_state() {
-  auto &retry_test_state = Get_curl_retry_test_state();
-  retry_test_state.response_codes.clear();
-  retry_test_state.next_response_code_index = 0;
-  retry_test_state.sleep_call_count = 0;
-}
-
-/**
  * @brief Function hooks used to override selected libcurl entry points.
  *
  * Tests use these hooks to force specific failure paths without requiring a
@@ -162,10 +117,6 @@ struct Curl_api_hooks {
   CURL *(*easy_init)() = curl_easy_init;
   /// Hook for curl_easy_perform.
   CURLcode (*easy_perform)(CURL *) = curl_easy_perform;
-  /// Hook for reading the HTTP response code.
-  int64_t (*easy_getinfo_response_code)(CURL *) = Curl_getinfo_response_code;
-  /// Hook for retry delay handling.
-  void (*sleep_for_seconds)(uint8_t) = Sleep_for_seconds;
 };
 
 // Helper for access to the mutable curl hook set
@@ -353,23 +304,49 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   return QDMI_ERROR_FATAL;
 }
 
-// Helper overload to allow passing CURL* for response code extraction
-int Handle_response_code(CURL *curl, const std::string &url,
-                         const std::string &response,
-                         const ERROR_LOG_POLICY error_log_policy) {
-  const auto response_code =
-      Get_curl_api_hooks().easy_getinfo_response_code(curl);
-  return Handle_response_code(response_code, url, response, error_log_policy);
+/**
+ * @brief Execute a configured request and retry on HTTP 429 responses.
+ *
+ * The supplied callback performs one request attempt and returns both the
+ * libcurl result and the resulting HTTP response code.
+ */
+template <typename Perform_attempt, typename Sleep_function>
+int Perform_request_with_retries(const std::string &url, std::string &response,
+                                 const ERROR_LOG_POLICY error_log_policy,
+                                 Perform_attempt perform_attempt,
+                                 Sleep_function sleep_for_seconds) {
+  for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
+    response.clear();
+    const auto attempt_result = perform_attempt();
+
+    if (attempt_result.curl_result != CURLE_OK) {
+      Log_error(error_log_policy, "curl_easy_perform() failed: " +
+                                      std::string(curl_easy_strerror(
+                                          attempt_result.curl_result)));
+      return QDMI_ERROR_FATAL;
+    }
+
+    if (attempt_result.response_code != 429 ||
+        attempt == RATE_LIMIT_RETRY_COUNT) {
+      return Handle_response_code(attempt_result.response_code, url, response,
+                                  error_log_policy);
+    }
+
+    LOG_DEBUG("Request to URL '" + url +
+              "' hit HTTP 429 rate limiting; retrying in " +
+              std::to_string(RATE_LIMIT_RETRY_DELAY_SECONDS) +
+              " second(s) (attempt " + std::to_string(attempt + 1) + "/" +
+              std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
+    sleep_for_seconds(RATE_LIMIT_RETRY_DELAY_SECONDS);
+  }
+
+  return QDMI_ERROR_FATAL;
 }
 
-int Perform_request(const HTTP_METHOD method, const std::string &url,
-                    const std::string &bearer_token, std::string &response,
-                    const ERROR_LOG_POLICY error_log_policy,
-                    const std::string &data = "",
-                    const std::string &extra_header = "") {
-  LOG_INFO(std::string("Performing ") +
-           (method == HTTP_METHOD::GET ? "GET" : "POST") + " request to " +
-           url);
+int Perform_get_request(const std::string &url, const std::string &bearer_token,
+                        std::string &response,
+                        const ERROR_LOG_POLICY error_log_policy) {
+  LOG_INFO("Performing GET request to " + url);
   auto &curl_api_hooks = Get_curl_api_hooks();
   CURL *curl = curl_api_hooks.easy_init();
   if (curl == nullptr) {
@@ -381,46 +358,20 @@ int Perform_request(const HTTP_METHOD method, const std::string &url,
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
   auto *headers = Default_headers(bearer_token);
-  if (method == HTTP_METHOD::POST) {
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    if (!extra_header.empty()) {
-      headers = curl_slist_append(headers, extra_header.c_str());
-    }
-    if (!data.empty()) {
-      LOG_DEBUG("POST data: " + data);
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
-    } else {
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
-    }
-  }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-  int ret = QDMI_ERROR_FATAL;
-  for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
-    response.clear();
-    if (const auto res = curl_api_hooks.easy_perform(curl); res != CURLE_OK) {
-      Log_error(error_log_policy, "curl_easy_perform() failed: " +
-                                      std::string(curl_easy_strerror(res)));
-      break;
-    }
-
-    const auto response_code = curl_api_hooks.easy_getinfo_response_code(curl);
-
-    if (response_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
-      ret =
-          Handle_response_code(response_code, url, response, error_log_policy);
-      break;
-    }
-
-    LOG_DEBUG("Request to URL '" + url +
-              "' hit HTTP 429 rate limiting; retrying in " +
-              std::to_string(RATE_LIMIT_RETRY_DELAY_SECONDS) +
-              " second(s) (attempt " + std::to_string(attempt + 1) + "/" +
-              std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
-    curl_api_hooks.sleep_for_seconds(RATE_LIMIT_RETRY_DELAY_SECONDS);
-  }
+  const auto ret = Perform_request_with_retries(
+      url, response, error_log_policy,
+      [&]() -> Request_attempt_result {
+        const auto res = curl_api_hooks.easy_perform(curl);
+        if (res != CURLE_OK) {
+          return Request_attempt_result{res, 0};
+        }
+        return Request_attempt_result{CURLE_OK, Get_response_code(curl)};
+      },
+      Sleep_for_seconds);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
   curl_slist_free_all(headers);
   return ret;
@@ -429,15 +380,15 @@ int Perform_request(const HTTP_METHOD method, const std::string &url,
 
 int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
                         std::string &response) {
-  return Perform_request(HTTP_METHOD::GET, url, bearer_token, response,
-                         ERROR_LOG_POLICY::LOG_AS_ERROR);
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
 int CurlHttpClient::get_optional(const std::string &url,
                                  const std::string &bearer_token,
                                  std::string &response) {
-  return Perform_request(HTTP_METHOD::GET, url, bearer_token, response,
-                         ERROR_LOG_POLICY::LOG_AS_DEBUG);
+  return Perform_get_request(url, bearer_token, response,
+                             ERROR_LOG_POLICY::LOG_AS_DEBUG);
 }
 
 /**
@@ -457,8 +408,45 @@ int CurlHttpClient::post(const std::string &url,
                          const std::string &bearer_token, std::string &response,
                          const std::string &data,
                          const std::string &extra_header) {
-  return Perform_request(HTTP_METHOD::POST, url, bearer_token, response,
-                         ERROR_LOG_POLICY::LOG_AS_ERROR, data, extra_header);
+  LOG_INFO("Performing POST request to " + url);
+  auto &curl_api_hooks = Get_curl_api_hooks();
+  CURL *curl = curl_api_hooks.easy_init();
+  if (curl == nullptr) {
+    LOG_ERROR("curl_easy_init() failed");
+    return QDMI_ERROR_FATAL;
+  }
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+  auto *headers = Default_headers(bearer_token);
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+  if (!extra_header.empty()) {
+    headers = curl_slist_append(headers, extra_header.c_str());
+  }
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  if (!data.empty()) {
+    LOG_DEBUG("POST data: " + data);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+  } else {
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  }
+  const auto ret = Perform_request_with_retries(
+      url, response, ERROR_LOG_POLICY::LOG_AS_ERROR,
+      [&]() -> Request_attempt_result {
+        const auto res = curl_api_hooks.easy_perform(curl);
+        if (res != CURLE_OK) {
+          return Request_attempt_result{res, 0};
+        }
+        return Request_attempt_result{CURLE_OK, Get_response_code(curl)};
+      },
+      Sleep_for_seconds);
+  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
+  curl_slist_free_all(headers);
+  return ret;
 }
 
 namespace test_support {
@@ -475,48 +463,46 @@ int Handle_response_code_for_testing(const int64_t response_code,
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-void Set_curl_api_hooks_for_testing(
-    CURL *(*easy_init)(), CURLcode (*easy_perform)(CURL *),
-    int64_t (*easy_getinfo_response_code)(CURL *),
-    void (*sleep_for_seconds)(uint8_t)) {
+void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
+                                    CURLcode (*easy_perform)(CURL *)) {
   auto &curl_api_hooks = Get_curl_api_hooks();
   curl_api_hooks.easy_init = easy_init != nullptr ? easy_init : curl_easy_init;
   curl_api_hooks.easy_perform =
       easy_perform != nullptr ? easy_perform : curl_easy_perform;
-  curl_api_hooks.easy_getinfo_response_code =
-      easy_getinfo_response_code != nullptr ? easy_getinfo_response_code
-                                            : Curl_getinfo_response_code;
-  curl_api_hooks.sleep_for_seconds =
-      sleep_for_seconds != nullptr ? sleep_for_seconds : Sleep_for_seconds;
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 void Enable_curl_easy_init_failure_for_testing() {
-  Set_curl_api_hooks_for_testing(Fail_curl_easy_init, nullptr, nullptr,
-                                 nullptr);
+  Set_curl_api_hooks_for_testing(Fail_curl_easy_init, nullptr);
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-void Enable_rate_limit_response_codes_for_testing(
-    const std::vector<int64_t> &response_codes) {
-  auto &retry_test_state = Get_curl_retry_test_state();
-  retry_test_state.response_codes = response_codes;
-  retry_test_state.next_response_code_index = 0;
-  retry_test_state.sleep_call_count = 0;
-  Set_curl_api_hooks_for_testing(
-      nullptr, +[](CURL *) -> CURLcode { return CURLE_OK; },
-      Return_configured_response_code, Record_sleep_call);
-}
-
-// NOLINTNEXTLINE(misc-use-internal-linkage)
-size_t Get_recorded_sleep_call_count_for_testing() {
-  return Get_curl_retry_test_state().sleep_call_count;
+Retry_test_result
+Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
+                                 const std::string &url,
+                                 const bool use_debug_logging) {
+  size_t next_response_code_index = 0;
+  size_t sleep_call_count = 0;
+  std::string response;
+  const auto status_code = Perform_request_with_retries(
+      url, response,
+      use_debug_logging ? ERROR_LOG_POLICY::LOG_AS_DEBUG
+                        : ERROR_LOG_POLICY::LOG_AS_ERROR,
+      [&]() -> Request_attempt_result {
+        if (next_response_code_index >= response_codes.size()) {
+          return Request_attempt_result{CURLE_OK, 0};
+        }
+        const auto response_code = response_codes[next_response_code_index];
+        next_response_code_index++;
+        return Request_attempt_result{CURLE_OK, response_code};
+      },
+      [&]([[maybe_unused]] const uint8_t seconds) { sleep_call_count++; });
+  return Retry_test_result{status_code, sleep_call_count};
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 void Reset_curl_api_hooks_for_testing() {
-  Reset_curl_retry_test_state();
-  Set_curl_api_hooks_for_testing(nullptr, nullptr, nullptr, nullptr);
+  Set_curl_api_hooks_for_testing(nullptr, nullptr);
 }
 
 } // namespace test_support
