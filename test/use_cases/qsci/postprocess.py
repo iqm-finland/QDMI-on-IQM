@@ -104,7 +104,14 @@ def postprocess_counts(atom: str, basis: str, counts: dict[str, int], *, cutoff:
 
     Returns:
         The estimated electronic ground-state energy from the selected configurations.
+
+    Raises:
+        ValueError: If no counts are provided or no states survive occupancy filtering.
     """
+    if not counts:
+        msg = "counts must not be empty"
+        raise ValueError(msg)
+
     basis_states = list(counts.keys())
     basis_counts = list(counts.values())
     num_qubits = len(basis_states[0])
@@ -119,6 +126,10 @@ def postprocess_counts(atom: str, basis: str, counts: dict[str, int], *, cutoff:
             selected_states.append(int(state, 2))
         if len(selected_states) >= min(cutoff, len(basis_states)):
             break
+
+    if not selected_states:
+        msg = "no states selected after occupancy filtering"
+        raise ValueError(msg)
 
     molecule = gto.Mole(verbose=0)
     molecule.build(atom=atom, basis=basis)

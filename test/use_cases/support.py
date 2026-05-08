@@ -55,6 +55,10 @@ def selected_target_is_mock() -> bool:
 def transpile_for_backend(backend: IQMBackend, circuit: QuantumCircuit) -> QuantumCircuit:
     """Transpile a circuit for the configured IQM backend.
 
+    Args:
+        backend: The target IQM backend for transpilation.
+        circuit: The quantum circuit to transpile.
+
     Returns:
         The transpiled circuit ready for execution on the backend.
     """
@@ -63,6 +67,9 @@ def transpile_for_backend(backend: IQMBackend, circuit: QuantumCircuit) -> Quant
 
 def ensure_measurements(circuit: QuantumCircuit) -> QuantumCircuit:
     """Return a copy of the circuit with measurements attached.
+
+    Args:
+        circuit: The quantum circuit to copy and augment with measurements.
 
     Returns:
         A circuit that includes measurements on all qubits.
@@ -78,6 +85,11 @@ def ensure_measurements(circuit: QuantumCircuit) -> QuantumCircuit:
 def sample_counts(backend: IQMBackend, circuit: QuantumCircuit, *, shots: int) -> dict[str, int]:
     """Execute a circuit through the backend-bound sampler and return counts.
 
+    Args:
+        backend: The IQM backend providing the bound sampler.
+        circuit: The quantum circuit to execute.
+        shots: The number of shots to run.
+
     Returns:
         The measured bitstring counts from the sampler result.
     """
@@ -88,7 +100,12 @@ def sample_counts(backend: IQMBackend, circuit: QuantumCircuit, *, shots: int) -
 
 
 def skip_if_backend_too_small(backend: IQMBackend, *, required_qubits: int) -> None:
-    """Skip when the selected target does not expose enough qubits."""
+    """Skip when the selected target does not expose enough qubits.
+
+    Args:
+        backend: The IQM backend selected for the workflow.
+        required_qubits: The minimum number of qubits needed.
+    """
     if backend.num_qubits >= required_qubits:
         return
 
