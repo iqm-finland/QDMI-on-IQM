@@ -220,29 +220,6 @@ $ export RESONANCE_API_KEY="your-api-key"
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
-**Running the Python use-case workflows:**
-
-The use-case workflows in `test/use_cases/` are not part of the default Python test path because they exercise longer-running showcase flows.
-
-```console
-$ export IQM_BASE_URL="https://desired-iqm-server.com"
-$ export RESONANCE_API_KEY="your-api-key"
-$ uv run --group showcase pytest test/use_cases
-```
-
-To focus on one workflow family, filter with the dedicated markers:
-
-```console
-$ uv run --group showcase pytest test/use_cases -m mqt_bench
-$ uv run --group showcase pytest test/use_cases -m qsci
-```
-
-:::note
-The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-:::
-
-If you touch one of these showcase workflows, update the corresponding documentation in `docs/use_cases.md` as part of the same change.
-
 **Generating code coverage:**
 
 To generate a code coverage report, configure the project with `-DIQM_QDMI_COVERAGE=ON`, build, run the tests, and then use `lcov`:
@@ -277,6 +254,29 @@ Remember to pull the changes back into your local repository after the bot has f
 :::
 
 Our CI pipeline will also run `clang-tidy` over the changes in your PR and report any issues it finds. Due to technical limitations, the workflow can only post PR comments if the changes are not coming from a fork. If you are working on a fork, you can still see the `clang-tidy` results in the GitHub Actions logs or on the workflow summary page.
+
+## Running the Python use-case workflows
+
+The use-case workflows in `test/use_cases/` are not part of the default Python test path because they exercise longer-running showcase flows.
+
+```console
+$ export IQM_BASE_URL="https://desired-iqm-server.com"
+$ export RESONANCE_API_KEY="your-api-key"
+$ uv run --group showcase pytest test/use_cases
+```
+
+To focus on one workflow family, filter with the dedicated markers:
+
+```console
+$ uv run --group showcase pytest test/use_cases -m mqt_bench
+$ uv run --group showcase pytest test/use_cases -m qsci
+```
+
+:::{note}
+The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
+
+If you touch one of these showcase workflows, update the corresponding workflow guidance in [use_cases.md](use_cases.md) as part of the same change.
 
 ## Working on the Documentation
 

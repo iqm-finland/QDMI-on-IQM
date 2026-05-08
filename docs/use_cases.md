@@ -90,7 +90,7 @@ The QSCI use-case flow is:
 
 1. Build the electronic-structure problem with Qiskit Nature.
 2. Construct a UCCSD ansatz and map the Hamiltonian with Jordan-Wigner.
-3. Optimize the ansatz with {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator` through VQE.
+3. Optimize the ansatz with Qiskit's {py:class}`~qiskit.primitives.BackendEstimator` wrapper over the IQM backend so VQE can use the backend through the estimator V1 interface it still expects.
 4. Sample the trained ansatz with {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler`.
 5. Postprocess the measured configurations classically in `test/use_cases/qsci/postprocess.py`.
 
@@ -101,6 +101,7 @@ The use-case implementation in `test/use_cases/qsci/test_qsci.py` uses {py:class
 ```{code-cell} ipython3
 from qiskit_algorithms import VQE
 from qiskit_algorithms.optimizers import L_BFGS_B
+from qiskit.primitives import BackendEstimator
 from qiskit_nature.second_q.circuit.library import HartreeFock, UCCSD
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -121,7 +122,9 @@ ansatz = UCCSD(
 )
 observable = mapper.map(problem.second_q_ops()[0])
 
-estimator = backend.estimator(options={"default_shots": 2048})
+# qiskit_algorithms.VQE still expects the Estimator V1 interface, so
+# wrap the backend instead of using IQMBackend.estimator()'s V2 primitive.
+estimator = BackendEstimator(backend=backend, options={"shots": 2048})
 vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=30))
 result = vqe.compute_minimum_eigenvalue(operator=observable)
 

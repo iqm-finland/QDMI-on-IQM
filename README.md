@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://www.meetiqm.com">
+  <a href="https://www.iqm.tech">
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/iqm-finland/QDMI-on-IQM/raw/refs/heads/main/docs/_static/iqm_logo_dark.svg">
      <img src="https://github.com/iqm-finland/QDMI-on-IQM/raw/refs/heads/main/docs/_static/iqm_logo.svg" alt="IQM Logo" width="40%">
@@ -170,9 +170,8 @@ $ uv run --group showcase pytest test/use_cases -m mqt_bench
 $ uv run --group showcase pytest test/use_cases -m qsci
 ```
 
-:::note
-The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-:::
+> [!NOTE]
+> The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 
 ## Contributing
 
