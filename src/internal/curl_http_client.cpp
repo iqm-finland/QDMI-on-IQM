@@ -24,6 +24,7 @@
 
 #include "curl_http_client.hpp"
 
+#include "../../test/unit/curl_http_client_test_support.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
@@ -39,20 +40,6 @@
 #include <vector>
 
 namespace iqm {
-
-namespace test_support {
-
-/**
- * @brief Outcome captured while exercising retry behavior in tests.
- */
-struct Retry_test_result {
-  /// The final QDMI status code returned by the retry helper.
-  int status_code;
-  /// The number of retry-delay calls that would have been performed.
-  size_t sleep_call_count;
-};
-
-} // namespace test_support
 
 namespace {
 /**
@@ -80,7 +67,7 @@ constexpr uint8_t RATE_LIMIT_RETRY_DELAY_SECONDS = 2;
  */
 struct Request_attempt_result {
   /// The result returned by curl_easy_perform.
-  CURLcode curl_result;
+  CURLcode curl_result = CURLE_OK;
   /// The HTTP response code observed for the completed request.
   int64_t response_code = 0;
 };
@@ -367,9 +354,10 @@ int Perform_get_request(const std::string &url, const std::string &bearer_token,
       [&]() -> Request_attempt_result {
         const auto res = curl_api_hooks.easy_perform(curl);
         if (res != CURLE_OK) {
-          return Request_attempt_result{res, 0};
+          return Request_attempt_result{.curl_result = res, .response_code = 0};
         }
-        return Request_attempt_result{CURLE_OK, Get_response_code(curl)};
+        return Request_attempt_result{.curl_result = CURLE_OK,
+                                      .response_code = Get_response_code(curl)};
       },
       Sleep_for_seconds);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
@@ -439,9 +427,10 @@ int CurlHttpClient::post(const std::string &url,
       [&]() -> Request_attempt_result {
         const auto res = curl_api_hooks.easy_perform(curl);
         if (res != CURLE_OK) {
-          return Request_attempt_result{res, 0};
+          return Request_attempt_result{.curl_result = res, .response_code = 0};
         }
-        return Request_attempt_result{CURLE_OK, Get_response_code(curl)};
+        return Request_attempt_result{.curl_result = CURLE_OK,
+                                      .response_code = Get_response_code(curl)};
       },
       Sleep_for_seconds);
   curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
@@ -490,14 +479,17 @@ Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
                         : ERROR_LOG_POLICY::LOG_AS_ERROR,
       [&]() -> Request_attempt_result {
         if (next_response_code_index >= response_codes.size()) {
-          return Request_attempt_result{CURLE_OK, 0};
+          return Request_attempt_result{.curl_result = CURLE_OK,
+                                        .response_code = 0};
         }
         const auto response_code = response_codes[next_response_code_index];
         next_response_code_index++;
-        return Request_attempt_result{CURLE_OK, response_code};
+        return Request_attempt_result{.curl_result = CURLE_OK,
+                                      .response_code = response_code};
       },
       [&]([[maybe_unused]] const uint8_t seconds) { sleep_call_count++; });
-  return Retry_test_result{status_code, sleep_call_count};
+  return Retry_test_result{.status_code = status_code,
+                           .sleep_call_count = sleep_call_count};
 }
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
