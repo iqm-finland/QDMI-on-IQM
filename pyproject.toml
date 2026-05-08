@@ -27,7 +27,7 @@ requires-python = ">=3.10"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 authors = [
-  { name = "IQM Finland Oy", email = "developers@meetiqm.com" },
+  { name = "IQM Finland Oy", email = "developers@iqm.tech" },
 ]
 
 license = "Apache-2.0 WITH LLVM-exception"
@@ -139,6 +139,7 @@ markers = [
 ]
 filterwarnings = [
   "error",
+  "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
 testpaths = ["test/python"]
