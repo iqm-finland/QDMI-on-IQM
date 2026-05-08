@@ -22,8 +22,9 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -42,11 +43,13 @@ QSCI_WINDOWS_REASON = (
     "Install the showcase dependencies on a non-Windows platform to run it."
 )
 
-pytest.importorskip(
+qiskit_algorithms = pytest.importorskip(
     "qiskit_algorithms",
     reason=QSCI_PY314_REASON,
 )
 qiskit_algorithms_optimizers = pytest.importorskip("qiskit_algorithms.optimizers", reason=QSCI_PY314_REASON)
+qiskit_primitives = pytest.importorskip("qiskit.primitives", reason=QSCI_PY314_REASON)
+qiskit_quantum_info = pytest.importorskip("qiskit.quantum_info", reason=QSCI_PY314_REASON)
 pytest.importorskip(
     "qiskit_nature",
     reason=QSCI_PY314_REASON,
@@ -60,33 +63,15 @@ pytest.importorskip(
     reason=QSCI_WINDOWS_REASON,
 )
 
-qiskit_algorithms = importlib.import_module("qiskit_algorithms")
-postprocess_module = importlib.import_module("postprocess")
-support_module = importlib.import_module("support")
-
-VQE = qiskit_algorithms.VQE
-NumPyMinimumEigensolver = qiskit_algorithms.NumPyMinimumEigensolver
-L_BFGS_B = qiskit_algorithms_optimizers.L_BFGS_B
-GroundStateEigensolver = qiskit_nature_algorithms.GroundStateEigensolver
-UCCSD = qiskit_nature_circuit_library.UCCSD
-HartreeFock = qiskit_nature_circuit_library.HartreeFock
-PySCFDriver = qiskit_nature_drivers.PySCFDriver
-JordanWignerMapper = qiskit_nature_mappers.JordanWignerMapper
-postprocess_counts = postprocess_module.postprocess_counts
-sample_counts = support_module.sample_counts
-selected_target_is_mock = support_module.selected_target_is_mock
-skip_if_backend_too_small = support_module.skip_if_backend_too_small
+postprocess = importlib.import_module("postprocess")
+support = importlib.import_module("support")
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from qiskit.circuit.parameter import Parameter
-    from qiskit.circuit.parameterexpression import ParameterExpression
     from qiskit.circuit.quantumcircuit import QuantumCircuit
-    from qiskit.primitives.base.base_estimator import BaseEstimator
+    from qiskit.primitives import BackendEstimator
     from qiskit.quantum_info import SparsePauliOp
-    from qiskit_nature.second_q.operators import FermionicOp
-    from qiskit_nature.second_q.problems import ElectronicStructureResult
+    from qiskit_nature.second_q.circuit.library import UCCSD
+    from qiskit_nature.second_q.mappers import JordanWignerMapper
 
     from iqm.qdmi.qiskit import IQMBackend
 
@@ -101,16 +86,20 @@ def prepare_ansatz(
 ) -> tuple[JordanWignerMapper, UCCSD]:
     """Construct the mapped ansatz used in the QSCI workflow.
 
+    Args:
+        num_spatial_orbitals: The number of spatial orbitals in the problem.
+        num_particles: The number of alpha and beta electrons.
+
     Returns:
         The Jordan-Wigner mapper together with the configured UCCSD ansatz.
     """
-    mapper = JordanWignerMapper()
-    initial_state = HartreeFock(
+    mapper = qiskit_nature_mappers.JordanWignerMapper()
+    initial_state = qiskit_nature_circuit_library.HartreeFock(
         num_spatial_orbitals,
         num_particles,
         mapper,
     )
-    ansatz = UCCSD(
+    ansatz = qiskit_nature_circuit_library.UCCSD(
         num_spatial_orbitals,
         num_particles,
         mapper,
@@ -126,17 +115,37 @@ def train_ansatz(
 ) -> QuantumCircuit:
     """Optimize the ansatz parameters using the backend-bound estimator.
 
+    Args:
+        backend: The IQM backend used for estimator evaluations.
+        ansatz: The parameterized ansatz circuit to optimize.
+        observable: The mapped observable whose expectation value is minimized.
+
     Returns:
         The ansatz circuit with the optimized parameters assigned.
+
+    Raises:
+        ValueError: If VQE does not return optimal parameters or parameter assignment fails.
     """
-    estimator = cast("BaseEstimator", backend.estimator(options={"default_shots": QSCI_SHOTS}))
-    vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=QSCI_MAXITER))
+    estimator: BackendEstimator
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        # qiskit_algorithms.VQE still expects the Estimator V1 interface, so
+        # wrap the backend instead of using IQMBackend.estimator()'s V2 primitive.
+        estimator = qiskit_primitives.BackendEstimator(
+            backend=backend,
+            options={"shots": QSCI_SHOTS},
+        )
+    vqe = qiskit_algorithms.VQE(estimator, ansatz, qiskit_algorithms_optimizers.L_BFGS_B(maxiter=QSCI_MAXITER))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
-    assert result.optimal_parameters is not None, "VQE must return optimal parameters"
-    trained_ansatz = ansatz.assign_parameters(
-        cast("Mapping[Parameter, ParameterExpression | float]", result.optimal_parameters)
-    )
-    assert trained_ansatz is not None, "assign_parameters should return a bound circuit"
+    if result.optimal_parameters is None:
+        msg = "VQE must return optimal parameters"
+        raise ValueError(msg)
+
+    trained_ansatz = ansatz.assign_parameters(result.optimal_parameters)
+    if trained_ansatz is None:
+        msg = "assign_parameters should return a bound circuit"
+        raise ValueError(msg)
+
     return trained_ansatz
 
 
@@ -146,7 +155,7 @@ def energy_tolerance() -> float:
     Returns:
         The allowed deviation between the exact and QSCI energies.
     """
-    target_is_mock = selected_target_is_mock()
+    target_is_mock = support.selected_target_is_mock()
     default_tolerance = "0.15" if target_is_mock else "0.75"
     return float(os.getenv("IQM_QSCI_ENERGY_TOLERANCE", default_tolerance))
 
@@ -157,7 +166,7 @@ def test_h2_qsci_workflow(backend: IQMBackend) -> None:
     atom = "H 0 0 0; H 0 0 1;"
     basis = "sto-3g"
 
-    driver = PySCFDriver(atom=atom, basis=basis)
+    driver = qiskit_nature_drivers.PySCFDriver(atom=atom, basis=basis)
     problem = driver.run()
     nuclear_repulsion_energy = problem.nuclear_repulsion_energy
 
@@ -166,18 +175,27 @@ def test_h2_qsci_workflow(backend: IQMBackend) -> None:
     assert nuclear_repulsion_energy is not None, "nuclear_repulsion_energy is required"
 
     mapper, ansatz = prepare_ansatz(problem.num_spatial_orbitals, problem.num_particles)
-    observable = cast("SparsePauliOp", mapper.map(cast("FermionicOp", problem.second_q_ops()[0])))
-    skip_if_backend_too_small(backend, required_qubits=ansatz.num_qubits)
+    observable = mapper.map(problem.second_q_ops()[0])
+    assert isinstance(observable, qiskit_quantum_info.SparsePauliOp), "mapped observable must be a SparsePauliOp"
+    support.skip_if_backend_too_small(backend, required_qubits=ansatz.num_qubits)
 
     trained_ansatz = train_ansatz(backend, ansatz, observable)
-    counts = sample_counts(backend, trained_ansatz, shots=QSCI_SHOTS)
+    counts = support.sample_counts(backend, trained_ansatz, shots=QSCI_SHOTS)
 
-    eigval = postprocess_counts(atom, basis, counts, cutoff=QSCI_CUTOFF)
+    eigval = postprocess.postprocess_counts(atom, basis, counts, cutoff=QSCI_CUTOFF)
     qsci_energy = eigval + nuclear_repulsion_energy
 
-    exact_solver = GroundStateEigensolver(mapper, NumPyMinimumEigensolver())
-    exact_result = cast("ElectronicStructureResult", exact_solver.solve(problem))
+    exact_solver = qiskit_nature_algorithms.GroundStateEigensolver(
+        mapper,
+        qiskit_algorithms.NumPyMinimumEigensolver(),
+    )
+    exact_result = exact_solver.solve(problem)
     assert exact_result.total_energies is not None, "exact solver must return total energies"
     exact_energy = float(exact_result.total_energies[0])
+    tolerance = energy_tolerance()
+    energy_difference = abs(exact_energy - qsci_energy)
 
-    assert abs(exact_energy - qsci_energy) < energy_tolerance()
+    assert energy_difference < tolerance, (
+        f"QSCI energy deviated from the exact reference by {energy_difference:.6f}, "
+        f"expected less than {tolerance:.6f} (exact={exact_energy:.6f}, qsci={qsci_energy:.6f})."
+    )
