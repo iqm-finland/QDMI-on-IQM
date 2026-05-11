@@ -259,10 +259,18 @@ Our CI pipeline will also run `clang-tidy` over the changes in your PR and repor
 
 The use-case workflows in `test/use_cases/` are not part of the default Python test path because they exercise longer-running showcase flows.
 
+The default showcase mode targets IQM hardware through the packaged Python backend:
+
 ```console
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
 $ uv run --group showcase pytest test/use_cases
+```
+
+To run the same workflows against the [MQT Core DDSIM](https://github.com/munich-quantum-toolkit/ddsim) QDMI backend instead, opt in explicitly:
+
+```console
+$ IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/use_cases
 ```
 
 To focus on one workflow family, filter with the dedicated markers:
@@ -274,6 +282,12 @@ $ uv run --group showcase pytest test/use_cases -m qsci
 
 :::{note}
 The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
+
+:::{important}
+The IQM-backed showcase assertions are tuned for real IQM QPUs.
+Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but the stricter showcase assertions may fail on them.
+Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM credentials.
 :::
 
 If you touch one of these showcase workflows, update the corresponding workflow guidance in [use_cases.md](use_cases.md) as part of the same change.

@@ -1,7 +1,7 @@
 # Workflow Guide
 
-This guide collects end-to-end Qiskit workflows built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
-Unlike the C API examples in the general [usage guide](usage.md), these workflows exercise the `qiskit` extra together with MQT Core's sampler and estimator primitives.
+This guide collects end-to-end Qiskit workflows built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
+Unlike the C API examples in the general [usage guide](usage.md), these workflows exercise the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
 
 The corresponding implementations live in the use-case test tree:
 
@@ -13,17 +13,28 @@ They are heavier than the wrapper tests in `test/python/` and are meant to be ru
 
 ## Running the Workflows
 
-Both workflows use the same environment-variable contract as the rest of the package:
+The showcase suite defaults to the IQM backend path and uses the same environment-variable contract as the rest of the package:
 
 - `IQM_BASE_URL`: IQM server endpoint.
 - `IQM_TOKEN` or `RESONANCE_API_KEY`: authentication token.
 - `IQM_TOKENS_FILE`: optional authentication file.
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: optional explicit target selection.
+- `IQM_SHOWCASE_BACKEND`: showcase backend selection. Supported values are `iqm` (default) and `ddsim`.
 
-Install the showcase dependencies and run the workflow suite explicitly with `uv`:
+Install the showcase dependencies and run the workflow suite explicitly with `uv`.
+
+For the default IQM-backed path:
 
 ```bash
+export IQM_BASE_URL="https://desired-iqm-server.com"
+export RESONANCE_API_KEY="your-api-key"
 uv run --group showcase pytest test/use_cases
+```
+
+For the DDSIM-backed path, opt in explicitly and omit the IQM credentials:
+
+```bash
+IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/use_cases
 ```
 
 You can also focus on one showcase family at a time:
@@ -37,10 +48,16 @@ uv run --group showcase pytest test/use_cases -m qsci
 The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
+:::{important}
+The IQM-backed showcase assertions are tuned for real IQM QPUs.
+If you point `IQM_QC_ALIAS` or `IQM_QC_ID` at a mock IQM target, the workflow is still executed, but the stricter showcase assertions may fail.
+Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM credentials.
+:::
+
 ## MQT Bench Showcase
 
 [MQT Bench](https://mqt.readthedocs.io/projects/bench/) provides a large catalog of benchmark circuits.
-In this repository, it serves as a use-case sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected IQM target, executes them through {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler`, and validates the observed bitstring distribution.
+In this repository, it serves as a use-case sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected showcase backend, executes them through MQT Core's generic QDMI sampler primitive, and validates the observed bitstring distribution.
 
 The current workflow covers:
 
@@ -55,10 +72,20 @@ The current workflow covers:
 The use-case tests in `test/use_cases/mqt_bench/test_mqt_bench.py` follow this structure:
 
 ```{code-cell} ipython3
+import os
+
 from mqt.bench import BenchmarkLevel, get_benchmark
+from mqt.core.plugins.qiskit.provider import QDMIProvider
+from mqt.core.plugins.qiskit.sampler import QDMISampler
+from qiskit import transpile
+
 from iqm.qdmi.qiskit import IQMBackend
 
-backend = IQMBackend()
+backend_kind = os.getenv("IQM_SHOWCASE_BACKEND", "iqm").strip().lower()
+if backend_kind == "ddsim":
+    backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+else:
+    backend = IQMBackend()
 
 circuit = get_benchmark(
     benchmark="ghz",
@@ -68,9 +95,16 @@ circuit = get_benchmark(
 if not any(instruction.operation.name == "measure" for instruction in circuit.data):
     circuit.measure_all()
 
-transpiled = transpile(circuit, backend=backend, optimization_level=3)
-job = backend.sampler().run([(transpiled,)], shots=1024)
-counts = job.result()[0].data["meas"].get_counts()
+if backend_kind == "ddsim":
+    transpiled = transpile(
+        circuit, basis_gates=sorted(backend.operation_names), optimization_level=1
+    )
+else:
+    transpiled = transpile(circuit, backend=backend, optimization_level=3)
+
+sampler = QDMISampler(backend, default_shots=1024)
+job = sampler.run([(transpiled,)], shots=1024)
+counts = job.result()[0].data
 ```
 
 ### Runtime Knob
@@ -90,25 +124,34 @@ The QSCI use-case flow is:
 
 1. Build the electronic-structure problem with Qiskit Nature.
 2. Construct a UCCSD ansatz and map the Hamiltonian with Jordan-Wigner.
-3. Optimize the ansatz with Qiskit's {py:class}`~qiskit.primitives.BackendEstimator` wrapper over the IQM backend so VQE can use the backend through the estimator V1 interface it still expects.
-4. Sample the trained ansatz with {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler`.
+3. Optimize the ansatz with Qiskit's `BackendEstimator` wrapper over the selected showcase backend so VQE can use the estimator V1 interface it still expects.
+4. Sample the trained ansatz with MQT Core's generic QDMI sampler primitive.
 5. Postprocess the measured configurations classically in `test/use_cases/qsci/postprocess.py`.
 
 ### Implementation Pattern
 
-The use-case implementation in `test/use_cases/qsci/test_qsci.py` uses {py:class}`~iqm.qdmi.qiskit.IQMBackend` together with Qiskit Nature and Qiskit Algorithms to run the full workflow end to end:
+The use-case implementation in `test/use_cases/qsci/test_qsci.py` selects the showcase backend first and then uses the same Qiskit Nature and Qiskit Algorithms flow on top of it:
 
 ```{code-cell} ipython3
+import os
+
 from qiskit_algorithms import VQE
 from qiskit_algorithms.optimizers import L_BFGS_B
 from qiskit.primitives import BackendEstimator
 from qiskit_nature.second_q.circuit.library import HartreeFock, UCCSD
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
+from mqt.core.plugins.qiskit.provider import QDMIProvider
+from qiskit import transpile
 
 from iqm.qdmi.qiskit import IQMBackend
 
-backend = IQMBackend()
+backend_kind = os.getenv("IQM_SHOWCASE_BACKEND", "iqm").strip().lower()
+if backend_kind == "ddsim":
+    backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+else:
+    backend = IQMBackend()
+
 driver = PySCFDriver(atom="H 0 0 0; H 0 0 1;", basis="sto-3g")
 problem = driver.run()
 
@@ -122,17 +165,33 @@ ansatz = UCCSD(
 )
 observable = mapper.map(problem.second_q_ops()[0])
 
-# qiskit_algorithms.VQE still expects the Estimator V1 interface, so
-# wrap the backend instead of using IQMBackend.estimator()'s V2 primitive.
-estimator = BackendEstimator(backend=backend, options={"shots": 2048})
+# qiskit_algorithms.VQE still expects the Estimator V1 interface.
+# DDSIM runs pre-transpile the ansatz and skip estimator-side transpilation,
+# while IQM runs let BackendEstimator transpile against the hardware target.
+if backend_kind == "ddsim":
+    ansatz = transpile(
+        ansatz, basis_gates=sorted(backend.operation_names), optimization_level=1
+    )
+    estimator = BackendEstimator(
+        backend=backend, options={"shots": 2048}, skip_transpilation=True
+    )
+else:
+    estimator = BackendEstimator(backend=backend, options={"shots": 2048})
+
 vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=30))
 result = vqe.compute_minimum_eigenvalue(operator=observable)
 
 trained_ansatz = ansatz.assign_parameters(result.optimal_parameters)
 sample_circuit = trained_ansatz.copy()
 sample_circuit.measure_all()
-transpiled = transpile(sample_circuit, backend=backend, optimization_level=3)
-counts = backend.sampler().run([(transpiled,)], shots=2048).result()[0].data["meas"].get_counts()
+if backend_kind == "ddsim":
+    transpiled = transpile(
+        sample_circuit,
+        basis_gates=sorted(backend.operation_names),
+        optimization_level=1,
+    )
+else:
+    transpiled = transpile(sample_circuit, backend=backend, optimization_level=3)
 ```
 
 The classical reduction step is intentionally kept in a separate module so the use-case test remains easy to read while still showing the full workflow.

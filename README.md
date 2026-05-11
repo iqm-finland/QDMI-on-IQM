@@ -160,8 +160,13 @@ $ ctest --test-dir build/test/integration --output-on-failure
 ```
 
 ```console
-# Run the optional Python use-case workflows
+# Run the optional Python use-case workflows on an IQM backend (default)
+$ export IQM_BASE_URL="https://desired-iqm-server.com"
+$ export RESONANCE_API_KEY="your-api-key"
 $ uv run --group showcase pytest test/use_cases
+
+# Run the same showcase workflows against DDSIM instead
+$ IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/use_cases
 
 # Run only the MQT Bench showcase workflows
 $ uv run --group showcase pytest test/use_cases -m mqt_bench
@@ -172,6 +177,9 @@ $ uv run --group showcase pytest test/use_cases -m qsci
 
 > [!NOTE]
 > The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+
+> [!IMPORTANT]
+> The IQM-backed showcase assertions are tuned for real IQM QPUs. Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but they may fail the stricter showcase checks. Use `IQM_SHOWCASE_BACKEND=ddsim` for an explicit simulator-backed validation path.
 
 ## Contributing
 
