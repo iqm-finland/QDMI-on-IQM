@@ -227,10 +227,11 @@ PC170 = "We do not use rST files"
 [tool.cibuildwheel]
 build = "cp3*"
 archs = "auto64"
-test-groups = ["test"]
-test-sources = ["test/python"]
-test-command = "pytest test/python"
+test-groups = ["showcase"]
+test-sources = ["test"]
+test-command = "pytest test/python test/use_cases"
 build-frontend = "uv"
+environment = { IQM_SHOWCASE_BACKEND = "ddsim" }
 test-skip = [
   "cp3??t-*", # no freethreading qiskit wheels
   "cp*-win_arm64", # no numpy, qiskit, ... wheels
