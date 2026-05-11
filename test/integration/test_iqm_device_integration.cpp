@@ -42,6 +42,7 @@
 // time for real job execution on the quantum computer.
 constexpr size_t DEFAULT_JOB_WAIT_TIMEOUT = 300; // seconds
 
+namespace {
 class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
@@ -58,9 +59,8 @@ protected:
     const std::string api_key{(api_key_env != nullptr) ? api_key_env : ""};
 
     const auto *base_url_env = std::getenv("IQM_BASE_URL");
-    const std::string base_url = (base_url_env != nullptr)
-                                     ? base_url_env
-                                     : "https://resonance.meetiqm.com";
+    const std::string base_url =
+        (base_url_env != nullptr) ? base_url_env : "https://resonance.iqm.tech";
 
     const auto *qc_id_env = std::getenv("IQM_QC_ID");
     const std::optional<std::string> qc_id =
@@ -220,6 +220,7 @@ protected:
       "graph_definition": null,
     })";
 };
+} // namespace
 
 TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   const auto device_name = fomac.get_name();
