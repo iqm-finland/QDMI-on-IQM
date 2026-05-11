@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -27,11 +28,11 @@ import pytest
 from mqt.core.plugins.qiskit.estimator import QDMIEstimator
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit import transpile
-from qiskit.primitives import BackendEstimator
 
 if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.circuit import QuantumCircuit
+    from qiskit.primitives import BackendEstimator
 
 SHOWCASE_BACKEND_ENV = "IQM_SHOWCASE_BACKEND"
 
@@ -130,10 +131,12 @@ def make_vqe_estimator(backend: QDMIBackend, *, shots: int) -> BackendEstimator:
     Returns:
         A BackendEstimator instance using the Estimator V1 compatibility layer.
     """
+    backend_estimator = importlib.import_module("qiskit.primitives").BackendEstimator
+
     skip_transpilation = showcase_backend_kind() is ShowcaseBackend.DDSIM
     # qiskit_algorithms.VQE still expects the Estimator V1 interface, so use
     # BackendEstimator here even though the native QDMI estimator is V2.
-    return BackendEstimator(
+    return backend_estimator(
         backend=backend,
         options={"shots": shots},
         skip_transpilation=skip_transpilation,
