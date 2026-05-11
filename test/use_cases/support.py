@@ -20,19 +20,52 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import pytest
+from mqt.core.plugins.qiskit.estimator import QDMIEstimator
+from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit import transpile
+from qiskit.primitives import BackendEstimator
 
 if TYPE_CHECKING:
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.circuit import QuantumCircuit
 
-    from iqm.qdmi.qiskit import IQMBackend
+SHOWCASE_BACKEND_ENV = "IQM_SHOWCASE_BACKEND"
 
 
-def require_iqm_access() -> None:
-    """Skip use-case workflow tests when IQM credentials are unavailable."""
+class ShowcaseBackend(str, Enum):
+    """Supported showcase backend kinds."""
+
+    IQM = "iqm"
+    DDSIM = "ddsim"
+
+
+def showcase_backend_kind() -> ShowcaseBackend:
+    """Return the configured showcase backend kind.
+
+    Returns:
+        The normalized showcase backend selection.
+
+    Raises:
+        ValueError: If the showcase backend selection is unsupported.
+    """
+    backend_kind = os.getenv(SHOWCASE_BACKEND_ENV, "iqm").strip().lower()
+    try:
+        return ShowcaseBackend(backend_kind)
+    except ValueError as exc:
+        expected_values = ", ".join(backend.value for backend in ShowcaseBackend)
+        msg = f"{SHOWCASE_BACKEND_ENV} must be one of {expected_values}, got {backend_kind!r}."
+        raise ValueError(msg) from exc
+
+
+def require_showcase_backend_access() -> None:
+    """Skip showcase workflows when the selected backend is not configured."""
+    if showcase_backend_kind() is not ShowcaseBackend.IQM:
+        return
+
     if any(os.getenv(name) for name in ("RESONANCE_API_KEY", "IQM_TOKEN", "IQM_TOKENS_FILE")):
         return
 
@@ -42,27 +75,69 @@ def require_iqm_access() -> None:
     )
 
 
-def selected_target_is_mock() -> bool:
-    """Return whether the selected IQM target looks like a mock backend.
-
-    Returns:
-        True when the selected target identifier suggests a mock backend.
-    """
-    target_hint = " ".join(filter(None, (os.getenv("IQM_QC_ALIAS"), os.getenv("IQM_QC_ID")))).lower()
-    return "mock" in target_hint
-
-
-def transpile_for_backend(backend: IQMBackend, circuit: QuantumCircuit) -> QuantumCircuit:
-    """Transpile a circuit for the configured IQM backend.
+def transpile_for_backend(backend: QDMIBackend, circuit: QuantumCircuit) -> QuantumCircuit:
+    """Transpile a circuit for the configured showcase backend.
 
     Args:
-        backend: The target IQM backend for transpilation.
+        backend: The target QDMI backend for transpilation.
         circuit: The quantum circuit to transpile.
 
     Returns:
         The transpiled circuit ready for execution on the backend.
     """
+    if showcase_backend_kind() is ShowcaseBackend.DDSIM:
+        # The DDSIM backend's Target metadata does not round-trip through
+        # qiskit.transpile(backend=...), so decompose against the exposed basis
+        # gates without asking Qiskit to build backend properties from Target.
+        return transpile(circuit, basis_gates=sorted(backend.operation_names), optimization_level=1)
+
     return transpile(circuit, backend=backend, optimization_level=3)
+
+
+def make_sampler(backend: QDMIBackend, *, shots: int) -> QDMISampler:
+    """Return a sampler primitive for the selected QDMI backend.
+
+    Args:
+        backend: The QDMI backend that should execute the sampling jobs.
+        shots: The default number of shots for the primitive.
+
+    Returns:
+        A sampler primitive bound to the selected backend.
+    """
+    return QDMISampler(backend, default_shots=shots)
+
+
+def make_estimator(backend: QDMIBackend, *, shots: int) -> QDMIEstimator:
+    """Return an estimator primitive for the selected QDMI backend.
+
+    Args:
+        backend: The QDMI backend that should execute the estimator jobs.
+        shots: The default shot budget for expectation-value estimation.
+
+    Returns:
+        An estimator primitive bound to the selected backend.
+    """
+    return QDMIEstimator(backend, options={"default_shots": shots})
+
+
+def make_vqe_estimator(backend: QDMIBackend, *, shots: int) -> BackendEstimator:
+    """Return a VQE-compatible estimator for the selected backend.
+
+    Args:
+        backend: The QDMI backend that should execute the VQE jobs.
+        shots: The backend-estimator shot budget.
+
+    Returns:
+        A BackendEstimator instance using the Estimator V1 compatibility layer.
+    """
+    skip_transpilation = showcase_backend_kind() is ShowcaseBackend.DDSIM
+    # qiskit_algorithms.VQE still expects the Estimator V1 interface, so use
+    # BackendEstimator here even though the native QDMI estimator is V2.
+    return BackendEstimator(
+        backend=backend,
+        options={"shots": shots},
+        skip_transpilation=skip_transpilation,
+    )
 
 
 def ensure_measurements(circuit: QuantumCircuit) -> QuantumCircuit:
@@ -82,28 +157,40 @@ def ensure_measurements(circuit: QuantumCircuit) -> QuantumCircuit:
     return measured_circuit
 
 
-def sample_counts(backend: IQMBackend, circuit: QuantumCircuit, *, shots: int) -> dict[str, int]:
+def sample_counts(backend: QDMIBackend, circuit: QuantumCircuit, *, shots: int) -> dict[str, int]:
     """Execute a circuit through the backend-bound sampler and return counts.
 
     Args:
-        backend: The IQM backend providing the bound sampler.
+        backend: The QDMI backend providing the bound sampler.
         circuit: The quantum circuit to execute.
         shots: The number of shots to run.
 
     Returns:
         The measured bitstring counts from the sampler result.
+
+    Raises:
+        ValueError: If the sampler result does not expose classical measurement data.
     """
     measured_circuit = ensure_measurements(circuit)
     transpiled_circuit = transpile_for_backend(backend, measured_circuit)
-    job = backend.sampler(default_shots=shots).run([(transpiled_circuit,)], shots=shots)
-    return job.result()[0].data["meas"].get_counts()
+    job = make_sampler(backend, shots=shots).run([(transpiled_circuit,)], shots=shots)
+    data = job.result()[0].data
+    if "meas" in data:
+        return data["meas"].get_counts()
+
+    register_name = next(iter(data.keys()), None)
+    if register_name is None:
+        msg = "Sampler result did not contain any classical measurement data."
+        raise ValueError(msg)
+
+    return data[register_name].get_counts()
 
 
-def skip_if_backend_too_small(backend: IQMBackend, *, required_qubits: int) -> None:
+def skip_if_backend_too_small(backend: QDMIBackend, *, required_qubits: int) -> None:
     """Skip when the selected target does not expose enough qubits.
 
     Args:
-        backend: The IQM backend selected for the workflow.
+        backend: The QDMI backend selected for the workflow.
         required_qubits: The minimum number of qubits needed.
     """
     if backend.num_qubits >= required_qubits:

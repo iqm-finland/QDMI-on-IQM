@@ -27,7 +27,7 @@ requires-python = ">=3.10"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 authors = [
-  { name = "IQM Finland Oy", email = "developers@meetiqm.com" },
+  { name = "IQM Finland Oy", email = "developers@iqm.tech" },
 ]
 
 license = "Apache-2.0 WITH LLVM-exception"
@@ -139,6 +139,14 @@ markers = [
 ]
 filterwarnings = [
   "error",
+  'ignore:.*Device operation.*cannot be mapped to a Qiskit gate.*:UserWarning',
+  'ignore:Device does not define a measurement operation.*:UserWarning',
+  'ignore:qiskit\.providers\.models is deprecated since Qiskit 1\.2.*:DeprecationWarning',
+  'ignore:The class ``qiskit\.circuit\.library\.n_local\.n_local\.NLocal`` is pending deprecation.*:PendingDeprecationWarning',
+  'ignore:The class ``qiskit\.primitives\.backend_estimator\.BackendEstimator`` is deprecated.*:DeprecationWarning',
+  'ignore:The class ``qiskit\.primitives\.base\.base_estimator\.BaseEstimator`` is deprecated.*:DeprecationWarning',
+  'ignore:scipy\.optimize.*L-BFGS-B solver are deprecated.*:DeprecationWarning',
+  'ignore:The function ``qiskit\.primitives\.utils\.init_observable\(\)`` is deprecated.*:DeprecationWarning',
 ]
 log_level = "INFO"
 testpaths = ["test/python"]

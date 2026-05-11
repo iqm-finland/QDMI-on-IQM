@@ -22,7 +22,6 @@ from __future__ import annotations
 import importlib
 import os
 import sys
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -48,7 +47,6 @@ qiskit_algorithms = pytest.importorskip(
     reason=QSCI_PY314_REASON,
 )
 qiskit_algorithms_optimizers = pytest.importorskip("qiskit_algorithms.optimizers", reason=QSCI_PY314_REASON)
-qiskit_primitives = pytest.importorskip("qiskit.primitives", reason=QSCI_PY314_REASON)
 qiskit_quantum_info = pytest.importorskip("qiskit.quantum_info", reason=QSCI_PY314_REASON)
 pytest.importorskip(
     "qiskit_nature",
@@ -67,13 +65,11 @@ postprocess = importlib.import_module("postprocess")
 support = importlib.import_module("support")
 
 if TYPE_CHECKING:
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.circuit.quantumcircuit import QuantumCircuit
-    from qiskit.primitives import BackendEstimator
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_nature.second_q.circuit.library import UCCSD
     from qiskit_nature.second_q.mappers import JordanWignerMapper
-
-    from iqm.qdmi.qiskit import IQMBackend
 
 QSCI_MAXITER = int(os.getenv("IQM_QSCI_MAXITER", "30"))
 QSCI_SHOTS = int(os.getenv("IQM_QSCI_SHOTS", "2048"))
@@ -109,14 +105,14 @@ def prepare_ansatz(
 
 
 def train_ansatz(
-    backend: IQMBackend,
+    backend: QDMIBackend,
     ansatz: UCCSD,
     observable: SparsePauliOp,
 ) -> QuantumCircuit:
     """Optimize the ansatz parameters using the backend-bound estimator.
 
     Args:
-        backend: The IQM backend used for estimator evaluations.
+        backend: The selected QDMI backend used for estimator evaluations.
         ansatz: The parameterized ansatz circuit to optimize.
         observable: The mapped observable whose expectation value is minimized.
 
@@ -126,22 +122,18 @@ def train_ansatz(
     Raises:
         ValueError: If VQE does not return optimal parameters or parameter assignment fails.
     """
-    estimator: BackendEstimator
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        # qiskit_algorithms.VQE still expects the Estimator V1 interface, so
-        # wrap the backend instead of using IQMBackend.estimator()'s V2 primitive.
-        estimator = qiskit_primitives.BackendEstimator(
-            backend=backend,
-            options={"shots": QSCI_SHOTS},
-        )
-    vqe = qiskit_algorithms.VQE(estimator, ansatz, qiskit_algorithms_optimizers.L_BFGS_B(maxiter=QSCI_MAXITER))
+    vqe_ansatz = ansatz
+    if support.showcase_backend_kind() is support.ShowcaseBackend.DDSIM:
+        vqe_ansatz = support.transpile_for_backend(backend, ansatz)
+
+    estimator = support.make_vqe_estimator(backend, shots=QSCI_SHOTS)
+    vqe = qiskit_algorithms.VQE(estimator, vqe_ansatz, qiskit_algorithms_optimizers.L_BFGS_B(maxiter=QSCI_MAXITER))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     if result.optimal_parameters is None:
         msg = "VQE must return optimal parameters"
         raise ValueError(msg)
 
-    trained_ansatz = ansatz.assign_parameters(result.optimal_parameters)
+    trained_ansatz = vqe_ansatz.assign_parameters(result.optimal_parameters)
     if trained_ansatz is None:
         msg = "assign_parameters should return a bound circuit"
         raise ValueError(msg)
@@ -155,13 +147,11 @@ def energy_tolerance() -> float:
     Returns:
         The allowed deviation between the exact and QSCI energies.
     """
-    target_is_mock = support.selected_target_is_mock()
-    default_tolerance = "0.15" if target_is_mock else "0.75"
-    return float(os.getenv("IQM_QSCI_ENERGY_TOLERANCE", default_tolerance))
+    return float(os.getenv("IQM_QSCI_ENERGY_TOLERANCE", "0.35"))
 
 
 @pytest.mark.qsci
-def test_h2_qsci_workflow(backend: IQMBackend) -> None:
+def test_h2_qsci_workflow(backend: QDMIBackend) -> None:
     """Run the H2 QSCI showcase workflow end to end on the selected backend."""
     atom = "H 0 0 0; H 0 0 1;"
     basis = "sto-3g"

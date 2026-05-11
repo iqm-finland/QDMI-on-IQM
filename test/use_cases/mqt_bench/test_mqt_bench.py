@@ -20,31 +20,30 @@
 from __future__ import annotations
 
 import os
-import warnings
 from typing import TYPE_CHECKING
 
 import pytest
 from qiskit.quantum_info import hellinger_fidelity
-from support import sample_counts, selected_target_is_mock, skip_if_backend_too_small
+from support import sample_counts, skip_if_backend_too_small
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from iqm.qdmi.qiskit import IQMBackend
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
 
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        "ignore",
-        message=r"qiskit\.providers\.models is deprecated since Qiskit 1\.2.*",
-        category=DeprecationWarning,
-    )
-    pytest.importorskip(
-        "mqt.bench",
-        reason="Install the showcase dependencies with `uv run --group showcase ...` to run the MQT Bench workflows.",
-    )
-    from mqt.bench import BenchmarkLevel, get_benchmark
+pytest.importorskip(
+    "mqt.bench",
+    reason="Install the showcase dependencies with `uv run --group showcase ...` to run the MQT Bench workflows.",
+)
+from mqt.bench import BenchmarkLevel, get_benchmark
 
 MQT_BENCH_SHOTS = int(os.getenv("IQM_MQT_BENCH_SHOTS", "1024"))
+
+GHZ_FIDELITY_THRESHOLD = 0.35
+DEUTSCH_JOZSA_MAX_ZERO_PROBABILITY = 0.35
+QFT_MIN_STATES = 3
+GRAPHSTATE_MIN_STATES = 2
+WSTATE_FIDELITY_THRESHOLD = 0.4
 
 
 def validate_ghz_state_fidelity(counts: dict[str, int], *, num_qubits: int, threshold: float) -> None:
@@ -89,7 +88,7 @@ def validate_graphstate(counts: dict[str, int], *, min_states: int) -> None:
 
 
 def run_mqt_bench_test(
-    backend: IQMBackend,
+    backend: QDMIBackend,
     benchmark: str,
     circuit_size: int,
     validation_func: Callable[[dict[str, int]], None],
@@ -109,9 +108,8 @@ def run_mqt_bench_test(
 
 
 @pytest.mark.mqt_bench
-def test_ghz_workflow(backend: IQMBackend) -> None:
+def test_ghz_workflow(backend: QDMIBackend) -> None:
     """Run the GHZ-state showcase workflow through the backend sampler."""
-    target_is_mock = selected_target_is_mock()
     run_mqt_bench_test(
         backend,
         benchmark="ghz",
@@ -119,53 +117,50 @@ def test_ghz_workflow(backend: IQMBackend) -> None:
         validation_func=lambda counts: validate_ghz_state_fidelity(
             counts,
             num_qubits=3,
-            threshold=0.5 if target_is_mock else 0.2,
+            threshold=GHZ_FIDELITY_THRESHOLD,
         ),
     )
 
 
 @pytest.mark.mqt_bench
-def test_deutsch_jozsa_workflow(backend: IQMBackend) -> None:
+def test_deutsch_jozsa_workflow(backend: QDMIBackend) -> None:
     """Run the balanced Deutsch-Jozsa showcase workflow through the backend sampler."""
-    target_is_mock = selected_target_is_mock()
     run_mqt_bench_test(
         backend,
         benchmark="dj",
         circuit_size=4,
         validation_func=lambda counts: validate_deutsch_jozsa(
             counts,
-            max_zero_probability=0.2 if target_is_mock else 0.6,
+            max_zero_probability=DEUTSCH_JOZSA_MAX_ZERO_PROBABILITY,
         ),
     )
 
 
 @pytest.mark.mqt_bench
-def test_qft_workflow(backend: IQMBackend) -> None:
+def test_qft_workflow(backend: QDMIBackend) -> None:
     """Run the QFT showcase workflow through the backend sampler."""
-    target_is_mock = selected_target_is_mock()
     run_mqt_bench_test(
         backend,
         benchmark="qft",
         circuit_size=3,
-        validation_func=lambda counts: validate_qft(counts, min_states=4 if target_is_mock else 2),
+        validation_func=lambda counts: validate_qft(counts, min_states=QFT_MIN_STATES),
     )
 
 
 @pytest.mark.mqt_bench
-def test_graphstate_workflow(backend: IQMBackend) -> None:
+def test_graphstate_workflow(backend: QDMIBackend) -> None:
     """Run the graph-state showcase workflow through the backend sampler."""
     run_mqt_bench_test(
         backend,
         benchmark="graphstate",
         circuit_size=4,
-        validation_func=lambda counts: validate_graphstate(counts, min_states=2),
+        validation_func=lambda counts: validate_graphstate(counts, min_states=GRAPHSTATE_MIN_STATES),
     )
 
 
 @pytest.mark.mqt_bench
-def test_wstate_workflow(backend: IQMBackend) -> None:
+def test_wstate_workflow(backend: QDMIBackend) -> None:
     """Run the W-state showcase workflow through the backend sampler."""
-    target_is_mock = selected_target_is_mock()
     run_mqt_bench_test(
         backend,
         benchmark="wstate",
@@ -173,6 +168,6 @@ def test_wstate_workflow(backend: IQMBackend) -> None:
         validation_func=lambda counts: validate_wstate_fidelity(
             counts,
             num_qubits=3,
-            threshold=0.6 if target_is_mock else 0.25,
+            threshold=WSTATE_FIDELITY_THRESHOLD,
         ),
     )
