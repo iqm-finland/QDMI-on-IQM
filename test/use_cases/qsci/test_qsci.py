@@ -55,6 +55,9 @@ pytest.importorskip(
 qiskit_nature_algorithms = pytest.importorskip("qiskit_nature.second_q.algorithms", reason=QSCI_PY314_REASON)
 qiskit_nature_circuit_library = pytest.importorskip("qiskit_nature.second_q.circuit.library", reason=QSCI_PY314_REASON)
 qiskit_nature_drivers = pytest.importorskip("qiskit_nature.second_q.drivers", reason=QSCI_PY314_REASON)
+qiskit_nature_initial_points = pytest.importorskip(
+    "qiskit_nature.second_q.algorithms.initial_points", reason=QSCI_PY314_REASON
+)
 qiskit_nature_mappers = pytest.importorskip("qiskit_nature.second_q.mappers", reason=QSCI_PY314_REASON)
 pytest.importorskip(
     "pyscf",
@@ -70,6 +73,7 @@ if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_nature.second_q.circuit.library import UCCSD
     from qiskit_nature.second_q.mappers import JordanWignerMapper
+    from qiskit_nature.second_q.problems import ElectronicStructureProblem
 
 QSCI_MAXITER = int(os.getenv("IQM_QSCI_MAXITER", "30"))
 QSCI_SHOTS = int(os.getenv("IQM_QSCI_SHOTS", "2048"))
@@ -108,6 +112,7 @@ def train_ansatz(
     backend: QDMIBackend,
     ansatz: UCCSD,
     observable: SparsePauliOp,
+    problem: ElectronicStructureProblem,
 ) -> QuantumCircuit:
     """Optimize the ansatz parameters using the backend-bound estimator.
 
@@ -115,6 +120,7 @@ def train_ansatz(
         backend: The selected QDMI backend used for estimator evaluations.
         ansatz: The parameterized ansatz circuit to optimize.
         observable: The mapped observable whose expectation value is minimized.
+        problem: The electronic-structure problem used to derive a deterministic MP2 initial point.
 
     Returns:
         The ansatz circuit with the optimized parameters assigned.
@@ -127,7 +133,14 @@ def train_ansatz(
         vqe_ansatz = support.transpile_for_backend(backend, ansatz)
 
     estimator = support.make_vqe_estimator(backend, shots=QSCI_SHOTS)
-    vqe = qiskit_algorithms.VQE(estimator, vqe_ansatz, qiskit_algorithms_optimizers.L_BFGS_B(maxiter=QSCI_MAXITER))
+    mp2_initial_point = qiskit_nature_initial_points.MP2InitialPoint()
+    mp2_initial_point.compute(ansatz=ansatz, problem=problem)
+    vqe = qiskit_algorithms.VQE(
+        estimator,
+        vqe_ansatz,
+        qiskit_algorithms_optimizers.L_BFGS_B(maxiter=QSCI_MAXITER),
+        initial_point=mp2_initial_point.to_numpy_array(),
+    )
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     if result.optimal_parameters is None:
         msg = "VQE must return optimal parameters"
@@ -169,7 +182,7 @@ def test_h2_qsci_workflow(backend: QDMIBackend) -> None:
     assert isinstance(observable, qiskit_quantum_info.SparsePauliOp), "mapped observable must be a SparsePauliOp"
     support.skip_if_backend_too_small(backend, required_qubits=ansatz.num_qubits)
 
-    trained_ansatz = train_ansatz(backend, ansatz, observable)
+    trained_ansatz = train_ansatz(backend, ansatz, observable, problem)
     counts = support.sample_counts(backend, trained_ansatz, shots=QSCI_SHOTS)
 
     eigval = postprocess.postprocess_counts(atom, basis, counts, cutoff=QSCI_CUTOFF)
