@@ -124,7 +124,7 @@ print(f"Standard deviations: {data['stds']}")
 ### End-to-End Showcase Examples
 
 The repository also ships larger showcase examples built on top of these primitives.
-See the [showcase page](showcases.md) for:
+See the [end-user showcases](showcases.md) for:
 
 - MQT Bench sampler showcases in `test/showcases/mqt_bench/test_mqt_bench.py`
 - A QSCI estimator-and-sampler showcase in `test/showcases/qsci/test_qsci.py`

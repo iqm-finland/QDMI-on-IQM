@@ -1,7 +1,7 @@
-# Workflow Guide
+# End-User Showcases
 
-This guide collects end-to-end Qiskit showcases built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
-Unlike the C API examples in the general [usage guide](usage.md), these showcases exercise the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
+This page showcases end-to-end Qiskit demonstrations built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
+Unlike the C API examples in the general [usage guide](usage.md), these demonstrations focus on how end users can apply the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
 
 The corresponding implementations live in the showcase test tree:
 
@@ -9,7 +9,7 @@ The corresponding implementations live in the showcase test tree:
 - `test/showcases/qsci/test_qsci.py`
 
 These showcases are intentionally kept out of the default Python test path.
-They are heavier than the wrapper tests in `test/python/` and are meant to be run explicitly when you want a realistic showcase of the QDMI-backed Qiskit integration.
+They are heavier than the wrapper tests in `test/python/` and are meant to be run explicitly when you want a realistic end-user demonstration of the QDMI-backed Qiskit integration.
 
 ## Running the Showcases
 
@@ -50,7 +50,7 @@ The QSCI showcase depends on PySCF, which is [not supported on Windows](https://
 
 :::{important}
 The IQM-backed showcase assertions are tuned for real IQM QPUs.
-If you point `IQM_QC_ALIAS` or `IQM_QC_ID` at a mock IQM target, the workflow is still executed, but the stricter showcase assertions may fail.
+If you point `IQM_QC_ALIAS` or `IQM_QC_ID` at a mock IQM target, the showcase is still executed, but the stricter showcase assertions may fail.
 Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM credentials.
 :::
 
