@@ -1,17 +1,17 @@
 # Workflow Guide
 
-This guide collects end-to-end Qiskit workflows built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
-Unlike the C API examples in the general [usage guide](usage.md), these workflows exercise the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
+This guide collects end-to-end Qiskit showcases built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
+Unlike the C API examples in the general [usage guide](usage.md), these showcases exercise the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
 
-The corresponding implementations live in the use-case test tree:
+The corresponding implementations live in the showcase test tree:
 
-- `test/use_cases/mqt_bench/test_mqt_bench.py`
-- `test/use_cases/qsci/test_qsci.py`
+- `test/showcases/mqt_bench/test_mqt_bench.py`
+- `test/showcases/qsci/test_qsci.py`
 
-These workflows are intentionally kept out of the default Python test path.
+These showcases are intentionally kept out of the default Python test path.
 They are heavier than the wrapper tests in `test/python/` and are meant to be run explicitly when you want a realistic showcase of the QDMI-backed Qiskit integration.
 
-## Running the Workflows
+## Running the Showcases
 
 The showcase suite defaults to the IQM backend path and uses the same environment-variable contract as the rest of the package:
 
@@ -21,31 +21,31 @@ The showcase suite defaults to the IQM backend path and uses the same environmen
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: optional explicit target selection.
 - `IQM_SHOWCASE_BACKEND`: showcase backend selection. Supported values are `iqm` (default) and `ddsim`.
 
-Install the showcase dependencies and run the workflow suite explicitly with `uv`.
+Install the showcase dependencies and run the showcase suite explicitly with `uv`.
 
 For the default IQM-backed path:
 
 ```bash
 export IQM_BASE_URL="https://desired-iqm-server.com"
 export RESONANCE_API_KEY="your-api-key"
-uv run --group showcase pytest test/use_cases
+uv run --group showcase pytest test/showcases
 ```
 
 For the DDSIM-backed path, opt in explicitly and omit the IQM credentials:
 
 ```bash
-IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/use_cases
+IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/showcases
 ```
 
 You can also focus on one showcase family at a time:
 
 ```bash
-uv run --group showcase pytest test/use_cases -m mqt_bench
-uv run --group showcase pytest test/use_cases -m qsci
+uv run --group showcase pytest test/showcases -m mqt_bench
+uv run --group showcase pytest test/showcases -m qsci
 ```
 
 :::note
-The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
 :::{important}
@@ -57,9 +57,9 @@ Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM crede
 ## MQT Bench Showcase
 
 [MQT Bench](https://mqt.readthedocs.io/projects/bench/) provides a large catalog of benchmark circuits.
-In this repository, it serves as a use-case sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected showcase backend, executes them through MQT Core's generic QDMI sampler primitive, and validates the observed bitstring distribution.
+In this repository, it serves as a sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected showcase backend, executes them through MQT Core's generic QDMI sampler primitive, and validates the observed bitstring distribution.
 
-The current workflow covers:
+The current showcase covers:
 
 - GHZ states
 - Deutsch-Jozsa
@@ -69,7 +69,7 @@ The current workflow covers:
 
 ### Implementation Pattern
 
-The use-case tests in `test/use_cases/mqt_bench/test_mqt_bench.py` follow this structure:
+The showcase tests in `test/showcases/mqt_bench/test_mqt_bench.py` follow this structure:
 
 ```{code-cell} ipython3
 import os
@@ -118,19 +118,19 @@ For stronger distribution checks on noisier targets, increase it.
 
 ## QSCI Showcase
 
-The **Quantum-Selected Configuration Interaction (QSCI)** workflow combines a variational quantum step with classical postprocessing to estimate a molecular ground-state energy.
+The **Quantum-Selected Configuration Interaction (QSCI)** showcase combines a variational quantum step with classical postprocessing to estimate a molecular ground-state energy.
 
-The QSCI use-case flow is:
+The QSCI showcase flow is:
 
 1. Build the electronic-structure problem with Qiskit Nature.
 2. Construct a UCCSD ansatz and map the Hamiltonian with Jordan-Wigner.
 3. Optimize the ansatz with Qiskit's `BackendEstimator` wrapper over the selected showcase backend so VQE can use the estimator V1 interface it still expects.
 4. Sample the trained ansatz with MQT Core's generic QDMI sampler primitive.
-5. Postprocess the measured configurations classically in `test/use_cases/qsci/postprocess.py`.
+5. Postprocess the measured configurations classically in `test/showcases/qsci/postprocess.py`.
 
 ### Implementation Pattern
 
-The use-case implementation in `test/use_cases/qsci/test_qsci.py` selects the showcase backend first and then uses the same Qiskit Nature and Qiskit Algorithms flow on top of it:
+The showcase implementation in `test/showcases/qsci/test_qsci.py` selects the showcase backend first and then uses the same Qiskit Nature and Qiskit Algorithms flow on top of it:
 
 ```{code-cell} ipython3
 import os
@@ -194,7 +194,7 @@ else:
     transpiled = transpile(sample_circuit, backend=backend, optimization_level=3)
 ```
 
-The classical reduction step is intentionally kept in a separate module so the use-case test remains easy to read while still showing the full workflow.
+The classical reduction step is intentionally kept in a separate module so the showcase test remains easy to read while still showing the full flow.
 
 ### Runtime Knobs
 
@@ -212,4 +212,4 @@ The defaults are tuned for showcase runs, not for aggressive convergence.
 The lightweight tests in `test/python/test_qiskit_backend.py` remain the fast test layer for the backend itself.
 They verify creation plus direct `backend.run`, `backend.sampler`, and `backend.estimator` calls.
 
-The use-case workflows in `test/use_cases/` build on top of that layer and are intended to answer a different question: what do realistic application-level workflows look like when they utilize the backend?
+The showcases in `test/showcases/` build on top of that layer and are intended to answer a different question: what do realistic application-level showcases look like when they utilize the backend?

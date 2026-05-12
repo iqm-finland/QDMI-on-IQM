@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Classical postprocessing helpers for the QSCI use-case workflow."""
+"""Classical postprocessing helpers for the QSCI showcase."""
 
 from __future__ import annotations
 

@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Shared fixtures for QDMI use-case workflow tests."""
+"""Shared fixtures for QDMI showcase tests."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ showcase_backend_kind = support_module.showcase_backend_kind
 
 @pytest.fixture(scope="session")
 def backend() -> QDMIBackend:
-    """Return the configured showcase backend for use-case workflows.
+    """Return the configured showcase backend for the showcase tests.
 
     Raises:
         ValueError: If the showcase backend selection is unsupported.

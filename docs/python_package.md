@@ -121,21 +121,21 @@ print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
 
-### End-to-End Workflow Examples
+### End-to-End Showcase Examples
 
-The repository also ships larger, workflow examples built on top of these primitives.
-See the [workflow guide](use_cases.md) for:
+The repository also ships larger showcase examples built on top of these primitives.
+See the [showcase page](showcases.md) for:
 
-- MQT Bench sampler workflows in `test/use_cases/mqt_bench/test_mqt_bench.py`
-- A QSCI estimator-and-sampler workflow in `test/use_cases/qsci/test_qsci.py`
+- MQT Bench sampler showcases in `test/showcases/mqt_bench/test_mqt_bench.py`
+- A QSCI estimator-and-sampler showcase in `test/showcases/qsci/test_qsci.py`
 
-Those use-case workflows are intentionally separate from the lightweight tests in `test/python/`.
+Those showcases are intentionally separate from the lightweight tests in `test/python/`.
 Run them explicitly with:
 
 ```bash
-uv run --group showcase pytest test/use_cases
+uv run --group showcase pytest test/showcases
 ```
 
 :::note
-The QSCI workflow depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::

@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Shared helpers for use-case workflow tests."""
+"""Shared helpers for showcase tests."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def require_showcase_backend_access() -> None:
         return
 
     pytest.skip(
-        "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run the QDMI use-case workflows.",
+        "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run the QDMI showcases.",
         allow_module_level=True,
     )
 
@@ -193,13 +193,13 @@ def skip_if_backend_too_small(backend: QDMIBackend, *, required_qubits: int) -> 
     """Skip when the selected target does not expose enough qubits.
 
     Args:
-        backend: The QDMI backend selected for the workflow.
+        backend: The QDMI backend selected for the showcase.
         required_qubits: The minimum number of qubits needed.
     """
     if backend.num_qubits >= required_qubits:
         return
 
     pytest.skip(
-        f"Selected target exposes {backend.num_qubits} qubits, but this workflow needs {required_qubits}.",
+        f"Selected target exposes {backend.num_qubits} qubits, but this showcase needs {required_qubits}.",
         allow_module_level=False,
     )

@@ -134,8 +134,8 @@ addopts = [
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
 markers = [
-  "mqt_bench: marks MQT Bench use-case workflows",
-  "qsci: marks QSCI use-case workflows",
+  "mqt_bench: marks MQT Bench showcases",
+  "qsci: marks QSCI showcases",
 ]
 filterwarnings = [
   "error",
@@ -199,7 +199,7 @@ convention = "google"
 "python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
-"test/use_cases/**" = ["T20", "INP001"]
+"test/showcases/**" = ["T20", "INP001"]
 "docs/**" = ["T20", "INP001"]
 
 
@@ -229,7 +229,7 @@ build = "cp3*"
 archs = "auto64"
 test-groups = ["showcase"]
 test-sources = ["test"]
-test-command = "pytest test/python test/use_cases"
+test-command = "pytest test/python test/showcases"
 build-frontend = "uv"
 environment = { IQM_SHOWCASE_BACKEND = "ddsim" }
 test-skip = [

@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Use-case workflow tests for QSCI using the QDMI Qiskit integration."""
+"""Showcase tests for QSCI using the QDMI Qiskit integration."""
 
 from __future__ import annotations
 
@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 THIS_DIR = Path(__file__).resolve().parent
-USE_CASES_DIR = THIS_DIR.parent
-for path in (THIS_DIR, USE_CASES_DIR):
+SHOWCASES_DIR = THIS_DIR.parent
+for path in (THIS_DIR, SHOWCASES_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
@@ -84,7 +84,7 @@ def prepare_ansatz(
     num_spatial_orbitals: int,
     num_particles: tuple[int, int],
 ) -> tuple[JordanWignerMapper, UCCSD]:
-    """Construct the mapped ansatz used in the QSCI workflow.
+    """Construct the mapped ansatz used in the QSCI showcase.
 
     Args:
         num_spatial_orbitals: The number of spatial orbitals in the problem.
@@ -164,8 +164,8 @@ def energy_tolerance() -> float:
 
 
 @pytest.mark.qsci
-def test_h2_qsci_workflow(backend: QDMIBackend) -> None:
-    """Run the H2 QSCI showcase workflow end to end on the selected backend."""
+def test_h2_qsci_showcase(backend: QDMIBackend) -> None:
+    """Run the H2 QSCI showcase end to end on the selected backend."""
     atom = "H 0 0 0; H 0 0 1;"
     basis = "sto-3g"
 

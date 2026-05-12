@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Use-case workflow tests using benchmark circuits from MQT Bench."""
+"""Showcase tests using benchmark circuits from MQT Bench."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 pytest.importorskip(
     "mqt.bench",
-    reason="Install the showcase dependencies with `uv run --group showcase ...` to run the MQT Bench workflows.",
+    reason="Install the showcase dependencies with `uv run --group showcase ...` to run the MQT Bench showcases.",
 )
 from mqt.bench import BenchmarkLevel, get_benchmark
 
@@ -87,7 +87,7 @@ def validate_graphstate(counts: dict[str, int], *, min_states: int) -> None:
     assert len(counts) >= min_states, f"Graph-state circuit should expose at least {min_states} states."
 
 
-def run_mqt_bench_test(
+def run_mqt_bench_showcase(
     backend: QDMIBackend,
     benchmark: str,
     circuit_size: int,
@@ -108,9 +108,9 @@ def run_mqt_bench_test(
 
 
 @pytest.mark.mqt_bench
-def test_ghz_workflow(backend: QDMIBackend) -> None:
-    """Run the GHZ-state showcase workflow through the backend sampler."""
-    run_mqt_bench_test(
+def test_ghz_showcase(backend: QDMIBackend) -> None:
+    """Run the GHZ-state showcase through the backend sampler."""
+    run_mqt_bench_showcase(
         backend,
         benchmark="ghz",
         circuit_size=3,
@@ -123,9 +123,9 @@ def test_ghz_workflow(backend: QDMIBackend) -> None:
 
 
 @pytest.mark.mqt_bench
-def test_deutsch_jozsa_workflow(backend: QDMIBackend) -> None:
-    """Run the balanced Deutsch-Jozsa showcase workflow through the backend sampler."""
-    run_mqt_bench_test(
+def test_deutsch_jozsa_showcase(backend: QDMIBackend) -> None:
+    """Run the balanced Deutsch-Jozsa showcase through the backend sampler."""
+    run_mqt_bench_showcase(
         backend,
         benchmark="dj",
         circuit_size=4,
@@ -137,9 +137,9 @@ def test_deutsch_jozsa_workflow(backend: QDMIBackend) -> None:
 
 
 @pytest.mark.mqt_bench
-def test_qft_workflow(backend: QDMIBackend) -> None:
-    """Run the QFT showcase workflow through the backend sampler."""
-    run_mqt_bench_test(
+def test_qft_showcase(backend: QDMIBackend) -> None:
+    """Run the QFT showcase through the backend sampler."""
+    run_mqt_bench_showcase(
         backend,
         benchmark="qft",
         circuit_size=3,
@@ -148,9 +148,9 @@ def test_qft_workflow(backend: QDMIBackend) -> None:
 
 
 @pytest.mark.mqt_bench
-def test_graphstate_workflow(backend: QDMIBackend) -> None:
-    """Run the graph-state showcase workflow through the backend sampler."""
-    run_mqt_bench_test(
+def test_graphstate_showcase(backend: QDMIBackend) -> None:
+    """Run the graph-state showcase through the backend sampler."""
+    run_mqt_bench_showcase(
         backend,
         benchmark="graphstate",
         circuit_size=4,
@@ -159,9 +159,9 @@ def test_graphstate_workflow(backend: QDMIBackend) -> None:
 
 
 @pytest.mark.mqt_bench
-def test_wstate_workflow(backend: QDMIBackend) -> None:
-    """Run the W-state showcase workflow through the backend sampler."""
-    run_mqt_bench_test(
+def test_wstate_showcase(backend: QDMIBackend) -> None:
+    """Run the W-state showcase through the backend sampler."""
+    run_mqt_bench_showcase(
         backend,
         benchmark="wstate",
         circuit_size=3,
