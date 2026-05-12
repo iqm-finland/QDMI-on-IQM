@@ -91,7 +91,9 @@ def prepare_ansatz(
         num_particles: The number of alpha and beta electrons.
 
     Returns:
-        The Jordan-Wigner mapper together with the configured UCCSD ansatz.
+        The configured :class:`~qiskit_nature.second_q.mappers.JordanWignerMapper`
+        together with the corresponding
+        :class:`~qiskit_nature.second_q.circuit.library.UCCSD` ansatz.
     """
     mapper = qiskit_nature_mappers.JordanWignerMapper()
     initial_state = qiskit_nature_circuit_library.HartreeFock(
@@ -120,13 +122,16 @@ def train_ansatz(
         backend: The selected QDMI backend used for estimator evaluations.
         ansatz: The parameterized ansatz circuit to optimize.
         observable: The mapped observable whose expectation value is minimized.
-        problem: The electronic-structure problem used to derive a deterministic MP2 initial point.
+        problem: The electronic-structure problem used to derive a deterministic
+            :class:`~qiskit_nature.second_q.algorithms.initial_points.MP2InitialPoint`.
 
     Returns:
         The ansatz circuit with the optimized parameters assigned.
 
     Raises:
-        ValueError: If VQE does not return optimal parameters or parameter assignment fails.
+        ValueError: If :class:`~qiskit_algorithms.minimum_eigensolvers.VQE` does not
+            return optimal parameters or if
+            :meth:`~qiskit.circuit.QuantumCircuit.assign_parameters` fails.
     """
     vqe_ansatz = ansatz
     if support.showcase_backend_kind() is support.ShowcaseBackend.DDSIM:

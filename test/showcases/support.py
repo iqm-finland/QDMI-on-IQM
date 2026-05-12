@@ -103,7 +103,7 @@ def make_sampler(backend: QDMIBackend, *, shots: int) -> QDMISampler:
         shots: The default number of shots for the primitive.
 
     Returns:
-        A sampler primitive bound to the selected backend.
+        A :class:`~mqt.core.plugins.qiskit.sampler.QDMISampler` bound to the selected backend.
     """
     return QDMISampler(backend, default_shots=shots)
 
@@ -116,20 +116,21 @@ def make_estimator(backend: QDMIBackend, *, shots: int) -> QDMIEstimator:
         shots: The default shot budget for expectation-value estimation.
 
     Returns:
-        An estimator primitive bound to the selected backend.
+        A :class:`~mqt.core.plugins.qiskit.estimator.QDMIEstimator` bound to the selected backend.
     """
     return QDMIEstimator(backend, options={"default_shots": shots})
 
 
 def make_vqe_estimator(backend: QDMIBackend, *, shots: int) -> BackendEstimator:
-    """Return a VQE-compatible estimator for the selected backend.
+    """Return a :class:`~qiskit_algorithms.minimum_eigensolvers.VQE`-compatible estimator.
 
     Args:
         backend: The QDMI backend that should execute the VQE jobs.
         shots: The backend-estimator shot budget.
 
     Returns:
-        A BackendEstimator instance using the Estimator V1 compatibility layer.
+        A :class:`~qiskit.primitives.BackendEstimator` instance using the Estimator V1
+        compatibility layer.
     """
     backend_estimator = importlib.import_module("qiskit.primitives").BackendEstimator
 
