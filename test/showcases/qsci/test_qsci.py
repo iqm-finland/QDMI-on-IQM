@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Showcase tests for QSCI using the QDMI Qiskit integration."""
+"""QSCI showcase using the QDMI Qiskit integration."""
 
 from __future__ import annotations
 

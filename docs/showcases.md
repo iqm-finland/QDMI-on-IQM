@@ -3,7 +3,7 @@
 This page showcases end-to-end Qiskit demonstrations built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
 Unlike the C API examples in the general [usage guide](usage.md), these demonstrations focus on how end users can apply the `qiskit` extra together with MQT Core's generic sampler and estimator primitives.
 
-The corresponding implementations live in the showcase test tree:
+The corresponding implementations live in the `test/showcases/` tree:
 
 - `test/showcases/mqt_bench/test_mqt_bench.py`
 - `test/showcases/qsci/test_qsci.py`
@@ -69,7 +69,7 @@ The current showcase covers:
 
 ### Implementation Pattern
 
-The showcase tests in `test/showcases/mqt_bench/test_mqt_bench.py` follow this structure:
+The MQT Bench showcase in `test/showcases/mqt_bench/test_mqt_bench.py` follows this structure:
 
 ```{code-cell} ipython3
 import os
@@ -194,7 +194,7 @@ else:
     transpiled = transpile(sample_circuit, backend=backend, optimization_level=3)
 ```
 
-The classical reduction step is intentionally kept in a separate module so the showcase test remains easy to read while still showing the full flow.
+The classical reduction step is intentionally kept in a separate module so the showcase remains easy to read while still showing the full flow.
 
 ### Runtime Knobs
 

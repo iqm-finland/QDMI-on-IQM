@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Showcase tests using benchmark circuits from MQT Bench."""
+"""MQT Bench showcases using benchmark circuits."""
 
 from __future__ import annotations
 

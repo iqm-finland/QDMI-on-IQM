@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Shared helpers for showcase tests."""
+"""Shared helpers for showcases."""
 
 from __future__ import annotations
 
