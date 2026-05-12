@@ -24,10 +24,10 @@ uv pip install iqm-qdmi
 
 The package itself makes the following variables available for import:
 
-- `__version__`: installed package version.
-- `IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
-- `IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
-- `IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
+- {py:data}`~iqm.qdmi.__version__`: installed package version.
+- {py:data}`~iqm.qdmi.IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
+- {py:data}`~iqm.qdmi.IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
+- {py:data}`~iqm.qdmi.IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
 
 ```{code-cell} ipython3
 from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH

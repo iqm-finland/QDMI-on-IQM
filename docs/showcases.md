@@ -57,7 +57,7 @@ Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM crede
 ## MQT Bench Showcase
 
 [MQT Bench](https://mqt.readthedocs.io/projects/bench/) provides a large catalog of benchmark circuits.
-In this repository, it serves as a sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected showcase backend, executes them through MQT Core's generic QDMI sampler primitive, and validates the observed bitstring distribution.
+In this repository, it serves as a sampler showcase: the test suite generates benchmark circuits, transpiles them for the selected showcase backend, executes them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and validates the observed bitstring distribution.
 
 The current showcase covers:
 
@@ -123,9 +123,9 @@ The **Quantum-Selected Configuration Interaction (QSCI)** showcase combines a va
 The QSCI showcase flow is:
 
 1. Build the electronic-structure problem with Qiskit Nature.
-2. Construct a UCCSD ansatz and map the Hamiltonian with Jordan-Wigner.
-3. Optimize the ansatz with Qiskit's `BackendEstimator` wrapper over the selected showcase backend so VQE can use the estimator V1 interface it still expects.
-4. Sample the trained ansatz with MQT Core's generic QDMI sampler primitive.
+2. Construct a {py:class}`~qiskit_nature.second_q.circuit.library.UCCSD` ansatz and map the Hamiltonian with {py:class}`~qiskit_nature.second_q.mappers.JordanWignerMapper`.
+3. Optimize the ansatz with Qiskit's {py:class}`~qiskit.primitives.BackendEstimator` wrapper over the selected showcase backend so {py:class}`~qiskit_algorithms.minimum_eigensolvers.VQE` can use the estimator V1 interface it still expects.
+4. Sample the trained ansatz with {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`.
 5. Postprocess the measured configurations classically in `test/showcases/qsci/postprocess.py`.
 
 ### Implementation Pattern
@@ -210,6 +210,6 @@ The defaults are tuned for showcase runs, not for aggressive convergence.
 ## Relationship to the Thin Python Tests
 
 The lightweight tests in `test/python/test_qiskit_backend.py` remain the fast test layer for the backend itself.
-They verify creation plus direct `backend.run`, `backend.sampler`, and `backend.estimator` calls.
+They verify creation plus direct {py:meth}`~mqt.core.plugins.qiskit.backend.QDMIBackend.run`, {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler`, and {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator` calls.
 
 The showcases in `test/showcases/` build on top of that layer and are intended to answer a different question: what do realistic application-level showcases look like when they utilize the backend?
