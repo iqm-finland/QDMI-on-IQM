@@ -38,6 +38,14 @@ def _full_mbh_canonical_from_qsci(
 ) -> tuple[list[int], list[int], list[float]]:
     """Calculate a sparse Hamiltonian representation for the selected QSCI basis.
 
+    Args:
+        basis: Selected many-body basis states encoded as integers.
+        h_diag: Diagonal one-body Hamiltonian terms.
+        h_off_diag: Off-diagonal one-body Hamiltonian terms.
+        u_full: Two-body interaction tensor in the molecular-orbital basis.
+        num_qubits: Total number of qubits in the encoded problem.
+        tol: Absolute tolerance below which matrix elements are discarded.
+
     Returns:
         The sparse Hamiltonian encoded as row indices, column indices, and values.
     """
@@ -101,6 +109,12 @@ def _full_mbh_canonical_from_qsci(
 
 def postprocess_counts(atom: str, basis: str, counts: dict[str, int], *, cutoff: int = 10) -> float:
     """Postprocess sampled bitstrings into a QSCI energy estimate.
+
+    Args:
+        atom: Molecular geometry passed to PySCF.
+        basis: Atomic-orbital basis name passed to PySCF.
+        counts: Sampled bitstring counts selected for QSCI postprocessing.
+        cutoff: Maximum number of configurations retained for the reduced basis.
 
     Returns:
         The estimated electronic ground-state energy from the selected configurations.

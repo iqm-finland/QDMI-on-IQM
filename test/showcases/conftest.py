@@ -80,7 +80,14 @@ def backend() -> QDMIBackend:
 
 @pytest.fixture(scope="session")
 def target_label(backend: QDMIBackend) -> str:
-    """Return a human-readable label for the selected target."""
+    """Return a human-readable label for the selected target.
+
+    Args:
+        backend: The configured backend used for the selected showcase path.
+
+    Returns:
+        A readable label describing the active target.
+    """
     if showcase_backend_kind() is ShowcaseBackend.IQM:
         return os.getenv("IQM_QC_ALIAS") or os.getenv("IQM_QC_ID") or os.getenv("IQM_BASE_URL") or "default-target"
 

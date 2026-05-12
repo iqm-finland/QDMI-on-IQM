@@ -47,7 +47,13 @@ WSTATE_FIDELITY_THRESHOLD = 0.4
 
 
 def validate_ghz_state_fidelity(counts: dict[str, int], *, num_qubits: int, threshold: float) -> None:
-    """Validate that a GHZ-state measurement shows the expected parity pattern."""
+    """Validate that a GHZ-state measurement shows the expected parity pattern.
+
+    Args:
+        counts: Observed bitstring counts from the sampler.
+        num_qubits: Number of qubits in the GHZ circuit.
+        threshold: Minimum accepted Hellinger fidelity.
+    """
     total_shots = sum(counts.values())
     expected_dist = {
         "0" * num_qubits: total_shots // 2,
@@ -58,7 +64,13 @@ def validate_ghz_state_fidelity(counts: dict[str, int], *, num_qubits: int, thre
 
 
 def validate_wstate_fidelity(counts: dict[str, int], *, num_qubits: int, threshold: float) -> None:
-    """Validate that a W-state measurement emphasizes single-excitation outcomes."""
+    """Validate that a W-state measurement emphasizes single-excitation outcomes.
+
+    Args:
+        counts: Observed bitstring counts from the sampler.
+        num_qubits: Number of qubits in the W-state circuit.
+        threshold: Minimum accepted Hellinger fidelity.
+    """
     total_shots = sum(counts.values())
     expected_states = ["0" * index + "1" + "0" * (num_qubits - index - 1) for index in range(num_qubits)]
     expected_count_per_state = total_shots // num_qubits
@@ -68,7 +80,12 @@ def validate_wstate_fidelity(counts: dict[str, int], *, num_qubits: int, thresho
 
 
 def validate_deutsch_jozsa(counts: dict[str, int], *, max_zero_probability: float) -> None:
-    """Validate that the balanced Deutsch-Jozsa circuit avoids the all-zero outcome."""
+    """Validate that the balanced Deutsch-Jozsa circuit avoids the all-zero outcome.
+
+    Args:
+        counts: Observed bitstring counts from the sampler.
+        max_zero_probability: Largest accepted probability for the all-zero outcome.
+    """
     total_shots = sum(counts.values())
     all_zeros = "0" * len(next(iter(counts)))
     zero_probability = counts.get(all_zeros, 0) / total_shots
@@ -78,12 +95,22 @@ def validate_deutsch_jozsa(counts: dict[str, int], *, max_zero_probability: floa
 
 
 def validate_qft(counts: dict[str, int], *, min_states: int) -> None:
-    """Validate that QFT yields a diverse measurement distribution."""
+    """Validate that QFT yields a diverse measurement distribution.
+
+    Args:
+        counts: Observed bitstring counts from the sampler.
+        min_states: Minimum number of distinct bitstrings expected.
+    """
     assert len(counts) >= min_states, f"QFT should expose at least {min_states} states, got {len(counts)}."
 
 
 def validate_graphstate(counts: dict[str, int], *, min_states: int) -> None:
-    """Validate that graph-state generation produces more than one outcome."""
+    """Validate that graph-state generation produces more than one outcome.
+
+    Args:
+        counts: Observed bitstring counts from the sampler.
+        min_states: Minimum number of distinct bitstrings expected.
+    """
     assert len(counts) >= min_states, f"Graph-state circuit should expose at least {min_states} states."
 
 
@@ -95,7 +122,15 @@ def run_mqt_bench_showcase(
     *,
     shots: int = MQT_BENCH_SHOTS,
 ) -> None:
-    """Generate, execute, and validate an MQT Bench circuit."""
+    """Generate, execute, and validate an MQT Bench circuit.
+
+    Args:
+        backend: Backend that should execute the generated circuit.
+        benchmark: Name of the benchmark family to generate.
+        circuit_size: Number of qubits used for the benchmark circuit.
+        validation_func: Validation callback applied to the observed counts.
+        shots: Number of shots used for sampling.
+    """
     skip_if_backend_too_small(backend, required_qubits=circuit_size)
     circuit = get_benchmark(
         benchmark=benchmark,
