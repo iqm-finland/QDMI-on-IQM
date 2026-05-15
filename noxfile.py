@@ -115,6 +115,42 @@ def minimums(session: nox.Session) -> None:
         session.run("uv", "tree", "--frozen", env=env)
 
 
+@nox.session(python=["3.13"], reuse_venv=True)
+def showcase_smoke(session: nox.Session) -> None:
+    """Run the standalone showcase scripts against the simulator."""
+    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+    scripts = (
+        ("examples/showcases/mqt_bench_deutsch_jozsa.py", "--backend", "sim", "--shots", "128"),
+        ("examples/showcases/mqt_bench_ghz.py", "--backend", "sim", "--shots", "128"),
+        ("examples/showcases/mqt_bench_graphstate.py", "--backend", "sim", "--shots", "128"),
+        ("examples/showcases/mqt_bench_qft.py", "--backend", "sim", "--shots", "128"),
+        ("examples/showcases/mqt_bench_wstate.py", "--backend", "sim", "--shots", "128"),
+        (
+            "examples/showcases/qsci_h2.py",
+            "--backend",
+            "sim",
+            "--shots",
+            "256",
+            "--maxiter",
+            "5",
+            "--cutoff",
+            "4",
+            "--energy-tolerance",
+            "0.35",
+        ),
+    )
+
+    for script_args in scripts:
+        session.run(
+            "uv",
+            "run",
+            "--with-editable",
+            ".",
+            *script_args,
+            env=env,
+        )
+
+
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""

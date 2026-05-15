@@ -136,6 +136,34 @@ jobs:
       enable-ty: true
       enable-mypy: false
 
+  showcase-smoke:
+    name: 🐍 Smoke
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-python-tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: 3.13
+          activate-environment: true
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Run showcase smoke checks
+        run: uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+
   build-sdist:
     name: 🚀 CD
     needs: change-detection
@@ -177,6 +205,7 @@ jobs:
       - cpp-coverage
       - cpp-linter
       - python-linter
+      - showcase-smoke
       - build-sdist
       - build-wheel
     runs-on: ubuntu-slim
@@ -187,7 +216,7 @@ jobs:
           allowed-skips: >-
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && '' || 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-coverage,'
+              && '' || 'python-linter,showcase-smoke,'
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-linter)
