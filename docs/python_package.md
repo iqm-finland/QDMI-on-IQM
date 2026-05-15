@@ -75,6 +75,7 @@ uv pip install iqm-qdmi[qiskit]
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from {py:mod}`iqm.qdmi.qiskit` and used as a drop-in replacement for any Qiskit backend.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
 from iqm.qdmi.qiskit import IQMBackend
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
@@ -86,6 +87,7 @@ backend = IQMBackend(
 ```
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
 qc = QuantumCircuit(2)
 qc.h(0)
 qc.cx(0, 1)
@@ -104,12 +106,14 @@ If no API token is explicitly provided, like in the example above, the wrapper w
 to the backend instance.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
 sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
 counts = sampler_job.result()[0].data["meas"].get_counts()
 print(f"Counts: {counts}")
 ```
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
 from qiskit.quantum_info import SparsePauliOp
 
 transpiled_qc.remove_final_measurements(inplace=True)
@@ -126,14 +130,14 @@ print(f"Standard deviations: {data['stds']}")
 The repository also ships larger showcase examples built on top of these primitives.
 See the [end-user showcases](showcases.md) for:
 
-- MQT Bench sampler showcases in `test/showcases/mqt_bench/test_mqt_bench.py`
-- A QSCI estimator-and-sampler showcase in `test/showcases/qsci/test_qsci.py`
+- Standalone MQT Bench sampler scripts in `examples/showcases/mqt_bench_*.py`
+- A standalone QSCI estimator-and-sampler script in `examples/showcases/qsci_h2.py`
 
 Those showcases are intentionally separate from the lightweight tests in `test/python/`.
 Run them explicitly with:
 
 ```bash
-uv run --group showcase pytest test/showcases
+uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
 ```
 
 :::note

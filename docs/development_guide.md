@@ -138,20 +138,20 @@ $ ctest -C Release --test-dir build/test/integration --output-on-failure
 
 ### Python Showcases
 
-The repository also contains a Python showcase layer in `test/showcases/`.
-These tests exercise higher-level showcases through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler showcase.
+The repository also contains a standalone showcase layer in `examples/showcases/`.
+These scripts exercise higher-level end-user flows through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler showcase.
 
-Install the test dependencies and run the showcase suite explicitly:
+Use the dedicated smoke session for the default simulator-backed automation path:
 
 ```console
-$ uv run --group showcase pytest test/showcases
+$ uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
 ```
 
-To focus on one showcase family:
+To focus on one showcase directly, run the corresponding script from the repository root:
 
 ```console
-$ uv run --group showcase pytest test/showcases -m mqt_bench
-$ uv run --group showcase pytest test/showcases -m qsci
+$ uv run --with-editable . examples/showcases/mqt_bench_wstate.py --backend sim --shots 128
+$ uv run --with-editable . examples/showcases/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
 ```
 
 :::note
