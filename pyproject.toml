@@ -45,7 +45,7 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core[qiskit]~=3.5.0",
+  "mqt-core[qiskit]~=3.6.0",
   "qiskit>=1.1"
 ]
 
@@ -59,7 +59,7 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core[qiskit]~=3.5.0",
+  "mqt-core[qiskit]~=3.6.0",
   "qiskit>=1.1",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
@@ -139,8 +139,6 @@ markers = [
 ]
 filterwarnings = [
   "error",
-  'ignore:.*Device operation.*cannot be mapped to a Qiskit gate.*:UserWarning',
-  'ignore:Device does not define a measurement operation.*:UserWarning',
   'ignore:qiskit\.providers\.models is deprecated since Qiskit 1\.2.*:DeprecationWarning',
   'ignore:The class ``qiskit\.circuit\.library\.n_local\.n_local\.NLocal`` is pending deprecation.*:PendingDeprecationWarning',
   'ignore:The class ``qiskit\.primitives\.backend_estimator\.BackendEstimator`` is deprecated.*:DeprecationWarning',
