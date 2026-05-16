@@ -83,7 +83,7 @@ docs = [
 ]
 dev = [
   {include-group = "test"},
-  "nox>=2026.4.10",
+  "nox>=2025.11.12",
   "ty==0.0.34",
 ]
 
@@ -185,6 +185,7 @@ convention = "google"
 "python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
+"examples/**" = ["T20", "INP001"]
 "docs/**" = ["T20", "INP001"]
 
 

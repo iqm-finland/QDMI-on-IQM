@@ -125,7 +125,7 @@ int main() {
 }
 ```
 
-For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [end-user showcases](https://iqm-finland.github.io/QDMI-on-IQM/showcases.html).
+For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [end-user examples](https://iqm-finland.github.io/QDMI-on-IQM/examples.html).
 
 ## How It Works
 
@@ -160,23 +160,20 @@ $ ctest --test-dir build/test/integration --output-on-failure
 ```
 
 ```console
-# Run the standalone showcase smoke suite on the simulator
-$ uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+# Run the standalone example suite on the simulator
+$ uvx nox -s examples
 
-# Run one standalone MQT Bench showcase on the simulator
-$ uv run --with-editable . examples/showcases/mqt_bench_ghz.py --backend sim --shots 128
+# Run one standalone MQT Bench example on the simulator
+$ uvx --from . iqm-qdmi examples/ghz.py --backend sim --shots 128
 
-# Run the standalone QSCI showcase on an IQM backend
+# Run the standalone QSCI example on an IQM backend
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
-$ uv run --with-editable . examples/showcases/qsci_h2.py --backend iqm
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
 ```
 
 > [!NOTE]
-> The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-
-> [!IMPORTANT]
-> The IQM-backed showcase assertions are tuned for real IQM QPUs. Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but they may fail the stricter showcase checks. Use `--backend sim` for an explicit simulator-backed validation path.
+> The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 
 ## Contributing
 

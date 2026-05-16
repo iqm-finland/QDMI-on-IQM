@@ -75,7 +75,6 @@ uv pip install iqm-qdmi[qiskit]
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from {py:mod}`iqm.qdmi.qiskit` and used as a drop-in replacement for any Qiskit backend.
 
 ```{code-cell} ipython3
-:tags: [skip-execution]
 from iqm.qdmi.qiskit import IQMBackend
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
@@ -87,7 +86,6 @@ backend = IQMBackend(
 ```
 
 ```{code-cell} ipython3
-:tags: [skip-execution]
 qc = QuantumCircuit(2)
 qc.h(0)
 qc.cx(0, 1)
@@ -106,14 +104,12 @@ If no API token is explicitly provided, like in the example above, the wrapper w
 to the backend instance.
 
 ```{code-cell} ipython3
-:tags: [skip-execution]
 sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
 counts = sampler_job.result()[0].data["meas"].get_counts()
 print(f"Counts: {counts}")
 ```
 
 ```{code-cell} ipython3
-:tags: [skip-execution]
 from qiskit.quantum_info import SparsePauliOp
 
 transpiled_qc.remove_final_measurements(inplace=True)
@@ -125,21 +121,21 @@ print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
 
-### End-to-End Showcase Examples
+### End-to-End Example Scripts
 
-The repository also ships larger showcase examples built on top of these primitives.
-See the [end-user showcases](showcases.md) for:
+The repository also ships larger standalone examples built on top of these primitives.
+See the [end-user examples](examples.md) for:
 
-- Standalone MQT Bench sampler scripts in `examples/showcases/mqt_bench_*.py`
-- A standalone QSCI estimator-and-sampler script in `examples/showcases/qsci_h2.py`
+- Standalone MQT Bench sampler scripts in `examples/*.py`
+- A standalone QSCI estimator-and-sampler script in `examples/qsci_h2.py`
 
-Those showcases are intentionally separate from the lightweight tests in `test/python/`.
+Those examples are intentionally separate from the lightweight tests in `test/python/`.
 Run them explicitly with:
 
 ```bash
-uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+uvx nox -s examples
 ```
 
 :::note
-The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::

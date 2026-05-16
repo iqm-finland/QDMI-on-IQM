@@ -28,7 +28,7 @@
 # ]
 # ///
 
-"""Run an H2 QSCI showcase through the IQM QDMI Qiskit backend."""
+"""Run an H2 QSCI example through the IQM QDMI Qiskit backend."""
 
 from __future__ import annotations
 
@@ -40,8 +40,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from examples import qsci_postprocess
 from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit import transpile
@@ -56,7 +57,6 @@ from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from examples.showcases import qsci_postprocess
 from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ BASIS = "sto-3g"
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the QSCI showcase.
+    """Parse CLI arguments for the QSCI example.
 
     Returns:
         Parsed command-line arguments.
@@ -83,7 +83,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def make_backend(backend_kind: str) -> QDMIBackend:
-    """Create the selected QDMI backend for the showcase run.
+    """Create the selected QDMI backend for the example run.
 
     Args:
         backend_kind: Backend mode selected on the command line.
@@ -98,7 +98,7 @@ def make_backend(backend_kind: str) -> QDMIBackend:
         token = os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY")
         tokens_file = os.getenv("IQM_TOKENS_FILE")
         if token is None and tokens_file is None:
-            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this showcase on IQM hardware."
+            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this example on IQM hardware."
             raise SystemExit(msg)
 
         return IQMBackend(
@@ -121,7 +121,7 @@ def make_backend(backend_kind: str) -> QDMIBackend:
             raise SystemExit(msg) from None
 
         backend_names = ", ".join(backend.name or "<unnamed>" for backend in simulator_backends)
-        msg = f"Multiple simulator backends matched this showcase: {backend_names}."
+        msg = f"Multiple simulator backends matched this example: {backend_names}."
         raise SystemExit(msg) from None
 
 
@@ -142,7 +142,7 @@ def transpile_for_backend(circuit: QuantumCircuit, backend: QDMIBackend, backend
 
 
 def main() -> None:
-    """Execute the H2 QSCI showcase.
+    """Execute the H2 QSCI example.
 
     Raises:
         SystemExit: If backend setup fails or the sampled energy deviates beyond the accepted threshold.
@@ -176,14 +176,14 @@ def main() -> None:
     )
     second_q_operator = problem.second_q_ops()[0]
     if not isinstance(second_q_operator, FermionicOp):
-        msg = "The QSCI showcase requires a fermionic operator."
+        msg = "The QSCI example requires a fermionic operator."
         raise SystemExit(msg)
     observable = mapper.map(second_q_operator)
     if not isinstance(observable, SparsePauliOp):
         msg = "Mapped observable must be a SparsePauliOp."
         raise SystemExit(msg)
     if backend.num_qubits < ansatz.num_qubits:
-        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI showcase needs {ansatz.num_qubits}."
+        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI example needs {ansatz.num_qubits}."
         raise SystemExit(msg)
 
     vqe_ansatz = transpile_for_backend(ansatz, backend, args.backend) if args.backend == "sim" else ansatz

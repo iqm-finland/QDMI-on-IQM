@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # /// script
-# dependencies = ["nox"]
+# dependencies = ["nox>=2025.11.12"]
 # ///
 
 """Nox sessions."""
@@ -36,7 +36,7 @@ import nox
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
 
-nox.needs_version = ">=2026.04.10"
+nox.needs_version = ">=2025.11.12"
 nox.options.default_venv_backend = "uv"
 
 PYTHON_ALL_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -116,17 +116,17 @@ def minimums(session: nox.Session) -> None:
 
 
 @nox.session(python=["3.13"], reuse_venv=True)
-def showcase_smoke(session: nox.Session) -> None:
-    """Run the standalone showcase scripts against the simulator."""
+def examples(session: nox.Session) -> None:
+    """Run the standalone example scripts against the simulator."""
     env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
     scripts = (
-        ("examples/showcases/mqt_bench_deutsch_jozsa.py", "--backend", "sim", "--shots", "128"),
-        ("examples/showcases/mqt_bench_ghz.py", "--backend", "sim", "--shots", "128"),
-        ("examples/showcases/mqt_bench_graphstate.py", "--backend", "sim", "--shots", "128"),
-        ("examples/showcases/mqt_bench_qft.py", "--backend", "sim", "--shots", "128"),
-        ("examples/showcases/mqt_bench_wstate.py", "--backend", "sim", "--shots", "128"),
+        ("examples/deutsch_jozsa.py", "--backend", "sim", "--shots", "128"),
+        ("examples/ghz.py", "--backend", "sim", "--shots", "128"),
+        ("examples/graphstate.py", "--backend", "sim", "--shots", "128"),
+        ("examples/qft.py", "--backend", "sim", "--shots", "128"),
+        ("examples/wstate.py", "--backend", "sim", "--shots", "128"),
         (
-            "examples/showcases/qsci_h2.py",
+            "examples/qsci_h2.py",
             "--backend",
             "sim",
             "--shots",

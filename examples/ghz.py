@@ -25,7 +25,7 @@
 # ]
 # ///
 
-"""Run a GHZ-state showcase through the IQM QDMI Qiskit backend."""
+"""Run a GHZ-state example through the IQM QDMI Qiskit backend."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the GHZ showcase.
+    """Parse CLI arguments for the GHZ example.
 
     Returns:
         Parsed command-line arguments.
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def make_backend(backend_kind: str) -> QDMIBackend:
-    """Create the selected QDMI backend for the showcase run.
+    """Create the selected QDMI backend for the example run.
 
     Args:
         backend_kind: Backend mode selected on the command line.
@@ -75,7 +75,7 @@ def make_backend(backend_kind: str) -> QDMIBackend:
         token = os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY")
         tokens_file = os.getenv("IQM_TOKENS_FILE")
         if token is None and tokens_file is None:
-            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this showcase on IQM hardware."
+            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this example on IQM hardware."
             raise SystemExit(msg)
 
         return IQMBackend(
@@ -98,20 +98,20 @@ def make_backend(backend_kind: str) -> QDMIBackend:
             raise SystemExit(msg) from None
 
         backend_names = ", ".join(backend.name or "<unnamed>" for backend in simulator_backends)
-        msg = f"Multiple simulator backends matched this showcase: {backend_names}."
+        msg = f"Multiple simulator backends matched this example: {backend_names}."
         raise SystemExit(msg) from None
 
 
 def main() -> None:
-    """Execute the GHZ-state showcase.
+    """Execute the GHZ-state example.
 
     Raises:
-        SystemExit: If backend setup fails or the showcase result does not satisfy the fidelity threshold.
+        SystemExit: If backend setup fails or the example result does not satisfy the fidelity threshold.
     """
     args = parse_args()
     backend = make_backend(args.backend)
     if backend.num_qubits < args.num_qubits:
-        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the GHZ showcase needs {args.num_qubits}."
+        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the GHZ example needs {args.num_qubits}."
         raise SystemExit(msg)
 
     circuit = get_benchmark(

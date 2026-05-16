@@ -255,37 +255,37 @@ Remember to pull the changes back into your local repository after the bot has f
 
 Our CI pipeline will also run `clang-tidy` over the changes in your PR and report any issues it finds. Due to technical limitations, the workflow can only post PR comments if the changes are not coming from a fork. If you are working on a fork, you can still see the `clang-tidy` results in the GitHub Actions logs or on the workflow summary page.
 
-## Running the Python showcases
+## Running the Python examples
 
-The showcase layer now lives in `examples/showcases/` as standalone scripts rather than pytest-based harness tests.
-Use the dedicated nox smoke session for the default simulator-backed automation path:
+The example layer now lives in `examples/` as standalone scripts rather than pytest-based harness tests.
+Use the dedicated nox session for the default simulator-backed automation path:
 
 ```console
-$ uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+$ uvx nox -s examples
 ```
 
-You can also run individual showcase scripts directly from the repository root.
+You can also run individual example scripts directly from the repository root.
 For example:
 
 ```console
-$ uv run --with-editable . examples/showcases/mqt_bench_qft.py --backend sim --shots 128
+$ uvx --from . iqm-qdmi examples/qft.py --backend sim --shots 128
 
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
-$ uv run --with-editable . examples/showcases/qsci_h2.py --backend iqm
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
 ```
 
 :::{note}
-The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
 :::{important}
-The IQM-backed showcase assertions are tuned for real IQM QPUs.
-Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but the stricter showcase assertions may fail on them.
+The IQM-backed example assertions are tuned for real IQM QPUs.
+Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but the stricter example assertions may fail on them.
 Use `--backend sim` if you want a validation path without IQM credentials.
 :::
 
-If you touch one of these showcases, update the corresponding documentation in [showcases.md](showcases.md) as part of the same change.
+If you touch one of these examples, update the corresponding documentation in [examples.md](examples.md) as part of the same change.
 
 ## Working on the Documentation
 

@@ -136,26 +136,26 @@ Before running the integration tests, make sure you have set the necessary envir
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
-### Python Showcases
+### Python Examples
 
-The repository also contains a standalone showcase layer in `examples/showcases/`.
-These scripts exercise higher-level end-user flows through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler showcase.
+The repository also contains a standalone examples layer in `examples/`.
+These scripts exercise higher-level end-user flows through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler example.
 
-Use the dedicated smoke session for the default simulator-backed automation path:
+Use the dedicated examples session for the default simulator-backed automation path:
 
 ```console
-$ uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+$ uvx nox -s examples
 ```
 
-To focus on one showcase directly, run the corresponding script from the repository root:
+To focus on one example directly, run the corresponding script from the repository root:
 
 ```console
-$ uv run --with-editable . examples/showcases/mqt_bench_wstate.py --backend sim --shots 128
-$ uv run --with-editable . examples/showcases/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
+$ uvx --from . iqm-qdmi examples/wstate.py --backend sim --shots 128
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
 ```
 
 :::note
-The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
 Target selection remains environment-driven.

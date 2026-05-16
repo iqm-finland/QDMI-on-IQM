@@ -25,7 +25,7 @@
 # ]
 # ///
 
-"""Run a QFT showcase through the IQM QDMI Qiskit backend."""
+"""Run a W-state example through the IQM QDMI Qiskit backend."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ from mqt.bench import BenchmarkLevel, get_benchmark
 from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit import transpile
+from qiskit.quantum_info import hellinger_fidelity
 
 from iqm.qdmi.qiskit import IQMBackend
 
@@ -45,7 +46,7 @@ if TYPE_CHECKING:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the QFT showcase.
+    """Parse CLI arguments for the W-state example.
 
     Returns:
         Parsed command-line arguments.
@@ -54,12 +55,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=3)
-    parser.add_argument("--min-states", type=int, default=3)
+    parser.add_argument("--threshold", type=float, default=0.4)
     return parser.parse_args()
 
 
 def make_backend(backend_kind: str) -> QDMIBackend:
-    """Create the selected QDMI backend for the showcase run.
+    """Create the selected QDMI backend for the example run.
 
     Args:
         backend_kind: Backend mode selected on the command line.
@@ -74,7 +75,7 @@ def make_backend(backend_kind: str) -> QDMIBackend:
         token = os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY")
         tokens_file = os.getenv("IQM_TOKENS_FILE")
         if token is None and tokens_file is None:
-            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this showcase on IQM hardware."
+            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this example on IQM hardware."
             raise SystemExit(msg)
 
         return IQMBackend(
@@ -97,24 +98,24 @@ def make_backend(backend_kind: str) -> QDMIBackend:
             raise SystemExit(msg) from None
 
         backend_names = ", ".join(backend.name or "<unnamed>" for backend in simulator_backends)
-        msg = f"Multiple simulator backends matched this showcase: {backend_names}."
+        msg = f"Multiple simulator backends matched this example: {backend_names}."
         raise SystemExit(msg) from None
 
 
 def main() -> None:
-    """Execute the QFT showcase.
+    """Execute the W-state example.
 
     Raises:
-        SystemExit: If backend setup fails or the showcase result does not satisfy the state-count check.
+        SystemExit: If backend setup fails or the example result does not satisfy the fidelity threshold.
     """
     args = parse_args()
     backend = make_backend(args.backend)
     if backend.num_qubits < args.num_qubits:
-        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the QFT showcase needs {args.num_qubits}."
+        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the W-state example needs {args.num_qubits}."
         raise SystemExit(msg)
 
     circuit = get_benchmark(
-        benchmark="qft",
+        benchmark="wstate",
         level=BenchmarkLevel.ALG,
         circuit_size=args.num_qubits,
     )
@@ -135,8 +136,14 @@ def main() -> None:
         msg = f"Expected {args.shots} shots, but observed {total_shots}."
         raise SystemExit(msg)
 
-    if len(counts) < args.min_states:
-        msg = f"QFT should expose at least {args.min_states} distinct bitstrings, got {len(counts)}."
+    expected_states = ["0" * index + "1" + "0" * (args.num_qubits - index - 1) for index in range(args.num_qubits)]
+    expected_counts = dict.fromkeys(expected_states, args.shots // args.num_qubits)
+    remaining_shots = args.shots - sum(expected_counts.values())
+    for state in expected_states[:remaining_shots]:
+        expected_counts[state] += 1
+    fidelity = hellinger_fidelity(counts, expected_counts)
+    if fidelity < args.threshold:
+        msg = f"W-state fidelity {fidelity:.2%} is below the requested threshold {args.threshold:.2%}."
         raise SystemExit(msg)
 
 

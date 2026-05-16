@@ -25,7 +25,7 @@
 # ]
 # ///
 
-"""Run a graph-state showcase through the IQM QDMI Qiskit backend."""
+"""Run a balanced Deutsch-Jozsa example through the IQM QDMI Qiskit backend."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the graph-state showcase.
+    """Parse CLI arguments for the Deutsch-Jozsa example.
 
     Returns:
         Parsed command-line arguments.
@@ -54,12 +54,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=4)
-    parser.add_argument("--min-states", type=int, default=2)
+    parser.add_argument("--max-zero-probability", type=float, default=0.35)
     return parser.parse_args()
 
 
 def make_backend(backend_kind: str) -> QDMIBackend:
-    """Create the selected QDMI backend for the showcase run.
+    """Create the selected QDMI backend for the example run.
 
     Args:
         backend_kind: Backend mode selected on the command line.
@@ -74,7 +74,7 @@ def make_backend(backend_kind: str) -> QDMIBackend:
         token = os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY")
         tokens_file = os.getenv("IQM_TOKENS_FILE")
         if token is None and tokens_file is None:
-            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this showcase on IQM hardware."
+            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this example on IQM hardware."
             raise SystemExit(msg)
 
         return IQMBackend(
@@ -97,27 +97,27 @@ def make_backend(backend_kind: str) -> QDMIBackend:
             raise SystemExit(msg) from None
 
         backend_names = ", ".join(backend.name or "<unnamed>" for backend in simulator_backends)
-        msg = f"Multiple simulator backends matched this showcase: {backend_names}."
+        msg = f"Multiple simulator backends matched this example: {backend_names}."
         raise SystemExit(msg) from None
 
 
 def main() -> None:
-    """Execute the graph-state showcase.
+    """Execute the balanced Deutsch-Jozsa example.
 
     Raises:
-        SystemExit: If backend setup fails or the showcase result does not satisfy the state-count check.
+        SystemExit: If backend setup fails or the example result does not satisfy the validation threshold.
     """
     args = parse_args()
     backend = make_backend(args.backend)
     if backend.num_qubits < args.num_qubits:
         msg = (
-            f"Selected backend exposes {backend.num_qubits} qubits, but the graph-state showcase "
-            f"needs {args.num_qubits}."
+            f"Selected backend exposes {backend.num_qubits} qubits, but the Deutsch-Jozsa "
+            f"example needs {args.num_qubits}."
         )
         raise SystemExit(msg)
 
     circuit = get_benchmark(
-        benchmark="graphstate",
+        benchmark="dj",
         level=BenchmarkLevel.ALG,
         circuit_size=args.num_qubits,
     )
@@ -138,8 +138,12 @@ def main() -> None:
         msg = f"Expected {args.shots} shots, but observed {total_shots}."
         raise SystemExit(msg)
 
-    if len(counts) < args.min_states:
-        msg = f"Graph-state generation should expose at least {args.min_states} distinct bitstrings, got {len(counts)}."
+    all_zeros = "0" * args.num_qubits
+    zero_probability = counts.get(all_zeros, 0) / total_shots
+    if zero_probability > args.max_zero_probability:
+        msg = (
+            f"Balanced Deutsch-Jozsa should not collapse to the all-zero state with probability {zero_probability:.2%}."
+        )
         raise SystemExit(msg)
 
 

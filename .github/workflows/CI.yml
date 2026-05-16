@@ -136,8 +136,8 @@ jobs:
       enable-ty: true
       enable-mypy: false
 
-  showcase-smoke:
-    name: 🐍 Smoke
+  examples:
+    name: 🐍 Examples
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
     runs-on: ubuntu-24.04
@@ -161,8 +161,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Run showcase smoke checks
-        run: uvx --from 'nox>=2026.04.10' nox -s showcase_smoke
+      - name: Run examples
+        run: uvx nox -s examples
 
   build-sdist:
     name: 🚀 CD
@@ -205,7 +205,7 @@ jobs:
       - cpp-coverage
       - cpp-linter
       - python-linter
-      - showcase-smoke
+      - examples
       - build-sdist
       - build-wheel
     runs-on: ubuntu-slim
@@ -216,7 +216,7 @@ jobs:
           allowed-skips: >-
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && '' || 'python-linter,showcase-smoke,'
+              && '' || 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-coverage,'
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-linter)
@@ -224,7 +224,7 @@ jobs:
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-python-tests)
-              && '' || 'python-linter,'
+              && '' || 'python-linter,examples,'
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cd)
