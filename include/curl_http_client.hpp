@@ -39,7 +39,8 @@ namespace iqm {
  *
  * The implementation includes:
  * - Bearer token authentication
- * - SSL certificate verification (disabled by default for development)
+ * - SSL certificate and hostname verification
+ * - Automatic retry on HTTP 429 rate limiting
  * - Request timeouts
  * - JSON content type for POST requests
  * - Custom headers support
