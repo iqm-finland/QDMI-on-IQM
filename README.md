@@ -125,7 +125,7 @@ int main() {
 }
 ```
 
-For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html).
+For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [end-user showcases](https://iqm-finland.github.io/QDMI-on-IQM/showcases.html).
 
 ## How It Works
 
@@ -158,6 +158,28 @@ $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
 $ ctest --test-dir build/test/integration --output-on-failure
 ```
+
+```console
+# Run the optional Python showcases on an IQM backend (default)
+$ export IQM_BASE_URL="https://desired-iqm-server.com"
+$ export RESONANCE_API_KEY="your-api-key"
+$ uv run --group showcase pytest test/showcases
+
+# Run the same showcases against DDSIM instead
+$ IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/showcases
+
+# Run only the MQT Bench showcases
+$ uv run --group showcase pytest test/showcases -m mqt_bench
+
+# Run only the QSCI showcase
+$ uv run --group showcase pytest test/showcases -m qsci
+```
+
+> [!NOTE]
+> The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+
+> [!IMPORTANT]
+> The IQM-backed showcase assertions are tuned for real IQM QPUs. Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but they may fail the stricter showcase checks. Use `IQM_SHOWCASE_BACKEND=ddsim` for an explicit simulator-backed validation path.
 
 ## Contributing
 

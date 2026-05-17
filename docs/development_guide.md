@@ -136,6 +136,31 @@ Before running the integration tests, make sure you have set the necessary envir
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 
+### Python Showcases
+
+The repository also contains a Python showcase layer in `test/showcases/`.
+These tests exercise higher-level showcases through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler showcase.
+
+Install the test dependencies and run the showcase suite explicitly:
+
+```console
+$ uv run --group showcase pytest test/showcases
+```
+
+To focus on one showcase family:
+
+```console
+$ uv run --group showcase pytest test/showcases -m mqt_bench
+$ uv run --group showcase pytest test/showcases -m qsci
+```
+
+:::note
+The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
+
+Target selection remains environment-driven.
+Set `IQM_BASE_URL` together with either `IQM_TOKEN` or `RESONANCE_API_KEY`, and optionally pin a backend with `IQM_QC_ALIAS` or `IQM_QC_ID`.
+
 **Running only install/public API tests:**
 
 The `install-test` setup in CI validates only the installed public API surface.

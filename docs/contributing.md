@@ -255,6 +255,43 @@ Remember to pull the changes back into your local repository after the bot has f
 
 Our CI pipeline will also run `clang-tidy` over the changes in your PR and report any issues it finds. Due to technical limitations, the workflow can only post PR comments if the changes are not coming from a fork. If you are working on a fork, you can still see the `clang-tidy` results in the GitHub Actions logs or on the workflow summary page.
 
+## Running the Python showcases
+
+The showcases in `test/showcases/` are not part of the default Python test path because they exercise longer-running showcase flows.
+
+The default showcase mode targets IQM hardware through the packaged Python backend:
+
+```console
+$ export IQM_BASE_URL="https://desired-iqm-server.com"
+$ export RESONANCE_API_KEY="your-api-key"
+$ uv run --group showcase pytest test/showcases
+```
+
+To run the same showcases against the [MQT Core DDSIM](https://github.com/munich-quantum-toolkit/ddsim) QDMI backend instead, opt in explicitly:
+
+```console
+$ IQM_SHOWCASE_BACKEND=ddsim uv run --group showcase pytest test/showcases
+```
+
+To focus on one showcase family, filter with the dedicated markers:
+
+```console
+$ uv run --group showcase pytest test/showcases -m mqt_bench
+$ uv run --group showcase pytest test/showcases -m qsci
+```
+
+:::{note}
+The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
+
+:::{important}
+The IQM-backed showcase assertions are tuned for real IQM QPUs.
+Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but the stricter showcase assertions may fail on them.
+Use `IQM_SHOWCASE_BACKEND=ddsim` if you want a validation path without IQM credentials.
+:::
+
+If you touch one of these showcases, update the corresponding documentation in [showcases.md](showcases.md) as part of the same change.
+
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and built with Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and AutoAPI for the Python package. The documentation source files can be found in the `docs/` directory.

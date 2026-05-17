@@ -24,10 +24,10 @@ uv pip install iqm-qdmi
 
 The package itself makes the following variables available for import:
 
-- `__version__`: installed package version.
-- `IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
-- `IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
-- `IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
+- {py:data}`~iqm.qdmi.__version__`: installed package version.
+- {py:data}`~iqm.qdmi.IQM_QDMI_INCLUDE_DIR`: include directory for C/C++ headers.
+- {py:data}`~iqm.qdmi.IQM_QDMI_CMAKE_DIR`: CMake package directory for `find_package` integration.
+- {py:data}`~iqm.qdmi.IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
 
 ```{code-cell} ipython3
 from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH
@@ -120,3 +120,22 @@ data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
+
+### End-to-End Showcase Examples
+
+The repository also ships larger showcase examples built on top of these primitives.
+See the [end-user showcases](showcases.md) for:
+
+- MQT Bench sampler showcases in `test/showcases/mqt_bench/test_mqt_bench.py`
+- A QSCI estimator-and-sampler showcase in `test/showcases/qsci/test_qsci.py`
+
+Those showcases are intentionally separate from the lightweight tests in `test/python/`.
+Run them explicitly with:
+
+```bash
+uv run --group showcase pytest test/showcases
+```
+
+:::note
+The QSCI showcase depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
+:::
