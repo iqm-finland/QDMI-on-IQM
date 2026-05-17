@@ -214,4 +214,31 @@ TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlPerformFails) {
             std::string::npos);
 }
 
+TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
+  const LoggerCapture logger_capture;
+  const auto result = iqm::test_support::Retry_response_codes_for_testing(
+      {429, 200}, "https://example.test/jobs", false);
+
+  EXPECT_EQ(result.status_code, QDMI_SUCCESS);
+  EXPECT_EQ(result.sleep_call_count, 1U);
+
+  const auto logs = logger_capture.str();
+  EXPECT_NE(logs.find("hit HTTP 429 rate limiting; retrying in 2 second(s)"),
+            std::string::npos);
+  EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
+}
+
+TEST(CurlHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
+  const LoggerCapture logger_capture;
+  const auto result = iqm::test_support::Retry_response_codes_for_testing(
+      {429, 429, 429, 429}, "https://example.test/jobs", false);
+
+  EXPECT_EQ(result.status_code, QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(result.sleep_call_count, 3U);
+
+  const auto logs = logger_capture.str();
+  EXPECT_NE(logs.find("failed with HTTP 429 (Client Error)"),
+            std::string::npos);
+}
+
 } // namespace

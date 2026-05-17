@@ -50,7 +50,7 @@ jobs:
       # build the project in the specified mode
       - name: Build
         run: cmake --build build
-      # run the tests (for retry for transient AWS connectivity failures)
+      # run the tests
       - name: Test
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
