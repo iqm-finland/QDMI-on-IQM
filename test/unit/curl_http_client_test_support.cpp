@@ -31,6 +31,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <curl/curl.h>
+#include <curl/easy.h>
 #include <string>
 #include <vector>
 
@@ -46,6 +48,7 @@ int Handle_response_code_for_testing(const int64_t response_code,
                         : internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
+namespace {
 void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
                                     CURLcode (*easy_perform)(CURL *)) {
   auto &curl_api_hooks = internal::Get_curl_api_hooks();
@@ -53,6 +56,7 @@ void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
   curl_api_hooks.easy_perform =
       easy_perform != nullptr ? easy_perform : curl_easy_perform;
 }
+} // namespace
 
 void Enable_curl_easy_init_failure_for_testing() {
   Set_curl_api_hooks_for_testing(internal::Fail_curl_easy_init, nullptr);

@@ -34,6 +34,7 @@
 #include <chrono>
 #include <cstdint>
 #include <curl/curl.h>
+#include <curl/easy.h>
 #include <string>
 #include <thread>
 
