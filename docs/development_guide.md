@@ -11,7 +11,7 @@ Ready to contribute to the project? This guide will get you started.
    If you do not have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, fork the repository on GitHub (see <https://docs.github.com/en/get-started/quickstart/fork-a-repo>) and clone your
    fork locally.
 
-   ```bash
+   ```console
    $ git clone git@github.com:your_name_here/QDMI-on-IQM.git
    ```
 
@@ -19,19 +19,19 @@ Ready to contribute to the project? This guide will get you started.
 
    If you do have write access to the [iqm-finland/QDMI-on-IQM](https://github.com/iqm-finland/QDMI-on-IQM) repository, clone the repository locally.
 
-   ```bash
+   ```console
    $ git clone git@github.com/iqm-finland/QDMI-on-IQM.git
    ```
 
 2. Change into the project directory
 
-   ```bash
+   ```console
    $ cd QDMI-on-IQM
    ```
 
 3. Create a branch for local development
 
-   ```bash
+   ```console
    $ git checkout -b name-of-your-bugfix-or-feature
    ```
 
@@ -138,8 +138,8 @@ $ ctest -C Release --test-dir build/test/integration --output-on-failure
 
 ### Python Examples
 
-The repository also contains a standalone examples layer in `examples/`.
-These scripts exercise higher-level end-user flows through {py:class}`~iqm.qdmi.qiskit.IQMBackend`, including MQT Bench sampler runs and a QSCI estimator-and-sampler example.
+The `examples/` directory contains executable example scripts for higher-level end-user workflows built on top of {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
+The examples cover MQT Bench sampler runs and a QSCI estimator-and-sampler workflow.
 
 Use the dedicated examples session for the default simulator-backed automation path:
 
@@ -158,7 +158,7 @@ $ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 
 The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
-Target selection remains environment-driven.
+The target selection is again environment-driven.
 Set `IQM_BASE_URL` together with either `IQM_TOKEN` or `RESONANCE_API_KEY`, and optionally pin a backend with `IQM_QC_ALIAS` or `IQM_QC_ID`.
 
 **Running only install/public API tests:**

@@ -16,7 +16,7 @@ when integrating the IQM QDMI Device into downstream build systems.
 
 Use `uv` (or your Python package manager of choice) to install the package:
 
-```bash
+```console
 uv pip install iqm-qdmi
 ```
 
@@ -68,7 +68,7 @@ The package includes a wrapper for the IQM QDMI Device library that integrates i
 This wrapper is implemented in the {py:mod}`iqm.qdmi.qiskit` submodule and is based on the open-source, MIT-licensed MQT Core library.
 To use the wrapper, make sure to install the `iqm-qdmi` package with the `qiskit` extra:
 
-```bash
+```console
 uv pip install iqm-qdmi[qiskit]
 ```
 
@@ -121,20 +121,13 @@ print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
 
-### End-to-End Example Scripts
+### End-to-End Examples
 
-The repository also ships larger standalone examples built on top of these primitives.
-See the [end-user examples](examples.md) for:
+For larger end-to-end workflows built on top of these primitives, see the [end-user examples](examples.md) guide.
+That guide covers MQT Bench sampler examples and a QSCI estimator-and-sampler example.
 
-- Standalone MQT Bench sampler scripts in `examples/*.py`
-- A standalone QSCI estimator-and-sampler script in `examples/qsci_h2.py`
-
-Those examples are intentionally separate from the lightweight tests in `test/python/`.
-Run them explicitly with:
-
-```bash
-uvx nox -s examples
-```
+The example scripts are documented separately from the installed-package interface described on this page.
+They live in the source repository rather than in the PyPI distribution.
 
 :::note
 The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).

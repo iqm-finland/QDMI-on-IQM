@@ -1,22 +1,13 @@
 # End-User Examples
 
-This page documents the standalone Qiskit example scripts that live under `examples/`.
-Unlike the thin regression tests in `test/python/`, these scripts are end-user demonstrations built on top of the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend` and the generic QDMI backend surface exposed by MQT Core.
+The examples in this repository show how to drive real workloads on IQM systems through the packaged {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
 
-The examples tree contains:
+This page focuses on two families of examples:
 
-- `examples/deutsch_jozsa.py`
-- `examples/ghz.py`
-- `examples/graphstate.py`
-- `examples/qft.py`
-- `examples/wstate.py`
-- `examples/qsci_h2.py`
-- `examples/qsci_postprocess.py`
+- **Quantum chemistry:** QSCI for an H2 ground-state workflow.
+- **Benchmarks:** MQT Bench circuits such as GHZ, Deutsch-Jozsa, QFT, graph states, and W-states.
 
-## Running the Examples
-
-Run the scripts from the repository root.
-The `iqm-qdmi` CLI can launch a local example script through `uv`, so the shortest repository-local commands are:
+## Choose Your Setup
 
 The IQM-backed path uses the same environment-variable contract as the rest of the package:
 
@@ -25,64 +16,84 @@ The IQM-backed path uses the same environment-variable contract as the rest of t
 - `IQM_TOKENS_FILE`: optional authentication file.
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: optional explicit target selection.
 
-For quick simulator-backed runs, pass `--backend sim` on the command line instead of setting a dedicated examples environment variable.
+### If You Installed `iqm-qdmi` From PyPI
+
+Install the package with the Qiskit integration enabled:
+
+```console
+$ uv pip install "iqm-qdmi[qiskit]"
+```
+
+The example scripts themselves are not part of the wheel, so to run them, download or clone the [`examples/`](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/examples) directory.
+Once you have that directory locally, run an example with `uv run --script` so the script's embedded dependency metadata is honored:
+
+```console
+$ uv run --script examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
+$ uv run --script examples/ghz.py --backend sim --shots 128
+```
+
+If you want to target IQM hardware instead of the simulator, set the environment variables above and switch `--backend sim` to `--backend iqm`.
+
+### If You Cloned the Repository
+
+From a local checkout you can either run the whole examples suite or launch a single example directly through the local `iqm-qdmi` CLI:
 
 ```console
 $ uvx nox -s examples
 
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
 $ uvx --from . iqm-qdmi examples/ghz.py --backend sim --shots 128
+```
 
-$ export IQM_BASE_URL="https://desired-iqm-server.com"
-$ export RESONANCE_API_KEY="your-api-key"
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
+For quick simulator-backed runs, pass `--backend sim` on the command line.
+For IQM-backed runs, set the environment variables above and use `--backend iqm`.
+
+## Quantum Chemistry: QSCI for H2
+
+If you want a workflow that looks like an application instead of a toy circuit, start with QSCI.
+This example combines Qiskit Nature, a UCCSD ansatz, IQM-backed estimation and sampling, and classical postprocessing to recover an H2 ground-state energy estimate.
+
+In practice, the script shows you how to:
+
+1. Build an electronic-structure problem for a small molecule.
+2. Map it to qubits with Qiskit Nature.
+3. Optimize a variational ansatz against an IQM backend or simulator.
+4. Sample the trained circuit.
+5. Classically reconstruct an energy estimate from the measured bitstrings.
+
+The classical postprocessing helper used by this example lives in `examples/qsci_postprocess.py`.
+
+```{literalinclude} ../examples/qsci_h2.py
+:language: python
+:caption: examples/qsci_h2.py
+:start-after: # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 ```
 
 :::note
 The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
-:::{important}
-The IQM-backed example thresholds are tuned for real IQM QPUs.
-Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but some stricter distribution and energy checks may fail on them.
-Use `--backend sim` if you want a simulator-backed validation path without IQM credentials.
-:::
-
-## MQT Bench Scripts
+## Benchmarks: MQT Bench on IQM Backends
 
 [MQT Bench](https://mqt.readthedocs.io/projects/bench/) provides a catalog of benchmark circuits.
-In this repository, the standalone MQT Bench scripts demonstrate sampler-based end-user flows by generating benchmark circuits, transpiling them for the selected backend, executing them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and validating the observed bitstring distribution.
+In this repository, the MQT Bench examples show how to generate benchmark circuits, transpile them for the selected backend, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and validate the observed bitstring distribution.
 
 The current scripts cover:
 
-- GHZ states
-- Deutsch-Jozsa
-- Quantum Fourier Transform
-- Graph states
-- W-states
+- `examples/ghz.py`
+- `examples/deutsch_jozsa.py`
+- `examples/qft.py`
+- `examples/graphstate.py`
+- `examples/wstate.py`
 
 Each script exposes a small CLI surface, including `--backend`, `--shots`, and a benchmark-specific validation threshold such as `--threshold`, `--max-zero-probability`, or `--min-states`.
 The simulator path uses `--backend sim` and applies a small explicit gate basis for stable transpilation against the QDMI simulator backend.
 
-## QSCI Script
+Here is the GHZ example in full.
+The same structure carries over to the other MQT Bench scripts, with benchmark-specific validation logic swapped in where appropriate.
 
-The **Quantum-Selected Configuration Interaction (QSCI)** example combines a variational quantum step with classical postprocessing to estimate a molecular ground-state energy for H2.
-The implementation is split across `examples/qsci_h2.py` and the helper module `examples/qsci_postprocess.py`.
-
-The `qsci_h2.py` script performs the following steps:
-
-1. Build the electronic-structure problem with Qiskit Nature.
-2. Construct a {py:class}`~qiskit_nature.second_q.circuit.library.UCCSD` ansatz and map the Hamiltonian with {py:class}`~qiskit_nature.second_q.mappers.JordanWignerMapper`.
-3. Optimize the ansatz with Qiskit's {py:class}`~qiskit.primitives.BackendEstimator` so {py:class}`~qiskit_algorithms.minimum_eigensolvers.VQE` can use the estimator V1 interface it still expects.
-4. Sample the trained ansatz with {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`.
-5. Postprocess the measured configurations classically and compare the resulting energy against the exact reference.
-
-The script exposes CLI knobs for `--shots`, `--maxiter`, `--cutoff`, and `--energy-tolerance` so you can trade runtime for precision.
-The defaults are tuned for example runs rather than aggressive convergence.
-
-## Relationship to the Thin Python Tests
-
-The lightweight tests in `test/python/test_qiskit_backend.py` remain the fast regression layer for the backend itself.
-They verify creation plus direct {py:meth}`~mqt.core.plugins.qiskit.backend.QDMIBackend.run`, {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler`, and {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator` calls.
-
-The standalone scripts in `examples/` answer a different question: what do realistic application-level workflows look like when they utilize the backend?
-The dedicated `examples` nox session provides a thin automation layer for running those scripts on the simulator in CI and during local development.
+```{literalinclude} ../examples/ghz.py
+:language: python
+:caption: examples/ghz.py
+:start-after: # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+```

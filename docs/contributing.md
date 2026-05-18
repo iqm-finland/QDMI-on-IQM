@@ -255,9 +255,38 @@ Remember to pull the changes back into your local repository after the bot has f
 
 Our CI pipeline will also run `clang-tidy` over the changes in your PR and report any issues it finds. Due to technical limitations, the workflow can only post PR comments if the changes are not coming from a fork. If you are working on a fork, you can still see the `clang-tidy` results in the GitHub Actions logs or on the workflow summary page.
 
-## Running the Python examples
+## Working on the Python Package
 
-The example layer now lives in `examples/` as standalone scripts rather than pytest-based harness tests.
+The project also comes with a thin Python wrapper around the QDMI device implementation for easier distribution and integration.
+The Python package is located in the `python/` directory.
+
+### Running the Python tests
+
+If you touch the Python package, run the relevant `nox` sessions before opening or updating a PR.
+
+**Running the full Python test matrix:**
+
+```console
+$ uvx nox -s tests
+```
+
+**Running a single Python version locally:**
+
+```console
+$ uvx nox -s tests-3.14
+```
+
+**Running minimum-dependency tests:**
+
+The `minimums` session runs the test suite against the minimum supported dependency versions for a specific Python version.
+
+```console
+$ uvx nox -s minimums-3.14
+```
+
+### Running the Python examples
+
+The `examples/` directory contains executable example scripts for higher-level Python workflows, including MQT Bench sampler runs and a QSCI estimator-and-sampler example.
 Use the dedicated nox session for the default simulator-backed automation path:
 
 ```console
@@ -277,12 +306,6 @@ $ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
 
 :::{note}
 The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-:::
-
-:::{important}
-The IQM-backed example assertions are tuned for real IQM QPUs.
-Mock IQM targets selected through `IQM_QC_ALIAS` or `IQM_QC_ID` are still accepted, but the stricter example assertions may fail on them.
-Use `--backend sim` if you want a validation path without IQM credentials.
 :::
 
 If you touch one of these examples, update the corresponding documentation in [examples.md](examples.md) as part of the same change.
