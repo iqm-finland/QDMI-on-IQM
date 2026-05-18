@@ -1,0 +1,40 @@
+name: 🐍 • Examples
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "The runner image to test on"
+        default: "ubuntu-24.04"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  examples:
+    name: 🐍 ${{ inputs.runs-on }}
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: 3.13
+          activate-environment: true
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Run end-user examples on the simulator
+        run: uvx nox -s examples -- --backend sim

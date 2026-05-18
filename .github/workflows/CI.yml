@@ -137,32 +137,16 @@ jobs:
       enable-mypy: false
 
   examples:
-    name: 🐍 Examples
+    name: 🐍 Examples • ${{ matrix.runs-on }}
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          python-version: 3.13
-          activate-environment: true
-          enable-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
-
-      - name: Run examples
-        run: uvx nox -s examples
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, macos-26-intel, macos-26]
+    uses: ./.github/workflows/python-examples.yml
+    with:
+      runs-on: ${{ matrix.runs-on }}
 
   build-sdist:
     name: 🚀 CD
