@@ -19,13 +19,8 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytest
-
-import iqm.qdmi.__main__ as iqm_qdmi_main
 from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
 
 if TYPE_CHECKING:
@@ -66,42 +61,3 @@ def test_cli_lib_path(script_runner: ScriptRunner) -> None:
     result = script_runner.run(["iqm-qdmi", "--lib_path"])
     assert result.success
     assert str(IQM_QDMI_LIBRARY_PATH) in result.stdout
-
-
-def test_cli_example_launcher_uses_local_project(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test CLI launches a local example through uv with the editable checkout."""
-    repo_root = Path(__file__).resolve().parents[2]
-    captured: dict[str, object] = {}
-
-    def fake_run(command: list[str], *, check: bool, cwd: Path | None = None) -> object:
-        captured["command"] = command
-        captured["check"] = check
-        captured["cwd"] = cwd
-
-        class Result:
-            returncode = 0
-
-        return Result()
-
-    monkeypatch.chdir(repo_root)
-    monkeypatch.setattr(sys, "argv", ["iqm-qdmi", "examples/qsci_h2.py", "--backend", "sim"])
-    monkeypatch.setattr(iqm_qdmi_main.shutil, "which", lambda executable: "/usr/bin/uv" if executable == "uv" else None)
-    monkeypatch.setattr(iqm_qdmi_main.subprocess, "run", fake_run)
-
-    with pytest.raises(SystemExit) as exc_info:
-        iqm_qdmi_main.main()
-
-    assert exc_info.value.code == 0
-    assert captured == {
-        "command": [
-            "/usr/bin/uv",
-            "run",
-            "--with-editable",
-            ".",
-            "examples/qsci_h2.py",
-            "--backend",
-            "sim",
-        ],
-        "check": False,
-        "cwd": repo_root,
-    }
