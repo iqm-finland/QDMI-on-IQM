@@ -134,8 +134,8 @@ addopts = [
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
 filterwarnings = [
-  "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
   "error",
+  "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
 testpaths = ["test/python"]
