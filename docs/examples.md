@@ -23,44 +23,17 @@ Before running any of the examples, make sure the following variables are set as
 - `IQM_TOKENS_FILE`: Optional path to a file containing your authentication credentials.
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: Optional explicit selection of the target quantum computer.
 
-## Choose Your Installation Path
-
-Depending on how you are installing the package, the commands differ slightly.
-Pick the path that matches your setup.
-
-::::{tab-set}
-:::{tab-item} Option A: Installing `iqm-qdmi` From PyPI
-
-Install the package with the Qiskit integration enabled:
-
-```console
-$ uv pip install "iqm-qdmi[qiskit]"
-```
-
 Because the example scripts are not packaged inside the wheel, download or clone the [examples directory][examples-directory].
-Once you have that directory locally, use `uv run --script` so the script's embedded dependencies are correctly resolved, e.g.:
-
-```console
-$ uv run --script examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
-$ uv run --script examples/ghz.py --shots 128
-```
-
-:::
-:::{tab-item} Option B: Cloning the Repository Locally
-
-If you are working from a local checkout, you can either run the full suite or launch individual scripts directly through the local `iqm-qdmi` CLI:
+Once you have that directory locally, use `nox` to run the full suite or `uv run --script` so the script's embedded dependencies are correctly resolved, e.g.:
 
 ```console
 # Run the entire suite
 $ uvx nox -s examples
 
 # Run specific examples
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
-$ uvx --from . iqm-qdmi examples/ghz.py --shots 128
+$ uv run --script examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
+$ uv run --script examples/ghz.py --shots 128
 ```
-
-:::
-::::
 
 ## Quantum Chemistry
 

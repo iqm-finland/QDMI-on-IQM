@@ -303,11 +303,11 @@ You can also run individual example scripts directly from the repository root.
 For example:
 
 ```console
-$ uvx --from . iqm-qdmi examples/qft.py --backend sim --shots 128
+$ uv run --script examples/qft.py --backend sim --shots 128
 
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
+$ uv run --script examples/qsci_h2.py --backend iqm
 ```
 
 :::{note}

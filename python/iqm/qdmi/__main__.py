@@ -18,56 +18,10 @@
 """Command line interface for the IQM QDMI device library."""
 
 import argparse
-import shutil
-import subprocess
 import sys
 from functools import partial
-from pathlib import Path
 
 from . import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
-
-
-def _find_project_root(start_path: Path) -> Path | None:
-    for candidate in (start_path, *start_path.parents):
-        if (candidate / "pyproject.toml").is_file() and (candidate / "examples").is_dir():
-            return candidate
-    return None
-
-
-def _run_uv_command(command: list[str], *, cwd: Path | None = None) -> int:
-    """Run a uv command assembled from validated CLI inputs.
-
-    Returns:
-        The delegated uv process exit code.
-    """
-    return subprocess.run(command, check=False, cwd=cwd).returncode  # noqa: S603
-
-
-def _run_example(example: str, example_args: list[str]) -> int:
-    example_path = Path(example)
-    if not example_path.is_file():
-        msg = f"Example script not found: {example}"
-        raise SystemExit(msg)
-
-    uv_executable = shutil.which("uv")
-    if uv_executable is None:
-        msg = "Could not find the uv executable required to launch examples."
-        raise SystemExit(msg)
-
-    project_root = _find_project_root(Path.cwd())
-    if project_root is not None:
-        command = [
-            uv_executable,
-            "run",
-            "--with-editable",
-            ".",
-            str(example_path.resolve().relative_to(project_root)),
-            *example_args,
-        ]
-        return _run_uv_command(command, cwd=project_root)
-
-    command = [uv_executable, "run", "--script", str(example_path.resolve()), *example_args]
-    return _run_uv_command(command)
 
 
 def main() -> None:
@@ -86,10 +40,6 @@ def main() -> None:
     - :code:`--include_dir`: Print the path to the iqm-qdmi C/C++ include directory.
     - :code:`--cmake_dir`: Print the path to the iqm-qdmi CMake module directory.
     - :code:`--lib_path`: Print the path to the iqm-qdmi shared library.
-    - :code:`examples/<name>.py`: Launch a local example script via `uv`.
-
-    Raises:
-        SystemExit: If example launching fails or when propagating the delegated example exit code.
     """
     make_parser = partial(
         argparse.ArgumentParser, prog="iqm-qdmi", description="Command line interface for the QDMI on IQM library."
@@ -119,21 +69,8 @@ def main() -> None:
         action="store_true",
         help="Print the path to the iqm-qdmi shared library",
     )
-    parser.add_argument(
-        "example",
-        nargs="?",
-        help="Launch a local example script, for example examples/ghz.py",
-    )
-    parser.add_argument(
-        "example_args",
-        nargs=argparse.REMAINDER,
-        help="Arguments passed through to the example script",
-    )
 
     args = parser.parse_args()
-
-    if args.example is not None:
-        raise SystemExit(_run_example(args.example, args.example_args))
 
     if args.include_dir:
         print(IQM_QDMI_INCLUDE_DIR)

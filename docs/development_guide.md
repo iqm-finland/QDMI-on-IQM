@@ -156,8 +156,8 @@ $ uvx nox -s examples -- --backend sim
 To focus on one example directly, run the corresponding script from the repository root:
 
 ```console
-$ uvx --from . iqm-qdmi examples/wstate.py --backend sim --shots 128
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4
+$ uv run --script examples/wstate.py --backend sim --shots 128
+$ uv run --script examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4
 ```
 
 :::note
