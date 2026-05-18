@@ -32,7 +32,6 @@ def main() -> None:
     .. code-block:: bash
 
         iqm-qdmi [--version] [--include_dir] [--cmake_dir] [--lib_path]
-        iqm-qdmi examples/ghz.py [--backend sim]
 
     It provides the following command line options:
 
