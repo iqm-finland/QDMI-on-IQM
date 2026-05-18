@@ -28,7 +28,7 @@ The example scripts themselves are not part of the wheel, so to run them, downlo
 Once you have that directory locally, run an example with `uv run --script` so the script's embedded dependency metadata is honored:
 
 ```console
-$ uv run --script examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
+$ uv run --script examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4
 $ uv run --script examples/ghz.py --backend sim --shots 128
 ```
 
@@ -41,8 +41,8 @@ From a local checkout you can either run the whole examples suite or launch a si
 ```console
 $ uvx nox -s examples
 
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
-$ uvx --from . iqm-qdmi examples/ghz.py --backend sim --shots 128
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
+$ uvx --from . iqm-qdmi examples/ghz.py --shots 128
 ```
 
 For quick simulator-backed runs, pass `--backend sim` on the command line.
@@ -51,7 +51,7 @@ For IQM-backed runs, set the environment variables above and use `--backend iqm`
 ## Quantum Chemistry: QSCI for H2
 
 If you want a workflow that looks like an application instead of a toy circuit, start with QSCI.
-This example combines Qiskit Nature, a UCCSD ansatz, IQM-backed estimation and sampling, and classical postprocessing to recover an H2 ground-state energy estimate.
+This example combines Qiskit Nature, a UCCSD ansatz, IQM-backed estimation and sampling, and classical postprocessing to recover an H2 ground-state energy estimate and compare it against an exact reference.
 
 In practice, the script shows you how to:
 
@@ -76,7 +76,7 @@ The QSCI example depends on PySCF, which is [not supported on Windows](https://p
 ## Benchmarks: MQT Bench on IQM Backends
 
 [MQT Bench](https://mqt.readthedocs.io/projects/bench/) provides a catalog of benchmark circuits.
-In this repository, the MQT Bench examples show how to generate benchmark circuits, transpile them for the selected backend, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and validate the observed bitstring distribution.
+In this repository, the MQT Bench examples show how to generate benchmark circuits, transpile them for the selected backend, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the observed bitstring distribution.
 
 The current scripts cover:
 
@@ -86,11 +86,11 @@ The current scripts cover:
 - `examples/graphstate.py`
 - `examples/wstate.py`
 
-Each script exposes a small CLI surface, including `--backend`, `--shots`, and a benchmark-specific validation threshold such as `--threshold`, `--max-zero-probability`, or `--min-states`.
+Each script exposes a small CLI surface, including `--backend`, `--shots`, and usually `--num-qubits`.
 The simulator path uses `--backend sim` and applies a small explicit gate basis for stable transpilation against the QDMI simulator backend.
 
 Here is the GHZ example in full.
-The same structure carries over to the other MQT Bench scripts, with benchmark-specific validation logic swapped in where appropriate.
+The same structure carries over to the other MQT Bench scripts, with benchmark-specific circuits and summaries swapped in where appropriate.
 
 ```{literalinclude} ../examples/ghz.py
 :language: python

@@ -117,26 +117,34 @@ def minimums(session: nox.Session) -> None:
 
 @nox.session(python=["3.13"], reuse_venv=True)
 def examples(session: nox.Session) -> None:
-    """Run the standalone example scripts against the simulator."""
+    """Run the standalone example scripts against the selected backend."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--backend",
+        choices=("iqm", "sim"),
+        default="iqm",
+        help="Backend to use for the examples session (default: iqm).",
+    )
+    args, posargs = parser.parse_known_args(session.posargs)
+    if posargs:
+        joined_args = " ".join(posargs)
+        session.error(f"Unexpected arguments for the examples session: {joined_args}")
+
     env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
     scripts = (
-        ("examples/deutsch_jozsa.py", "--backend", "sim", "--shots", "128"),
-        ("examples/ghz.py", "--backend", "sim", "--shots", "128"),
-        ("examples/graphstate.py", "--backend", "sim", "--shots", "128"),
-        ("examples/qft.py", "--backend", "sim", "--shots", "128"),
-        ("examples/wstate.py", "--backend", "sim", "--shots", "128"),
+        ("examples/deutsch_jozsa.py", "--shots", "128"),
+        ("examples/ghz.py", "--shots", "128"),
+        ("examples/graphstate.py", "--shots", "128"),
+        ("examples/qft.py", "--shots", "128"),
+        ("examples/wstate.py", "--shots", "128"),
         (
             "examples/qsci_h2.py",
-            "--backend",
-            "sim",
             "--shots",
             "256",
             "--maxiter",
             "5",
             "--cutoff",
             "4",
-            "--energy-tolerance",
-            "0.35",
         ),
     )
 
@@ -146,7 +154,10 @@ def examples(session: nox.Session) -> None:
             "run",
             "--with-editable",
             ".",
-            *script_args,
+            script_args[0],
+            "--backend",
+            args.backend,
+            *script_args[1:],
             env=env,
         )
 

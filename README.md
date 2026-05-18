@@ -159,17 +159,20 @@ $ export RESONANCE_API_KEY="your-api-key"
 $ ctest --test-dir build/test/integration --output-on-failure
 ```
 
+## End-User Examples
+
 ```console
-# Run the standalone example suite on the simulator
-$ uvx nox -s examples
-
-# Run one standalone MQT Bench example on the simulator
-$ uvx --from . iqm-qdmi examples/ghz.py --backend sim --shots 128
-
-# Run the standalone QSCI example on an IQM backend
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
 $ export RESONANCE_API_KEY="your-api-key"
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend iqm
+
+# Run the entire example suite
+$ uvx nox -s examples
+
+# Run the QSCI example
+$ uvx --from . iqm-qdmi examples/qsci_h2.py
+
+# Run one dedicated MQT Bench example
+$ uvx --from . iqm-qdmi examples/ghz.py --shots 128
 ```
 
 > [!NOTE]

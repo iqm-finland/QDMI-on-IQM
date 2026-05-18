@@ -287,10 +287,16 @@ $ uvx nox -s minimums-3.14
 ### Running the Python examples
 
 The `examples/` directory contains executable example scripts for higher-level Python workflows, including MQT Bench sampler runs and a QSCI estimator-and-sampler example.
-Use the dedicated nox session for the default simulator-backed automation path:
+Use the dedicated nox session to run all examples:
 
 ```console
 $ uvx nox -s examples
+```
+
+The nox session defaults to executing all examples on the IQM backend; pass `-- --backend sim` for simulator-backed runs.
+
+```console
+$ uvx nox -s examples -- --backend sim
 ```
 
 You can also run individual example scripts directly from the repository root.

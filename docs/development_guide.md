@@ -141,17 +141,23 @@ $ ctest -C Release --test-dir build/test/integration --output-on-failure
 The `examples/` directory contains executable example scripts for higher-level end-user workflows built on top of {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
 The examples cover MQT Bench sampler runs and a QSCI estimator-and-sampler workflow.
 
-Use the dedicated examples session for the default simulator-backed automation path:
+Use the dedicated nox session to run all examples:
 
 ```console
 $ uvx nox -s examples
+```
+
+The nox session defaults to executing all examples on the IQM backend; pass `-- --backend sim` for simulator-backed runs.
+
+```console
+$ uvx nox -s examples -- --backend sim
 ```
 
 To focus on one example directly, run the corresponding script from the repository root:
 
 ```console
 $ uvx --from . iqm-qdmi examples/wstate.py --backend sim --shots 128
-$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4 --energy-tolerance 0.35
+$ uvx --from . iqm-qdmi examples/qsci_h2.py --backend sim --shots 256 --maxiter 5 --cutoff 4
 ```
 
 :::note

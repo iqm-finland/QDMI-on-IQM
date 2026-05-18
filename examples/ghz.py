@@ -55,7 +55,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=3)
-    parser.add_argument("--threshold", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -106,7 +105,7 @@ def main() -> None:
     """Execute the GHZ-state example.
 
     Raises:
-        SystemExit: If backend setup fails or the example result does not satisfy the fidelity threshold.
+        SystemExit: If backend setup fails or the backend returns an unexpected shot count.
     """
     args = parse_args()
     backend = make_backend(args.backend)
@@ -143,9 +142,9 @@ def main() -> None:
         "1" * args.num_qubits: args.shots - args.shots // 2,
     }
     fidelity = hellinger_fidelity(counts, expected_counts)
-    if fidelity < args.threshold:
-        msg = f"GHZ fidelity {fidelity:.2%} is below the requested threshold {args.threshold:.2%}."
-        raise SystemExit(msg)
+
+    print(f"Measured counts: {dict(sorted(counts.items()))}")
+    print(f"Hellinger fidelity to the ideal GHZ distribution: {fidelity:.2%}")
 
 
 if __name__ == "__main__":

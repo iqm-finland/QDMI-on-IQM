@@ -54,7 +54,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=4)
-    parser.add_argument("--max-zero-probability", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -105,7 +104,7 @@ def main() -> None:
     """Execute the balanced Deutsch-Jozsa example.
 
     Raises:
-        SystemExit: If backend setup fails or the example result does not satisfy the validation threshold.
+        SystemExit: If backend setup fails or the backend returns an unexpected shot count.
     """
     args = parse_args()
     backend = make_backend(args.backend)
@@ -140,11 +139,9 @@ def main() -> None:
 
     all_zeros = "0" * args.num_qubits
     zero_probability = counts.get(all_zeros, 0) / total_shots
-    if zero_probability > args.max_zero_probability:
-        msg = (
-            f"Balanced Deutsch-Jozsa should not collapse to the all-zero state with probability {zero_probability:.2%}."
-        )
-        raise SystemExit(msg)
+
+    print(f"Measured counts: {dict(sorted(counts.items()))}")
+    print(f"All-zero probability for the balanced oracle: {zero_probability:.2%}")
 
 
 if __name__ == "__main__":

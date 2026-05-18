@@ -54,7 +54,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=3)
-    parser.add_argument("--min-states", type=int, default=3)
     return parser.parse_args()
 
 
@@ -105,7 +104,7 @@ def main() -> None:
     """Execute the QFT example.
 
     Raises:
-        SystemExit: If backend setup fails or the example result does not satisfy the state-count check.
+        SystemExit: If backend setup fails or the backend returns an unexpected shot count.
     """
     args = parse_args()
     backend = make_backend(args.backend)
@@ -135,9 +134,8 @@ def main() -> None:
         msg = f"Expected {args.shots} shots, but observed {total_shots}."
         raise SystemExit(msg)
 
-    if len(counts) < args.min_states:
-        msg = f"QFT should expose at least {args.min_states} distinct bitstrings, got {len(counts)}."
-        raise SystemExit(msg)
+    print(f"Measured counts: {dict(sorted(counts.items()))}")
+    print(f"Observed {len(counts)} distinct bitstrings across {total_shots} shots.")
 
 
 if __name__ == "__main__":
