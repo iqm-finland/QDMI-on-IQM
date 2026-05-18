@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # /// script
-# dependencies = ["nox>=2025.11.12"]
+# dependencies = ["nox"]
 # ///
 
 """Nox sessions."""
@@ -36,7 +36,7 @@ import nox
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
 
-nox.needs_version = ">=2025.11.12"
+nox.needs_version = ">=2026.04.10"
 nox.options.default_venv_backend = "uv"
 
 PYTHON_ALL_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]

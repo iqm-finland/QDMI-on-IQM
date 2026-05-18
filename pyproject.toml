@@ -134,13 +134,8 @@ addopts = [
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
 filterwarnings = [
+  "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
   "error",
-  'ignore:qiskit\.providers\.models is deprecated since Qiskit 1\.2.*:DeprecationWarning',
-  'ignore:The class ``qiskit\.circuit\.library\.n_local\.n_local\.NLocal`` is pending deprecation.*:PendingDeprecationWarning',
-  'ignore:The class ``qiskit\.primitives\.backend_estimator\.BackendEstimator`` is deprecated.*:DeprecationWarning',
-  'ignore:The class ``qiskit\.primitives\.base\.base_estimator\.BaseEstimator`` is deprecated.*:DeprecationWarning',
-  'ignore:scipy\.optimize.*L-BFGS-B solver are deprecated.*:DeprecationWarning',
-  'ignore:The function ``qiskit\.primitives\.utils\.init_observable\(\)`` is deprecated.*:DeprecationWarning',
 ]
 log_level = "INFO"
 testpaths = ["test/python"]
@@ -222,7 +217,7 @@ PC170 = "We do not use rST files"
 build = "cp3*"
 archs = "auto64"
 test-groups = ["test"]
-test-sources = ["test"]
+test-sources = ["test/python"]
 test-command = "pytest test/python"
 build-frontend = "uv"
 test-skip = [
