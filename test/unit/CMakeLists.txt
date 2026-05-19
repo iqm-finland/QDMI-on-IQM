@@ -16,8 +16,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_executable(
-  unit_tests test_curl_http_client.cpp test_iqm_api_config.cpp
-             test_iqm_auth.cpp test_iqm_device.cpp test_logging.cpp)
+  unit_tests
+  curl_http_client_test_support.cpp test_curl_http_client.cpp
+  test_iqm_api_config.cpp test_iqm_auth.cpp test_iqm_device.cpp
+  test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
   unit_tests PRIVATE GTest::gmock_main GTest::gtest qdmi::qdmi_project_warnings
