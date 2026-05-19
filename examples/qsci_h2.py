@@ -27,11 +27,12 @@
 # iqm-qdmi = { path = ".." }
 # ///
 
-"""Run QSCI on the H2 molecule through the IQM QDMI Qiskit backend."""
+"""Run QSCI on the H2 molecule using the QDMI-on-IQM stack."""
 
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from functools import reduce
 from typing import TYPE_CHECKING, cast
@@ -56,21 +57,23 @@ from iqm.qdmi.qiskit import IQMBackend
 if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
 
+log = logging.getLogger(__name__)
+
 ATOM = "H 0 0 0; H 0 0 1;"
 BASIS = "sto-3g"
 EXPECTED_ENERGY = -1.101150
 
 
 def main() -> None:
-    """Execute the H2 QSCI example.
+    """Runs QSCI on the H2 molecule."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
 
-    Raises:
-        SystemExit: If backend setup fails, required chemistry data is missing,
-            or the backend returns an unexpected shot count.
-    """
     if sys.platform == "win32":
-        msg = "QSCI requires PySCF, which is not supported on Windows."
-        raise SystemExit(msg)
+        sys.exit("QSCI requires PySCF, which is not supported on Windows.")
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
@@ -78,66 +81,97 @@ def main() -> None:
     parser.add_argument("--maxiter", type=int, default=30)
     parser.add_argument("--cutoff", type=int, default=10)
     args = parser.parse_args()
+    log.info(
+        "Starting QSCI/H2 example (backend=%s, shots=%d, maxiter=%d, cutoff=%d)",
+        args.backend,
+        args.shots,
+        args.maxiter,
+        args.cutoff,
+    )
 
-    if args.backend == "iqm":
-        backend = IQMBackend()
-    else:
-        provider = QDMIProvider()
-        try:
-            backend = provider.get_backend("MQT Core DDSIM QDMI Device")
-        except ValueError:
-            msg = "MQT Core DDSIM QDMI Device backend is not available through QDMIProvider()."
-            raise SystemExit(msg) from None
+    log.info("Initialising '%s' backend...", args.backend)
+    backend = IQMBackend() if args.backend == "iqm" else QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+    log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
 
+    log.info("Setting up H2 problem (atom='%s', basis='%s')...", ATOM.strip(), BASIS)
     driver = PySCFDriver(atom=ATOM, basis=BASIS)
     problem = driver.run()
     mapper = JordanWignerMapper()
     initial_state = HartreeFock(problem.num_spatial_orbitals, problem.num_particles, mapper)
+    num_spatial_orbitals = problem.num_spatial_orbitals
+    num_particles = problem.num_particles
+    assert num_spatial_orbitals is not None
+    assert num_particles is not None
     ansatz = UCCSD(
-        problem.num_spatial_orbitals,
-        problem.num_particles,
+        num_spatial_orbitals,
+        num_particles,
         mapper,
         initial_state=initial_state,
     )
+    log.info(
+        "Problem ready: %d spatial orbitals, %d particles → %d-qubit UCCSD ansatz",
+        num_spatial_orbitals,
+        num_particles[0] + num_particles[1],
+        ansatz.num_qubits,
+    )
 
     if backend.num_qubits < ansatz.num_qubits:
-        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI example needs {ansatz.num_qubits}."
-        raise SystemExit(msg)
+        sys.exit(
+            f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI example needs {ansatz.num_qubits}."
+        )
 
-    ansatz = transpile(ansatz, backend=backend, optimization_level=3)
-    estimator = QDMIEstimator(backend, options={"default_shots": args.shots})
-    vqe = VQE(
-        estimator,
-        ansatz,
-        L_BFGS_B(maxiter=args.maxiter),
+    log.info("Transpiling UCCSD ansatz for '%s'...", backend.name)
+    ansatz = transpile(ansatz, backend=backend)
+    log.info(
+        "Transpiled ansatz: %d qubits, %d gates, depth %d",
+        ansatz.num_qubits,
+        ansatz.size(),
+        ansatz.depth(),
     )
 
     hamiltonian = problem.hamiltonian
     second_q_operator = hamiltonian.second_q_op()
     observable = cast("SparsePauliOp", mapper.map(second_q_operator))
+    log.info(
+        "Mapped Hamiltonian to %d-term qubit observable.",
+        len(observable),
+    )
+
+    log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", args.maxiter, args.shots)
+    estimator = QDMIEstimator(backend, options={"default_shots": args.shots})
+    vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     optimal_parameters = result.optimal_parameters
     if optimal_parameters is None:
-        msg = "VQE must return optimal parameters."
-        raise SystemExit(msg)
+        sys.exit("VQE must return optimal parameters.")
+    log.info(
+        "VQE converged. Eigenvalue estimate: %.6f (function evaluations: %s)",
+        result.eigenvalue,
+        result.optimizer_evals,
+    )
 
+    log.info("Assigning optimal parameters and adding measurements to ansatz...")
     ansatz.assign_parameters(optimal_parameters, inplace=True)
     ansatz.measure_active()
+
+    log.info("Submitting sampling job to '%s' (%d shots)...", backend.name, args.shots)
     sampler = QDMISampler(backend, default_shots=args.shots)
     job = sampler.run([(ansatz,)])
     counts = job.result()[0].data["meas"].get_counts()
-    performed_shots: int = sum(counts.values())
-    if performed_shots != args.shots:
-        msg = f"Expected {args.shots} shots, but observed {performed_shots}."
-        raise SystemExit(msg)
+    log.info("Job completed. Collected %d shots across %d distinct bitstrings.", sum(counts.values()), len(counts))
 
+    log.info("Running QSCI post-processing (cutoff=%d)...", args.cutoff)
     eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
     qsci_energy = eigval + (problem.hamiltonian.nuclear_repulsion_energy or 0.0)
-
-    print(f"Sampled {args.shots} shots from the optimized ansatz.")
-    print(f"QSCI total energy: {qsci_energy:.6f}")
     energy_difference = abs(EXPECTED_ENERGY - qsci_energy)
-    print(f"Absolute energy difference: {energy_difference:.6f} to the expected energy of {EXPECTED_ENERGY:.6f}")
+
+    log.info("QSCI total energy: %.6f Ha", qsci_energy)
+    log.info(
+        "Absolute energy difference from expected (%.6f Ha): %.6f Ha",
+        EXPECTED_ENERGY,
+        energy_difference,
+    )
+    log.info("Done.")
 
 
 def _full_mbh_canonical_from_qsci(
