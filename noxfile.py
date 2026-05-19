@@ -29,6 +29,7 @@ import contextlib
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nox
@@ -131,34 +132,13 @@ def examples(session: nox.Session) -> None:
         session.error(f"Unexpected arguments for the examples session: {joined_args}")
 
     env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
-    scripts = (
-        ("examples/deutsch_jozsa.py", "--shots", "128"),
-        ("examples/ghz.py", "--shots", "128"),
-        ("examples/graphstate.py", "--shots", "128"),
-        ("examples/qft.py", "--shots", "128"),
-        ("examples/wstate.py", "--shots", "128"),
-        (
-            "examples/qsci_h2.py",
-            "--shots",
-            "256",
-            "--maxiter",
-            "5",
-            "--cutoff",
-            "4",
-        ),
-    )
-
-    for script_args in scripts:
+    for script in Path("examples").glob("*.py"):
         session.run(
-            "uv",
-            "run",
-            "--with-editable",
-            ".",
-            script_args[0],
+            script,
             "--backend",
             args.backend,
-            *script_args[1:],
             env=env,
+            external=True,
         )
 
 
