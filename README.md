@@ -159,7 +159,7 @@ $ export RESONANCE_API_KEY="your-api-key"
 $ ctest --test-dir build/test/integration --output-on-failure
 ```
 
-## End-User Examples
+## End-To-End Examples
 
 ```console
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
@@ -168,15 +168,15 @@ $ export RESONANCE_API_KEY="your-api-key"
 # Run the entire example suite
 $ uvx nox -s examples
 
-# Run the QSCI example
-$ uvx --from . iqm-qdmi examples/qsci_h2.py
+# Run the entire example suite with a simulator backend (for testing without hardware access)
+$ uvx nox -s examples -- --backend sim
+
+# Run the QSCI example (only supported on non-Windows platforms)
+$ ./examples/qsci_h2.py
 
 # Run one dedicated MQT Bench example
-$ uvx --from . iqm-qdmi examples/ghz.py --shots 128
+$ ./examples/grover.py
 ```
-
-> [!NOTE]
-> The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
 
 ## Contributing
 
