@@ -64,14 +64,6 @@ qiskit = [
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
 ]
-showcase = [
-  {include-group = "qiskit"},
-  "mqt-bench>=2.0.0",
-  "qiskit<2.0",
-  "qiskit-algorithms>=0.3.0,<0.4.0",
-  "qiskit-nature>=0.7.2",
-  "pyscf>=2.11.0; platform_system != 'Windows'",
-]
 test = [
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
@@ -253,3 +245,9 @@ cache-keys = [
     { git = { commit = true, tags = true } },
     { file = "src/**/*" },
 ]
+
+[tool.ty.analysis]
+# The following packages are solely used in the end-to-end demonstrations and are not required for the core functionality of the library.
+# To avoid limiting the usability of the core library, we purposely do not add these packages as dependencies.
+# As a consequence, we need to ignore the unresolved imports from these packages in the type analysis.
+allowed-unresolved-imports = ["mqt.bench.**", "qiskit_nature.**", "qiskit_algorithms.**", "pyscf.**"]

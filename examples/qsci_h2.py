@@ -46,7 +46,7 @@ from examples import qsci_postprocess
 from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit import transpile
-from qiskit.primitives import BackendEstimator
+from qiskit.primitives import BackendEstimator  # ty: ignore[unresolved-import]
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms import VQE, NumPyMinimumEigensolver
 from qiskit_algorithms.optimizers import L_BFGS_B
