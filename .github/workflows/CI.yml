@@ -137,16 +137,10 @@ jobs:
       enable-mypy: false
 
   examples:
-    name: 🐍 Examples • ${{ matrix.runs-on }}
+    name: 🐍 End-to-End Examples
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, macos-26-intel, macos-26]
     uses: ./.github/workflows/python-examples.yml
-    with:
-      runs-on: ${{ matrix.runs-on }}
 
   build-sdist:
     name: 🚀 CD
