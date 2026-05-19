@@ -71,25 +71,6 @@ struct Request_attempt_result {
 };
 
 /**
- * @brief Build a Request_attempt_result from a curl perform result.
- *
- * When the perform call failed, the response code is left at zero.
- * Otherwise the HTTP response code is read from the handle.
- *
- * @param curl The curl handle associated with the completed request.
- * @param res  The CURLcode returned by curl_easy_perform.
- * @return The combined attempt result.
- */
-inline Request_attempt_result Attempt_result(CURL *curl, CURLcode res) {
-  if (res != CURLE_OK) {
-    return {.curl_result = res, .response_code = 0};
-  }
-  int64_t response_code{};
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-  return {.curl_result = CURLE_OK, .response_code = response_code};
-}
-
-/**
  * @brief Function hooks used to override selected libcurl entry points.
  *
  * Tests use these hooks to force specific failure paths without requiring a
@@ -104,9 +85,6 @@ struct Curl_api_hooks {
 
 /// Access the mutable curl hook set.
 Curl_api_hooks &Get_curl_api_hooks();
-
-/// Stub that always returns nullptr, used to simulate curl_easy_init failure.
-CURL *Fail_curl_easy_init();
 
 /**
  * @brief Helper for policy-aware error logging.

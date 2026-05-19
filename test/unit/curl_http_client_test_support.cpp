@@ -59,7 +59,7 @@ void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
 } // namespace
 
 void Enable_curl_easy_init_failure_for_testing() {
-  Set_curl_api_hooks_for_testing(internal::Fail_curl_easy_init, nullptr);
+  Set_curl_api_hooks_for_testing([]() -> CURL * { return nullptr; }, nullptr);
 }
 
 Retry_test_result
