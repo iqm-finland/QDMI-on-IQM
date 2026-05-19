@@ -19,124 +19,70 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "iqm-qdmi",
-#   "mqt-core[qiskit]~=3.6.0",
-#   "mqt-bench>=2.0.0",
+#   "iqm-qdmi[qiskit]",
+#   "mqt-bench>=2.2.2",
 # ]
+# [tool.uv.sources]
+# iqm-qdmi = { path = ".." }
 # ///
 
-"""Run a QFT example through the IQM QDMI Qiskit backend."""
+"""Prepare and sample from a QFT circuit using the QDMI-on-IQM stack."""
 
 from __future__ import annotations
 
 import argparse
-import os
-from typing import TYPE_CHECKING
+import logging
+import sys
 
 from mqt.bench import BenchmarkLevel, get_benchmark
 from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
-from qiskit import transpile
+from qiskit.quantum_info import hellinger_fidelity
 
 from iqm.qdmi.qiskit import IQMBackend
 
-if TYPE_CHECKING:
-    from mqt.core.plugins.qiskit.backend import QDMIBackend
+log = logging.getLogger(__name__)
 
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
 
-def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the QFT example.
-
-    Returns:
-        Parsed command-line arguments.
-    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--shots", type=int, default=1024)
     parser.add_argument("--num-qubits", type=int, default=3)
-    return parser.parse_args()
+    args = parser.parse_args()
+    log.info("Starting QFT example (backend=%s, qubits=%d, shots=%d)", args.backend, args.num_qubits, args.shots)
 
+    log.info("Initialising '%s' backend...", args.backend)
+    backend = IQMBackend() if args.backend == "iqm" else QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+    log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
 
-def make_backend(backend_kind: str) -> QDMIBackend:
-    """Create the selected QDMI backend for the example run.
-
-    Args:
-        backend_kind: Backend mode selected on the command line.
-
-    Returns:
-        The requested QDMI backend.
-
-    Raises:
-        SystemExit: If required IQM credentials are missing or no simulator backend is available.
-    """
-    if backend_kind == "iqm":
-        token = os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY")
-        tokens_file = os.getenv("IQM_TOKENS_FILE")
-        if token is None and tokens_file is None:
-            msg = "Set RESONANCE_API_KEY, IQM_TOKEN, or IQM_TOKENS_FILE to run this example on IQM hardware."
-            raise SystemExit(msg)
-
-        return IQMBackend(
-            base_url=os.getenv("IQM_BASE_URL"),
-            token=token,
-            tokens_file=tokens_file,
-            qc_id=os.getenv("IQM_QC_ID"),
-            qc_alias=os.getenv("IQM_QC_ALIAS"),
-        )
-
-    provider = QDMIProvider()
-    try:
-        return provider.get_backend("MQT Core DDSIM QDMI Device")
-    except ValueError:
-        simulator_backends = provider.backends(name="DDSIM")
-        if len(simulator_backends) == 1:
-            return simulator_backends[0]
-        if not simulator_backends:
-            msg = "No QDMI simulator backend is available through QDMIProvider()."
-            raise SystemExit(msg) from None
-
-        backend_names = ", ".join(backend.name or "<unnamed>" for backend in simulator_backends)
-        msg = f"Multiple simulator backends matched this example: {backend_names}."
-        raise SystemExit(msg) from None
-
-
-def main() -> None:
-    """Execute the QFT example.
-
-    Raises:
-        SystemExit: If backend setup fails or the backend returns an unexpected shot count.
-    """
-    args = parse_args()
-    backend = make_backend(args.backend)
     if backend.num_qubits < args.num_qubits:
-        msg = f"Selected backend exposes {backend.num_qubits} qubits, but the QFT example needs {args.num_qubits}."
-        raise SystemExit(msg)
+        sys.exit(f"Selected backend exposes {backend.num_qubits} qubits, but the QFT example needs {args.num_qubits}.")
 
+    log.info("Building and mapping QFT benchmark circuit (n=%d)...", args.num_qubits)
     circuit = get_benchmark(
         benchmark="qft",
-        level=BenchmarkLevel.ALG,
+        level=BenchmarkLevel.MAPPED,
         circuit_size=args.num_qubits,
+        target=backend.target,
     )
-    if not any(instruction.operation.name == "measure" for instruction in circuit.data):
-        circuit.measure_all()
+    log.info("Circuit ready: %d qubits, %d gates, depth %d", circuit.num_qubits, circuit.size(), circuit.depth())
 
-    if args.backend == "sim":
-        transpiled_circuit = transpile(circuit, basis_gates=["u", "cx", "measure"], optimization_level=1)
-    else:
-        transpiled_circuit = transpile(circuit, backend=backend, optimization_level=3)
-
+    log.info("Submitting job to '%s' (%d shots)...", backend.name, args.shots)
     sampler = QDMISampler(backend, default_shots=args.shots)
-    job = sampler.run([(transpiled_circuit,)])
-    data = job.result()[0].data
-    counts = data["meas"].get_counts() if "meas" in data else next(iter(data.values())).get_counts()
-    total_shots = sum(counts.values())
-    if total_shots != args.shots:
-        msg = f"Expected {args.shots} shots, but observed {total_shots}."
-        raise SystemExit(msg)
+    job = sampler.run([(circuit,)])
+    counts: dict[str, int] = job.result()[0].data["meas"].get_counts()
+    log.info("Job completed. Collected %d shots across %d distinct bitstrings.", sum(counts.values()), len(counts))
+    log.info("Measured counts: %s", sorted(counts.items()))
 
-    print(f"Measured counts: {dict(sorted(counts.items()))}")
-    print(f"Observed {len(counts)} distinct bitstrings across {total_shots} shots.")
-
-
-if __name__ == "__main__":
-    main()
+    expected_counts = {
+        format(i, f"0{args.num_qubits}b"): args.shots / (2**args.num_qubits) for i in range(2**args.num_qubits)
+    }
+    fidelity = hellinger_fidelity(counts, expected_counts)
+    log.info("Hellinger fidelity between measured distribution and ideal distribution: %.7f", fidelity)
+    log.info("Done.")
