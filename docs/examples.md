@@ -15,7 +15,7 @@ Whether you want to estimate molecular ground-state energies with [QSCI][qsci] o
 This tutorial focuses on two application areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature] to estimate the ground-state energy of an H2 molecule.
-- **Benchmarking:** running [MQT Bench][mqt-bench] circuits such as [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa], [QFT][quantum-fourier-transform], [graph states][graph-state], [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
+- **Benchmarking:** running [MQT Bench][mqt-bench] programs such as [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa], [QFT][quantum-fourier-transform], [graph states][graph-state], [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
 
 :::{important}
 The example scripts live in the QDMI-on-IQM repository and are not shipped with the distribution of the `iqm-qdmi` package on PyPI.
@@ -66,11 +66,11 @@ QSCI is a great first end-to-end workload beyond a simple toy circuit.
 The QSCI example depends on PySCF for classical chemistry calculations, and [PySCF is not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
-## Standardized Benchmarks
+## MQT Bench Programs
 
-To understand how the backend behaves on standard circuits, we move on to [MQT Bench][mqt-bench].
+To understand how the backend behaves on standard programs, we move on to [MQT Bench][mqt-bench].
 MQT Bench is an open-source benchmark suite that collects representative quantum algorithms across several abstraction levels.
-In this repository, the benchmark scripts show how to generate those circuits, transpile them for the selected target, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the resulting bitstring distributions.
+In this repository, the benchmark scripts show how to generate those programs, transpile them for the selected target, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the resulting bitstring distributions.
 
 The current benchmark scripts cover the following algorithms:
 
