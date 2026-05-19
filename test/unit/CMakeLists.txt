@@ -22,14 +22,8 @@ add_executable(
   test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
-  unit_tests
-  PRIVATE GTest::gmock_main
-          GTest::gtest
-          qdmi::qdmi_project_warnings
-          ${QDMI_TARGET_NAME}
-          iqm::qdmi_device_internals
-          mocks
-          CURL::libcurl)
+  unit_tests PRIVATE GTest::gmock_main GTest::gtest qdmi::qdmi_project_warnings
+                     ${QDMI_TARGET_NAME} iqm::qdmi_device_internals mocks)
 
 if(WIN32)
   add_custom_command(
