@@ -125,7 +125,7 @@ int main() {
 }
 ```
 
-For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [end-user examples](https://iqm-finland.github.io/QDMI-on-IQM/examples.html).
+For complete examples, see the [Usage Guide](https://iqm-finland.github.io/QDMI-on-IQM/usage.html) and the [end-to-end examples](https://iqm-finland.github.io/QDMI-on-IQM/examples.html).
 
 ## How It Works
 

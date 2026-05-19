@@ -1,4 +1,4 @@
-# Usage Guide
+# Directly Using the QDMI Device Library to Run Quantum Workloads on IQM Hardware via QDMI-on-IQM
 
 This guide demonstrates how to use the IQM QDMI Device library to communicate with IQM's quantum computing hardware.
 

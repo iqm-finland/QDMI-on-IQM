@@ -1,32 +1,58 @@
 # QDMI on IQM
 
-**QDMI on IQM** is IQM's official, production-ready implementation of the [Quantum Device Management Interface (QDMI)](https://github.com/Munich-Quantum-Software-Stack/qdmi).
+**QDMI on IQM** is IQM's official, production-ready implementation of the
+[Quantum Device Management Interface (QDMI)](https://github.com/Munich-Quantum-Software-Stack/qdmi).
 
-By providing this officially supported implementation, we empower HPC centers and middleware developers to embed IQM processors via a stable, vendor-agnostic standard.
-This avoids the need for fragile, bespoke adapter chains and allows users to keep their familiar tools while operators maintain manageable workflows.
+By providing this officially supported implementation, IQM empowers HPC centers and middleware
+developers to embed IQM processors via a stable, vendor-agnostic standard—no fragile, bespoke
+adapter chains, just clean integration through a shared interface.
 
-The library seamlessly wraps backend orchestration—spanning persistent session control, calibration queries, and job semantics via the [IQM Server API](https://resonance.iqm.tech/docs/api-reference)—to connect higher-level software and schedulers to both our cloud-hosted endpoints through [IQM Resonance](https://resonance.iqm.tech) and our on-premise device deployments.
+The library is written in C++20 and communicates with IQM hardware through the
+[IQM Server API](https://resonance.iqm.tech/docs/api-reference), handling session control,
+calibration queries, and job lifecycle management transparently.
+Pre-compiled binaries for all major platforms are provided alongside a Python wrapper for
+straightforward installation via `pip` or `uv`.
 
-The underlying library is written in C++20, providing a reliable foundation for long-lived integration code.
-Pre-compiled binaries for major OS and architecture configurations are provided alongside an official Python wrapper for straightforward installation via `uv` and direct use in Python workflows.
+## Where to Start
 
-Several end-to-end examples demonstrate how the QDMI-on-IQM library can drive benchmark circuits and quantum-chemistry tasks directly.
+| I want to…                                                       | Start here                          |
+| :--------------------------------------------------------------- | :---------------------------------- |
+| Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)     |
+| Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)             |
+| Integrate the C++ library directly                               | [Usage Guide](usage.md)             |
+| Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)       |
+| Understand the Python package and its entry points               | [Python Package](python_package.md) |
+| Contribute to the project                                        | [Contributing](contributing.md)     |
 
-This documentation combines [user guides](usage) with generated API references for both [C++](capi/index) and [Python](api/iqm/qdmi/index).
+## API Reference
+
+The generated API references cover both the C++ library and the Python package:
+the [C++ API reference](capi/index) documents all public QDMI functions and types exposed by the
+library, while the [Python API reference](api/iqm/qdmi/index) covers the `iqm-qdmi` package
+including the Qiskit backend and its sampler and estimator primitives.
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: User Guide
 
+examples
+qiskit
 usage
 python_package
-examples
+
 spack_guide
+
+CHANGELOG
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Developer Guide
+
 dependencies
 contributing
 support
 security
-CHANGELOG
 ```
 
 ```{toctree}

@@ -17,6 +17,8 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## Changed
 
+- 📝 Restructure documentation for better clarity and navigation ([#53]) ([**@burgholzer**])
+- 📝 Update Spack package guide with latest release and installation instructions ([#53]) ([**@burgholzer**])
 - 📝 Reduce redundancy across documentation ([#53]) ([**@burgholzer**])
 - 🚚 Replace `meetiqm.com` with new `iqm.tech` domain in documentation and codebase ([#56]) ([**@iqmtjm**], [**@marcelwa**])
 - 🚸 Demote warnings from missing calibration endpoints to debug level ([#51]) ([**@marcelwa**])

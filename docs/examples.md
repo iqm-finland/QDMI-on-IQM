@@ -18,9 +18,14 @@ This tutorial focuses on two application areas:
 - **Benchmarking:** running [MQT Bench][mqt-bench] programs such as [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa], [QFT][quantum-fourier-transform], [graph states][graph-state], [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
 
 :::{important}
-The example scripts live in the QDMI-on-IQM repository and are not shipped with the distribution of the `iqm-qdmi` package on PyPI.
+The example scripts live in the QDMI-on-IQM repository and are not shipped with the distribution of the [`iqm-qdmi` Python package](python_package.md) on PyPI.
 Hence, you need to download or clone the repository to access them.
-See the [contributing guide](contributing.md#installation) for instructions on how to get the code locally.
+You can do so by running the following command in your terminal:
+
+```console
+$ git clone https://github.com/iqm-finland/QDMI-on-IQM.git
+```
+
 :::
 
 ## Configure Your Environment

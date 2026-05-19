@@ -6,11 +6,10 @@ mystnb:
   number_source_lines: true
 ---
 
-# Python Package
+# Easy Integration with the `iqm-qdmi` Python Package
 
-The Python package for this project is published on PyPI as `iqm-qdmi`.
-It provides a Python entry point for discovering installation paths that are useful
-when integrating the IQM QDMI Device into downstream build systems.
+To ease the distribution and integration of the IQM QDMI Device library, we have packaged it as a Python module available on PyPI under the name `iqm-qdmi`.
+This package provides a convenient way to discover installation paths and metadata that are useful when integrating the IQM QDMI Device into downstream build systems, such as CMake-based projects or Python workflows.
 
 ## Install From PyPI
 
@@ -60,63 +59,4 @@ The above values can also be conveniently queried from the command line via the 
 
 ```{code-cell} ipython3
 !iqm-qdmi --lib_path
-```
-
-## Qiskit Integration
-
-The package includes a wrapper for the IQM QDMI Device library that integrates it with Qiskit.
-This wrapper is implemented in the {py:mod}`iqm.qdmi.qiskit` submodule and is based on the open-source, MIT-licensed MQT Core library.
-To use the wrapper, make sure to install the `iqm-qdmi` package with the `qiskit` extra:
-
-```console
-uv pip install iqm-qdmi[qiskit]
-```
-
-Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from {py:mod}`iqm.qdmi.qiskit` and used as a drop-in replacement for any Qiskit backend.
-
-```{code-cell} ipython3
-from iqm.qdmi.qiskit import IQMBackend
-from qiskit.circuit import QuantumCircuit
-from qiskit.compiler import transpile
-
-backend = IQMBackend(
-  base_url="https://resonance.iqm.tech",
-  qc_alias="emerald:mock",
-)
-```
-
-```{code-cell} ipython3
-qc = QuantumCircuit(2)
-qc.h(0)
-qc.cx(0, 1)
-qc.measure_all()
-
-transpiled_qc = transpile(qc, backend)
-result = backend.run(transpiled_qc, shots=128).result()
-print(result.get_counts())
-```
-
-If no API token is explicitly provided, like in the example above, the wrapper will attempt to read it from the `IQM_TOKEN` or `RESONANCE_API_KEY` environment variables.
-
-### Sampler and Estimator Primitives
-
-{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing {py:class}`~qiskit.primitives.BaseSamplerV2` and {py:class}`~qiskit.primitives.BaseEstimatorV2` primitives bound
-to the backend instance.
-
-```{code-cell} ipython3
-sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
-counts = sampler_job.result()[0].data["meas"].get_counts()
-print(f"Counts: {counts}")
-```
-
-```{code-cell} ipython3
-from qiskit.quantum_info import SparsePauliOp
-
-transpiled_qc.remove_final_measurements(inplace=True)
-observable = SparsePauliOp("Z" * backend.num_qubits)
-
-estimator_job = backend.estimator().run([(transpiled_qc, observable)])
-data = estimator_job.result()[0].data
-print(f"Expectation values: {data['evs']}")
-print(f"Standard deviations: {data['stds']}")
 ```
