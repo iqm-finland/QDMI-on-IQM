@@ -91,4 +91,4 @@ jobs:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
-        run: ctest -C Release --output-on-failure --test-dir build --repeat until-pass:3 --timeout 600
+        run: ctest -C Release --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

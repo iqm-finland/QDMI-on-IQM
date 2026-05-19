@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+## Added
+
+- 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52]) ([**@marcelwa**], [**@burgholzer**])
+
 ## [1.0.1] - 2026-04-27
 
 ### Fixed
@@ -29,6 +33,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#52]: https://github.com/iqm-finland/QDMI-on_IQM/pull/52
 [#49]: https://github.com/iqm-finland/QDMI-on_IQM/pull/49
 
 <!-- Contributor -->
