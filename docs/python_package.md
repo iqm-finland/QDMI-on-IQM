@@ -120,15 +120,3 @@ data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
-
-### End-to-End Examples
-
-For larger end-to-end workflows built on top of these primitives, see the [end-user examples](examples.md) guide.
-That guide covers MQT Bench sampler examples and a QSCI estimator-and-sampler example.
-
-The example scripts are documented separately from the installed-package interface described on this page.
-They live in the source repository rather than in the PyPI distribution.
-
-:::note
-The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-:::

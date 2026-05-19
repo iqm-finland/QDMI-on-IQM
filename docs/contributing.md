@@ -286,33 +286,14 @@ $ uvx nox -s minimums-3.14
 
 ### Running the Python examples
 
-The `examples/` directory contains executable example scripts for higher-level Python workflows, including MQT Bench sampler runs and a QSCI estimator-and-sampler example.
-Use the dedicated nox session to run all examples:
+Run the full example suite via the dedicated nox session before opening or updating a PR:
 
 ```console
-$ uvx nox -s examples
+$ uvx nox -s examples -- --backend sim  # simulator (no IQM access required)
+$ uvx nox -s examples                   # real IQM hardware
 ```
 
-The nox session defaults to executing all examples on the IQM backend; pass `-- --backend sim` for simulator-backed runs.
-
-```console
-$ uvx nox -s examples -- --backend sim
-```
-
-You can also run individual example scripts directly from the repository root.
-For example:
-
-```console
-$ uv run --script examples/qft.py --backend sim --shots 128
-
-$ export IQM_BASE_URL="https://desired-iqm-server.com"
-$ export RESONANCE_API_KEY="your-api-key"
-$ uv run --script examples/qsci_h2.py --backend iqm
-```
-
-:::{note}
-The QSCI example depends on PySCF, which is [not supported on Windows](https://pyscf.org/user/install.html).
-:::
+For a walkthrough of each example, environment setup, and CLI options, see the [Examples](examples.md) guide.
 
 If you touch one of these examples, update the corresponding documentation in [examples.md](examples.md) as part of the same change.
 
@@ -361,6 +342,89 @@ If something goes wrong, the CI pipeline will notify you. Here are some tips for
 
 - If the **documentation build** fails, the documentation could not be built properly.
   Inspect the corresponding log file for any errors.
+
+## IQM API Usage in QDMI Device Implementation
+
+This section describes how the unified IQM Server API, as defined in `iqm_api_config.hpp` and `iqm_api_config.cpp`, is used to provide the functionality of the QDMI device implementation in `iqm_device.cpp`.
+
+### API Endpoints Used
+
+The QDMI device implementation uses the following endpoints from the unified IQM Server API:
+
+**Quantum Computer Management:**
+
+- `GET_QUANTUM_COMPUTERS`: Retrieves the list of available quantum computers with their IDs and aliases.
+- `GET_STATIC_QUANTUM_ARCHITECTURE`: Fetches the static quantum architecture (qubits and connectivity) for a specific quantum computer.
+- `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Obtains the set of calibrated gates and their implementations for a given calibration set.
+- `GET_CALIBRATION_SET_QUALITY_METRICS`: Gets calibration metrics such as qubit T1/T2 times and gate fidelities.
+
+**Job Management:**
+
+- `SUBMIT_CIRCUIT_JOB`: Submits a quantum circuit job (QIR or IQM JSON format) for execution.
+- `GET_JOB_STATUS`: Checks the status of a submitted job.
+- `GET_JOB_ARTIFACT_MEASUREMENT_COUNTS`: Retrieves the measurement results as aggregated histogram counts of a completed job.
+- `GET_JOB_ARTIFACT_MEASUREMENTS`: Retrieves the individual shot measurement results of a completed job.
+- `CANCEL_JOB`: Cancels a running job.
+
+**Calibration Jobs (if supported):**
+
+- `COCOS_HEALTH`: Health check endpoint to determine if calibration jobs are supported.
+- `SUBMIT_CALIBRATION_JOB`: Submits a calibration job for execution.
+- `GET_CALIBRATION_JOB_STATUS`: Checks the status of a calibration job.
+- `ABORT_CALIBRATION_JOB`: Cancels a running calibration job.
+
+### When API Calls Happen
+
+**During Session Initialization (`IQM_QDMI_device_session_init`):**
+
+These steps correspond to the initialization sequence described in the [Usage Guide](usage.md#session-initialization-details).
+
+1. `GET_QUANTUM_COMPUTERS`: Fetches the list of available quantum computers.
+2. The appropriate quantum computer is selected based on ID, alias, or first available.
+3. `GET_STATIC_QUANTUM_ARCHITECTURE`: Retrieves the static architecture (qubits, connectivity).
+4. `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Fetches calibrated gates for the default calibration set.
+5. `GET_CALIBRATION_SET_QUALITY_METRICS`: Retrieves quality metrics (T1, T2, fidelities) if available.
+6. `COCOS_HEALTH`: Checks whether calibration jobs are supported.
+
+**During Job Submission and Management:**
+
+- `SUBMIT_CIRCUIT_JOB` or `SUBMIT_CALIBRATION_JOB`: Called when `IQM_QDMI_device_job_submit` is invoked.
+- `GET_JOB_STATUS` or `GET_CALIBRATION_JOB_STATUS`: Polled when `IQM_QDMI_device_job_check` or `IQM_QDMI_device_job_wait` is called.
+- `GET_JOB_ARTIFACT_MEASUREMENT_COUNTS`: Fetched when histogram results are queried.
+- `GET_JOB_ARTIFACT_MEASUREMENTS`: Fetched when individual shot results are queried.
+- `CANCEL_JOB` or `ABORT_CALIBRATION_JOB`: Called when `IQM_QDMI_device_job_cancel` is invoked.
+
+**After Calibration Job Completion:**
+
+When querying results of a calibration job, the implementation automatically:
+
+1. Extracts the new calibration set ID from the job result.
+2. Calls `GET_DYNAMIC_QUANTUM_ARCHITECTURE` with the new calibration set ID.
+3. Calls `GET_CALIBRATION_SET_QUALITY_METRICS` to update quality metrics.
+
+### API Configuration
+
+The `APIConfig` class in `iqm_api_config.hpp` provides a centralized way to build URLs for API endpoints. The base URL is set during session initialization, and endpoints are constructed using string formatting with parameters like quantum computer alias, calibration set ID, and job ID.
+
+### Error Handling
+
+- If an API call fails, the HTTP client returns an appropriate QDMI status code.
+- Error messages are logged using the logging system.
+- For calibration job endpoints, if the server doesn't support them (e.g., `COCOS_HEALTH` check fails), the `supports_calibration_jobs_` flag is set to false, and calibration job submissions will return `QDMI_ERROR_NOTSUPPORTED`.
+
+### API Response Expectations
+
+The implementation expects JSON responses in specific formats:
+
+- **Quantum Computers List**: Array of objects with `id` and `alias` fields.
+- **Static Architecture**: Array with a single object containing `qubits` (array of strings) and `connectivity` (array of 2-element arrays).
+- **Dynamic Architecture**: Object with `calibration_set_id` (string) and `gates` (nested objects with gate details).
+- **Quality Metrics**: Object with `observations` array containing `dut_field`, `value`, and `invalid` fields.
+- **Job Status**: Object with job status, errors, and messages.
+- **Measurement Counts Artifact**: Array with a single object containing `counts` (object mapping bitstrings to count integers).
+- **Measurements Artifact**: Array typically containing a single object where each measurement key maps to an array of all shot results. Each shot result is a single-element array containing an integer (0 or 1). For example: `[{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[1], [0], [1], [0]]}]` represents 4 shots measuring two qubits, where each measurement key contains all results for that qubit across all shots.
+
+For more details, see the implementation in `iqm_device.cpp` and the API configuration in `iqm_api_config.hpp`/`.cpp`.
 
 ## Security
 

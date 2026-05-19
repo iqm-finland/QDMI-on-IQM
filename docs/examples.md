@@ -23,6 +23,8 @@ Before running any of the examples, make sure the following variables are set as
 - `IQM_TOKENS_FILE`: Optional path to a file containing your authentication credentials.
 - `IQM_QC_ALIAS` or `IQM_QC_ID`: Optional explicit selection of the target quantum computer.
 
+For the full set of authentication options available when configuring C++ sessions directly, see [Authentication Methods](usage.md#authentication-methods) in the Usage Guide.
+
 Because the example scripts are not packaged inside the wheel, download or clone the [examples directory][examples-directory].
 Once you have that directory locally, use `nox` to run the full suite or `uv run --script` so the script's embedded dependencies are correctly resolved, e.g.:
 
