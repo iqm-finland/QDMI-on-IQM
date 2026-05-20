@@ -86,7 +86,6 @@ if __name__ == "__main__":
     log.info("Job completed. Collected %d shots across %d distinct bitstrings.", total_shots, len(counts))
     log.info("Measured counts: %s", sorted(counts.items()))
 
-    actual_qubits = args.num_qubits - 1
     ideal_bitstring = max(counts, key=lambda k: counts[k])
     expected_counts = {ideal_bitstring: total_shots}
     fidelity = hellinger_fidelity(counts, expected_counts)
