@@ -32,22 +32,19 @@ They live in the user's Python environment and are **not bundled** inside the wh
 
 | Dependency | Version | License     | Purpose                                                                  |
 | :--------- | :------ | :---------- | :----------------------------------------------------------------------- |
-| [MQT Core] | ~=3.6.0 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
+| [MQT Core] | ~=3.6.1 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
 | [Qiskit]   | ≥1.1    | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
 
-## End-User Example Dependencies
+## End-to-End Example Dependencies
 
-The scripts in `examples/` declare their own [PEP 723](https://peps.python.org/pep-0723/) metadata.
+On top of the Python integration dependencies, the example scripts rely on additional libraries to construct and execute their workloads.
+The scripts in `examples/` declare these dependencies in their own [PEP 723](https://peps.python.org/pep-0723/) metadata.
 These dependencies are resolved when the scripts are executed locally and are **not shipped** as part of the `iqm-qdmi` wheel.
 
-| Dependency          | Version               | License     | Applies to         | Purpose                                                       |
-| :------------------ | :-------------------- | :---------- | :----------------- | :------------------------------------------------------------ |
-| [MQT Core]          | ~=3.6.0               | MIT License | All examples       | QDMI-backed Qiskit provider and sampler integration           |
-| [MQT Bench]         | ≥2.0.0                | MIT License | Benchmark examples | Standardized benchmark circuit generation                     |
-| [Qiskit]            | ≥1.1,<2.0             | Apache-2.0  | QSCI example       | Circuit construction, transpilation, and estimator interfaces |
-| [Qiskit Algorithms] | ≥0.3.0,<0.4.0         | Apache-2.0  | QSCI example       | VQE and classical eigensolver workflow components             |
-| [Qiskit Nature]     | ≥0.7.2                | Apache-2.0  | QSCI example       | Electronic-structure modeling and qubit mapping               |
-| [PySCF]             | ≥2.11.0 (non-Windows) | Apache-2.0  | QSCI example       | Classical chemistry backend used by the H2 workflow           |
+| Dependency      | Version | License     | Applies to         | Purpose                                         |
+| :-------------- | :------ | :---------- | :----------------- | :---------------------------------------------- |
+| [MQT Bench]     | ≥2.2.2  | MIT License | Benchmark examples | Standardized benchmark circuit generation       |
+| [Qiskit Nature] | ≥0.7.2  | Apache-2.0  | QSCI example       | Electronic-structure modeling and qubit mapping |
 
 ## Test Dependencies
 
@@ -61,16 +58,13 @@ Used for testing only, **not shipped** in any binary or wheel.
 
 ### Python Tests
 
-| Dependency               | Version                                      | License      | Purpose                                                               |
-| :----------------------- | :------------------------------------------- | :----------- | :-------------------------------------------------------------------- |
-| [pytest]                 | ≥9.0.1                                       | MIT License  | Testing framework                                                     |
-| [pytest-console-scripts] | ≥1.4.1                                       | MIT License  | Testing CLI entry points                                              |
-| [pytest-cov]             | ≥7.0.0                                       | MIT License  | Test coverage reporting                                               |
-| [pytest-sugar]           | ≥1.1.1                                       | BSD-3-Clause | Prettier test output formatting                                       |
-| [pytest-xdist]           | ≥3.8.0                                       | MIT License  | Parallel test execution                                               |
-| [MQT Core]               | ~=3.6.0                                      | MIT License  | Qiskit-backed backend, provider, sampler, and estimator test coverage |
-| [Qiskit]                 | ≥1.1                                         | Apache-2.0   | Python integration and CLI test coverage                              |
-| [NumPy]                  | ≥2.1 on Python ≥3.13; ≥2.3.2 on Python ≥3.14 | BSD-3-Clause | Numeric support required by the Qiskit-backed test environment        |
+| Dependency               | Version | License      | Purpose                         |
+| :----------------------- | :------ | :----------- | :------------------------------ |
+| [pytest]                 | ≥9.0.1  | MIT License  | Testing framework               |
+| [pytest-console-scripts] | ≥1.4.1  | MIT License  | Testing CLI entry points        |
+| [pytest-cov]             | ≥7.0.0  | MIT License  | Test coverage reporting         |
+| [pytest-sugar]           | ≥1.1.1  | BSD-3-Clause | Prettier test output formatting |
+| [pytest-xdist]           | ≥3.8.0  | MIT License  | Parallel test execution         |
 
 ## Documentation Dependencies
 
