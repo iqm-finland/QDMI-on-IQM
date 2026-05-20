@@ -23,7 +23,7 @@ These are **not shipped** in any binary or wheel.
 
 | Dependency          | Version | License    | Purpose                                    |
 | :------------------ | :------ | :--------- | :----------------------------------------- |
-| [scikit-build-core] | ≥0.11.6 | Apache-2.0 | Python build backend and CMake integration |
+| [scikit-build-core] | ≥0.12.2 | Apache-2.0 | Python build backend and CMake integration |
 
 ## Optional Python Integration Dependencies
 
