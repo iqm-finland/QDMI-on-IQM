@@ -60,6 +60,6 @@ jobs:
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
-          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

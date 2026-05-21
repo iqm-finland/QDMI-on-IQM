@@ -42,7 +42,7 @@ jobs:
       config: ${{ matrix.config }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-macos:
     name: 🇨 Test 🍎
@@ -64,7 +64,7 @@ jobs:
       config: ${{ matrix.config }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-windows:
     name: 🇨 Test 🏁
@@ -86,7 +86,7 @@ jobs:
       config: ${{ matrix.config }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-install-tests:
     name: 📦 Install
@@ -100,7 +100,7 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-coverage:
     name: 🇨 Coverage
@@ -111,7 +111,7 @@ jobs:
       contents: read
       id-token: write
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-linter:
     name: 🇨 Lint
@@ -162,7 +162,7 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   # this job does nothing and is only used for branch protection
   required-checks-pass:
