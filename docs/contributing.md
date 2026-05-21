@@ -216,7 +216,7 @@ Before running the integration tests, make sure you have set the necessary envir
 
 ```console
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
-$ export RESONANCE_API_KEY="your-api-key"
+$ export IQM_TOKEN="your-api-key"
 $ ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
 

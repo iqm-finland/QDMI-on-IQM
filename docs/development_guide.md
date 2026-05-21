@@ -130,7 +130,7 @@ $ ctest -C Release --test-dir build/test/unit --output-on-failure
 
 **Running only the integration tests:**
 
-Before running the integration tests, make sure you have set the necessary environment variables, such as `IQM_BASE_URL` and `RESONANCE_API_KEY`.
+Before running the integration tests, make sure you have set the necessary environment variables, such as `IQM_BASE_URL` and either `IQM_TOKEN` or `IQM_TOKENS_FILE`.
 
 ```console
 $ ctest -C Release --test-dir build/test/integration --output-on-failure

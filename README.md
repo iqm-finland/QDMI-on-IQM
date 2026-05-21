@@ -155,7 +155,7 @@ $ ctest --test-dir build/test/unit --output-on-failure
 
 # Run integration tests (requires IQM access)
 $ export IQM_BASE_URL="https://desired-iqm-server.com"
-$ export RESONANCE_API_KEY="your-api-key"
+$ export IQM_TOKEN="your-api-key"
 $ ctest --test-dir build/test/integration --output-on-failure
 ```
 
