@@ -1,4 +1,4 @@
-# Usage Guide
+# Directly Using the QDMI Device Library to Run Quantum Workloads on IQM Hardware via QDMI-on-IQM
 
 This guide demonstrates how to use the IQM QDMI Device library to communicate with IQM's quantum computing hardware.
 
@@ -15,6 +15,8 @@ The QDMI device supports multiple authentication methods:
    - `IQM_TOKENS_FILE`: Path to a file containing authentication tokens
 
 2. **Explicit Parameters**: Authentication credentials can be set programmatically via session parameters.
+
+For the environment variable setup used in the Python example scripts, see [Configure Your Environment](examples.md#configure-your-environment) in the Examples guide.
 
 **Important**: Authentication credentials are resolved in the following order:
 
@@ -130,6 +132,8 @@ When {cpp:func}`IQM_QDMI_device_session_init` is called, the following steps occ
    - This determines whether {cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION` jobs can be submitted.
 
 After initialization, the session is ready to submit jobs and query device information.
+
+For the REST API endpoints called during each of these steps, see [IQM API Usage in QDMI Device Implementation](contributing.md#iqm-api-usage-in-qdmi-device-implementation) in the Contributing guide.
 
 ## Understanding Quantum Architecture and Calibration Sets
 
