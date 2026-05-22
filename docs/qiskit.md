@@ -40,7 +40,7 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-If no API token is explicitly provided, like in the example above, the wrapper will attempt to read it from the `IQM_TOKEN` or `RESONANCE_API_KEY` environment variables.
+If no API token is explicitly provided, like in the example above, the wrapper will attempt to read it from the `IQM_TOKEN` environment variable. Alternatively, set `IQM_TOKENS_FILE` to point to an authentication file.
 
 ## Sampler and Estimator Primitives
 
