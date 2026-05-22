@@ -136,6 +136,12 @@ jobs:
       enable-ty: true
       enable-mypy: false
 
+  examples:
+    name: 🐍 End-to-End Examples
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-python-tests)
+    uses: ./.github/workflows/python-examples.yml
+
   build-sdist:
     name: 🚀 CD
     needs: change-detection
@@ -177,6 +183,7 @@ jobs:
       - cpp-coverage
       - cpp-linter
       - python-linter
+      - examples
       - build-sdist
       - build-wheel
     runs-on: ubuntu-slim
@@ -195,7 +202,7 @@ jobs:
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-python-tests)
-              && '' || 'python-linter,'
+              && '' || 'python-linter,examples,'
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cd)

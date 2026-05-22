@@ -29,6 +29,7 @@ import contextlib
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nox
@@ -113,6 +114,32 @@ def minimums(session: nox.Session) -> None:
         )
         env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
         session.run("uv", "tree", "--frozen", env=env)
+
+
+@nox.session(python=["3.13"], reuse_venv=True)
+def examples(session: nox.Session) -> None:
+    """Run the standalone example scripts against the selected backend."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--backend",
+        choices=("iqm", "sim"),
+        default="iqm",
+        help="Backend to use for the examples session (default: iqm).",
+    )
+    args, posargs = parser.parse_known_args(session.posargs)
+    if posargs:
+        joined_args = " ".join(posargs)
+        session.error(f"Unexpected arguments for the examples session: {joined_args}")
+
+    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+    for script in Path("examples").glob("*.py"):
+        session.run(
+            script,
+            "--backend",
+            args.backend,
+            env=env,
+            external=True,
+        )
 
 
 @nox.session(reuse_venv=True)
