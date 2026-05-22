@@ -26,6 +26,8 @@
 #include <optional>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
+#include <string_view>
+#include <utility>
 
 namespace {
 int Set_env_var_raw(const char *key, const char *value) {
@@ -44,10 +46,6 @@ int Unset_env_var_raw(const char *key) {
 #endif
 }
 
-void Set_env_var(const char *key, const char *value) {
-  ASSERT_EQ(Set_env_var_raw(key, value), 0);
-}
-
 class ScopedEnvVar {
 public:
   ScopedEnvVar(const char *key, const char *value) : key_(key) {
@@ -55,7 +53,11 @@ public:
         existing_value != nullptr) {
       previous_value_ = existing_value;
     }
-    EXPECT_EQ(Set_env_var_raw(key, value), 0);
+    if (value != nullptr) {
+      EXPECT_EQ(Set_env_var_raw(key, value), 0);
+    } else {
+      EXPECT_EQ(Unset_env_var_raw(key), 0);
+    }
   }
 
   ScopedEnvVar(const ScopedEnvVar &) = delete;
@@ -77,6 +79,49 @@ private:
   std::string key_;
   std::optional<std::string> previous_value_;
 };
+
+class ScopedTokensFile {
+public:
+  ScopedTokensFile(std::string path, const std::string &access_token)
+      : path_(std::move(path)) {
+    std::ofstream file(path_);
+    file << R"({"access_token": ")" << access_token << R"("})";
+  }
+
+  ScopedTokensFile(const ScopedTokensFile &) = delete;
+  ScopedTokensFile &operator=(const ScopedTokensFile &) = delete;
+  ScopedTokensFile(ScopedTokensFile &&) = delete;
+  ScopedTokensFile &operator=(ScopedTokensFile &&) = delete;
+
+  ~ScopedTokensFile() { static_cast<void>(std::remove(path_.c_str())); }
+
+  [[nodiscard]] const std::string &path() const { return path_; }
+
+private:
+  std::string path_;
+};
+
+testing::AssertionResult
+Is_bearer_token_for(const std::string &actual,
+                    const std::string &expected_token) {
+  constexpr std::string_view bearer_prefix = "Bearer ";
+  if (!actual.starts_with(bearer_prefix)) {
+    return testing::AssertionFailure() << "missing Bearer prefix";
+  }
+  if (actual.size() != bearer_prefix.size() + expected_token.size()) {
+    return testing::AssertionFailure() << "unexpected bearer token length";
+  }
+  if (actual.compare(bearer_prefix.size(), std::string::npos, expected_token) !=
+      0) {
+    return testing::AssertionFailure() << "unexpected bearer token content";
+  }
+  return testing::AssertionSuccess();
+}
+
+constexpr std::string_view K_FUTURE_TOKEN =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIw"
+    "MCwiaWF0IjoxNjIwNjc1MjAwfQ.signature";
 } // namespace
 
 TEST(TokenManagerTest, TimeLeftSeconds) {
@@ -100,74 +145,86 @@ TEST(TokenManagerTest, TimeLeftSeconds) {
   EXPECT_EQ(iqm::TokenManager::time_left_seconds(""), 0);
 }
 
-TEST(TokenManagerTest, ConstructorWithToken) {
+TEST(TokenManagerTest, ConstructorWithExplicitToken) {
+  const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
+
   iqm::TokenManager tm(std::make_optional("my_token"), std::nullopt);
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
-
-  {
-    const ScopedEnvVar env_token("IQM_TOKEN", "my_token");
-    // Test with only the env var
-    tm = iqm::TokenManager(std::nullopt, std::nullopt);
-    EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
-
-    // Test with parameter and env var set to the same value --> expected to
-    // work
-    tm = iqm::TokenManager(std::make_optional("my_token"), std::nullopt);
-    EXPECT_EQ(tm.get_bearer_token(), "Bearer my_token");
-
-    // Test with the env var set to a different value --> expected to fail
-    Set_env_var("IQM_TOKEN", "different_token");
-    EXPECT_THROW(
-        iqm::TokenManager(std::make_optional("my_token"), std::nullopt),
-        iqm::ClientConfigurationError);
-  }
+  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
 }
 
-TEST(TokenManagerTest, ConstructorWithTokensFile) {
-  // Create a temporary tokens file
-  const std::string filename = "test_tokens.json";
-  std::ofstream file(filename);
-  // Create a valid token with an expiration time in the future
-  const std::string future_token =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-      "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIw"
-      "MCwiaWF0IjoxNjIwNjc1MjAwfQ.signature";
-  file << R"({"access_token": ")" << future_token << R"("})";
-  file.close();
+TEST(TokenManagerTest, ConstructorWithTokenFromEnvironment) {
+  const ScopedEnvVar env_token("IQM_TOKEN", "my_token");
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
 
-  iqm::TokenManager tm(std::nullopt, std::make_optional(filename));
-  EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
-
-  {
-    const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", filename.c_str());
-    // Test with only the env var
-    tm = iqm::TokenManager(std::nullopt, std::nullopt);
-    EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
-
-    // Test with parameter and env var set to the same value --> expected to
-    // work
-    tm = iqm::TokenManager(std::nullopt, std::make_optional(filename));
-    EXPECT_EQ(tm.get_bearer_token(), "Bearer " + future_token);
-
-    // Test with the env var set to a different value --> expected to fail
-    Set_env_var("IQM_TOKENS_FILE", "different_file_token");
-    EXPECT_THROW(iqm::TokenManager(std::nullopt, std::make_optional(filename)),
-                 iqm::ClientConfigurationError);
-  }
-
-  // Clean up the temporary file
-  std::remove(filename.c_str());
+  iqm::TokenManager tm(std::nullopt, std::nullopt);
+  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
 }
 
-TEST(TokenManagerTest, ConstructorWithInvalidParameters) {
+TEST(TokenManagerTest, ConstructorWithExplicitTokenOverridesEnvironment) {
+  const ScopedEnvVar env_token("IQM_TOKEN", "different_token");
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", "different_file");
+
+  iqm::TokenManager tm(std::make_optional("my_token"), std::nullopt);
+  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
+}
+
+TEST(TokenManagerTest, ConstructorWithExplicitTokensFile) {
+  const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
+  const ScopedTokensFile tokens_file("test_tokens.json",
+                                     std::string(K_FUTURE_TOKEN));
+
+  iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
+  EXPECT_TRUE(
+      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+}
+
+TEST(TokenManagerTest, ConstructorWithTokensFileFromEnvironment) {
+  const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
+  const ScopedTokensFile tokens_file("test_tokens_env.json",
+                                     std::string(K_FUTURE_TOKEN));
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE",
+                                     tokens_file.path().c_str());
+
+  iqm::TokenManager tm(std::nullopt, std::nullopt);
+  EXPECT_TRUE(
+      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+}
+
+TEST(TokenManagerTest, ConstructorWithExplicitTokensFileOverridesEnvironment) {
+  const ScopedEnvVar env_token("IQM_TOKEN", "different_token");
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", "different_file");
+  const ScopedTokensFile tokens_file("test_tokens_override.json",
+                                     std::string(K_FUTURE_TOKEN));
+
+  iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
+  EXPECT_TRUE(
+      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+}
+
+TEST(TokenManagerTest, ConstructorWithInvalidExplicitParameters) {
+  const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
+
   EXPECT_THROW(iqm::TokenManager(std::make_optional("token"),
                                  std::make_optional("file")),
                iqm::ClientConfigurationError);
 }
 
+TEST(TokenManagerTest, ConstructorWithInvalidEnvironmentParameters) {
+  const ScopedEnvVar env_token("IQM_TOKEN", "token");
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", "file");
+
+  EXPECT_THROW(iqm::TokenManager(), iqm::ClientConfigurationError);
+}
+
 TEST(TokenManagerTest, GetBearerTokenNoProvider) {
+  const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
+  const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
+
   iqm::TokenManager tm;
-  EXPECT_EQ(tm.get_bearer_token(), "");
+  EXPECT_TRUE(tm.get_bearer_token().empty());
 }
 
 TEST(TokenManagerTest, TimeLeftSecondsInvalidJson) {

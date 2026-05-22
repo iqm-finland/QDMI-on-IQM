@@ -23,6 +23,11 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 - 🚚 Replace `meetiqm.com` with new `iqm.tech` domain in documentation and codebase ([#56]) ([**@iqmtjm**], [**@marcelwa**])
 - 🚸 Demote warnings from missing calibration endpoints to debug level ([#51]) ([**@marcelwa**])
 
+## Changed
+
+- ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for authentication ([#67]) ([**@marcelwa**])
+- ♻️ Consistently enforce explicit authentication parameters to take precedence over environment variables ([#67]) ([**@marcelwa**])
+
 ## [1.0.1] - 2026-04-27
 
 ### Fixed
@@ -43,6 +48,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
 [#56]: https://github.com/iqm-finland/QDMI-on_IQM/pull/56
 [#53]: https://github.com/iqm-finland/QDMI-on_IQM/pull/53
 [#52]: https://github.com/iqm-finland/QDMI-on_IQM/pull/52

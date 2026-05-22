@@ -35,7 +35,7 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
-      RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   # Downloads the previously generated artifacts and deploys to PyPI on published releases.
   deploy:
