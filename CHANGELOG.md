@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-22
+
 ## Added
 
 - ✨ Add end-to-end examples and documentation for running experiments on IQM hardware ([#53]) ([**@marcelwa**], [**@burgholzer**])
@@ -42,7 +44,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/...v1.0.0
 
