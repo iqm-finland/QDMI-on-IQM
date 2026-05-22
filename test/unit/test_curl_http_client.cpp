@@ -231,10 +231,10 @@ TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
 TEST(CurlHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
   const LoggerCapture logger_capture;
   const auto result = iqm::test_support::Retry_response_codes_for_testing(
-      {429, 429, 429, 429}, "https://example.test/jobs", false);
+      {429, 429, 429, 429, 429, 429}, "https://example.test/jobs", false);
 
   EXPECT_EQ(result.status_code, QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(result.sleep_call_count, 3U);
+  EXPECT_EQ(result.sleep_call_count, 5U);
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("failed with HTTP 429 (Client Error)"),

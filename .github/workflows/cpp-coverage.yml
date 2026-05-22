@@ -9,7 +9,7 @@ on:
         default: "emerald:mock"
         type: string
     secrets:
-      RESONANCE_API_KEY:
+      IQM_TOKEN:
         required: true
 
 concurrency:
@@ -74,12 +74,12 @@ jobs:
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
-          RESONANCE_API_KEY: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest -C Debug --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           fail_ci_if_error: true
           flags: cpp

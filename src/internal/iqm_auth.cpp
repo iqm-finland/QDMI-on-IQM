@@ -193,35 +193,22 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
     : token_provider_(nullptr), access_token_(std::nullopt) {
   std::map<std::string, std::string> auth_parameters;
 
-  // Check for environment variables
-  const auto env_token = Get_env_var("IQM_TOKEN");
-  const auto env_tokens_file = Get_env_var("IQM_TOKENS_FILE");
-
-  if (env_token.has_value() && token.has_value() && *env_token != *token) {
-    throw ClientConfigurationError(
-        "Authentication token given both as an initialization argument and as "
-        "an environment variable IQM_TOKEN with different values."
-        "Parameter sources must not be mixed.");
-  }
-
-  if (env_tokens_file.has_value() && tokens_file.has_value() &&
-      *env_tokens_file != *tokens_file) {
-    throw ClientConfigurationError(
-        "Authentication tokens file given both as an initialization argument "
-        "and as an environment variable IQM_TOKENS_FILE with different values. "
-        "Parameter sources must not be mixed.");
-  }
-
-  if (env_token.has_value()) {
-    auth_parameters["token"] = *env_token;
-  } else if (token.has_value()) {
-    auth_parameters["token"] = *token;
-  }
-
-  if (env_tokens_file.has_value()) {
-    auth_parameters["tokens_file"] = *env_tokens_file;
-  } else if (tokens_file.has_value()) {
-    auth_parameters["tokens_file"] = *tokens_file;
+  if (token.has_value() || tokens_file.has_value()) {
+    if (token.has_value()) {
+      auth_parameters["token"] = *token;
+    }
+    if (tokens_file.has_value()) {
+      auth_parameters["tokens_file"] = *tokens_file;
+    }
+  } else {
+    if (const auto env_token = Get_env_var("IQM_TOKEN");
+        env_token.has_value()) {
+      auth_parameters["token"] = *env_token;
+    }
+    if (const auto env_tokens_file = Get_env_var("IQM_TOKENS_FILE");
+        env_tokens_file.has_value()) {
+      auth_parameters["tokens_file"] = *env_tokens_file;
+    }
   }
 
   // Initialize appropriate token provider
@@ -242,9 +229,9 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
       }
       keys += key;
     }
-    throw ClientConfigurationError("Missing authentication parameters, neither "
-                                   "token or tokens_file is available: " +
-                                   keys);
+    throw ClientConfigurationError(
+        "Multiple authentication methods configured: " + keys +
+        ". Provide only one of token or tokens_file.");
   }
 }
 

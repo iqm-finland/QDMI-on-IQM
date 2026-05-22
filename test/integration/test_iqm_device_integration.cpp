@@ -51,12 +51,19 @@ protected:
 
   void SetUp() override {
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
-    const auto *api_key_env = std::getenv("RESONANCE_API_KEY");
-    if (api_key_env == nullptr) {
-      std::cerr << "[WARN] Environment variable RESONANCE_API_KEY is not set. "
-                   "Some tests may fail if an API key is required.\n";
+    const auto *token_env = std::getenv("IQM_TOKEN");
+    const auto *tokens_file_env = std::getenv("IQM_TOKENS_FILE");
+    if (token_env == nullptr && tokens_file_env == nullptr) {
+      std::cerr << "[WARN] Neither IQM_TOKEN nor IQM_TOKENS_FILE is set. "
+                   "Some tests may fail if authentication is required.\n";
     }
-    const std::string api_key{(api_key_env != nullptr) ? api_key_env : ""};
+    const std::optional<std::string> token =
+        (token_env != nullptr) ? std::make_optional<std::string>(token_env)
+                               : std::nullopt;
+    const std::optional<std::string> tokens_file =
+        (tokens_file_env != nullptr)
+            ? std::make_optional<std::string>(tokens_file_env)
+            : std::nullopt;
 
     const auto *base_url_env = std::getenv("IQM_BASE_URL");
     const std::string base_url =
@@ -74,8 +81,8 @@ protected:
             : std::nullopt;
     requested_qc_alias = qc_alias;
 
-    session = FoMaC::get_iqm_session(base_url, api_key, std::nullopt, qc_id,
-                                     qc_alias);
+    session =
+        FoMaC::get_iqm_session(base_url, token, tokens_file, qc_id, qc_alias);
     fomac = FoMaC{session};
   }
 

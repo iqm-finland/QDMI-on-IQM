@@ -33,9 +33,9 @@ from iqm.qdmi.qiskit import IQMBackend
 
 def _skip_without_iqm_access() -> None:
     """Skip live tests when IQM credentials are unavailable."""
-    if not os.getenv("RESONANCE_API_KEY") and not os.getenv("IQM_TOKEN"):
+    if not os.getenv("IQM_TOKEN") and not os.getenv("IQM_TOKENS_FILE"):
         pytest.skip(
-            "Either RESONANCE_API_KEY or IQM_TOKEN environment variable must be set to run live IQM backend tests."
+            "Either IQM_TOKEN or IQM_TOKENS_FILE environment variable must be set to run live IQM backend tests."
         )
 
 

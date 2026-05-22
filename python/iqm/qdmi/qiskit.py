@@ -52,7 +52,7 @@ class IQMBackend(QDMIBackend):
     Args:
         base_url: Base URL of the IQM service. Defaults to `IQM_BASE_URL` or
             the standard Resonance endpoint.
-        token: Authentication token. Defaults to `IQM_TOKEN` or `RESONANCE_API_KEY`.
+        token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier.
         qc_alias: Optional IQM quantum computer alias.
@@ -68,14 +68,20 @@ class IQMBackend(QDMIBackend):
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
+        resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech"
+        resolved_token = token or os.getenv("IQM_TOKEN")
+        resolved_tokens_file = tokens_file or os.getenv("IQM_TOKENS_FILE")
+        resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
+        resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
+
         device = add_dynamic_device_library(
             library_path=str(IQM_QDMI_LIBRARY_PATH),
             prefix="IQM",
-            base_url=base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech",
-            token=token or os.getenv("IQM_TOKEN") or os.getenv("RESONANCE_API_KEY"),
-            auth_file=tokens_file or os.getenv("IQM_TOKENS_FILE"),
-            custom1=qc_id or os.getenv("IQM_QC_ID"),
-            custom2=qc_alias or os.getenv("IQM_QC_ALIAS"),
+            base_url=resolved_base_url,
+            token=resolved_token,
+            auth_file=resolved_tokens_file,
+            custom1=resolved_qc_id,
+            custom2=resolved_qc_alias,
         )
         super().__init__(device=device)
 
