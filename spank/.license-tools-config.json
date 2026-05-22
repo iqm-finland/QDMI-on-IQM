@@ -1,0 +1,41 @@
+{
+  "author": {
+    "name": "IQM Finland Oy",
+    "years": [2025, 2026]
+  },
+  "force_author": true,
+  "custom_license": "This program is free software: you can redistribute it and/or modify it under\nthe terms of the GNU General Public License as published by the Free Software\nFoundation, version 3.\n\nThis program is distributed in the hope that it will be useful, but WITHOUT\nANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS\nFOR A PARTICULAR PURPOSE. See the GNU General Public License for more\ndetails.\n\nYou may obtain a copy of the License at\n\nhttps://github.com/iqm-finland/QDMI-on-IQM/blob/main/spank/LICENSE.md\n\nSPDX-License-Identifier: GPL-3.0-only",
+  "force_license": true,
+  "title": false,
+  "include": ["**/*"],
+  "style_override_for_suffix": {
+    ".pyi": "DOCSTRING_STYLE",
+    ".in": "POUND_STYLE",
+    ".mlir": "SLASH_STYLE",
+    ".td": "SLASH_STYLE",
+    ".yaml": "POUND_STYLE",
+    ".toml": "POUND_STYLE",
+    ".proto": "SLASH_STYLE",
+    ".ts": "C_STYLE",
+    ".ps1": "POUND_STYLE"
+  },
+  "exclude": [
+    "^\\.[^/]+",
+    "/\\.[^/]+",
+    ".*\\.qasm",
+    ".*\\.ll",
+    ".*\\.md",
+    ".*\\.bib",
+    ".*\\.cff",
+    ".*\\.css",
+    ".*\\.json",
+    ".*\\.html",
+    ".*\\.tfc",
+    ".*\\.qc",
+    ".*\\.real",
+    ".*\\.tex",
+    "uv\\.lock",
+    "py\\.typed",
+    ".*build.*"
+  ]
+}

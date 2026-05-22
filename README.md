@@ -9,7 +9,8 @@
 
 # QDMI on IQM
 
-[![Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![Core Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=Core&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![SPANK Plugin GPLv3 License](https://img.shields.io/static/v1?logo=gnu&label=SPANK&message=GPLv3&color=informational&style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
 
@@ -180,4 +181,10 @@ Please see our [Contributing Guide](https://iqm-finland.github.io/QDMI-on-IQM/co
 
 ## License
 
-This project is licensed under the Apache License 2.0 with LLVM exceptions. See the [LICENSE.md](LICENSE.md) file for details.
+The code in this repository is available under two licenses:
+
+- The main QDMI-on-IQM codebase is licensed under the Apache License 2.0 with LLVM exception.
+- The SPANK plugin in [spank/](spank/) is licensed under GPLv3 because it links against GPL'd Slurm libraries.
+
+See [LICENSE.md](LICENSE.md) for the Apache-licensed parts of the repository and
+[spank/LICENSE.md](spank/LICENSE.md) for the SPANK plugin license text.

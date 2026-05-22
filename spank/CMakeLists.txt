@@ -1,19 +1,20 @@
 # Copyright (c) 2025 - 2026 IQM Finland Oy
 # All rights reserved.
 #
-# Licensed under the Apache License v2.0 with LLVM Exceptions (the "License");
-# you may not use this file except in compliance with the License.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/spank/LICENSE.md
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-# License for the specific language governing permissions and limitations under
-# the License.
-#
-# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+# SPDX-License-Identifier: GPL-3.0-only
 
 set(BUILD_IQM_QDMI_SPANK_TARGET iqm-qdmi-spank-plugin)
 add_library(${BUILD_IQM_QDMI_SPANK_TARGET} MODULE iqm_qdmi_spank_plugin.cpp)
