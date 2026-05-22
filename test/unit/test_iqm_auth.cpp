@@ -27,6 +27,7 @@
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace {
 int Set_env_var_raw(const char *key, const char *value) {
