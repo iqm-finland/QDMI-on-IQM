@@ -14,7 +14,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 ## Added
 
 - ✨ Add end-to-end examples and documentation for running experiments on IQM hardware ([#53]) ([**@marcelwa**], [**@burgholzer**])
-- 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52]) ([**@marcelwa**], [**@burgholzer**])
+- 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52], [#73]) ([**@marcelwa**], [**@burgholzer**])
 - ✨ Add Qiskit-compatible `IQMBackend` wrapper including Sampler and Estimator primitives ([#37]) ([**@marcelwa**], [**@burgholzer**])
 
 ## Changed
@@ -51,6 +51,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#73]: https://github.com/iqm-finland/QDMI-on_IQM/pull/73
 [#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
 [#56]: https://github.com/iqm-finland/QDMI-on_IQM/pull/56
 [#53]: https://github.com/iqm-finland/QDMI-on_IQM/pull/53
