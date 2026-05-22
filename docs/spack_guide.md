@@ -36,6 +36,9 @@ You can add the definition to an existing custom repo or create a dedicated one.
 
 3. Paste the following content into `package.py`:
 
+   Replace each placeholder with a concrete value before installing the package.
+   Use your desired version for `<version>` as `X.Y.Z`, the matching Git tag for `<tag>`, and the full commit SHA for that tag as `<commit>`.
+
    ```python
    # Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
    # Spack Project Developers. See the top-level COPYRIGHT file for details.
@@ -53,7 +56,7 @@ You can add the definition to an existing custom repo or create a dedicated one.
 
        maintainers("@burgholzer", "@marcelwa")
 
-       version("1.0.1", tag="v1.0.1", commit="5d37eca717051f7a32b70762f3e0d8d8f457d36c")
+       version("<version>", tag="<tag>", commit="<commit>")
        version("main", branch="main")
 
        depends_on("cmake", type="build")
@@ -66,14 +69,14 @@ You can add the definition to an existing custom repo or create a dedicated one.
 
 ## Installing a Stable Release
 
-To install the latest stable release (`1.0.1`), run:
+To install a stable release, replace `<version>` with a concrete release and run:
 
 ```console
-$ spack spec iqm-qdmi@1.0.1
-$ spack install iqm-qdmi@1.0.1
+$ spack spec iqm-qdmi@<version>
+$ spack install iqm-qdmi@<version>
 ```
 
-`spack spec` performs a dry-run concretization so you can verify the dependency tree before committing to the install.
+`spack spec` performs a dry-run concretization, so you can verify the dependency tree before committing to the installation.
 
 ## Installing from `main`
 
@@ -86,7 +89,7 @@ $ spack install iqm-qdmi@main
 
 :::{note}
 `@main` tracks a moving target and may include unreleased or unstable changes.
-Prefer `@1.0.1` for production use.
+Prefer a stable version for production use.
 :::
 
 ## Using the Installed Package
@@ -94,7 +97,7 @@ Prefer `@1.0.1` for production use.
 After installation, load the package into your environment with:
 
 ```console
-$ spack load iqm-qdmi@1.0.1
+$ spack load iqm-qdmi@<version-or-branch>
 ```
 
 Downstream CMake projects can then find the library via `find_package(iqm-qdmi-device)`.
