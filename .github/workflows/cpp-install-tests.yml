@@ -14,7 +14,7 @@ on:
         default: "emerald:mock"
         type: string
     secrets:
-      RESONANCE_API_KEY:
+      IQM_TOKEN:
         required: true
 
 permissions:
@@ -89,6 +89,6 @@ jobs:
       - name: Test
         env:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
-          IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_CPP_API_LOG_LEVEL: "DEBUG"
         run: ctest -C Release --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
