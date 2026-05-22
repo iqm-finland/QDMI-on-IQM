@@ -55,10 +55,7 @@ enum class ERROR_LOG_POLICY : uint8_t {
 };
 
 /// Number of retries to attempt after receiving HTTP 429.
-constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 3;
-
-/// Delay in seconds between consecutive HTTP 429 retry attempts.
-constexpr uint8_t RATE_LIMIT_RETRY_DELAY_SECONDS = 2;
+constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 5;
 
 /**
  * @brief Result of a single CURL request attempt.
@@ -134,13 +131,13 @@ int Perform_request_with_retries(const std::string &url, std::string &response,
                                   error_log_policy);
     }
 
+    const int delay_seconds = 2 << attempt;
     LOG_DEBUG("Request to URL '" + url +
               "' hit HTTP 429 rate limiting; retrying in " +
-              std::to_string(RATE_LIMIT_RETRY_DELAY_SECONDS) +
-              " second(s) (attempt " + std::to_string(attempt + 1) + "/" +
+              std::to_string(delay_seconds) + " second(s) (attempt " +
+              std::to_string(attempt + 1) + "/" +
               std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
-    std::this_thread::sleep_for(
-        std::chrono::seconds(RATE_LIMIT_RETRY_DELAY_SECONDS));
+    std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
   }
 
   return QDMI_ERROR_FATAL;
