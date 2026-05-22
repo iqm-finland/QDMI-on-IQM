@@ -13,6 +13,10 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 - 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52]) ([**@marcelwa**], [**@burgholzer**])
 
+## Changed
+
+- ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for authentication ([#67]) ([**@marcelwa**])
+
 ## [1.0.1] - 2026-04-27
 
 ### Fixed
@@ -33,6 +37,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
 [#52]: https://github.com/iqm-finland/QDMI-on_IQM/pull/52
 [#49]: https://github.com/iqm-finland/QDMI-on_IQM/pull/49
 
