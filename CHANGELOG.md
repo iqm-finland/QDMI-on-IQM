@@ -16,6 +16,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 ## Changed
 
 - ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for authentication ([#67]) ([**@marcelwa**])
+- ♻️ Consistently enforce explicit authentication parameters to take precedence over environment variables ([#67]) ([**@marcelwa**])
 
 ## [1.0.1] - 2026-04-27
 
