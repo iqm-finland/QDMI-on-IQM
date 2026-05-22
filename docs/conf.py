@@ -20,17 +20,7 @@
 from __future__ import annotations
 
 import os
-import sys
 from importlib import metadata
-from pathlib import Path
-
-# Make _ext discoverable as a local extension module.
-docs_dir = Path(__file__).resolve().parent
-sys_path = str(docs_dir / "_ext")
-
-if sys_path not in sys.path:
-    sys.path.insert(0, sys_path)
-
 
 project = "QDMI on IQM"
 author = "IQM Finland Oy"
@@ -45,7 +35,6 @@ except metadata.PackageNotFoundError:
 release = version.split("+")[0]
 
 extensions = [
-    "release_substitutions",
     "myst_nb",
     "autoapi.extension",
     "sphinx.ext.autodoc",
@@ -111,9 +100,13 @@ intersphinx_mapping = {
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",
+    "substitution",
     "deflist",
     "dollarmath",
 ]
+myst_substitutions = {
+    "version": version,
+}
 myst_heading_anchors = 3
 
 nb_execution_mode = "cache"
