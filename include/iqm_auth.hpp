@@ -112,8 +112,9 @@ public:
    * @param tokens_file Path to a tokens file used for authentication
    *
    * Parameters can also be read from environment variables IQM_TOKEN or
-   * IQM_TOKENS_FILE. Environment variables cannot be mixed with initialization
-   * arguments. All parameters must come from the same source.
+   * IQM_TOKENS_FILE. Explicit initialization arguments take precedence over
+   * environment variables. Environment variables are only used when neither
+   * explicit authentication parameter is provided.
    */
   explicit TokenManager(
       const std::optional<std::string> &token = std::nullopt,
