@@ -54,8 +54,8 @@ class IQMBackend(QDMIBackend):
             the standard Resonance endpoint.
         token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
-        qc_id: Optional IQM quantum computer identifier.
-        qc_alias: Optional IQM quantum computer alias.
+        qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
+        qc_alias: Optional IQM quantum computer alias. Defaults to `IQM_QC_ALIAS`.
     """
 
     def __init__(
