@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.1.0"
+version = "1.1.1"
 requires-python = ">=3.10"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
@@ -45,8 +45,8 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core[qiskit]~=3.6.1",
-  "qiskit>=1.1"
+  "mqt-core~=3.6.1",
+  "qiskit[qasm3-import]>=1.1"
 ]
 
 [project.urls]
@@ -59,8 +59,8 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core[qiskit]~=3.6.1",
-  "qiskit>=1.1",
+  "mqt-core~=3.6.1",
+  "qiskit[qasm3-import]>=1.1",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
 ]
