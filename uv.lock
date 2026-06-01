@@ -852,7 +852,7 @@ wheels = [
 
 [[package]]
 name = "iqm-qdmi"
-version = "1.1.0"
+version = "1.1.1"
 source = { editable = "." }
 
 [package.optional-dependencies]
