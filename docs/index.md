@@ -15,14 +15,15 @@ straightforward installation via `pip` or `uv`.
 
 ## Where to Start
 
-| I want to…                                                       | Start here                          |
-| :--------------------------------------------------------------- | :---------------------------------- |
-| Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)     |
-| Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)             |
-| Integrate the C++ library directly                               | [Usage Guide](usage.md)             |
-| Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)       |
-| Understand the Python package and its entry points               | [Python Package](python_package.md) |
-| Contribute to the project                                        | [Contributing](contributing.md)     |
+| I want to…                                                       | Start here                            |
+| :--------------------------------------------------------------- | :------------------------------------ |
+| Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)       |
+| Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)               |
+| Integrate the C++ library directly                               | [Usage Guide](usage.md)               |
+| Integrate with **Slurm** on an HPC cluster                       | [SPANK Plugin Guide](spank_plugin.md) |
+| Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)         |
+| Understand the Python package and its entry points               | [Python Package](python_package.md)   |
+| Contribute to the project                                        | [Contributing](contributing.md)       |
 
 ## API Reference
 
@@ -39,6 +40,7 @@ examples
 qiskit
 usage
 python_package
+spank_plugin
 
 spack_guide
 

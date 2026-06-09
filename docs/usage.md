@@ -137,6 +137,10 @@ After initialization, the session is ready to submit jobs and query device infor
 
 For the REST API endpoints called during each of these steps, see [IQM API Usage in QDMI Device Implementation](contributing.md#iqm-api-usage-in-qdmi-device-implementation) in the Contributing guide.
 
+## Running Jobs via Slurm
+
+For Slurm-backed native job submission, see the [SPANK Plugin Guide](spank_plugin.md).
+
 ## Understanding Quantum Architecture and Calibration Sets
 
 The IQM Server API distinguishes between two types of quantum architecture:
