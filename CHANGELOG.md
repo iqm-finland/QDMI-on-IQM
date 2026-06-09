@@ -9,26 +9,29 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-01
+
+### Fixed
+
+- 🩹 Decouple MQT Core and Qiskit dependency resolution to avoid potential cyclic dependency issues ([#78]) ([**@marcelwa**])
+
 ## [1.1.0] - 2026-05-22
 
-## Added
+### Added
 
 - ✨ Add end-to-end examples and documentation for running experiments on IQM hardware ([#53]) ([**@marcelwa**], [**@burgholzer**])
 - 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52], [#73]) ([**@marcelwa**], [**@burgholzer**])
 - ✨ Add Qiskit-compatible `IQMBackend` wrapper including Sampler and Estimator primitives ([#37]) ([**@marcelwa**], [**@burgholzer**])
 
-## Changed
+### Changed
 
+- ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for authentication ([#67]) ([**@marcelwa**])
+- ♻️ Consistently enforce explicit authentication parameters to take precedence over environment variables ([#67]) ([**@marcelwa**])
 - 📝 Restructure documentation for better clarity and navigation ([#53]) ([**@burgholzer**])
 - 📝 Update Spack package guide with latest release and installation instructions ([#53]) ([**@burgholzer**])
 - 📝 Reduce redundancy across documentation ([#53]) ([**@burgholzer**])
 - 🚚 Replace `meetiqm.com` with new `iqm.tech` domain in documentation and codebase ([#56]) ([**@iqmtjm**], [**@marcelwa**])
 - 🚸 Demote warnings from missing calibration endpoints to debug level ([#51]) ([**@marcelwa**])
-
-## Changed
-
-- ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for authentication ([#67]) ([**@marcelwa**])
-- ♻️ Consistently enforce explicit authentication parameters to take precedence over environment variables ([#67]) ([**@marcelwa**])
 
 ## [1.0.1] - 2026-04-27
 
@@ -44,13 +47,15 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/...v1.0.0
 
 <!-- PR links -->
 
+[#78]: https://github.com/iqm-finland/QDMI-on_IQM/pull/78
 [#73]: https://github.com/iqm-finland/QDMI-on_IQM/pull/73
 [#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
 [#56]: https://github.com/iqm-finland/QDMI-on_IQM/pull/56
