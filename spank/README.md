@@ -26,11 +26,12 @@ Inside your script, the `IQMBackend` (from `iqm-qdmi`) will automatically pick u
 
 ## Where to Start
 
-| I want to…                                                | Guide                                         |
-| :-------------------------------------------------------- | :-------------------------------------------- |
-| Understand the plugin runtime contract and user workflows | [SPANK Plugin Guide](../docs/spank_plugin.md) |
-| Configure plugstack entries and site defaults             | [SPANK Plugin Guide](../docs/spank_plugin.md) |
-| Build the plugin together with QDMI-on-IQM                | [Root README](../README.md)                   |
+| I want to…                                                | Guide                                                                                  |
+| :-------------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| Understand the plugin runtime contract and user workflows | [SPANK Plugin Guide](../docs/spank_plugin.md)                                          |
+| Submit an IQM JSON circuit file directly without code     | [Direct Circuit Submission](../docs/spank_plugin.md#direct-circuit-submission-no-code) |
+| Configure plugstack entries and site defaults             | [SPANK Plugin Guide](../docs/spank_plugin.md)                                          |
+| Build the plugin together with QDMI-on-IQM                | [Root README](../README.md)                                                            |
 
 ## What the Plugin Does
 
@@ -45,6 +46,9 @@ The plugin is intentionally narrow in scope:
 It does not implement scheduler policy, quantum resource brokering, or backend-side
 job semantics. Those remain the responsibility of Slurm configuration and the
 underlying IQM QDMI device implementation.
+
+- Supports direct submission of IQM JSON circuit files by redirecting execution to
+  `iqm-qdmi-runner`, enabling users to run circuit files as if they were executables.
 
 ## Build and Installation
 

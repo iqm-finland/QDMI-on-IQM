@@ -134,6 +134,42 @@ g++ -std=c++20 device_info.cpp -o device_info \
 srun --partition=quantum ./device_info
 ```
 
+#### Direct Circuit Submission (No-Code)
+
+For users who already have a quantum circuit in IQM JSON format, the plugin can
+submit the file directly as if it were an executable. The SPANK plugin
+intercepts the execution and wraps it using the `iqm-qdmi-runner` utility.
+
+Example with an IQM JSON file:
+
+```console
+srun --partition=quantum ./my_circuit.json
+```
+
+Batch submission:
+
+```bash
+#!/bin/bash
+#SBATCH --partition=quantum
+
+./my_circuit.json
+```
+
+In this mode, the results (histogram counts) are printed directly to `stdout` as a JSON object:
+
+```json
+{ "00": 512, "11": 488 }
+```
+
+This workflow avoids the need to write any Python or C++ code for simple circuit execution tasks.
+
+When running from a source checkout, repository examples can be submitted directly, for
+example:
+
+```console
+srun --partition=quantum python examples/ghz.py --backend iqm
+```
+
 ---
 
 ## For HPC Administrators
