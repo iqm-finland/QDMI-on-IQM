@@ -28,4 +28,5 @@
 #     iqm_token= \
 #     iqm_tokens_file= \
 #     iqm_qc_id= \
-#     iqm_qc_alias=
+#     iqm_qc_alias= \
+#     iqm_runner_path=@CMAKE_INSTALL_FULL_BINDIR@/iqm-qdmi-runner

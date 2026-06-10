@@ -24,6 +24,7 @@ generate_prefixed_qdmi_headers(${QDMI_PREFIX})
 file(GLOB_RECURSE PUBLIC_HEADER_FILES "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 
 add_subdirectory(internal)
+add_subdirectory(tools)
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
@@ -76,7 +77,7 @@ install(
   COMPONENT ${QDMI_TARGET_NAME}_Development)
 
 install(
-  TARGETS ${QDMI_TARGET_NAME}
+  TARGETS ${QDMI_TARGET_NAME} ${IQM_QDMI_RUNNER_NAME}
   EXPORT ${QDMI_TARGET_NAME}-targets
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
           COMPONENT ${QDMI_TARGET_NAME}_Runtime

@@ -87,7 +87,7 @@ struct Config_mapping {
 };
 
 /// All recognized configuration entries and their mappings.
-constexpr std::array<Config_mapping, 5> K_CONFIG_MAPPINGS = {{
+constexpr std::array<Config_mapping, 6> K_CONFIG_MAPPINGS = {{
     {.key = "iqm_base_url",
      .env_var = "IQM_BASE_URL",
      .option_name = "iqm-base-url",
@@ -108,6 +108,10 @@ constexpr std::array<Config_mapping, 5> K_CONFIG_MAPPINGS = {{
      .env_var = "IQM_QC_ALIAS",
      .option_name = "iqm-qc-alias",
      .option_usage = "Quantum computer alias"},
+    {.key = "iqm_runner_path",
+     .env_var = "IQM_RUNNER_PATH",
+     .option_name = "iqm-runner-path",
+     .option_usage = "Path to the IQM QDMI runner binary"},
 }};
 
 /**
@@ -259,6 +263,90 @@ public:
     }
     return ESPANK_SUCCESS;
   }
+
+  /**
+   * @brief Intercept direct submission of circuit files and wrap them with the
+   * runner.
+   *
+   * Triggers when the executable ends with .json or .qasm.
+   *
+   * @param spank SPANK handle.
+   * @return ESPANK_SUCCESS on success or if no interception needed.
+   */
+  int intercept_direct_submission(spank_t spank) {
+    char *executable = nullptr;
+    if (spank_get_item(spank, S_JOB_EXECUTABLE, &executable) !=
+            ESPANK_SUCCESS ||
+        executable == nullptr) {
+      return ESPANK_SUCCESS;
+    }
+
+    const std::string_view exec_path{executable};
+    bool is_circuit = false;
+    if (exec_path.ends_with(".json")) {
+      is_circuit = true;
+    }
+
+    if (!is_circuit) {
+      return ESPANK_SUCCESS;
+    }
+
+    // Determine runner path. Preference: srun option > plugstack default.
+    const std::string *runner_path = nullptr;
+    constexpr std::size_t k_runner_idx = 5; // index of iqm_runner_path
+    if (srun_values_[k_runner_idx].has_value()) {
+      runner_path = &srun_values_[k_runner_idx].value();
+    } else if (plugstack_values_[k_runner_idx].has_value()) {
+      runner_path = &plugstack_values_[k_runner_idx].value();
+    }
+
+    if (runner_path == nullptr || runner_path->empty()) {
+      slurm_debug("[iqm_spank_plugin] circuit file detected but no runner path "
+                  "configured, skipping interception");
+      return ESPANK_SUCCESS;
+    }
+
+    slurm_spank_log("[iqm_spank_plugin] intercepting direct submission of %s",
+                    executable);
+
+    // 1. Swap executable to the runner
+    if (spank_set_item(spank, S_JOB_EXECUTABLE, runner_path->c_str()) !=
+        ESPANK_SUCCESS) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to set runner as "
+                      "executable");
+      return ESPANK_ERROR;
+    }
+
+    // 2. Prepend original executable to argv.
+    char **argv = nullptr;
+    int argc = 0;
+    if (spank_get_item(spank, S_JOB_ARGV, &argc, &argv) != ESPANK_SUCCESS ||
+        argv == nullptr) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to get job arguments");
+      return ESPANK_ERROR;
+    }
+
+    // Construct new argv: [runner, circuit_file, original_args...]
+    std::vector<char *> new_argv;
+    // Slurm copies these strings, so const_cast is safe for the API.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-const-cast)
+    new_argv.push_back(const_cast<char *>(runner_path->c_str()));
+    new_argv.push_back(executable);
+    for (int i = 1; i < argc; ++i) {
+      new_argv.push_back(argv[i]);
+    }
+    new_argv.push_back(nullptr);
+    // NOLINTEND(cppcoreguidelines-pro-type-const-cast)
+
+    if (spank_set_item(spank, S_JOB_ARGV, static_cast<int>(new_argv.size() - 1),
+                       new_argv.data()) != ESPANK_SUCCESS) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to set job arguments");
+      return ESPANK_ERROR;
+    }
+
+    return ESPANK_SUCCESS;
+  }
+
   /**
    * @brief Validate that the effective configuration is non-contradictory.
    *
@@ -589,6 +677,23 @@ int slurm_spank_init_post_opt(spank_t /* spank */, const int /* ac */,
                               char ** /* av */) {
   Emit_hook_log("slurm_spank_init_post_opt");
   return ESPANK_SUCCESS;
+}
+
+/**
+ * @brief SPANK local user init hook (submit context).
+ *
+ * Checks if the job executable is a circuit file and wraps it with the runner
+ * if necessary.
+ *
+ * @return `ESPANK_SUCCESS` on success, otherwise `ESPANK_ERROR`.
+ */
+int slurm_spank_local_user_init(spank_t spank, const int /* ac */,
+                                char ** /* av */) {
+  Emit_hook_log("slurm_spank_local_user_init");
+  if (!g_config.is_active_for_job(spank)) {
+    return ESPANK_SUCCESS;
+  }
+  return g_config.intercept_direct_submission(spank);
 }
 
 /**
