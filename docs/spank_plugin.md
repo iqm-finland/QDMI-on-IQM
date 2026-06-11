@@ -25,7 +25,7 @@ srun --partition=quantum --iqm-qc-alias=emerald python my_experiment.py
 
 ### Supported Options
 
-You can use these flags with `srun` or `sbatch`:
+You can use these flags with `srun`, `sbatch`, and `salloc`.
 
 | Option              | Environment Variable | What it's for                                                       |
 | :------------------ | :------------------- | :------------------------------------------------------------------ |
@@ -34,6 +34,15 @@ You can use these flags with `srun` or `sbatch`:
 | `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to a file containing your tokens (best for long-running jobs). |
 | `--iqm-qc-id`       | `IQM_QC_ID`          | The unique ID of the quantum computer.                              |
 | `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | A friendly name (alias) for the quantum computer.                   |
+
+### Credential Safety
+
+`IQM_TOKEN` is sensitive. Command-line tokens can leak through scheduler logs,
+accounting data, or process listings. Environment variables are visible to job
+code.
+
+If you use `IQM_TOKENS_FILE`, the path must exist and be readable on the compute
+nodes where tasks run, not only on the submit node.
 
 ### Practical Examples
 
@@ -155,6 +164,13 @@ sudo cmake --install build-spank
 
 By default, it installs the `.so` file to your Slurm plugin directory and a template configuration to `plugstack.conf.d/`.
 
+Build against the target cluster's Slurm headers. Rebuild after Slurm
+major-version upgrades.
+
+Install the plugin on submit/login nodes that run `srun`, `sbatch`, or `salloc`,
+and on compute nodes that run `slurmd` or `slurmstepd`. Controller nodes only
+need it if they also serve one of those roles.
+
 ### Configuration
 
 The plugin is configured via `plugstack.conf`. You can set global defaults here so that users don't have to provide them every time.
@@ -182,6 +198,10 @@ required /usr/lib/slurm/iqm-qdmi-spank-plugin.so \
     ```bash
     sudo scontrol reconfigure
     ```
+
+`plugstack.conf` changes apply to new job launches, not running jobs. This
+plugin sets job environment at launch time and does not rely on persistent
+`slurmd` daemon-side state.
 
 ### Monitoring and Troubleshooting
 

@@ -56,6 +56,9 @@ Because SPANK plugins are compiled against the target Slurm installation, they a
 typically deployed as cluster-specific artifacts rather than treated as universally
 portable binaries.
 
+Build against the target cluster's Slurm headers and rebuild after Slurm
+major-version upgrades.
+
 ## License and Compatibility
 
 The SPANK plugin in this directory is licensed under GPLv3 because it links against
