@@ -42,6 +42,11 @@ The plugin is intentionally narrow in scope:
 - Performs shallow local checks such as required base URL presence and conflicting
   authentication sources.
 
+Direct token passing is intentionally not supported by this plugin. Slurm
+submission commands may be recorded in shell history, scheduler logs,
+accounting data, audit trails, or process listings, so accepting a raw token would expose credentials in plain text. Use `--iqm-tokens-file`
+instead, so the job receives only a path to a protected credentials file.
+
 It does not implement scheduler policy, quantum resource brokering, or backend-side
 job semantics. Those remain the responsibility of Slurm configuration and the
 underlying IQM QDMI device implementation.

@@ -31,7 +31,7 @@
  * partitions.
  *
  * Configuration precedence (highest first):
- *   1. srun command-line options (--iqm-base-url, --iqm-token, etc.)
+ *   1. srun command-line options (--iqm-base-url, --iqm-tokens-file, etc.)
  *   2. User-set environment variables
  *   3. plugstack.conf defaults
  *
@@ -46,7 +46,6 @@
  *
  * Supported plugstack arguments, srun options, and mapped env variables:
  *   - iqm_base_url     /  --iqm-base-url     → IQM_BASE_URL
- *   - iqm_token        /  --iqm-token        → IQM_TOKEN
  *   - iqm_tokens_file  /  --iqm-tokens-file  → IQM_TOKENS_FILE
  *   - iqm_qc_id        /  --iqm-qc-id        → IQM_QC_ID
  *   - iqm_qc_alias     /  --iqm-qc-alias     → IQM_QC_ALIAS
@@ -87,15 +86,11 @@ struct Config_mapping {
 };
 
 /// All recognized configuration entries and their mappings.
-constexpr std::array<Config_mapping, 5> K_CONFIG_MAPPINGS = {{
+constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
     {.key = "iqm_base_url",
      .env_var = "IQM_BASE_URL",
      .option_name = "iqm-base-url",
      .option_usage = "IQM server base URL"},
-    {.key = "iqm_token",
-     .env_var = "IQM_TOKEN",
-     .option_name = "iqm-token",
-     .option_usage = "IQM authentication token"},
     {.key = "iqm_tokens_file",
      .env_var = "IQM_TOKENS_FILE",
      .option_name = "iqm-tokens-file",

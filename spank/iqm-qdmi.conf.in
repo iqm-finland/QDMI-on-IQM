@@ -25,7 +25,6 @@
 # required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-qdmi-spank-plugin.so \
 #     partitions= \
 #     iqm_base_url= \
-#     iqm_token= \
 #     iqm_tokens_file= \
 #     iqm_qc_id= \
 #     iqm_qc_alias=

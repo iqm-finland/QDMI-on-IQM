@@ -27,19 +27,24 @@ srun --partition=quantum --iqm-qc-alias=emerald python my_experiment.py
 
 You can use these flags with `srun`, `sbatch`, and `salloc`.
 
-| Option              | Environment Variable | What it's for                                                       |
-| :------------------ | :------------------- | :------------------------------------------------------------------ |
-| `--iqm-base-url`    | `IQM_BASE_URL`       | The URL of the IQM service you're connecting to.                    |
-| `--iqm-token`       | `IQM_TOKEN`          | Your personal API token (use this for quick tests).                 |
-| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to a file containing your tokens (best for long-running jobs). |
-| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique ID of the quantum computer.                              |
-| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | A friendly name (alias) for the quantum computer.                   |
+| Option              | Environment Variable | What it's for                                     |
+| :------------------ | :------------------- | :------------------------------------------------ |
+| `--iqm-base-url`    | `IQM_BASE_URL`       | The URL of the IQM service you're connecting to.  |
+| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to a file containing your tokens.            |
+| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique ID of the quantum computer.            |
+| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | A friendly name (alias) for the quantum computer. |
 
 ### Credential Safety
 
-`IQM_TOKEN` is sensitive. Command-line tokens can leak through scheduler logs,
-accounting data, or process listings. Environment variables are visible to job
-code.
+Direct token passing is intentionally unsupported. Slurm submission commands can
+be copied into shell history, scheduler logs, accounting records, audit trails,
+and process listings, which would expose a raw token in plain text.
+
+The plugin only accepts a path to a credentials file via `--iqm-tokens-file`
+so the secret itself stays out of Slurm command lines.
+
+`IQM_TOKEN` remains a sensitive environment variable if set through some other
+path. Environment variables are visible to job code.
 
 If you use `IQM_TOKENS_FILE`, the path must exist and be readable on the compute
 nodes where tasks run, not only on the submit node.
@@ -101,7 +106,7 @@ int main() {
     IQM_QDMI_Device_Session session = nullptr;
 
     // Allocate and initialize the session.
-    // It will automatically read IQM_BASE_URL, IQM_TOKEN, etc. from the environment.
+    // It will automatically read IQM_BASE_URL, IQM_TOKENS_FILE, etc. from the environment.
     if (IQM_QDMI_device_session_alloc(&session) != QDMI_SUCCESS) {
         std::cerr << "Failed to allocate session\n";
         return EXIT_FAILURE;
