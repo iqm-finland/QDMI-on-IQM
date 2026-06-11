@@ -172,7 +172,7 @@ def docs(session: nox.Session) -> None:
         env={
             "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
             "SKBUILD_CMAKE_DEFINE": "BUILD_IQM_QDMI_DOCS=ON",
-            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs",
+            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs;iqm-qdmi-runner",
             "SKBUILD_BUILD_DIR": "build/docs",
         },
     )
