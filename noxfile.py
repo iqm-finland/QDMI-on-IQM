@@ -132,14 +132,31 @@ def examples(session: nox.Session) -> None:
         session.error(f"Unexpected arguments for the examples session: {joined_args}")
 
     env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
-    for script in Path("examples").glob("*.py"):
+    for benchmark in ("ghz", "dj", "qft", "graphstate", "wstate", "grover", "qpe"):
         session.run(
-            script,
+            Path("examples/mqt_bench.py"),
             "--backend",
             args.backend,
+            "--benchmark",
+            benchmark,
+            "--shots",
+            "128",
             env=env,
             external=True,
         )
+    session.run(
+        Path("examples/qsci_h2.py"),
+        "--backend",
+        args.backend,
+        "--shots",
+        "256",
+        "--maxiter",
+        "5",
+        "--cutoff",
+        "4",
+        env=env,
+        external=True,
+    )
 
 
 @nox.session(reuse_venv=True)
