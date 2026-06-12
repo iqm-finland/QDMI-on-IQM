@@ -1,0 +1,132 @@
+name: 🇨 • Tests • SPANK
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "The ubuntu runner image to use."
+        default: "ubuntu-24.04"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  spank-tests:
+    name: 🐧 ${{ inputs.runs-on }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install build and Slurm dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libslurm-dev slurm-wlm munge
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: 3.13
+          activate-environment: true
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Setup local Slurm environment
+        run: |
+          # 1. Start Munge service for authentication
+          sudo service munge start
+
+          # 2. Make sure state and spool directories exist with correct permissions
+          sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd /var/log
+          sudo chown slurm:slurm /var/spool/slurmctld
+          sudo chown root:root /var/spool/slurmd
+
+          # 3. Create a minimal slurm.conf matching local hostname
+          HOSTNAME=$(hostname)
+          cat <<EOF | sudo tee /etc/slurm/slurm.conf
+          ClusterName=local-ci
+          SlurmctldHost=$HOSTNAME(127.0.0.1)
+          SlurmUser=slurm
+          SlurmctldPort=6817
+          SlurmdPort=6818
+          AuthType=auth/munge
+          StateSaveLocation=/var/spool/slurmctld
+          SlurmdSpoolDir=/var/spool/slurmd
+          SlurmdLogFile=/var/log/slurmd.log
+          SlurmctldLogFile=/var/log/slurmctld.log
+          ProctrackType=proctrack/pgid
+          SchedulerType=sched/backfill
+          SelectType=select/linear
+          TaskPlugin=task/none
+          PlugStackConfig=/etc/slurm/plugstack.conf
+          NodeName=$HOSTNAME NodeAddr=127.0.0.1 State=UNKNOWN
+          PartitionName=debug Nodes=$HOSTNAME Default=YES MaxTime=INFINITE State=UP
+          EOF
+
+          # 4. Start Slurm services
+          sudo service slurmctld start
+          sudo service slurmd start
+
+          # 5. Wait for the node to register and become idle/up
+          for i in {1..30}; do
+            if sinfo -h -o "%t" | grep -qE "idle|alloc"; then
+              echo "Node is ready!"
+              break
+            fi
+            echo "Waiting for node to register (attempt $i)..."
+            # Try to force resume if it got marked DOWN/DRAINED, ignoring errors
+            sudo scontrol update nodename=$HOSTNAME state=resume 2>/dev/null || true
+            sleep 1
+          done
+
+          # 6. Verify local connectivity before installing the plugin
+          srun --partition=debug --immediate=5 /bin/true
+
+      - name: Dump Slurm logs on failure
+        if: failure()
+        run: |
+          echo "=== Slurmctld Status ==="
+          sudo systemctl status slurmctld || true
+          echo "=== Slurmd Status ==="
+          sudo systemctl status slurmd || true
+          echo "=== Munge Status ==="
+          sudo systemctl status munge || true
+          echo "=== Slurmctld Log ==="
+          sudo cat /var/log/slurmctld.log || true
+          echo "=== Slurmd Log ==="
+          sudo cat /var/log/slurmd.log || true
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_SPANK=ON
+
+      - name: Build SPANK plugin
+        run: cmake --build build --target iqm-qdmi-spank-plugin
+
+      - name: Install SPANK plugin
+        run: sudo cmake --install build --component iqm_spank_plugin_Runtime
+
+      - name: Activate SPANK plugin
+        run: |
+          # Find installed library path (could vary based on system lib/lib64/arch folders)
+          PLUGIN_PATH=$(find /usr/lib -name iqm-qdmi-spank-plugin.so 2>/dev/null | head -n 1)
+          if [ -z "$PLUGIN_PATH" ]; then
+            echo "ERROR: Could not locate installed iqm-qdmi-spank-plugin.so"
+            exit 1
+          fi
+          echo "Found plugin at: $PLUGIN_PATH"
+
+          # Create plugstack configuration structure
+          sudo mkdir -p /etc/slurm/plugstack.conf.d
+          echo "include /etc/slurm/plugstack.conf.d/*.conf" | sudo tee /etc/slurm/plugstack.conf
+
+          # Overwrite default inactive drop-in config with an active one for the integration test
+          echo "required $PLUGIN_PATH iqm_base_url=https://test.example.com" | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+
+          # Reload Slurm controller/daemon configuration
+          sudo scontrol reconfigure
+
+      - name: Run SPANK smoke tests
+        run: |
+          uv run nox -f spank/noxfile.py -s smoke_tests -- --partition debug --test-base-url https://test.example.com

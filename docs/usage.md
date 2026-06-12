@@ -81,14 +81,16 @@ FoMaC::get_iqm_session(const std::string &base_url,
 The {cpp:func}`IQM_QDMI_device_session_alloc` function allocates a new session object, and the {cpp:func}`IQM_QDMI_device_session_set_parameter` function is used to set various parameters for the session:
 
 - **Base URL** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_BASEURL`): The URL of the IQM server.
-- **Quantum Computer ID** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1`): Optional ID of the specific quantum computer to use.
-- **Quantum Computer Alias** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional alias of the specific quantum computer to use.
+- **Quantum Computer ID** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1`): Optional ID of the specific quantum computer to use. If not set, falls back to `IQM_QC_ID`.
+- **Quantum Computer Alias** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional alias of the specific quantum computer to use. If not set, falls back to `IQM_QC_ALIAS`.
 - **Authentication Token** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_TOKEN`): Bearer token for authentication. If not set, falls back to the `IQM_TOKEN` environment variable.
 - **Tokens File** ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE`): Path to a file containing authentication tokens. If not set, falls back to the `IQM_TOKENS_FILE` environment variable.
 
 **Note on Authentication**: If you set either authentication parameter explicitly, the corresponding environment variable will be ignored. This allows you to override environment-based authentication when needed.
 
 If neither quantum computer ID nor alias is specified, the first available quantum computer from the server will be used.
+
+If the base URL is not specified explicitly, the session initialization path falls back to `IQM_BASE_URL` before using the standard Resonance endpoint.
 
 The session is initialized with {cpp:func}`IQM_QDMI_device_session_init`, which:
 
@@ -134,6 +136,10 @@ When {cpp:func}`IQM_QDMI_device_session_init` is called, the following steps occ
 After initialization, the session is ready to submit jobs and query device information.
 
 For the REST API endpoints called during each of these steps, see [IQM API Usage in QDMI Device Implementation](contributing.md#iqm-api-usage-in-qdmi-device-implementation) in the Contributing guide.
+
+## Running Jobs via Slurm
+
+For Slurm-backed native job submission, see the [SPANK Plugin Guide](spank_plugin.md).
 
 ## Understanding Quantum Architecture and Calibration Sets
 

@@ -44,6 +44,14 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  spank-tests:
+    name: 🇨 Test SPANK
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: ./.github/workflows/spank-tests.yml
+    with:
+      runs-on: ubuntu-24.04
+
   cpp-tests-macos:
     name: 🇨 Test 🍎
     needs: change-detection
@@ -186,6 +194,7 @@ jobs:
       - examples
       - build-sdist
       - build-wheel
+      - spank-tests
     runs-on: ubuntu-slim
     steps:
       - name: Decide whether the needed jobs succeeded or failed
@@ -194,7 +203,7 @@ jobs:
           allowed-skips: >-
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && '' || 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-coverage,'
+              && '' || 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-coverage,spank-tests,'
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cpp-linter)
