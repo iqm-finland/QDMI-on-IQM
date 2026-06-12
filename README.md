@@ -58,10 +58,7 @@ the development workflow, coding standards, and pull request process.
 
 ## License
 
-The code in this repository is available under two licenses:
+This repository is licensed under two separate licenses, depending on the component:
 
-- The main QDMI-on-IQM codebase is licensed under the Apache License 2.0 with LLVM exception.
-- The SPANK plugin in [spank/](spank/) is licensed under GPLv3 because it links against GPL'd Slurm libraries.
-
-See [LICENSE.md](LICENSE.md) for the Apache-licensed parts of the repository and
-[spank/LICENSE.md](spank/LICENSE.md) for the SPANK plugin license text.
+- The main **QDMI-on-IQM** codebase (including the core C++ library and the Python wrapper) is licensed under the **Apache License 2.0 with LLVM exception**. See [LICENSE.md](LICENSE.md) for the license text.
+- The **Slurm SPANK plugin** (located in the [spank/](spank/) directory) is licensed under the **GNU General Public License v3 (GPLv3)** because it links against GPL-licensed Slurm libraries. See [spank/LICENSE.md](spank/LICENSE.md) for the plugin license text.
