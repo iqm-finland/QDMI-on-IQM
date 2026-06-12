@@ -47,8 +47,8 @@ jobs:
           HOSTNAME=$(hostname)
           cat <<EOF | sudo tee /etc/slurm/slurm.conf
           ClusterName=local-ci
-          SlurmctldHost=$HOSTNAME
-          SlurmUser=root
+          SlurmctldHost=$HOSTNAME(127.0.0.1)
+          SlurmUser=slurm
           SlurmctldPort=6817
           SlurmdPort=6818
           AuthType=auth/munge
@@ -61,7 +61,7 @@ jobs:
           SelectType=select/linear
           TaskPlugin=task/none
           PlugStackConfig=/etc/slurm/plugstack.conf
-          NodeName=$HOSTNAME State=UNKNOWN
+          NodeName=$HOSTNAME NodeAddr=127.0.0.1 State=UNKNOWN
           PartitionName=debug Nodes=$HOSTNAME Default=YES MaxTime=INFINITE State=UP
           EOF
 
@@ -83,6 +83,20 @@ jobs:
 
           # 6. Verify local connectivity before installing the plugin
           srun --partition=debug --immediate=5 /bin/true
+
+      - name: Dump Slurm logs on failure
+        if: failure()
+        run: |
+          echo "=== Slurmctld Status ==="
+          sudo systemctl status slurmctld || true
+          echo "=== Slurmd Status ==="
+          sudo systemctl status slurmd || true
+          echo "=== Munge Status ==="
+          sudo systemctl status munge || true
+          echo "=== Slurmctld Log ==="
+          sudo cat /var/log/slurmctld.log || true
+          echo "=== Slurmd Log ==="
+          sudo cat /var/log/slurmd.log || true
 
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_SPANK=ON
