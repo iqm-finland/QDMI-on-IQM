@@ -69,8 +69,17 @@ jobs:
           sudo service slurmctld start
           sudo service slurmd start
 
-          # 5. Bring the local node online
-          sudo scontrol update nodename=$HOSTNAME state=resume
+          # 5. Wait for the node to register and become idle/up
+          for i in {1..30}; do
+            if sinfo -h -o "%t" | grep -qE "idle|alloc"; then
+              echo "Node is ready!"
+              break
+            fi
+            echo "Waiting for node to register (attempt $i)..."
+            # Try to force resume if it got marked DOWN/DRAINED, ignoring errors
+            sudo scontrol update nodename=$HOSTNAME state=resume 2>/dev/null || true
+            sleep 1
+          done
 
           # 6. Verify local connectivity before installing the plugin
           srun --partition=debug --immediate=5 /bin/true
