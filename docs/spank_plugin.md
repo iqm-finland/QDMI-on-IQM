@@ -53,7 +53,7 @@ nodes where tasks run, not only on the submit node.
 
 #### Using Python and Qiskit
 
-Most users will interact with our hardware via Python. The `IQMBackend` automatically picks up the settings injected by the plugin. Here is a complete "Hello World" example that creates a Bell state:
+Most users will interact with our hardware via Python. The {py:class}`~iqm.qdmi.qiskit.IQMBackend` automatically picks up the settings injected by the plugin. Here is a complete "Hello World" example that creates a Bell state:
 
 **`bell_state.py`**
 
