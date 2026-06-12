@@ -1,59 +1,39 @@
-# Using IQM Quantum Computers with Slurm
+# Slurm SPANK Plugin
 
-If you're working on a high-performance computing (HPC) cluster managed by Slurm, our SPANK plugin makes it easy to run your quantum jobs. Whether you are a researcher running circuits or an admin managing the cluster, this guide will help you get everything set up.
-
-The plugin acts as a bridge: it takes care of passing your IQM credentials and settings from Slurm directly into your jobs. This means you don't have to manually export environment variables every time you run a task.
+The Slurm SPANK plugin for QDMI-on-IQM simplifies running quantum jobs on clusters by automatically propagating `IQM_*` environment variables to job steps. This avoids manual `export` statements in job scripts and enables administrators to configure global defaults and partition-gated access.
 
 ---
 
 ## For Users
 
-As a user, the plugin provides a seamless way to target IQM quantum hardware using standard Slurm commands like `srun` and `sbatch`.
-
-### How it Works
-
-The plugin automatically injects the necessary environment variables into your job. You can provide these values directly on the command line using new `--iqm-*` options.
-
-### Basic Usage
-
-If your cluster admin has set up defaults, you might not need any extra flags. However, you can always override them:
-
-```bash
-# Run a job on the 'quantum' partition, specifying a specific quantum computer
-srun --partition=quantum --iqm-qc-alias=emerald python my_experiment.py
-```
+The plugin registers `--iqm-*` command-line options for standard Slurm submission tools (`srun`, `sbatch`, `salloc`). When these options are provided, the plugin translates them into the corresponding environment variables for the job tasks.
 
 ### Supported Options
 
-You can use these flags with `srun`, `sbatch`, and `salloc`.
+| Option              | Environment Variable | Description                                           |
+| :------------------ | :------------------- | :---------------------------------------------------- |
+| `--iqm-base-url`    | `IQM_BASE_URL`       | The endpoint URL of the IQM service.                  |
+| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.       |
+| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique identifier of the target quantum computer. |
+| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | The alias of the target quantum computer.             |
 
-| Option              | Environment Variable | What it's for                                     |
-| :------------------ | :------------------- | :------------------------------------------------ |
-| `--iqm-base-url`    | `IQM_BASE_URL`       | The URL of the IQM service you're connecting to.  |
-| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to a file containing your tokens.            |
-| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique ID of the quantum computer.            |
-| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | A friendly name (alias) for the quantum computer. |
+### Credential Security
 
-### Credential Safety
+Direct token passing is intentionally unsupported on the command line. Slurm command arguments may be captured in shell history, process listings, scheduler logs, or accounting records.
 
-Direct token passing is intentionally unsupported. Slurm submission commands can
-be copied into shell history, scheduler logs, accounting records, audit trails,
-and process listings, which would expose a raw token in plain text.
+To run authenticated jobs:
 
-The plugin only accepts a path to a credentials file via `--iqm-tokens-file`
-so the secret itself stays out of Slurm command lines.
+1. Save your tokens to a secure file.
+2. Pass the path to this file using the `--iqm-tokens-file` option.
+3. Ensure the token file is readable on the compute nodes where the tasks execute.
 
-`IQM_TOKEN` remains a sensitive environment variable if set through some other
-path. Environment variables are visible to job code.
+---
 
-If you use `IQM_TOKENS_FILE`, the path must exist and be readable on the compute
-nodes where tasks run, not only on the submit node.
+## Examples
 
-### Practical Examples
+### Python & Qiskit
 
-#### Using Python and Qiskit
-
-Most users will interact with our hardware via Python. The {py:class}`~iqm.qdmi.qiskit.IQMBackend` automatically picks up the settings injected by the plugin. Here is a complete "Hello World" example that creates a Bell state:
+The {py:class}`~iqm.qdmi.qiskit.IQMBackend` class automatically resolves configuration values from the environment variables injected by the plugin.
 
 **`bell_state.py`**
 
@@ -61,37 +41,36 @@ Most users will interact with our hardware via Python. The {py:class}`~iqm.qdmi.
 from iqm.qdmi.qiskit import IQMBackend
 from qiskit import QuantumCircuit, transpile
 
-# 1. Initialize the backend.
-# The plugin automatically handles the URL and authentication.
+# Initialize the backend (resolves URL and auth from Slurm environment)
 backend = IQMBackend()
-print(f"Connected to backend: {backend.name}")
+print(f"Connected to: {backend.name}")
 
-# 2. Create a simple Bell state circuit
+# Create a simple Bell state circuit
 qc = QuantumCircuit(2)
 qc.h(0)
 qc.cx(0, 1)
 qc.measure_all()
 
-# 3. Transpile and run the circuit
+# Transpile and execute
 transpiled_qc = transpile(qc, backend)
 job = backend.run(transpiled_qc, shots=100)
-print(f"Job submitted! ID: {job.job_id()}")
+print(f"Job ID: {job.job_id()}")
 
-# 4. Get and print results
+# Retrieve results
 result = job.result()
 counts = result.get_counts()
 print(f"Counts: {counts}")
 ```
 
-**To run it:**
+To run this job:
 
 ```bash
 srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 ```
 
-#### Using Native C++ Applications
+### C/C++
 
-If you are developing low-level applications, you can use the QDMI C++ library. The plugin ensures that `IQM_QDMI_device_session_init` finds everything it needs.
+If you are developing low-level applications, you can use the QDMI C/C++ library. The plugin ensures that `IQM_QDMI_device_session_init` finds everything it needs.
 
 **`device_info.cpp`**
 
@@ -113,12 +92,11 @@ int main() {
     }
 
     if (IQM_QDMI_device_session_init(session) != QDMI_SUCCESS) {
-        std::cerr << "Failed to initialize session. Check your Slurm/IQM settings.\n";
+        std::cerr << "Failed to initialize session. Check your environment settings.\n";
         IQM_QDMI_device_session_free(session);
         return EXIT_FAILURE;
     }
 
-    // Query the device name
     size_t name_size = 0;
     IQM_QDMI_device_session_query_device_property(session, QDMI_DEVICE_PROPERTY_NAME, 0, nullptr, &name_size);
 
@@ -132,19 +110,15 @@ int main() {
 }
 ```
 
-**To compile and run:**
-
-You'll need to link against the `iqm_qdmi_device` library. If you installed the `iqm-qdmi` Python package, you can use it to find the correct paths:
+To compile and link against `libiqm_qdmi_device`:
 
 ```bash
-# Compile using paths from the iqm-qdmi utility
 g++ -std=c++20 device_info.cpp -o device_info \
   -I"$(iqm-qdmi --include_dir)" \
   -L"$(dirname "$(iqm-qdmi --lib_path)")" \
   -Wl,-rpath,"$(dirname "$(iqm-qdmi --lib_path)")" \
   -liqm_qdmi_device
 
-# Run it on the cluster
 srun --partition=quantum ./device_info
 ```
 
@@ -152,41 +126,33 @@ srun --partition=quantum ./device_info
 
 ## For HPC Administrators
 
-The SPANK plugin is designed to be "shallow" and lightweight. It doesn't handle complex logic; it simply parses arguments and ensures the right environment is ready for the user's job.
+The SPANK plugin is a lightweight C++ module that intercepts job launches to parse options and inject environment variables. It does not implement scheduler policy or handle backend-side queue management.
 
 ### Compatibility and Requirements
 
-- **Slurm Version**: Slurm 17.11 or newer is supported. (The plugin utilizes standard SPANK APIs that are backward-compatible with all modern Slurm releases).
-- **C++ Compiler**: C++20 support with the `<format>` library is required (GCC 13+ or Clang 16+).
-- **Compilation Constraint**: SPANK plugins are tied to the ABI version of the Slurm daemon. You **must build the plugin on/against the target cluster's Slurm header files** (`slurm/spank.h`). The plugin will need to be recompiled whenever the cluster is upgraded to a new major/minor Slurm release.
+- **Slurm Version**: Slurm 17.11 or newer.
+- **C++ Compiler**: C++20 standard library support (GCC 13+ or Clang 16+).
+- **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI. You must compile the plugin against the target cluster's Slurm header files (`slurm/spank.h`) and rebuild the plugin after any major/minor Slurm upgrades.
 
 ### Installation
 
-Building the plugin is straightforward using CMake:
+To compile and install the plugin from the repository root:
 
 ```bash
-# Build the plugin
 cmake -S . -B build-spank -DBUILD_IQM_QDMI_SPANK=ON
 cmake --build build-spank -j
-
-# Install to the system
 sudo cmake --install build-spank
 ```
 
-By default, it installs the `.so` file to your Slurm plugin directory and a template configuration to `plugstack.conf.d/`.
+This installs the compiled `.so` file to the Slurm plugin directory and places the template configuration in `plugstack.conf.d/`.
 
-Build against the target cluster's Slurm headers. Rebuild after Slurm
-major-version upgrades.
-
-Install the plugin on submit/login nodes that run `srun`, `sbatch`, or `salloc`,
-and on compute nodes that run `slurmd` or `slurmstepd`. Controller nodes only
-need it if they also serve one of those roles.
+Deploy the plugin on login/submit nodes (for `srun`/`sbatch` command line parsing) and on compute nodes running `slurmd`/`slurmstepd`. Controller-only nodes do not require the plugin.
 
 ### Configuration
 
-The plugin is configured via `plugstack.conf`. You can set global defaults here so that users don't have to provide them every time.
+Configure the plugin in `plugstack.conf`. Global defaults defined here can be overridden by users at submission time.
 
-**Example: `/etc/slurm/plugstack.conf.d/iqm-qdmi.conf`**
+**`/etc/slurm/plugstack.conf.d/iqm-qdmi.conf`**
 
 ```text
 required /usr/lib/slurm/iqm-qdmi-spank-plugin.so \
@@ -195,39 +161,30 @@ required /usr/lib/slurm/iqm-qdmi-spank-plugin.so \
     partitions=quantum,debug
 ```
 
-- `iqm_base_url`: The default endpoint for your site.
-- `iqm_tokens_file`: A system-wide token file (optional).
-- `partitions`: A comma-separated list of partitions where this plugin should be active.
+- `iqm_base_url`: Default API endpoint.
+- `iqm_tokens_file`: Path to the shared token file.
+- `partitions`: Comma-separated list of partitions where this plugin will run. If omitted, the plugin evaluates all partitions.
 
-### Activation
+Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration directory:
 
-1.  Make sure your main `plugstack.conf` includes your config directory:
-    ```text
-    include /etc/slurm/plugstack.conf.d/*.conf
-    ```
-2.  Apply the changes:
-    ```bash
-    sudo scontrol reconfigure
-    ```
+```text
+include /etc/slurm/plugstack.conf.d/*.conf
+```
 
-`plugstack.conf` changes apply to new job launches, not running jobs. This
-plugin sets job environment at launch time and does not rely on persistent
-`slurmd` daemon-side state.
+After modifying the configuration, apply changes to the cluster:
 
-### Monitoring and Troubleshooting
+```bash
+sudo scontrol reconfigure
+```
 
-The plugin logs its activity to the standard Slurm logs (`slurmd.log`). When a job starts on an active partition, you'll see a structured summary line:
+### Troubleshooting
+
+The plugin logs to the standard `slurmd.log` on compute nodes. Successful activation prints a log entry when a job starts on an active partition:
 
 `[iqm_spank_plugin] job=12345 partition=quantum base_url=set auth=tokens_file tokens_file_ok=yes`
 
-**Common issues:**
+**Common Issues:**
 
-- **"Plugin metadata symbol missing":** Ensure the plugin was compiled with the correct headers and linked properly.
-- **Variables not showing up:** Check if `scontrol show config | grep PlugStackConfig` points to the file you edited.
-- **Permission denied:** Ensure the `slurmd` user can read the plugin `.so` file and any configured `iqm_tokens_file`.
-
-For a quick check if it's working, ask a user to run:
-
-```bash
-srun --partition=quantum env | grep IQM_
-```
+- **"Plugin metadata symbol missing"**: The plugin was compiled with incompatible headers or toolchain. Rebuild the plugin from source on the target environment.
+- **Options/variables not showing up**: Verify that `scontrol show config | grep PlugStackConfig` references your `plugstack.conf` directory and that the drop-in file is read-permitted.
+- **Permission Denied**: The `slurmd` process user must have read access to the compiled `.so` library and the specified `iqm_tokens_file`.
