@@ -129,4 +129,4 @@ jobs:
 
       - name: Run SPANK smoke tests
         run: |
-          spank/noxfile.py -s smoke_tests -- --partition debug --test-base-url https://test.example.com
+          uv run nox -f spank/noxfile.py -s smoke_tests -- --partition debug --test-base-url https://test.example.com
