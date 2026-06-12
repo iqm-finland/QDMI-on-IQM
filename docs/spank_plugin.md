@@ -154,6 +154,12 @@ srun --partition=quantum ./device_info
 
 The SPANK plugin is designed to be "shallow" and lightweight. It doesn't handle complex logic; it simply parses arguments and ensures the right environment is ready for the user's job.
 
+### Compatibility and Requirements
+
+- **Slurm Version**: Slurm 17.11 or newer is supported. (The plugin utilizes standard SPANK APIs that are backward-compatible with all modern Slurm releases).
+- **C++ Compiler**: C++20 support with the `<format>` library is required (GCC 13+ or Clang 16+).
+- **Compilation Constraint**: SPANK plugins are tied to the ABI version of the Slurm daemon. You **must build the plugin on/against the target cluster's Slurm header files** (`slurm/spank.h`). The plugin will need to be recompiled whenever the cluster is upgraded to a new major/minor Slurm release.
+
 ### Installation
 
 Building the plugin is straightforward using CMake:

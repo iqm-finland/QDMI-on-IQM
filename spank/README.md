@@ -75,3 +75,5 @@ QDMI-on-IQM: while the core library follows the repository's QDMI-on-IQM release
 versioning, the SPANK plugin must be built against the Slurm headers of the target
 system. In practice, that means the effective plugin variant is tied to the Slurm
 version and header set available on the cluster where it is compiled.
+
+For detailed information on Slurm version compatibility and toolchain requirements, see the [SPANK Plugin Guide](../docs/spank_plugin.md).
