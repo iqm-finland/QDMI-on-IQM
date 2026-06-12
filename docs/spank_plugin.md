@@ -122,6 +122,11 @@ g++ -std=c++20 device_info.cpp -o device_info \
 srun --partition=quantum ./device_info
 ```
 
+> [!NOTE]
+> **Shared Filesystem Requirement**: For dynamic linking to succeed at runtime on the compute nodes, both the compiled executable and the directory containing `libiqm_qdmi_device.so` (obtained via `iqm-qdmi --lib_path`) must reside on a shared filesystem mounted at the same path across both the login and compute nodes.
+>
+> If you are compiling/running in a local, non-shared environment, you must copy the library to the compute nodes or configure your `LD_LIBRARY_PATH` accordingly.
+
 ---
 
 ## For HPC Administrators
