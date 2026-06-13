@@ -36,14 +36,14 @@ jobs:
       CTEST_PARALLEL_LEVEL: 4
       FORCE_COLOR: 3
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
       # Set up ccache for faster C++ builds
       - name: Setup ccache
-        uses: Chocobo1/setup-ccache-action@7e813cbdf161f77737576f5c370b2810dbae058c # v1.5.7
+        uses: Chocobo1/setup-ccache-action@802ec72ba1d54bbf75c52f45367253d6abec30f5 # v1.5.8
         with:
           prepend_symlinks_to_path: false
           override_cache_key: c++-tests-${{ inputs.runs-on }}-${{ inputs.config }}
