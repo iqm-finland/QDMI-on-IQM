@@ -99,10 +99,10 @@ jobs:
           sudo cat /var/log/slurmd.log || true
 
       - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_SPANK=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON
 
       - name: Build SPANK plugin
-        run: cmake --build build --target iqm-qdmi-spank-plugin
+        run: cmake --build build --target iqm-spank-plugin
 
       - name: Install SPANK plugin
         run: sudo cmake --install build --component iqm_spank_plugin_Runtime
@@ -110,9 +110,9 @@ jobs:
       - name: Activate SPANK plugin
         run: |
           # Find installed library path (could vary based on system lib/lib64/arch folders)
-          PLUGIN_PATH=$(find /usr/lib -name iqm-qdmi-spank-plugin.so 2>/dev/null | head -n 1)
+          PLUGIN_PATH=$(find /usr/lib -name iqm-spank-plugin.so 2>/dev/null | head -n 1)
           if [ -z "$PLUGIN_PATH" ]; then
-            echo "ERROR: Could not locate installed iqm-qdmi-spank-plugin.so"
+            echo "ERROR: Could not locate installed iqm-spank-plugin.so"
             exit 1
           fi
           echo "Found plugin at: $PLUGIN_PATH"

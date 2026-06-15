@@ -58,7 +58,7 @@ endif()
 
 option(BUILD_IQM_QDMI_TESTS "Build tests for the IQM QDMI device"
        ${IQM_QDMI_MASTER_PROJECT})
-option(BUILD_IQM_QDMI_SPANK "Build the IQM QDMI device SPANK plugin" OFF)
+option(BUILD_IQM_SPANK "Build the IQM SPANK plugin" OFF)
 option(BUILD_IQM_QDMI_DOCS "Build documentation for the IQM QDMI device" OFF)
 option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
 
@@ -74,7 +74,7 @@ if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
 endif()
 
 # Add the SPANK plugin
-if(BUILD_IQM_QDMI_SPANK)
+if(BUILD_IQM_SPANK)
   add_subdirectory(spank)
 endif()
 

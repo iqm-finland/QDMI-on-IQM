@@ -128,7 +128,7 @@ else()
   find_package(CURL REQUIRED)
 endif()
 
-if(BUILD_IQM_QDMI_SPANK)
+if(BUILD_IQM_SPANK)
   find_path(
     SLURM_SPANK_INCLUDE_DIR
     NAMES spank.h
@@ -139,7 +139,7 @@ if(BUILD_IQM_QDMI_SPANK)
   if(NOT SLURM_SPANK_INCLUDE_DIR)
     message(
       FATAL_ERROR
-        "BUILD_IQM_QDMI_SPANK is ON but Slurm SPANK headers were not "
+        "BUILD_IQM_SPANK is ON but Slurm SPANK headers were not "
         "found. Please install Slurm development headers "
         "(e.g. slurm-devel or libslurm-dev), or provide "
         "SLURM_SPANK_INCLUDE_DIR.")

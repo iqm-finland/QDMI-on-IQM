@@ -144,7 +144,7 @@ The SPANK plugin is a lightweight C++ module that intercepts job launches to par
 To compile and install the plugin from the repository root:
 
 ```bash
-cmake -S . -B build-spank -DBUILD_IQM_QDMI_SPANK=ON
+cmake -S . -B build-spank -DBUILD_IQM_SPANK=ON
 cmake --build build-spank -j
 sudo cmake --install build-spank
 ```
@@ -160,7 +160,7 @@ Configure the plugin in `plugstack.conf`. Global defaults defined here can be ov
 **`/etc/slurm/plugstack.conf.d/iqm-qdmi.conf`**
 
 ```text
-required /usr/lib/slurm/iqm-qdmi-spank-plugin.so \
+required /usr/lib/slurm/iqm-spank-plugin.so \
     iqm_base_url=https://resonance.iqm.tech \
     iqm_tokens_file=/etc/iqm/tokens.json \
     partitions=quantum,debug

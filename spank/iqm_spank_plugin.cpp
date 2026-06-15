@@ -36,7 +36,7 @@
  *
  * Example plugstack.conf entry:
  * @code
- * required /usr/lib/slurm/iqm-qdmi-spank-plugin.so \
+ * required /usr/lib/slurm/iqm-spank-plugin.so \
  *     partitions=quantum                           \
  *     iqm_base_url=https://resonance.iqm.tech      \
  *     iqm_tokens_file=/etc/iqm/tokens.json         \

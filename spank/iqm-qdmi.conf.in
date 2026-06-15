@@ -21,7 +21,7 @@
 # To activate, uncomment the plugin line below and fill in site-specific values.
 # See the plugin README for details.
 
-# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-qdmi-spank-plugin.so \
+# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so \
 #     partitions= \
 #     iqm_base_url= \
 #     iqm_tokens_file= \

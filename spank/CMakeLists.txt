@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-set(BUILD_IQM_QDMI_SPANK_TARGET iqm-qdmi-spank-plugin)
-add_library(${BUILD_IQM_QDMI_SPANK_TARGET} MODULE iqm_qdmi_spank_plugin.cpp)
-target_compile_features(${BUILD_IQM_QDMI_SPANK_TARGET} PRIVATE cxx_std_20)
-target_include_directories(${BUILD_IQM_QDMI_SPANK_TARGET}
+set(BUILD_IQM_SPANK_TARGET iqm-spank-plugin)
+add_library(${BUILD_IQM_SPANK_TARGET} MODULE iqm_spank_plugin.cpp)
+target_compile_features(${BUILD_IQM_SPANK_TARGET} PRIVATE cxx_std_20)
+target_include_directories(${BUILD_IQM_SPANK_TARGET}
                            PRIVATE ${SLURM_SPANK_INCLUDE_DIR})
-set_target_properties(${BUILD_IQM_QDMI_SPANK_TARGET} PROPERTIES PREFIX "")
+set_target_properties(${BUILD_IQM_SPANK_TARGET} PROPERTIES PREFIX "")
 
 # Detect the Slurm plugin directory for the SPANK plugin.
 set(IQM_QDMI_SPANK_INSTALL_DIR_DEFAULT "/usr/lib/slurm")
@@ -68,7 +68,7 @@ set(IQM_QDMI_SLURM_CONF_DIR
 # Generate the plugstack drop-in configuration with the correct plugin path.
 configure_file(iqm-qdmi.conf.in iqm-qdmi.conf @ONLY)
 
-install(TARGETS ${BUILD_IQM_QDMI_SPANK_TARGET}
+install(TARGETS ${BUILD_IQM_SPANK_TARGET}
         LIBRARY DESTINATION ${IQM_QDMI_SPANK_INSTALL_DIR}
                 COMPONENT iqm_spank_plugin_Runtime)
 
