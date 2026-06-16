@@ -17,6 +17,7 @@ jobs:
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       FORCE_COLOR: 3
+      TEST_BASE_URL: "https://test.example.com"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -121,24 +122,22 @@ jobs:
 
       - name: Activate SPANK plugin
         run: |
-          # Find installed library path (could vary based on system lib/lib64/arch folders)
-          PLUGIN_PATH=$(find /usr/lib -name iqm-spank-plugin.so 2>/dev/null | head -n 1)
-          if [ -z "$PLUGIN_PATH" ]; then
-            echo "ERROR: Could not locate installed iqm-spank-plugin.so"
-            exit 1
-          fi
-          echo "Found plugin at: $PLUGIN_PATH"
-
-          # Create plugstack configuration structure
-          sudo mkdir -p /etc/slurm/plugstack.conf.d
+          # Create the top-level plugstack.conf with include directive
           echo "include /etc/slurm/plugstack.conf.d/*.conf" | sudo tee /etc/slurm/plugstack.conf
 
-          # Overwrite default inactive drop-in config with an active one for the integration test
-          echo "required $PLUGIN_PATH iqm_base_url=https://test.example.com" | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+          # Activate the CMake-installed drop-in config for testing
+          PLUGIN_PATH="/usr/lib/slurm/iqm-spank-plugin.so"
+          echo "required ${PLUGIN_PATH} iqm_base_url=${TEST_BASE_URL}" \
+            | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
-          # Reload Slurm controller/daemon configuration
+          # Reload Slurm configuration and verify the plugin is active
           sudo scontrol reconfigure
+          srun --partition=debug --immediate=5 /bin/true
 
       - name: Run SPANK smoke tests
         run: |
-          uv run nox -f spank/noxfile.py -s smoke_tests -- --partition debug --test-base-url https://test.example.com
+          uv run nox -f spank/noxfile.py -s smoke_tests -- \
+            --partition debug \
+            --hook-mode full \
+            --require-all-hooks \
+            --test-base-url "$TEST_BASE_URL"
