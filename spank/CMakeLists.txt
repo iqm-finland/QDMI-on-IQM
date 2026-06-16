@@ -45,7 +45,7 @@ set(IQM_QDMI_SPANK_INSTALL_DIR
     "${IQM_QDMI_SPANK_INSTALL_DIR_DEFAULT}"
     CACHE
       PATH
-      "Install directory for the IQM QDMI device SPANK plugin (override for distro-specific Slurm plugin paths)"
+      "Install directory for the IQM SPANK plugin (override for distro-specific Slurm plugin paths)"
 )
 
 mark_as_advanced(IQM_QDMI_SCONTROL_EXECUTABLE)
