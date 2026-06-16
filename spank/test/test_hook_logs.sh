@@ -59,7 +59,7 @@ detect_plugstack_config() {
   fi
 
   local configured_plugin
-  configured_plugin="$(echo "$effective_content" | awk '{print $NF}' | grep -E 'iqm.*spank.*\.so$' | tail -n 1 || true)"
+  configured_plugin="$(echo "$effective_content" | awk '{for (i=1; i<=NF; i++) if ($i ~ /iqm.*spank.*\.so$/) print $i}' | tail -n 1 || true)"
   if [[ -z "$configured_plugin" ]]; then
     echo "WARNING: No IQM SPANK plugin entry found in $plugstack_path" >&2
     return 0

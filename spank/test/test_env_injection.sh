@@ -248,7 +248,7 @@ fi
 echo "--- Test 5: Conflicting auth is rejected ---" >&2
 
 # Set both IQM_TOKEN and IQM_TOKENS_FILE to trigger the conflict check.
-local -a conflict_args=(--immediate=3 -N1 -n1)
+conflict_args=(--immediate=3 -N1 -n1)
 if [[ -n "$partition" ]]; then
   conflict_args+=(--partition "$partition")
 fi
@@ -276,7 +276,7 @@ echo "--- Test 6: srun --iqm-base-url overrides plugstack and user env ---" >&2
 srun_override_base_url="https://srun-override.example.com"
 
 # Run srun with --iqm-base-url, plus IQM_BASE_URL in env to test full precedence.
-local -a override_args=(--immediate=3 -N1 -n1)
+override_args=(--immediate=3 -N1 -n1)
 if [[ -n "$partition" ]]; then
   override_args+=(--partition "$partition")
 fi
@@ -309,7 +309,7 @@ echo "--- Test 7: Missing IQM_BASE_URL is rejected ---" >&2
 
 # Exporting IQM_BASE_URL as an empty value blocks plugstack default injection
 # (overwrite=0), which should trigger the plugin's required-IQM_BASE_URL check.
-local -a missing_args=(--immediate=3 -N1 -n1)
+missing_args=(--immediate=3 -N1 -n1)
 if [[ -n "$partition" ]]; then
   missing_args+=(--partition "$partition")
 fi
