@@ -29,9 +29,7 @@ To run authenticated jobs:
 
 ---
 
-## Examples
-
-### Python & Qiskit
+## Example
 
 The {py:class}`~iqm.qdmi.qiskit.IQMBackend` class automatically resolves configuration values from the environment variables injected by the plugin.
 
@@ -67,65 +65,6 @@ To run this job:
 ```bash
 srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 ```
-
-### C/C++
-
-If you are developing low-level applications, you can use the QDMI C/C++ library. The plugin ensures that `IQM_QDMI_device_session_init` finds everything it needs.
-
-**`device_info.cpp`**
-
-```cpp
-#include <cstdlib>
-#include <iostream>
-#include <vector>
-#include <iqm_qdmi/device.h>
-#include <iqm_qdmi/constants.h>
-
-int main() {
-    IQM_QDMI_Device_Session session = nullptr;
-
-    // Allocate and initialize the session.
-    // It will automatically read IQM_BASE_URL, IQM_TOKENS_FILE, etc. from the environment.
-    if (IQM_QDMI_device_session_alloc(&session) != QDMI_SUCCESS) {
-        std::cerr << "Failed to allocate session\n";
-        return EXIT_FAILURE;
-    }
-
-    if (IQM_QDMI_device_session_init(session) != QDMI_SUCCESS) {
-        std::cerr << "Failed to initialize session. Check your environment settings.\n";
-        IQM_QDMI_device_session_free(session);
-        return EXIT_FAILURE;
-    }
-
-    size_t name_size = 0;
-    IQM_QDMI_device_session_query_device_property(session, QDMI_DEVICE_PROPERTY_NAME, 0, nullptr, &name_size);
-
-    std::vector<char> name(name_size);
-    IQM_QDMI_device_session_query_device_property(session, QDMI_DEVICE_PROPERTY_NAME, name_size, name.data(), nullptr);
-
-    std::cout << "Successfully connected to: " << name.data() << '\n';
-
-    IQM_QDMI_device_session_free(session);
-    return EXIT_SUCCESS;
-}
-```
-
-To compile and link against `libiqm_qdmi_device`:
-
-```bash
-g++ -std=c++20 device_info.cpp -o device_info \
-  -I"$(iqm-qdmi --include_dir)" \
-  -L"$(dirname "$(iqm-qdmi --lib_path)")" \
-  -Wl,-rpath,"$(dirname "$(iqm-qdmi --lib_path)")" \
-  -liqm_qdmi_device
-
-srun --partition=quantum ./device_info
-```
-
-> [!NOTE]
-> **Shared Filesystem Requirement**: For dynamic linking to succeed at runtime on the compute nodes, both the compiled executable and the directory containing `libiqm_qdmi_device.so` (obtained via `iqm-qdmi --lib_path`) must reside on a shared filesystem mounted at the same path across both the login and compute nodes.
->
-> If you are compiling/running in a local, non-shared environment, you must copy the library to the compute nodes or configure your `LD_LIBRARY_PATH` accordingly.
 
 ---
 
