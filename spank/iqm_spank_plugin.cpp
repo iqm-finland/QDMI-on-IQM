@@ -67,7 +67,13 @@
 #include <system_error>
 #include <vector>
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+// Slurm's SPANK API (slurm_spank_log, slurm_debug) uses C-style vararg
+// functions. This is unavoidable when interfacing with the Slurm C API.
+
 extern "C" {
+#include <slurm/slurm_errno.h>
+#include <slurm/slurm_version.h>
 #include <slurm/spank.h>
 }
 
@@ -511,7 +517,7 @@ private:
 
   /// Partition filter: when non-empty, the plugin is only active on jobs
   /// targeting one of these partitions.
-  std::vector<std::string> active_partitions_{};
+  std::vector<std::string> active_partitions_;
 };
 
 /// Global plugin configuration instance. Populated once during SPANK init,
@@ -638,3 +644,5 @@ int slurm_spank_exit(spank_t /* spank */, const int /* ac */,
 }
 
 // NOLINTEND(readability-identifier-naming)
+
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
