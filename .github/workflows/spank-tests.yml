@@ -125,8 +125,9 @@ jobs:
           # Create the top-level plugstack.conf with include directive
           echo "include /etc/slurm/plugstack.conf.d/*.conf" | sudo tee /etc/slurm/plugstack.conf
 
-          # Activate the CMake-installed drop-in config for testing
-          PLUGIN_PATH="/usr/lib/slurm/iqm-spank-plugin.so"
+          # Resolve the Slurm plugin directory (mirrors CMake's detection logic)
+          PLUGIN_DIR=$(scontrol show config | awk -F'= *' '/^PluginDir/ {print $2}' | xargs)
+          PLUGIN_PATH="${PLUGIN_DIR}/iqm-spank-plugin.so"
           echo "required ${PLUGIN_PATH} iqm_base_url=${TEST_BASE_URL}" \
             | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
