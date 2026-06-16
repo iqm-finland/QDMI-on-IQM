@@ -1,4 +1,4 @@
-name: 🇨 • Tests • SPANK
+name: 🇸 • Tests • SPANK
 on:
   workflow_call:
     inputs:
