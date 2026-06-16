@@ -24,6 +24,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <gmock/gmock.h>
@@ -37,6 +38,7 @@
 
 using testing::_; // NOLINT(bugprone-reserved-identifier)
 using testing::DoAll;
+using testing::InSequence;
 using testing::Return;
 using testing::SetArgReferee;
 
@@ -46,6 +48,31 @@ int IQM_QDMI_device_session_init_with_http_client(
     std::unique_ptr<iqm::IHttpClient> http_client);
 
 namespace {
+
+class ScopedEnvVar {
+public:
+  explicit ScopedEnvVar(std::string name)
+      : name_(std::move(name)), original_value_(), had_original_value_(false) {
+    if (const char *original_value = std::getenv(name_.c_str());
+        original_value != nullptr) {
+      original_value_ = original_value;
+      had_original_value_ = true;
+    }
+  }
+
+  ~ScopedEnvVar() {
+    if (had_original_value_) {
+      setenv(name_.c_str(), original_value_.c_str(), 1);
+    } else {
+      unsetenv(name_.c_str());
+    }
+  }
+
+private:
+  std::string name_;
+  std::string original_value_;
+  bool had_original_value_;
+};
 
 // ============================================================================
 // TEST FIXTURES
@@ -389,6 +416,44 @@ protected:
     EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
   }
 
+  void expect_successful_initialization(
+      const std::string *first_url = nullptr) const {
+    if (first_url != nullptr) {
+      InSequence sequence;
+      EXPECT_CALL(*mock_http_client_, get(*first_url, _, _))
+          .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
+                          Return(QDMI_SUCCESS)));
+      EXPECT_CALL(*mock_http_client_, get(_, _, _))
+          .WillOnce(
+              DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
+                    Return(QDMI_SUCCESS)))
+          .WillOnce(DoAll(
+              SetArgReferee<2>(get_dynamic_quantum_architectures_response),
+              Return(QDMI_SUCCESS)))
+          .WillOnce(DoAll(
+              SetArgReferee<2>(get_calibration_set_quality_metrics_response),
+              Return(QDMI_SUCCESS)))
+          .WillOnce(DoAll(SetArgReferee<2>(cocos_health_response),
+                          Return(QDMI_SUCCESS)));
+      return;
+    }
+
+    EXPECT_CALL(*mock_http_client_, get(_, _, _))
+        .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
+                        Return(QDMI_SUCCESS)))
+        .WillOnce(
+            DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
+                  Return(QDMI_SUCCESS)))
+        .WillOnce(
+            DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
+                  Return(QDMI_SUCCESS)))
+        .WillOnce(DoAll(
+            SetArgReferee<2>(get_calibration_set_quality_metrics_response),
+            Return(QDMI_SUCCESS)))
+        .WillOnce(DoAll(SetArgReferee<2>(cocos_health_response),
+                        Return(QDMI_SUCCESS)));
+  }
+
   static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
     {
       "name": "test_circuit",
@@ -433,20 +498,7 @@ protected:
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
 
-    EXPECT_CALL(*mock_http_client_, get(_, _, _))
-        .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
-                        Return(QDMI_SUCCESS)))
-        .WillOnce(
-            DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
-                  Return(QDMI_SUCCESS)))
-        .WillOnce(
-            DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
-                  Return(QDMI_SUCCESS)))
-        .WillOnce(DoAll(
-            SetArgReferee<2>(get_calibration_set_quality_metrics_response),
-            Return(QDMI_SUCCESS)))
-        .WillOnce(DoAll(SetArgReferee<2>(cocos_health_response),
-                        Return(QDMI_SUCCESS)));
+    expect_successful_initialization();
 
     ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
                   session, std::move(mock_http_client_)),
@@ -464,9 +516,47 @@ protected:
   }
 };
 
+class DeviceIntegrationEnvMockTest : public DeviceIntegrationMockTest {
+protected:
+  void SetUp() override {
+    EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
+    mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
+    mock_handle_ = mock_http_client_.get();
+    EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
+  }
+};
+
 // ============================================================================
 // UNIT TESTS - Basic functionality without external dependencies
 // ============================================================================
+
+TEST_F(DeviceIntegrationEnvMockTest,
+       SessionInitializationUsesBaseUrlFromEnvironment) {
+  const ScopedEnvVar base_url_env("IQM_BASE_URL");
+  ASSERT_EQ(setenv("IQM_BASE_URL", "https://environment.example", 1), 0);
+  ASSERT_STREQ(std::getenv("IQM_BASE_URL"), "https://environment.example");
+
+  const std::string expected_url =
+      "https://environment.example/api/v1/quantum-computers";
+  expect_successful_initialization(&expected_url);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
+                session, std::move(mock_http_client_)),
+            QDMI_SUCCESS);
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationPrefersExplicitBaseUrlOverEnvironment) {
+  const ScopedEnvVar base_url_env("IQM_BASE_URL");
+  ASSERT_EQ(setenv("IQM_BASE_URL", "https://environment.example", 1), 0);
+
+  const std::string expected_url = "https://localhost/api/v1/quantum-computers";
+  expect_successful_initialization(&expected_url);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
+                session, std::move(mock_http_client_)),
+            QDMI_SUCCESS);
+}
 
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
