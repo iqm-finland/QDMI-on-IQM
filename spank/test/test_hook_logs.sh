@@ -44,8 +44,22 @@ detect_plugstack_config() {
     return 0
   fi
 
+  # Build effective plugstack content by resolving 'include' directives.
+  local effective_content
+  effective_content="$(awk '!/^\s*#/ && NF' "$plugstack_path")"
+
+  local include_glob
+  include_glob="$(echo "$effective_content" | awk '/^include / {print $2}')"
+  if [[ -n "$include_glob" ]]; then
+    local inc_file
+    for inc_file in $include_glob; do
+      [[ -f "$inc_file" ]] || continue
+      effective_content+=$'\n'"$(awk '!/^\s*#/ && NF' "$inc_file")"
+    done
+  fi
+
   local configured_plugin
-  configured_plugin="$(awk '!/^\s*#/ && NF {print $NF}' "$plugstack_path" | grep -E 'iqm.*spank.*\.so$' | tail -n 1 || true)"
+  configured_plugin="$(echo "$effective_content" | awk '{print $NF}' | grep -E 'iqm.*spank.*\.so$' | tail -n 1 || true)"
   if [[ -z "$configured_plugin" ]]; then
     echo "WARNING: No IQM SPANK plugin entry found in $plugstack_path" >&2
     return 0
