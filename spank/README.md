@@ -3,6 +3,7 @@
 [![SPANK Plugin GPLv3 License](https://img.shields.io/static/v1?logo=gnu&label=License&message=GPLv3&color=informational&style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![Slurm SPANK](https://img.shields.io/static/v1?label=Slurm&message=SPANK&color=informational&style=flat-square)](https://slurm.schedmd.com/spank.html)
+[![Platform: Linux](https://img.shields.io/static/v1?logo=linux&label=Platform&message=Linux&color=informational&style=flat-square)](https://www.kernel.org/)
 
 This plugin integrates the QDMI-on-IQM runtime with Slurm using the [SPANK plugin interface](https://slurm.schedmd.com/spank.html). It allows Slurm to automatically inject the required `IQM_*` environment variables into jobs and registers corresponding `--iqm-*` command-line options for `srun`, `sbatch`, and `salloc`.
 
