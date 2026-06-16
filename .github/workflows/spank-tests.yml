@@ -44,15 +44,15 @@ jobs:
 
       - name: Setup local Slurm environment
         run: |
-          # 1. Start Munge service for authentication
+          # Start Munge service for authentication
           sudo service munge start
 
-          # 2. Make sure state and spool directories exist with correct permissions
+          # Make sure state and spool directories exist with correct permissions
           sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd /var/log
           sudo chown slurm:slurm /var/spool/slurmctld
           sudo chown root:root /var/spool/slurmd
 
-          # 3. Create a minimal slurm.conf matching local hostname
+          # Create a minimal slurm.conf matching local hostname
           HOSTNAME=$(hostname)
           cat <<EOF | sudo tee /etc/slurm/slurm.conf
           ClusterName=local-ci
@@ -74,23 +74,26 @@ jobs:
           PartitionName=debug Nodes=$HOSTNAME Default=YES MaxTime=INFINITE State=UP
           EOF
 
-          # 4. Start Slurm services
-          sudo service slurmctld start
-          sudo service slurmd start
+          # Start Slurm services and verify they are running
+          sudo service slurmctld start || { echo "ERROR: slurmctld failed to start"; exit 1; }
+          sudo service slurmd start || { echo "ERROR: slurmd failed to start"; exit 1; }
 
-          # 5. Wait for the node to register and become idle/up
+          # Wait for the node to register and become idle
           for i in {1..30}; do
-            if sinfo -h -o "%t" | grep -qE "idle|alloc"; then
-              echo "Node is ready!"
+            if sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
               break
             fi
-            echo "Waiting for node to register (attempt $i)..."
-            # Try to force resume if it got marked DOWN/DRAINED, ignoring errors
-            sudo scontrol update nodename=$HOSTNAME state=resume 2>/dev/null || true
+            # Force resume if the node got marked DOWN/DRAINED
+            sudo scontrol update nodename="$HOSTNAME" state=resume 2>/dev/null || true
             sleep 1
           done
 
-          # 6. Verify local connectivity before installing the plugin
+          if ! sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
+            echo "ERROR: Node did not become ready after 30 seconds"
+            exit 1
+          fi
+
+          # Verify end-to-end connectivity
           srun --partition=debug --immediate=5 /bin/true
 
       - name: Dump Slurm logs on failure
