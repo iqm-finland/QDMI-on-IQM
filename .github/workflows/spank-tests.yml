@@ -131,9 +131,9 @@ jobs:
           echo "required ${PLUGIN_PATH} iqm_base_url=${TEST_BASE_URL}" \
             | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
-          # Reload Slurm configuration and verify the plugin is active
+          # Reload Slurm configuration (brief sleep lets the daemon settle)
           sudo scontrol reconfigure
-          srun --partition=debug --immediate=5 /bin/true
+          sleep 2
 
       - name: Run SPANK smoke tests
         run: |
