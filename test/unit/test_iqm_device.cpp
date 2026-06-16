@@ -51,8 +51,7 @@ namespace {
 
 class ScopedEnvVar {
 public:
-  explicit ScopedEnvVar(std::string name)
-      : name_(std::move(name)), original_value_(), had_original_value_(false) {
+  explicit ScopedEnvVar(std::string name) : name_(std::move(name)) {
     if (const char *original_value = std::getenv(name_.c_str());
         original_value != nullptr) {
       original_value_ = original_value;
@@ -62,16 +61,23 @@ public:
 
   ~ScopedEnvVar() {
     if (had_original_value_) {
+      // NOLINTNEXTLINE(misc-include-cleaner)
       setenv(name_.c_str(), original_value_.c_str(), 1);
     } else {
+      // NOLINTNEXTLINE(misc-include-cleaner)
       unsetenv(name_.c_str());
     }
   }
 
+  ScopedEnvVar(const ScopedEnvVar &) = delete;
+  ScopedEnvVar &operator=(const ScopedEnvVar &) = delete;
+  ScopedEnvVar(ScopedEnvVar &&) = delete;
+  ScopedEnvVar &operator=(ScopedEnvVar &&) = delete;
+
 private:
   std::string name_;
   std::string original_value_;
-  bool had_original_value_;
+  bool had_original_value_ = false;
 };
 
 // ============================================================================

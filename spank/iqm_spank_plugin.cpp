@@ -56,6 +56,7 @@
  * (set by Slurm in every job), which is portable across all Slurm versions.
  */
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <filesystem>
@@ -63,6 +64,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 extern "C" {
@@ -211,7 +213,7 @@ public:
    * @param spank SPANK handle for the current hook invocation.
    * @return `ESPANK_SUCCESS` on success, `ESPANK_ERROR` if injection fails.
    */
-  int inject_environment(spank_t spank) const {
+  [[nodiscard]] int inject_environment(spank_t spank) const {
     for (std::size_t i = 0; i < K_CONFIG_MAPPINGS.size(); ++i) {
       // Determine effective value: srun option > plugstack default.
       const std::string *effective_value = nullptr;
@@ -403,12 +405,9 @@ public:
    * @brief Log a summary of parsed plugstack configuration.
    */
   void log_parsed_config() const {
-    int configured_count = 0;
-    for (const auto &v : plugstack_values_) {
-      if (v.has_value()) {
-        ++configured_count;
-      }
-    }
+    const auto configured_count = static_cast<int>(
+        std::count_if(plugstack_values_.cbegin(), plugstack_values_.cend(),
+                      [](const auto &v) { return v.has_value(); }));
     slurm_debug("[iqm_spank_plugin] parsed %d plugstack argument(s), "
                 "%zu active partition(s)",
                 configured_count, active_partitions_.size());
@@ -512,12 +511,12 @@ private:
 
   /// Partition filter: when non-empty, the plugin is only active on jobs
   /// targeting one of these partitions.
-  std::vector<std::string> active_partitions_;
+  std::vector<std::string> active_partitions_{};
 };
 
 /// Global plugin configuration instance. Populated once during SPANK init,
 /// then read-only for subsequent hook invocations.
-IQMSpankConfigManager g_config{};
+IQMSpankConfigManager g_config{}; // NOLINT(*-avoid-non-const-global-variables)
 
 // Static callback implementation — stores the srun option value.
 int IQMSpankConfigManager::option_callback(const int val, const char *optarg,
