@@ -6,6 +6,9 @@ on:
         description: "The ubuntu runner image to use."
         default: "ubuntu-24.04"
         type: string
+    secrets:
+      IQM_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -142,3 +145,13 @@ jobs:
             --hook-mode full \
             --require-all-hooks \
             --test-base-url "$TEST_BASE_URL"
+
+      - name: Run SPANK resonance tests
+        if: secrets.IQM_TOKEN != ''
+        env:
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+        run: |
+          uv run nox -f spank/noxfile.py -s resonance_tests -- \
+            --partition debug \
+            --test-base-url "https://resonance.iqm.tech" \
+            --test-qc-alias "emerald:mock"

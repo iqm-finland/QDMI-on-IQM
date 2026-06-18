@@ -175,6 +175,8 @@ jobs:
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: ./.github/workflows/spank-tests.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   # this job does nothing and is only used for branch protection
   required-checks-pass:

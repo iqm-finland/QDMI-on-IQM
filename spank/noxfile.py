@@ -97,3 +97,55 @@ def smoke_tests(session: nox.Session) -> None:
         env_args.extend(["--test-tokens-file", args.test_tokens_file])
 
     session.run(*env_args, external=True)
+
+
+@nox.session(reuse_venv=True)
+def resonance_tests(session: nox.Session) -> None:
+    """Run a real workflow on Resonance through the SPANK plugin."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--partition",
+        default="quantum",
+        help="Slurm partition to target (default: quantum).",
+    )
+    parser.add_argument(
+        "--test-base-url",
+        default="https://resonance.iqm.tech",
+        help="Resonance endpoint to target (default: https://resonance.iqm.tech).",
+    )
+    parser.add_argument(
+        "--test-qc-alias",
+        default="emerald:mock",
+        help="Quantum computer alias to target (default: emerald:mock).",
+    )
+    parser.add_argument(
+        "--test-tokens-file",
+        default=os.environ.get("IQM_TOKENS_FILE"),
+        help="Optional tokens file path for authentication.",
+    )
+    args, posargs = parser.parse_known_args(session.posargs)
+    if posargs:
+        joined_args = " ".join(posargs)
+        session.error(f"Unexpected arguments for the resonance_tests session: {joined_args}")
+
+    if not os.environ.get("IQM_TOKEN") and not args.test_tokens_file:
+        session.error(
+            "Either export IQM_TOKEN or pass --test-tokens-file / export IQM_TOKENS_FILE "
+            "before running resonance_tests."
+        )
+
+    # Paths are relative to the 'spank' directory since this noxfile is located here.
+    workflow_args = [
+        "bash",
+        "test/test_resonance_workflow.sh",
+        "--partition",
+        args.partition,
+        "--test-base-url",
+        args.test_base_url,
+        "--test-qc-alias",
+        args.test_qc_alias,
+    ]
+    if args.test_tokens_file:
+        workflow_args.extend(["--test-tokens-file", args.test_tokens_file])
+
+    session.run(*workflow_args, external=True)
