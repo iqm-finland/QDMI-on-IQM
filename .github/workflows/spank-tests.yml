@@ -21,6 +21,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       FORCE_COLOR: 3
       TEST_BASE_URL: "https://test.example.com"
+      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -147,9 +148,7 @@ jobs:
             --test-base-url "$TEST_BASE_URL"
 
       - name: Run SPANK resonance tests
-        if: secrets.IQM_TOKEN != ''
-        env:
-          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+        if: env.IQM_TOKEN != ''
         run: |
           uv run nox -f spank/noxfile.py -s resonance_tests -- \
             --partition debug \
