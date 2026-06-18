@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Test script for the IQM QDMI SPANK plugin environment injection.
+# Test script for the IQM SPANK plugin environment injection.
 #
 # Requires:
 #   - A running Slurm cluster with an allocatable node.
-#   - The IQM QDMI SPANK plugin installed and referenced in plugstack.conf
+#   - The IQM SPANK plugin installed and referenced in plugstack.conf
 #     with at least one key=value argument (e.g. iqm_base_url=https://test.example).
 #
 # The tests verify:
@@ -93,7 +93,7 @@ usage() {
   cat <<'EOF'
 Usage: spank/test/test_env_injection.sh [options]
 
-Tests the IQM QDMI SPANK plugin environment injection behavior.
+Tests the IQM SPANK plugin environment injection behavior.
 Requires a running Slurm cluster with an allocatable node and the plugin
 configured in plugstack.conf with at least iqm_base_url=<url>.
 
@@ -159,7 +159,7 @@ fi
 # Connectivity check
 # ---------------------------------------------------------------------------
 
-echo "=== IQM QDMI SPANK Plugin: Environment Injection Tests ===" >&2
+echo "=== IQM SPANK Plugin: Environment Injection Tests ===" >&2
 echo "" >&2
 
 echo "Checking Slurm connectivity..." >&2

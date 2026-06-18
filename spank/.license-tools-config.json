@@ -4,7 +4,7 @@
     "years": [2026]
   },
   "force_author": true,
-  "license": "GPL-3.0-only",
+  "license": "GPL-3.0-or-later",
   "force_license": true,
   "title": false,
   "include": ["**/*"],

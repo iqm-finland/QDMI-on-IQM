@@ -70,9 +70,9 @@ configure_file(iqm-qdmi.conf.in iqm-qdmi.conf @ONLY)
 
 install(TARGETS ${BUILD_IQM_SPANK_TARGET}
         LIBRARY DESTINATION ${IQM_QDMI_SPANK_INSTALL_DIR}
-                COMPONENT iqm_spank_plugin_Runtime)
+                COMPONENT iqm_spank_plugin)
 
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/iqm-qdmi.conf
   DESTINATION ${IQM_QDMI_SLURM_CONF_DIR}/plugstack.conf.d
-  COMPONENT iqm_spank_plugin_Runtime)
+  COMPONENT iqm_spank_plugin)
