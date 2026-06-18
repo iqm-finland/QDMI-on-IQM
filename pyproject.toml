@@ -46,7 +46,8 @@ classifiers = [
 [project.optional-dependencies]
 qiskit = [
   "mqt-core~=3.6.1",
-  "qiskit[qasm3-import]>=1.1"
+  "qiskit[qasm3-import]>=1.1",
+  "qiskit-algorithms>=0.3.0"
 ]
 
 [project.urls]
@@ -56,11 +57,14 @@ Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 
 [project.scripts]
 iqm-qdmi = "iqm.qdmi.__main__:main"
+iqm-sampler = "iqm.qdmi.sampler:main"
+iqm-estimator = "iqm.qdmi.estimator:main"
 
 [dependency-groups]
 qiskit = [
   "mqt-core~=3.6.1",
   "qiskit[qasm3-import]>=1.1",
+  "qiskit-algorithms>=0.3.0",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
 ]
@@ -178,6 +182,8 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "python/iqm/qdmi/__init__.py" = ["RUF067"]
 "python/iqm/qdmi/__main__.py" = ["T201"]
+"python/iqm/qdmi/sampler.py" = ["T201"]
+"python/iqm/qdmi/estimator.py" = ["T201"]
 "test/python/**" = ["T20", "INP001"]
 "examples/**" = ["T20", "INP001"]
 "docs/**" = ["T20", "INP001"]
