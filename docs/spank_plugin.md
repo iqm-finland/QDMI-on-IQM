@@ -84,8 +84,8 @@ To compile and install the plugin from the repository root:
 
 ```bash
 cmake -S . -B build-spank -DBUILD_IQM_SPANK=ON
-cmake --build build-spank -j
-sudo cmake --install build-spank
+cmake --build build-spank --target iqm-spank-plugin --parallel
+sudo cmake --install build-spank --component iqm_spank_plugin
 ```
 
 This installs the compiled `.so` file to the Slurm plugin directory and places the template configuration in `plugstack.conf.d/`.
