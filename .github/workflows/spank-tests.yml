@@ -118,7 +118,7 @@ jobs:
         run: cmake --build build --target iqm-spank-plugin
 
       - name: Install SPANK plugin
-        run: sudo cmake --install build --component iqm_spank_plugin
+        run: sudo cmake --install build --component iqm-spank-plugin
 
       - name: Activate SPANK plugin
         run: |
