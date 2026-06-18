@@ -49,6 +49,24 @@ int IQM_QDMI_device_session_init_with_http_client(
 
 namespace {
 
+int Set_env_var_raw(const char *key, const char *value) {
+#ifdef _WIN32
+  return _putenv_s(key, value);
+#else
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  return setenv(key, value, 1);
+#endif
+}
+
+int Unset_env_var_raw(const char *key) {
+#ifdef _WIN32
+  return _putenv_s(key, "");
+#else
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  return unsetenv(key);
+#endif
+}
+
 class ScopedEnvVar {
 public:
   explicit ScopedEnvVar(std::string name) : name_(std::move(name)) {
@@ -61,11 +79,9 @@ public:
 
   ~ScopedEnvVar() {
     if (had_original_value_) {
-      // NOLINTNEXTLINE(misc-include-cleaner)
-      setenv(name_.c_str(), original_value_.c_str(), 1);
+      Set_env_var_raw(name_.c_str(), original_value_.c_str());
     } else {
-      // NOLINTNEXTLINE(misc-include-cleaner)
-      unsetenv(name_.c_str());
+      Unset_env_var_raw(name_.c_str());
     }
   }
 
@@ -539,7 +555,7 @@ protected:
 TEST_F(DeviceIntegrationEnvMockTest,
        SessionInitializationUsesBaseUrlFromEnvironment) {
   const ScopedEnvVar base_url_env("IQM_BASE_URL");
-  ASSERT_EQ(setenv("IQM_BASE_URL", "https://environment.example", 1), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
   ASSERT_STREQ(std::getenv("IQM_BASE_URL"), "https://environment.example");
 
   const std::string expected_url =
@@ -554,7 +570,7 @@ TEST_F(DeviceIntegrationEnvMockTest,
 TEST_F(DeviceIntegrationMockTest,
        SessionInitializationPrefersExplicitBaseUrlOverEnvironment) {
   const ScopedEnvVar base_url_env("IQM_BASE_URL");
-  ASSERT_EQ(setenv("IQM_BASE_URL", "https://environment.example", 1), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
 
   const std::string expected_url = "https://localhost/api/v1/quantum-computers";
   expect_successful_initialization(&expected_url);
