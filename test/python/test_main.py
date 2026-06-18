@@ -19,7 +19,11 @@
 
 from __future__ import annotations
 
+import sys
+from subprocess import check_output
 from typing import TYPE_CHECKING
+
+import pytest
 
 from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
 
@@ -61,3 +65,10 @@ def test_cli_lib_path(script_runner: ScriptRunner) -> None:
     result = script_runner.run(["iqm-qdmi", "--lib_path"])
     assert result.success
     assert str(IQM_QDMI_LIBRARY_PATH) in result.stdout
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="The subprocess calls do not work properly on Windows.")
+def test_cli_execute_module() -> None:
+    """Test running the CLI by executing the iqm.qdmi module."""
+    output = check_output([sys.executable, "-m", "iqm.qdmi", "--version"])
+    assert __version__ in output.decode()
