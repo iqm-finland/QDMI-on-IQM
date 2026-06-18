@@ -47,7 +47,7 @@ $ uvx nox -s examples
 
 # Run specific examples
 $ ./examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
-$ ./examples/ghz.py --shots 128
+$ ./examples/mqt_bench.py --benchmark ghz --shots 128
 ```
 
 ## Quantum Chemistry
@@ -77,37 +77,38 @@ To understand how the backend behaves on standard programs, we move on to [MQT B
 MQT Bench is an open-source benchmark suite that collects representative quantum algorithms across several abstraction levels.
 In this repository, the benchmark scripts show how to generate those programs, transpile them for the selected target, execute them through {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the resulting bitstring distributions.
 
-The current benchmark scripts cover the following algorithms:
+The `examples/mqt_bench.py` entrypoint currently covers the following algorithms:
 
-- `examples/ghz.py`: Prepares a [GHZ state][ghz-state], a highly entangled state that serves as a strong baseline test for multi-qubit entanglement fidelity.
-- `examples/deutsch_jozsa.py`: Implements the [Deutsch-Jozsa algorithm][deutsch-jozsa], one of the earliest examples of a quantum algorithm with an exponential query advantage over its classical counterpart.
-- `examples/qft.py`: Computes the [Quantum Fourier Transform][quantum-fourier-transform], a central building block used in algorithms such as phase estimation and Shor's algorithm.
-- `examples/graphstate.py`: Generates [graph states][graph-state], an important family of entangled states that also serve as key resources for [measurement-based quantum computing][measurement-based-quantum-computing].
-- `examples/wstate.py`: Creates a [W state][w-state], a multipartite entangled state that retains pairwise entanglement even if one qubit is lost.
-- `examples/grover.py`: Implements [Grover's algorithm][grover], a quantum search algorithm that provides a quadratic speedup for unstructured search problems.
-- `examples/qpe.py`: Implements the [Quantum Phase Estimation algorithm][qpe], a fundamental algorithm that estimates the eigenvalues of a unitary operator and underpins many quantum algorithms, including Shor's factoring algorithm.
+- `ghz`: Prepares a [GHZ state][ghz-state], a highly entangled state that serves as a strong baseline test for multi-qubit entanglement fidelity.
+- `dj`: Implements the [Deutsch-Jozsa algorithm][deutsch-jozsa], one of the earliest examples of a quantum algorithm with an exponential query advantage over its classical counterpart.
+- `qft`: Computes the [Quantum Fourier Transform][quantum-fourier-transform], a central building block used in algorithms such as phase estimation and Shor's algorithm.
+- `graphstate`: Generates [graph states][graph-state], an important family of entangled states that also serve as key resources for [measurement-based quantum computing][measurement-based-quantum-computing].
+- `wstate`: Creates a [W state][w-state], a multipartite entangled state that retains pairwise entanglement even if one qubit is lost.
+- `grover`: Implements [Grover's algorithm][grover], a quantum search algorithm that provides a quadratic speedup for unstructured search problems.
+- `qpe`: Implements the [Quantum Phase Estimation algorithm][qpe], a fundamental algorithm that estimates the eigenvalues of a unitary operator and underpins many quantum algorithms, including Shor's factoring algorithm.
 
-All benchmark scripts expose a compact, consistent CLI:
+The benchmark entrypoint exposes a compact, consistent CLI:
 
+- `--benchmark`: Selects the benchmark family to run.
 - `--backend`: Selects `iqm` for hardware runs or `sim` for simulator runs.
 - `--shots`: Controls how many samples are collected from the executed circuit.
 - `--num-qubits`: Adjusts the problem size for the benchmark families that support it.
 
 ### Code Example: Preparing and Sampling from a GHZ State
 
-The following snippet shows the GHZ benchmark in full.
-The same overall architecture carries over to the other MQT Bench scripts; only the benchmark-generation logic and the distribution analysis differ.
+The following snippet shows the benchmark runner in full.
+The same architecture covers every supported benchmark family; only the selected benchmark and validation logic differ.
 
-```{literalinclude} ../examples/ghz.py
+```{literalinclude} ../examples/mqt_bench.py
 :language: python
-:caption: examples/ghz.py
+:caption: examples/mqt_bench.py
 :start-after: "# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception"
 ```
 
 Execution on a simulator backend should yield a near-perfect distribution of the expected bitstrings (all 0s and all 1s for the GHZ state):
 
 ```{code-cell} ipython3
-!../examples/ghz.py --backend sim --shots 8192 --num-qubits 20
+!../examples/mqt_bench.py --benchmark ghz --backend sim --shots 8192 --num-qubits 20
 ```
 
 Now try running the same script with `--backend iqm` to see how the distribution looks on real hardware.
