@@ -24,7 +24,7 @@ import contextlib
 import os
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, SupportsInt, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 try:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
@@ -41,6 +41,7 @@ from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
+    from typing import SupportsInt
 
     from mqt.core.plugins.qiskit.backend import QDMIBackend
 
