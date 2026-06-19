@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
+
 ## [1.1.1] - 2026-06-01
 
 ### Fixed
@@ -55,6 +59,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#92]: https://github.com/iqm-finland/QDMI-on_IQM/pull/92
 [#78]: https://github.com/iqm-finland/QDMI-on_IQM/pull/78
 [#73]: https://github.com/iqm-finland/QDMI-on_IQM/pull/73
 [#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
