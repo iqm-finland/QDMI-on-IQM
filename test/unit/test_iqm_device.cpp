@@ -96,6 +96,36 @@ private:
   bool had_original_value_ = false;
 };
 
+class ScopedUnsetEnvVar {
+public:
+  explicit ScopedUnsetEnvVar(std::string name) : name_(std::move(name)) {
+    if (const char *original_value = std::getenv(name_.c_str());
+        original_value != nullptr) {
+      original_value_ = original_value;
+      had_original_value_ = true;
+    }
+    Unset_env_var_raw(name_.c_str());
+  }
+
+  ~ScopedUnsetEnvVar() {
+    if (had_original_value_) {
+      Set_env_var_raw(name_.c_str(), original_value_.c_str());
+    } else {
+      Unset_env_var_raw(name_.c_str());
+    }
+  }
+
+  ScopedUnsetEnvVar(const ScopedUnsetEnvVar &) = delete;
+  ScopedUnsetEnvVar &operator=(const ScopedUnsetEnvVar &) = delete;
+  ScopedUnsetEnvVar(ScopedUnsetEnvVar &&) = delete;
+  ScopedUnsetEnvVar &operator=(ScopedUnsetEnvVar &&) = delete;
+
+private:
+  std::string name_;
+  std::string original_value_;
+  bool had_original_value_ = false;
+};
+
 // ============================================================================
 // TEST FIXTURES
 // ============================================================================
@@ -104,6 +134,14 @@ class DeviceTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
 
+private:
+  ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
+  ScopedUnsetEnvVar token_env_{"IQM_TOKEN"};
+  ScopedUnsetEnvVar tokens_file_env_{"IQM_TOKENS_FILE"};
+  ScopedUnsetEnvVar qc_id_env_{"IQM_QC_ID"};
+  ScopedUnsetEnvVar qc_alias_env_{"IQM_QC_ALIAS"};
+
+protected:
   void SetUp() override {
     iqm::Logger::get_instance().set_level(iqm::LOG_LEVEL::DEBUG);
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
@@ -124,6 +162,14 @@ protected:
   std::unique_ptr<iqm::MockHttpClient> mock_http_client_;
   iqm::MockHttpClient *mock_handle_{};
 
+private:
+  ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
+  ScopedUnsetEnvVar token_env_{"IQM_TOKEN"};
+  ScopedUnsetEnvVar tokens_file_env_{"IQM_TOKENS_FILE"};
+  ScopedUnsetEnvVar qc_id_env_{"IQM_QC_ID"};
+  ScopedUnsetEnvVar qc_alias_env_{"IQM_QC_ALIAS"};
+
+protected:
   const std::string list_quantum_computers_response = R"({
       "quantum_computers": [
         {
