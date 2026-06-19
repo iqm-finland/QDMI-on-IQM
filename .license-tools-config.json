@@ -17,7 +17,9 @@
     ".toml": "POUND_STYLE",
     ".proto": "SLASH_STYLE",
     ".ts": "C_STYLE",
-    ".ps1": "POUND_STYLE"
+    ".ps1": "POUND_STYLE",
+    "Dockerfile": "POUND_STYLE",
+    "dockerfile": "POUND_STYLE"
   },
   "exclude": [
     "^\\.[^/]+",

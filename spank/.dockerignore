@@ -1,0 +1,37 @@
+# Version Control
+.git
+.github
+.gitignore
+
+# Editor & IDE Configs
+.idea/
+.vscode/
+.vs/
+*~
+*.swp
+
+# Python / Package Managers / Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.uv-cache/
+
+# Build, Tests & Cache
+build/
+dist/
+.tox/
+.nox/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Documentation Builds
+docs/_build/
+docs/api/
+docs/**/build
