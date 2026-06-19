@@ -18,6 +18,10 @@ jobs:
   change-detection:
     name: 🔍 Change
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@b17932e07095e11c8f8c0d74298bbcde43f77a15 # v2.1.1
+    with:
+      additional-cd-files: |
+        spank/**
+        .github/workflows/spank-tests.yml
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -170,6 +174,14 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  spank-tests:
+    name: 🇸 Test SPANK
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cd)
+    uses: ./.github/workflows/spank-tests.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+
   # this job does nothing and is only used for branch protection
   required-checks-pass:
     name: 🚦 Check
@@ -186,6 +198,7 @@ jobs:
       - examples
       - build-sdist
       - build-wheel
+      - spank-tests
     runs-on: ubuntu-slim
     steps:
       - name: Decide whether the needed jobs succeeded or failed
@@ -206,7 +219,7 @@ jobs:
             }}
             ${{
               fromJSON(needs.change-detection.outputs.run-cd)
-              && '' || 'build-sdist,'
+              && '' || 'build-sdist,spank-tests,'
             }}
             ${{
               (fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd))

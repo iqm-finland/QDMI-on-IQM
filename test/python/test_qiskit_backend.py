@@ -22,13 +22,135 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pytest
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 from qiskit.quantum_info import SparsePauliOp
 
+from iqm.qdmi import qiskit as iqm_qiskit
 from iqm.qdmi.qiskit import IQMBackend
+
+ENVIRONMENT_TOKENS_FILE = "/opt/iqm/environment-tokens.json"
+EXPLICIT_TOKENS_FILE = "/opt/iqm/explicit-tokens.json"
+
+
+def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Stub backend construction so environment-resolution tests stay hermetic.
+
+    Returns:
+        Captured constructor state from the fake device loader and backend base class.
+    """
+    captured: dict[str, Any] = {}
+    fake_device = object()
+
+    def fake_add_dynamic_device_library(
+        *,
+        library_path: str,
+        prefix: str,
+        base_url: str,
+        token: str | None,
+        auth_file: str | None,
+        custom1: str | None,
+        custom2: str | None,
+    ) -> object:
+        captured["kwargs"] = {
+            "library_path": library_path,
+            "prefix": prefix,
+            "base_url": base_url,
+            "token": token,
+            "auth_file": auth_file,
+            "custom1": custom1,
+            "custom2": custom2,
+        }
+        return fake_device
+
+    def fake_qdmi_backend_init(_self: IQMBackend, device: object) -> None:
+        captured["device"] = device
+
+    monkeypatch.setattr(iqm_qiskit, "add_dynamic_device_library", fake_add_dynamic_device_library)
+    monkeypatch.setattr(iqm_qiskit.QDMIBackend, "__init__", fake_qdmi_backend_init)
+    return captured
+
+
+def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The backend should forward the canonical IQM environment variables."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
+    monkeypatch.setenv("IQM_TOKEN", "environment-token")
+    monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
+    monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
+    monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
+
+    IQMBackend()
+
+    assert captured["device"] is not None
+    assert captured["kwargs"] == {
+        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
+        "prefix": "IQM",
+        "base_url": "https://environment.example",
+        "token": "environment-token",
+        "auth_file": ENVIRONMENT_TOKENS_FILE,
+        "custom1": "environment-qc-id",
+        "custom2": "environment-qc-alias",
+    }
+
+
+def test_iqm_backend_prefers_explicit_arguments_over_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit backend arguments should override inherited environment values."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
+    monkeypatch.setenv("IQM_TOKEN", "environment-token")
+    monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
+    monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
+    monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
+    explicit_token = "explicit-token"  # noqa: S105
+
+    IQMBackend(
+        base_url="https://explicit.example",
+        token=explicit_token,
+        tokens_file=EXPLICIT_TOKENS_FILE,
+        qc_id="explicit-qc-id",
+        qc_alias="explicit-qc-alias",
+    )
+
+    assert captured["kwargs"] == {
+        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
+        "prefix": "IQM",
+        "base_url": "https://explicit.example",
+        "token": explicit_token,
+        "auth_file": EXPLICIT_TOKENS_FILE,
+        "custom1": "explicit-qc-id",
+        "custom2": "explicit-qc-alias",
+    }
+
+
+def test_iqm_backend_does_not_use_legacy_resonance_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy RESONANCE_API_KEY should not be consulted at runtime anymore."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.delenv("IQM_BASE_URL", raising=False)
+    monkeypatch.delenv("IQM_TOKEN", raising=False)
+    monkeypatch.delenv("IQM_TOKENS_FILE", raising=False)
+    monkeypatch.delenv("IQM_QC_ID", raising=False)
+    monkeypatch.delenv("IQM_QC_ALIAS", raising=False)
+    monkeypatch.setenv("RESONANCE_API_KEY", "legacy-token")
+
+    IQMBackend()
+
+    assert captured["kwargs"] == {
+        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
+        "prefix": "IQM",
+        "base_url": "https://resonance.iqm.tech",
+        "token": None,
+        "auth_file": None,
+        "custom1": None,
+        "custom2": None,
+    }
 
 
 def _skip_without_iqm_access() -> None:

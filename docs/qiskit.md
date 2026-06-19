@@ -40,7 +40,7 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-If no API token is explicitly provided, like in the example above, the wrapper will attempt to read it from the `IQM_TOKEN` environment variable. Alternatively, set `IQM_TOKENS_FILE` to point to an authentication file.
+If no explicit arguments are provided, the wrapper resolves `IQM_BASE_URL`, `IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QC_ALIAS` from the environment. Alternatively, pass any of those values directly to `IQMBackend(...)`.
 
 ## Sampler and Estimator Primitives
 
