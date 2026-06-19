@@ -60,3 +60,38 @@ The above values can also be conveniently queried from the command line via the 
 ```{code-cell} ipython3
 !iqm-qdmi --lib_path
 ```
+
+## Sampler and Estimator CLI Utilities
+
+If you install the package with the `qiskit` extra, the following additional command-line scripts are exposed:
+
+- `iqm-sampler`: Samples a serialized QPY circuit on the specified backend.
+- `iqm-estimator`: Variational Quantum Eigensolver (VQE) parameter estimation for a serialized ansatz and observable.
+
+### `iqm-sampler` Usage
+
+```console
+$ iqm-sampler --help
+```
+
+For example, to execute a QPY circuit file (`bell.qpy`):
+
+```console
+$ iqm-sampler bell.qpy --shots 128
+```
+
+### `iqm-estimator` Usage
+
+```console
+$ iqm-estimator --help
+```
+
+To run a parameter estimation job:
+
+```console
+$ iqm-estimator ansatz.qpy observable.pkl --maxiter 10
+```
+
+:::{note}
+Direct token passing via a command-line flag is intentionally unsupported to prevent exposing access tokens in shell history, process listings, or logs. To run authenticated jobs, use the `--tokens-file` option or set the `IQM_TOKEN` / `IQM_TOKENS_FILE` environment variables.
+:::

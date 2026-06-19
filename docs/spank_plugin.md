@@ -66,6 +66,18 @@ To run this job:
 srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 ```
 
+### Executing via CLI Scripts
+
+Alternatively, if you already have serialized circuits (in QPY format), you can execute them directly on the cluster using the packaged CLI scripts without writing any custom Python code:
+
+```bash
+# Run a serialized circuit using the sampler CLI
+srun --partition=quantum --iqm-qc-alias=emerald iqm-sampler bell.qpy --shots 100
+
+# Estimate parameters using the estimator CLI
+srun --partition=quantum --iqm-qc-alias=emerald iqm-estimator ansatz.qpy observable.pkl --maxiter 10
+```
+
 ---
 
 ## For HPC Administrators

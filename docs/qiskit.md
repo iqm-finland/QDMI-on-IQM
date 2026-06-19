@@ -64,3 +64,7 @@ data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
+
+## CLI Scripts
+
+The package also exposes the `iqm-sampler` and `iqm-estimator` CLI scripts for executing serialized circuits directly from the shell. For more details on these utilities and their usage, see the [Python Package Guide](python_package.md).
