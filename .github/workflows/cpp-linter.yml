@@ -53,7 +53,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libslurm-dev
 
       - name: Set up Clang ${{ inputs.clang-version }}
         env:
@@ -87,7 +87,7 @@ jobs:
           echo $CXX
           $CC --version
           $CXX --version
-          cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_SPANK=ON
 
       # runs the cpp-linter action using the generated compilation database and the specified clang version
       - name: Run cpp-linter

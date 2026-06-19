@@ -128,6 +128,26 @@ else()
   find_package(CURL REQUIRED)
 endif()
 
+if(BUILD_IQM_SPANK)
+  find_path(
+    SLURM_SPANK_INCLUDE_DIR
+    NAMES spank.h
+    PATH_SUFFIXES slurm
+    HINTS /opt/slurm/include
+    DOC "Path to Slurm SPANK headers")
+
+  if(NOT SLURM_SPANK_INCLUDE_DIR)
+    message(
+      FATAL_ERROR
+        "BUILD_IQM_SPANK is ON but Slurm SPANK headers were not "
+        "found. Please install Slurm development headers "
+        "(e.g. slurm-devel or libslurm-dev), or provide "
+        "SLURM_SPANK_INCLUDE_DIR.")
+  endif()
+
+  mark_as_advanced(SLURM_SPANK_INCLUDE_DIR)
+endif()
+
 if(BUILD_IQM_QDMI_TESTS)
   set(gtest_force_shared_crt
       ON

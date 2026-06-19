@@ -1,0 +1,156 @@
+name: 🇸 • Tests • SPANK
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "The ubuntu runner image to use."
+        default: "ubuntu-24.04"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  spank-tests:
+    name: 🐧 ${{ inputs.runs-on }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+      TEST_BASE_URL: "https://test.example.com"
+      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install build and Slurm dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libslurm-dev slurm-wlm munge
+
+      - name: Setup ccache
+        uses: Chocobo1/setup-ccache-action@7e813cbdf161f77737576f5c370b2810dbae058c # v1.5.7
+        with:
+          prepend_symlinks_to_path: false
+          override_cache_key: spank-${{ inputs.runs-on }}
+
+      - name: Setup mold
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: 3.13
+          activate-environment: true
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Setup local Slurm environment
+        run: |
+          # Start Munge service for authentication
+          sudo service munge start
+
+          # Make sure state and spool directories exist with correct permissions
+          sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd /var/log
+          sudo chown slurm:slurm /var/spool/slurmctld
+          sudo chown root:root /var/spool/slurmd
+
+          # Create a minimal slurm.conf matching local hostname
+          HOSTNAME=$(hostname)
+          cat <<EOF | sudo tee /etc/slurm/slurm.conf
+          ClusterName=local-ci
+          SlurmctldHost=$HOSTNAME(127.0.0.1)
+          SlurmUser=slurm
+          SlurmctldPort=6817
+          SlurmdPort=6818
+          AuthType=auth/munge
+          StateSaveLocation=/var/spool/slurmctld
+          SlurmdSpoolDir=/var/spool/slurmd
+          SlurmdLogFile=/var/log/slurmd.log
+          SlurmctldLogFile=/var/log/slurmctld.log
+          ProctrackType=proctrack/pgid
+          SchedulerType=sched/backfill
+          SelectType=select/linear
+          TaskPlugin=task/none
+          PlugStackConfig=/etc/slurm/plugstack.conf
+          NodeName=$HOSTNAME NodeAddr=127.0.0.1 State=UNKNOWN
+          PartitionName=debug Nodes=$HOSTNAME Default=YES MaxTime=INFINITE State=UP
+          EOF
+
+          # Start Slurm services and verify they are running
+          sudo service slurmctld start || { echo "ERROR: slurmctld failed to start"; exit 1; }
+          sudo service slurmd start || { echo "ERROR: slurmd failed to start"; exit 1; }
+
+          # Wait for the node to register and become idle
+          for i in {1..30}; do
+            if sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
+              break
+            fi
+            # Force resume if the node got marked DOWN/DRAINED
+            sudo scontrol update nodename="$HOSTNAME" state=resume 2>/dev/null || true
+            sleep 1
+          done
+
+          if ! sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
+            echo "ERROR: Node did not become ready after 30 seconds"
+            exit 1
+          fi
+
+          # Verify end-to-end connectivity
+          srun --partition=debug --immediate=5 /bin/true
+
+      - name: Dump Slurm logs on failure
+        if: failure()
+        run: |
+          echo "=== Slurmctld Status ==="
+          sudo systemctl status slurmctld || true
+          echo "=== Slurmd Status ==="
+          sudo systemctl status slurmd || true
+          echo "=== Munge Status ==="
+          sudo systemctl status munge || true
+          echo "=== Slurmctld Log ==="
+          sudo cat /var/log/slurmctld.log || true
+          echo "=== Slurmd Log ==="
+          sudo cat /var/log/slurmd.log || true
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON
+
+      - name: Build SPANK plugin
+        run: cmake --build build --target iqm-spank-plugin
+
+      - name: Install SPANK plugin
+        run: sudo cmake --install build --component iqm-spank-plugin
+
+      - name: Activate SPANK plugin
+        run: |
+          # Create the top-level plugstack.conf with include directive
+          echo "include /etc/slurm/plugstack.conf.d/*.conf" | sudo tee /etc/slurm/plugstack.conf
+
+          # Resolve the Slurm plugin directory (mirrors CMake's detection logic)
+          PLUGIN_DIR=$(scontrol show config | awk -F'= *' '/^PluginDir/ {print $2}' | xargs)
+          PLUGIN_PATH="${PLUGIN_DIR}/iqm-spank-plugin.so"
+          echo "required ${PLUGIN_PATH} iqm_base_url=${TEST_BASE_URL}" \
+            | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+
+          # Reload Slurm configuration (brief sleep lets the daemon settle)
+          sudo scontrol reconfigure
+          sleep 2
+
+      - name: Run SPANK smoke tests
+        run: |
+          uv run nox -f spank/noxfile.py -s smoke_tests -- \
+            --partition debug \
+            --hook-mode full \
+            --require-all-hooks \
+            --test-base-url "$TEST_BASE_URL"
+
+      - name: Run SPANK resonance tests
+        if: env.IQM_TOKEN != ''
+        run: |
+          uv run nox -f spank/noxfile.py -s resonance_tests -- \
+            --partition debug \
+            --test-base-url "https://resonance.iqm.tech" \
+            --test-qc-alias "emerald:mock"
