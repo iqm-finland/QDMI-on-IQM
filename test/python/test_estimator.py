@@ -52,7 +52,14 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     with observable_path.open("wb") as file_obj:
         pickle.dump(observable, file_obj)
 
-    result = script_runner.run(["iqm-estimator", str(ansatz_path), str(observable_path), "5", "--simulator"])
+    result = script_runner.run([
+        "iqm-estimator",
+        str(ansatz_path),
+        str(observable_path),
+        "--maxiter",
+        "5",
+        "--simulator",
+    ])
     assert result.success
 
     params = ast.literal_eval(result.stdout.strip())

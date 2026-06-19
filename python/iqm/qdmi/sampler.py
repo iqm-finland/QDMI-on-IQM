@@ -149,11 +149,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Execute the sampler CLI subcommand."""
     parser = argparse.ArgumentParser(description="Sample a serialized QPY circuit.")
     parser.add_argument("circuit", type=str, help="Path to the QPY circuit file.")
-    parser.add_argument("shots", type=int, help="Number of shots to run the circuit.")
+    parser.add_argument("--shots", type=int, required=True, help="Number of shots to run the circuit.")
     parser.add_argument("--timeout", type=int, help="Timeout passed to the IQM Backend in seconds.", default=300)
     parser.add_argument("--simulator", action="store_true", help="Use the simulator instead of the actual backend.")
     parser.add_argument("--base-url", type=str, dest="base_url", help="IQM server base URL.", default=None)
-    parser.add_argument("--token", type=str, help="IQM token for authentication.", default=None)
     parser.add_argument("--tokens-file", type=str, help="IQM tokens file for authentication.", default=None)
     parser.add_argument("--qc-id", type=str, dest="qc_id", help="Quantum computer ID to use.", default=None)
     parser.add_argument(
@@ -176,7 +175,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         backend = IQMBackend(
             base_url=args.base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech",
-            token=args.token,
             tokens_file=args.tokens_file,
             qc_id=args.qc_id,
             qc_alias=args.qc_alias,

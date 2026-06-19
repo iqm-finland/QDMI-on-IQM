@@ -44,7 +44,7 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     with circuit_path.open("wb") as file_obj:
         qpy.dump(circuit, file_obj)
 
-    result = script_runner.run(["iqm-sampler", str(circuit_path), "256", "--simulator"])
+    result = script_runner.run(["iqm-sampler", str(circuit_path), "--shots", "256", "--simulator"])
     assert result.success
 
     counts = ast.literal_eval(result.stdout.strip())
