@@ -65,8 +65,8 @@ The above values can also be conveniently queried from the command line via the 
 
 If you install the package with the `qiskit` extra, the following additional command-line scripts are exposed:
 
-- `iqm-sampler`: Samples a serialized QPY circuit on the specified backend.
-- `iqm-estimator`: Variational Quantum Eigensolver (VQE) parameter estimation for a serialized ansatz and observable.
+- `iqm-sampler` (see the {py:mod}`~iqm.qdmi.sampler` entry point module): Samples a serialized QPY circuit on the specified backend.
+- `iqm-estimator` (see the {py:mod}`~iqm.qdmi.estimator` entry point module): Variational Quantum Eigensolver (VQE) parameter estimation for a serialized ansatz and observable.
 
 ### `iqm-sampler` Usage
 

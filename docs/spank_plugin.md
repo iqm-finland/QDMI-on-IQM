@@ -68,7 +68,7 @@ srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 
 ### Executing via CLI Scripts
 
-Alternatively, if you already have serialized circuits (in QPY format), you can execute them directly on the cluster using the packaged CLI scripts without writing any custom Python code:
+Alternatively, if you already have serialized circuits (in QPY format), you can execute them directly on the cluster using the packaged CLI scripts (see the [Sampler and Estimator CLI Utilities](python_package.md#sampler-and-estimator-cli-utilities) documentation for details) without writing any custom Python code:
 
 ```bash
 # Run a serialized circuit using the sampler CLI
