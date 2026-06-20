@@ -70,7 +70,6 @@ If you install the package with the `qiskit` extra, the following additional com
 
 ### `iqm-sampler` Usage
 
-
 For example, to execute a QPY circuit file (`bell.qpy`):
 
 ```console
@@ -79,10 +78,8 @@ $ iqm-sampler bell.qpy --shots 128
 
 ### `iqm-estimator` Usage
 
-
 To run a parameter estimation job:
 
 ```console
 $ iqm-estimator ansatz.qpy observable.pkl --maxiter 10
 ```
-
