@@ -20,11 +20,8 @@
 from __future__ import annotations
 
 import json
-import sys
-from subprocess import check_output
 from typing import TYPE_CHECKING
 
-import pytest
 from qiskit import QuantumCircuit, qpy
 
 if TYPE_CHECKING:
@@ -55,8 +52,8 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     assert counts
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="The subprocess calls do not work properly on Windows.")
-def test_sampler_execute_module() -> None:
-    """Test running the sampler CLI by executing the iqm.qdmi.sampler module."""
-    output = check_output([sys.executable, "-m", "iqm.qdmi.sampler", "--help"])
-    assert "Sample a serialized QPY circuit" in output.decode()
+def test_sampler_cli_help(script_runner: ScriptRunner) -> None:
+    """Test running the sampler CLI with the --help flag."""
+    result = script_runner.run(["iqm-sampler", "--help"])
+    assert result.success
+    assert "Sample a serialized QPY circuit" in result.stdout

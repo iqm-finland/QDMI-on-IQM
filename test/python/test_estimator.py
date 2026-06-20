@@ -22,11 +22,8 @@ from __future__ import annotations
 import json
 import math
 import pickle  # noqa: S403
-import sys
-from subprocess import check_output
 from typing import TYPE_CHECKING
 
-import pytest
 from qiskit import QuantumCircuit, qpy
 from qiskit.circuit import Parameter
 from qiskit.quantum_info import SparsePauliOp
@@ -70,8 +67,8 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     assert math.isfinite(float(params[0]))
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="The subprocess calls do not work properly on Windows.")
-def test_estimator_execute_module() -> None:
-    """Test running the estimator CLI by executing the iqm.qdmi.estimator module."""
-    output = check_output([sys.executable, "-m", "iqm.qdmi.estimator", "--help"])
-    assert "Estimate VQE parameters" in output.decode()
+def test_estimator_cli_help(script_runner: ScriptRunner) -> None:
+    """Test running the estimator CLI with the --help flag."""
+    result = script_runner.run(["iqm-estimator", "--help"])
+    assert result.success
+    assert "Estimate VQE parameters" in result.stdout
