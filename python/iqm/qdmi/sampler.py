@@ -42,8 +42,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
     from typing import SupportsInt
 
-    from mqt.core.plugins.qiskit.backend import QDMIBackend
-
 
 class _SupportsResult(Protocol):
     """Protocol for jobs exposing a result method."""
@@ -78,15 +76,6 @@ class _SupportsSamplerPrimitive(Protocol):
 
     def run(self, pubs: list[tuple[object, ...]], shots: int) -> _SupportsResult:
         """Execute sampler pubs and return a job handle."""
-
-
-def build_simulator_backend() -> QDMIBackend:
-    """Create the MQT Core DDSIM backend used for simulation.
-
-    Returns:
-        The MQT Core QDMI simulator backend.
-    """
-    return QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
 
 
 def _count_to_int(count: object) -> int:
@@ -168,7 +157,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         circuit = qpy.load(file_obj)[0]
 
     if args.simulator:
-        backend = build_simulator_backend()
+        backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
         circuit_for_execution = circuit
         sampler = cast("_SupportsSamplerPrimitive", QDMISampler(backend))
     else:

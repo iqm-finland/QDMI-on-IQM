@@ -42,17 +42,7 @@ from iqm.qdmi.qiskit import IQMBackend
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.quantum_info import SparsePauliOp
-
-
-def build_simulator_backend() -> QDMIBackend:
-    """Create the MQT Core DDSIM backend used for simulation.
-
-    Returns:
-        The MQT Core QDMI simulator backend.
-    """
-    return QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -87,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         observable: SparsePauliOp = pickle.load(file_obj)  # noqa: S301
 
     if args.simulator:
-        backend = build_simulator_backend()
+        backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
         estimator = QDMIEstimator(backend)
     else:
         backend = IQMBackend(
