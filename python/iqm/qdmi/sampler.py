@@ -23,7 +23,7 @@ import argparse
 import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -44,35 +44,14 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-class _SupportsResult(Protocol):
-    """Protocol for objects exposing result."""
-
-    def result(self) -> object:
-        """Return the result of the job."""
-
-
-class _SupportsSamplerPrimitive(Protocol):
-    """Protocol for sampler primitives with a run method."""
-
-    def run(self, pubs: list[tuple[object, ...]], shots: int) -> _SupportsResult:
-        """Execute sampler pubs and return a job handle."""
-
-
-class _HasGetCounts(Protocol):
-    """Protocol for objects exposing get_counts."""
-
-    def get_counts(self) -> dict[str, int]:
-        """Return a dictionary of measurement counts."""
-
-
 def _serialize_value(val: object) -> object:
-    if hasattr(val, "get_counts") and callable(val.get_counts):
-        return cast("_HasGetCounts", val).get_counts()
+    if hasattr(val, "get_counts") and callable(getattr(val, "get_counts", None)):
+        return cast("Any", val).get_counts()
     if isinstance(val, np.ndarray):
         return val.tolist()  # ty: ignore[no-matching-overload]
     if isinstance(val, (np.integer, np.floating)):
         return val.item()
-    if isinstance(val, Mapping) or (hasattr(val, "items") and callable(val.items)):
+    if isinstance(val, Mapping) or (hasattr(val, "items") and callable(getattr(val, "items", None))):
         return {str(k): _serialize_value(v) for k, v in cast("Any", val).items()}
     if isinstance(val, list):
         return [_serialize_value(v) for v in val]
@@ -118,10 +97,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.circuit).open("rb") as file_obj:
         circuit = qpy.load(file_obj)[0]
 
+    sampler: QDMISampler
     if args.simulator:
         backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
         circuit_for_execution = circuit
-        sampler = cast("_SupportsSamplerPrimitive", QDMISampler(backend))
+        sampler = QDMISampler(backend)
     else:
         backend = IQMBackend(
             base_url=args.base_url,
@@ -130,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             qc_alias=args.qc_alias,
         )
         circuit_for_execution = transpile(circuit, backend)
-        sampler = cast("_SupportsSamplerPrimitive", backend.sampler())
+        sampler = backend.sampler()
 
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
     serialized = _serialize_primitive_result(job.result())
