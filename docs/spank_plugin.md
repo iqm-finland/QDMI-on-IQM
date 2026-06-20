@@ -132,3 +132,33 @@ The plugin logs to the standard `slurmd.log` on compute nodes. Successful activa
 - **"Plugin metadata symbol missing"**: The plugin was compiled with incompatible headers or toolchain. Rebuild the plugin from source on the target environment.
 - **Options/variables not showing up**: Verify that `scontrol show config | grep PlugStackConfig` references your `plugstack.conf` directory and that the drop-in file is read-permitted.
 - **Permission Denied**: The `slurmd` process user must have read access to the compiled `.so` library and the specified `iqm_tokens_file`.
+
+---
+
+## Testing with Docker
+
+To test the SPANK plugin locally without installing Slurm or configuring services on your host machine, you can run the test suite inside an isolated Docker container.
+
+First, build the Docker image from the repository root:
+
+```bash
+docker build -t qdmi-spank-tests -f spank/Dockerfile .
+```
+
+Then, run the tests:
+
+```bash
+docker run --rm qdmi-spank-tests
+```
+
+To run integration tests targeting the Resonance backend, pass your `IQM_TOKEN` as an environment variable:
+
+```bash
+docker run --rm -e IQM_TOKEN="your-token" qdmi-spank-tests
+```
+
+For a faster development loop, you can bind-mount your local workspace. This avoids rebuilding the image when you make changes to the code or test scripts:
+
+```bash
+docker run --rm -v "$(pwd):/workspace" qdmi-spank-tests
+```
