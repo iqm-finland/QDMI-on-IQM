@@ -70,9 +70,6 @@ If you install the package with the `qiskit` extra, the following additional com
 
 ### `iqm-sampler` Usage
 
-```console
-$ iqm-sampler --help
-```
 
 For example, to execute a QPY circuit file (`bell.qpy`):
 
@@ -82,9 +79,6 @@ $ iqm-sampler bell.qpy --shots 128
 
 ### `iqm-estimator` Usage
 
-```console
-$ iqm-estimator --help
-```
 
 To run a parameter estimation job:
 
@@ -92,6 +86,3 @@ To run a parameter estimation job:
 $ iqm-estimator ansatz.qpy observable.pkl --maxiter 10
 ```
 
-:::{note}
-Direct token passing via a command-line flag is intentionally unsupported to prevent exposing access tokens in shell history, process listings, or logs. To run authenticated jobs, use the `--tokens-file` option or set the `IQM_TOKEN` / `IQM_TOKENS_FILE` environment variables.
-:::

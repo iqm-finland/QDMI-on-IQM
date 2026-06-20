@@ -174,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         sampler = cast("_SupportsSamplerPrimitive", QDMISampler(backend))
     else:
         backend = IQMBackend(
-            base_url=args.base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech",
+            base_url=args.base_url,
             tokens_file=args.tokens_file,
             qc_id=args.qc_id,
             qc_alias=args.qc_alias,
