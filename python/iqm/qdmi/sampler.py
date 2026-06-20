@@ -97,10 +97,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.circuit).open("rb") as file_obj:
         circuit = qpy.load(file_obj)[0]
 
-    sampler: QDMISampler
     if args.simulator:
         backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
-        circuit_for_execution = circuit
         sampler = QDMISampler(backend)
     else:
         backend = IQMBackend(
@@ -109,9 +107,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             qc_id=args.qc_id,
             qc_alias=args.qc_alias,
         )
-        circuit_for_execution = transpile(circuit, backend)
         sampler = backend.sampler()
 
+    circuit_for_execution = transpile(circuit, backend)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
     serialized = _serialize_primitive_result(job.result())
     print(json.dumps(serialized))
