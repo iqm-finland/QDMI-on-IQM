@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-import ast
+import json
 import math
 import pickle  # noqa: S403
 import sys
@@ -62,7 +62,10 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     ])
     assert result.success
 
-    params = ast.literal_eval(result.stdout.strip())
+    res = json.loads(result.stdout.strip())
+    assert "optimal_parameters" in res
+    assert "eigenvalue" in res
+    params = list(res["optimal_parameters"].values())
     assert len(params) == 1
     assert math.isfinite(float(params[0]))
 

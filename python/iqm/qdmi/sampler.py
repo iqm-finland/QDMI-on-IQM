@@ -20,10 +20,12 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
+import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+import numpy as np
 
 try:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
@@ -39,36 +41,14 @@ except ImportError as e:
 from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
-    from typing import SupportsInt
+    from collections.abc import Sequence
 
 
 class _SupportsResult(Protocol):
-    """Protocol for jobs exposing a result method."""
+    """Protocol for objects exposing result."""
 
-    def result(self) -> _SupportsIterableResult:
-        """Return job results."""
-
-
-class _SupportsIterableResult(Protocol):
-    """Protocol for iterable sampler/estimator v2 results."""
-
-    def __iter__(self) -> Iterator[_SupportsPubResult]:
-        """Iterate pub results."""
-
-
-class _SupportsPubResult(Protocol):
-    """Protocol for a single pub result."""
-
-    data: _SupportsDataBin
-    metadata: object
-
-
-class _SupportsDataBin(Protocol):
-    """Protocol for pub result data containers."""
-
-    def __getitem__(self, key: str) -> object:
-        """Read a field from the data bin."""
+    def result(self) -> object:
+        """Return the result of the job."""
 
 
 class _SupportsSamplerPrimitive(Protocol):
@@ -78,59 +58,41 @@ class _SupportsSamplerPrimitive(Protocol):
         """Execute sampler pubs and return a job handle."""
 
 
-def _count_to_int(count: object) -> int:
-    """Convert an external count payload to a plain integer.
+class _HasGetCounts(Protocol):
+    """Protocol for objects exposing get_counts."""
 
-    Returns:
-        The converted count value.
-    """
-    return int(cast("SupportsInt | str | bytes | bytearray", count))
+    def get_counts(self) -> dict[str, int]:
+        """Return a dictionary of measurement counts."""
 
 
-def normalize_counts(raw_counts: object) -> dict[str, int]:
-    """Convert backend count payloads into a plain typed dictionary.
+def _serialize_value(val: object) -> object:
+    if hasattr(val, "get_counts") and callable(val.get_counts):
+        return cast("_HasGetCounts", val).get_counts()
+    if isinstance(val, np.ndarray):
+        return val.tolist()  # ty: ignore[no-matching-overload]
+    if isinstance(val, (np.integer, np.floating)):
+        return val.item()
+    if isinstance(val, Mapping) or (hasattr(val, "items") and callable(val.items)):
+        return {str(k): _serialize_value(v) for k, v in cast("Any", val).items()}
+    if isinstance(val, list):
+        return [_serialize_value(v) for v in val]
+    return val
 
-    Returns:
-        A normalized mapping from bitstrings to integer counts.
-    """
-    if isinstance(raw_counts, Mapping):
-        return {str(bitstring): _count_to_int(count) for bitstring, count in raw_counts.items()}
 
-    pairs = cast("Iterable[tuple[object, object]]", raw_counts)
-    return {str(bitstring): _count_to_int(count) for bitstring, count in pairs}
+def _serialize_primitive_result(result: object) -> dict:
+    iterator = result if isinstance(result, Iterable) else [result]
 
-
-def extract_counts(pub_result: _SupportsPubResult) -> dict[str, int]:
-    """Extract counts from the first classical register exposed by a primitive result.
-
-    Returns:
-        A normalized mapping from measured bitstrings to shot counts.
-
-    Raises:
-        RuntimeError: If no classical register with counts is present in the result.
-    """
-    data = pub_result.data
-
-    if isinstance(data, dict):
-        values: Iterable[object] = data.values()
-    else:
-        keys = getattr(data, "keys", None)
-        values = (data[key] for key in keys()) if callable(keys) else ()
-
-    for value in values:
-        get_counts = getattr(value, "get_counts", None)
-        if callable(get_counts):
-            return normalize_counts(get_counts())
-
-    for key in ("meas", "c"):
-        with contextlib.suppress(AttributeError, KeyError, TypeError):
-            value = data[key]
-            get_counts = getattr(value, "get_counts", None)
-            if callable(get_counts):
-                return normalize_counts(get_counts())
-
-    msg = "Could not find a classical register with counts in the primitive result."
-    raise RuntimeError(msg)
+    serialized_pubs = [
+        {
+            "data": _serialize_value(getattr(pub, "data", pub)),
+            "metadata": _serialize_value(getattr(pub, "metadata", {})),
+        }
+        for pub in iterator
+    ]
+    return {
+        "results": serialized_pubs,
+        "metadata": _serialize_value(getattr(result, "metadata", {})),
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -171,9 +133,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         sampler = cast("_SupportsSamplerPrimitive", backend.sampler())
 
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
-    first_pub = next(iter(job.result()))
-    counts = extract_counts(first_pub)
-    print(counts)
+    serialized = _serialize_primitive_result(job.result())
+    print(json.dumps(serialized))
 
 
 if __name__ == "__main__":

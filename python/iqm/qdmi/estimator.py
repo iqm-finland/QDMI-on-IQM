@@ -20,9 +20,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import pickle  # noqa: S403
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
+
+import numpy as np
 
 try:
     from mqt.core.plugins.qiskit.estimator import QDMIEstimator
@@ -45,12 +49,53 @@ if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    """Execute the estimator CLI subcommand.
+def _serialize_value(val: object) -> object:
+    if isinstance(val, np.ndarray):
+        return val.tolist()  # ty: ignore[no-matching-overload]
+    if isinstance(val, (np.integer, np.floating)):
+        return val.item()
+    if isinstance(val, Mapping) or (hasattr(val, "items") and callable(val.items)):
+        return {str(k): _serialize_value(v) for k, v in cast("Any", val).items()}
+    if isinstance(val, list):
+        return [_serialize_value(v) for v in val]
+    return val
 
-    Raises:
-        RuntimeError: If VQE optimization does not return optimal parameters.
-    """
+
+def _serialize_vqe_result(result: object) -> dict:
+    optimal_params = getattr(result, "optimal_parameters", None)
+    serialized_params = {}
+    if isinstance(optimal_params, Mapping):
+        for param, val in optimal_params.items():
+            param_name = getattr(param, "name", str(param))
+            serialized_params[param_name] = float(val)
+
+    eigenvalue = getattr(result, "eigenvalue", None)
+    serialized_eigenvalue = None
+    if eigenvalue is not None:
+        if isinstance(eigenvalue, complex):
+            if abs(eigenvalue.imag) < 1e-12:
+                serialized_eigenvalue = float(eigenvalue.real)
+            else:
+                serialized_eigenvalue = {"real": float(eigenvalue.real), "imag": float(eigenvalue.imag)}
+        else:
+            serialized_eigenvalue = float(eigenvalue)
+
+    optimal_value = getattr(result, "optimal_value", None)
+    if isinstance(optimal_value, complex) and abs(optimal_value.imag) < 1e-12:
+        optimal_value = float(optimal_value.real)
+
+    return {
+        "eigenvalue": serialized_eigenvalue,
+        "optimal_parameters": serialized_params,
+        "optimal_point": _serialize_value(getattr(result, "optimal_point", None)),
+        "optimal_value": optimal_value,
+        "optimizer_time": getattr(result, "optimizer_time", None),
+        "cost_function_evals": getattr(result, "cost_function_evals", None),
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Execute the estimator CLI subcommand."""
     parser = argparse.ArgumentParser(description="Estimate VQE parameters for a serialized ansatz.")
     parser.add_argument("circuit", type=str, help="Path to the QPY circuit file.")
     parser.add_argument("observable", type=str, help="Path to the serialized observable file.")
@@ -90,11 +135,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
-    optimal_params = result.optimal_parameters
-    if optimal_params is None:
-        msg = "VQE optimization did not return optimal parameters."
-        raise RuntimeError(msg)
-    print([float(value) for value in optimal_params.values()])
+    print(json.dumps(_serialize_vqe_result(result)))
 
 
 if __name__ == "__main__":

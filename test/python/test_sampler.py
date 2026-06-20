@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-import ast
+import json
 import sys
 from subprocess import check_output
 from typing import TYPE_CHECKING
@@ -47,7 +47,9 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     result = script_runner.run(["iqm-sampler", str(circuit_path), "--shots", "256", "--simulator"])
     assert result.success
 
-    counts = ast.literal_eval(result.stdout.strip())
+    res = json.loads(result.stdout.strip())
+    first_pub_data = res["results"][0]["data"]
+    counts = next(iter(first_pub_data.values()))
     assert sum(counts.values()) == 256
     assert set(counts) <= {"00", "11"}
     assert counts
