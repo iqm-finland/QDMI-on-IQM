@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     slurm-wlm \
     munge \
     sudo \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv and uvx from the official image

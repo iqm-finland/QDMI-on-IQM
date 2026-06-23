@@ -141,6 +141,9 @@ if [[ -n "${IQM_TOKEN:-}" || -n "${IQM_TOKENS_FILE:-}" ]]; then
   uv run nox -f /workspace/spank/noxfile.py -s resonance_tests -- "${RESONANCE_ARGS[@]}"
 fi
 
+echo "=== Running SPANK GRES and Discovery Verification ==="
+bash /workspace/spank/test/verify_spank_gres_and_discovery.sh
+
 # Disable the error trap before exiting cleanly
 trap - ERR
 echo "=== All SPANK tests completed successfully! ==="
