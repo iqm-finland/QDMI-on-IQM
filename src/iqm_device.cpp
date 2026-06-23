@@ -136,6 +136,9 @@ struct IQM_QDMI_Device_Session_impl_d {
                                                   IQM_QDMI_Site_impl_d *>,
                                         double, Pair_hash>>
       operations_two_qubit_fidelity_map_;
+
+  /// Comma-separated list of all available quantum computers
+  std::string available_quantum_computers_;
 };
 
 /**
@@ -345,6 +348,18 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   }
 
   const auto &json_qc_list = json_response["quantum_computers"];
+
+  // Populate available quantum computers list
+  std::string available_qcs;
+  for (const auto &qc : json_qc_list) {
+    if (qc.contains("alias") && qc["alias"].is_string()) {
+      if (!available_qcs.empty()) {
+        available_qcs += ",";
+      }
+      available_qcs += qc["alias"].get<std::string>();
+    }
+  }
+  session->available_quantum_computers_ = available_qcs;
 
   // Select quantum computer: use `quantum_computer_id_` or
   // `quantum_computer_alias_` if set, otherwise use first available
@@ -1650,6 +1665,11 @@ int IQM_QDMI_device_session_query_device_property(
     ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_NAME,
                         session->quantum_computer_alias_->c_str(), prop, size,
                         value, size_ret)
+  }
+  if (prop == QDMI_DEVICE_PROPERTY_CUSTOM5) {
+    ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_CUSTOM5,
+                        session->available_quantum_computers_.c_str(), prop,
+                        size, value, size_ret)
   }
   // NOLINTNEXTLINE(misc-include-cleaner)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_VERSION, IQM_QDMI_DEVICE_VERSION,

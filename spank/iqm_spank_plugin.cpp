@@ -168,6 +168,12 @@ public:
         matched = true;
       }
 
+      // Handle the custom GRES name argument.
+      if (!matched && key == "iqm_gres_name") {
+        gres_name_ = std::string{value};
+        matched = true;
+      }
+
       if (!matched) {
         slurm_spank_log(
             "[iqm_spank_plugin] warning: unknown plugstack argument "
@@ -205,6 +211,43 @@ public:
         return ESPANK_ERROR;
       }
     }
+
+    // Register --iqm-gres-name option
+    srun_option_gres_name_ = {
+        .name = const_cast<char *>("iqm-gres-name"),
+        .arginfo = const_cast<char *>("value"),
+        .usage = const_cast<char *>(
+            "Custom GRES resource name for QPU mapping (default: qpu)"),
+        .has_arg = 1,
+        .val = 100,
+        .cb = &IQMSpankConfigManager::option_callback,
+    };
+    auto rc = spank_option_register(spank, &srun_option_gres_name_);
+    if (rc != ESPANK_SUCCESS) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to register option "
+                      "--iqm-gres-name: %s",
+                      spank_strerror(rc));
+      return ESPANK_ERROR;
+    }
+
+    // Register --iqm-list-devices option
+    srun_option_list_devices_ = {
+        .name = const_cast<char *>("iqm-list-devices"),
+        .arginfo = nullptr,
+        .usage = const_cast<char *>(
+            "Query and print available IQM quantum computers and exit"),
+        .has_arg = 0,
+        .val = 101,
+        .cb = &IQMSpankConfigManager::option_callback,
+    };
+    rc = spank_option_register(spank, &srun_option_list_devices_);
+    if (rc != ESPANK_SUCCESS) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to register option "
+                      "--iqm-list-devices: %s",
+                      spank_strerror(rc));
+      return ESPANK_ERROR;
+    }
+
     return ESPANK_SUCCESS;
   }
 
@@ -220,7 +263,57 @@ public:
    * @param spank SPANK handle for the current hook invocation.
    * @return `ESPANK_SUCCESS` on success, `ESPANK_ERROR` if injection fails.
    */
+  static std::string parse_gres_for_type(std::string_view gres_str,
+                                         std::string_view gres_name) {
+    std::size_t start = 0;
+    while (start < gres_str.size()) {
+      auto end = gres_str.find(',', start);
+      if (end == std::string_view::npos) {
+        end = gres_str.size();
+      }
+      const auto token = gres_str.substr(start, end - start);
+      if (token.starts_with(gres_name) && token.size() > gres_name.size() + 1 &&
+          token[gres_name.size()] == ':') {
+        const auto rest = token.substr(gres_name.size() + 1);
+        const auto colon = rest.find(':');
+        if (colon == std::string_view::npos) {
+          if (!std::all_of(rest.begin(), rest.end(),
+                           [](unsigned char c) { return std::isdigit(c); })) {
+            return std::string{rest};
+          }
+        } else {
+          const auto type = rest.substr(0, colon);
+          if (!std::all_of(type.begin(), type.end(),
+                           [](unsigned char c) { return std::isdigit(c); })) {
+            return std::string{type};
+          }
+        }
+      }
+      start = end + 1;
+    }
+    return {};
+  }
+
   [[nodiscard]] int inject_environment(spank_t spank) const {
+    const bool alias_configured = srun_values_[3].has_value() ||
+                                  plugstack_values_[3].has_value() ||
+                                  env_is_set(spank, "IQM_QC_ALIAS");
+    const bool id_configured = srun_values_[2].has_value() ||
+                               plugstack_values_[2].has_value() ||
+                               env_is_set(spank, "IQM_QC_ID");
+
+    std::string detected_alias;
+    if (!alias_configured && !id_configured) {
+      if (const auto job_gres = get_spank_env(spank, "SLURM_JOB_GRES")) {
+        detected_alias = parse_gres_for_type(job_gres.value(), gres_name_);
+        if (!detected_alias.empty()) {
+          slurm_debug(
+              "[iqm_spank_plugin] detected QPU alias '%s' from SLURM_JOB_GRES",
+              detected_alias.c_str());
+        }
+      }
+    }
+
     for (std::size_t i = 0; i < K_CONFIG_MAPPINGS.size(); ++i) {
       // Determine effective value: srun option > plugstack default.
       const std::string *effective_value = nullptr;
@@ -237,7 +330,12 @@ public:
       }
 
       if (effective_value == nullptr) {
-        continue;
+        if (i == 3 && !detected_alias.empty()) {
+          effective_value = &detected_alias;
+          overwrite = 0;
+        } else {
+          continue;
+        }
       }
 
       const std::string env_name{K_CONFIG_MAPPINGS[i].env_var};
@@ -254,8 +352,11 @@ public:
             "[iqm_spank_plugin] %s already set by user, keeping user value",
             env_name.c_str());
       } else {
-        const auto *source =
-            srun_values_[i].has_value() ? "srun option" : "plugstack config";
+        const auto *source = srun_values_[i].has_value() ? "srun option"
+                             : (i == 3 && !detected_alias.empty() &&
+                                effective_value == &detected_alias)
+                                 ? "Slurm GRES mapping"
+                                 : "plugstack config";
         slurm_debug("[iqm_spank_plugin] set %s from %s", env_name.c_str(),
                     source);
       }
@@ -420,6 +521,10 @@ public:
                 configured_count, active_partitions_.size());
   }
 
+  [[nodiscard]] bool list_devices_requested() const {
+    return list_devices_requested_;
+  }
+
 private:
   /**
    * @brief Callback invoked by Slurm when a user provides an --iqm-* option.
@@ -504,6 +609,82 @@ private:
     return false;
   }
 
+public:
+  void execute_device_discovery(spank_t spank) const {
+    std::string base_url = "https://resonance.iqm.tech";
+    if (srun_values_[0].has_value()) {
+      base_url = srun_values_[0].value();
+    } else if (const auto env_url = get_spank_env(spank, "IQM_BASE_URL")) {
+      base_url = env_url.value();
+    } else if (plugstack_values_[0].has_value()) {
+      base_url = plugstack_values_[0].value();
+    }
+
+    std::string token;
+    std::string tokens_file;
+
+    if (const auto env_tok = get_spank_env(spank, "IQM_TOKEN")) {
+      token = env_tok.value();
+    }
+    if (srun_values_[1].has_value()) {
+      tokens_file = srun_values_[1].value();
+    } else if (const auto env_file = get_spank_env(spank, "IQM_TOKENS_FILE")) {
+      tokens_file = env_file.value();
+    } else if (plugstack_values_[1].has_value()) {
+      tokens_file = plugstack_values_[1].value();
+    }
+
+    std::string python_cmd =
+        "python3 -c \"import sys, os, json, urllib.request, urllib.error\n"
+        "base_url = '" +
+        base_url +
+        "'\n"
+        "token = '" +
+        token +
+        "'\n"
+        "tokens_file = '" +
+        tokens_file +
+        "'\n"
+        "if not token and tokens_file:\n"
+        "    try:\n"
+        "        with open(tokens_file, 'r') as f:\n"
+        "            token = json.load(f).get('access_token', '')\n"
+        "    except Exception as e:\n"
+        "        print(f'Error reading tokens file: {e}', file=sys.stderr)\n"
+        "        sys.exit(1)\n"
+        "headers = {}\n"
+        "if token:\n"
+        "    headers['Authorization'] = f'Bearer {token}'\n"
+        "url = f'{base_url.rstrip(chr(47))}/api/v1/quantum-computers'\n"
+        "req = urllib.request.Request(url, headers=headers)\n"
+        "try:\n"
+        "    with urllib.request.urlopen(req) as r:\n"
+        "        qcs = json.loads(r.read().decode()).get('quantum_computers', "
+        "[])\n"
+        "        if not qcs:\n"
+        "            print('No quantum computers available.')\n"
+        "        else:\n"
+        "            print(f'Available IQM Quantum Computers (endpoint: "
+        "{base_url}):')\n"
+        "            for qc in qcs:\n"
+        "                alias = qc.get('alias', 'N/A')\n"
+        "                qc_id = qc.get('id', 'N/A')\n"
+        "                status = qc.get('status', 'N/A')\n"
+        "                print(f'  - {alias} (ID: {qc_id}, Status: "
+        "{status})')\n"
+        "except urllib.error.URLError as e:\n"
+        "    print(f'Error querying endpoint {url}: {e}', file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        "except Exception as e:\n"
+        "    print(f'Error parsing response: {e}', file=sys.stderr)\n"
+        "    sys.exit(1)\"";
+
+    const auto rc = std::system(python_cmd.c_str());
+    (void)rc;
+    std::exit(0);
+  }
+
+private:
   /// Stored plugstack-configured values, indexed in parallel with
   /// K_CONFIG_MAPPINGS.
   std::array<std::optional<std::string>, K_CONFIG_MAPPINGS.size()>
@@ -519,6 +700,16 @@ private:
   /// Partition filter: when non-empty, the plugin is only active on jobs
   /// targeting one of these partitions.
   std::vector<std::string> active_partitions_;
+
+  /// Custom GRES name (defaults to "qpu").
+  std::string gres_name_ = "qpu";
+
+  /// Whether list devices option was requested.
+  bool list_devices_requested_ = false;
+
+  /// Custom spank_option structs
+  spank_option srun_option_gres_name_{};
+  spank_option srun_option_list_devices_{};
 };
 
 /// Global plugin configuration instance. Populated once during SPANK init,
@@ -528,6 +719,20 @@ IQMSpankConfigManager g_config{}; // NOLINT(*-avoid-non-const-global-variables)
 // Static callback implementation — stores the srun option value.
 int IQMSpankConfigManager::option_callback(const int val, const char *optarg,
                                            int /* remote */) {
+  if (val == 100) {
+    if (optarg != nullptr && optarg[0] != '\0') {
+      g_config.gres_name_ = std::string{optarg};
+      slurm_debug("[iqm_spank_plugin] srun option --iqm-gres-name provided: %s",
+                  optarg);
+    }
+    return 0;
+  }
+  if (val == 101) {
+    g_config.list_devices_requested_ = true;
+    slurm_debug("[iqm_spank_plugin] srun option --iqm-list-devices provided");
+    return 0;
+  }
+
   if (val < 0 || static_cast<std::size_t>(val) >= K_CONFIG_MAPPINGS.size()) {
     slurm_spank_log("[iqm_spank_plugin] error: invalid option id %d", val);
     return -1;
@@ -585,9 +790,13 @@ int slurm_spank_init(spank_t spank, const int ac, char **av) {
  * @brief SPANK post-option-init hook.
  * @return `ESPANK_SUCCESS`.
  */
-int slurm_spank_init_post_opt(spank_t /* spank */, const int /* ac */,
+int slurm_spank_init_post_opt(spank_t spank, const int /* ac */,
                               char ** /* av */) {
   Emit_hook_log("slurm_spank_init_post_opt");
+  if (g_config.list_devices_requested() &&
+      (spank_context() == S_CTX_LOCAL || spank_context() == S_CTX_ALLOCATOR)) {
+    g_config.execute_device_discovery(spank);
+  }
   return ESPANK_SUCCESS;
 }
 

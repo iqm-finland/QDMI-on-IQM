@@ -18,10 +18,61 @@
 """Command line interface for the IQM QDMI device library."""
 
 import argparse
+import json
+import os
+import pathlib
 import sys
+import urllib.error
+import urllib.request
 from functools import partial
 
 from . import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
+
+
+def list_devices() -> None:
+    """Query and list available IQM quantum computers."""
+    base_url = os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech"
+    token = os.getenv("IQM_TOKEN")
+    tokens_file = os.getenv("IQM_TOKENS_FILE")
+
+    if not token and tokens_file:
+        try:
+            with pathlib.Path(tokens_file).open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                token = data.get("access_token")
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"Error reading tokens file '{tokens_file}': {e}", file=sys.stderr)
+            sys.exit(1)
+
+    url = f"{base_url.rstrip('/')}/api/v1/quantum-computers"
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    req = urllib.request.Request(url, headers=headers)  # noqa: S310
+    try:
+        with urllib.request.urlopen(req) as response:  # noqa: S310
+            resp_data = response.read()
+    except urllib.error.URLError as e:
+        print(f"Error querying endpoint {url}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        data = json.loads(resp_data.decode())
+    except json.JSONDecodeError as e:
+        print(f"Error parsing response from {url}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    qcs = data.get("quantum_computers", [])
+    if not qcs:
+        print("No quantum computers available.")
+        return
+    print(f"Available IQM Quantum Computers (endpoint: {base_url}):")
+    for qc in qcs:
+        alias = qc.get("alias", "N/A")
+        qc_id = qc.get("id", "N/A")
+        status = qc.get("status", "N/A")
+        print(f"  - {alias} (ID: {qc_id}, Status: {status})")
 
 
 def main() -> None:
@@ -31,7 +82,7 @@ def main() -> None:
 
     .. code-block:: bash
 
-        iqm-qdmi [--version] [--include_dir] [--cmake_dir] [--lib_path]
+        iqm-qdmi [--version] [--include_dir] [--cmake_dir] [--lib_path] [--list-devices]
 
     It provides the following command line options:
 
@@ -39,6 +90,7 @@ def main() -> None:
     - :code:`--include_dir`: Print the path to the iqm-qdmi C/C++ include directory.
     - :code:`--cmake_dir`: Print the path to the iqm-qdmi CMake module directory.
     - :code:`--lib_path`: Print the path to the iqm-qdmi shared library.
+    - :code:`--list-devices`: Query and print available IQM quantum computers.
     """
     make_parser = partial(
         argparse.ArgumentParser, prog="iqm-qdmi", description="Command line interface for the QDMI on IQM library."
@@ -68,6 +120,11 @@ def main() -> None:
         action="store_true",
         help="Print the path to the iqm-qdmi shared library",
     )
+    group.add_argument(
+        "--list-devices",
+        action="store_true",
+        help="Query and print available IQM quantum computers",
+    )
 
     args = parser.parse_args()
 
@@ -77,6 +134,8 @@ def main() -> None:
         print(IQM_QDMI_CMAKE_DIR)
     elif args.lib_path:
         print(IQM_QDMI_LIBRARY_PATH)
+    elif args.list_devices:
+        list_devices()
     else:
         parser.print_help()
 
