@@ -285,9 +285,20 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM4, 0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
+  size_t custom5_size = 0;
+  EXPECT_EQ(
+      IQM_QDMI_device_session_query_device_property(
+          session, QDMI_DEVICE_PROPERTY_CUSTOM5, 0, nullptr, &custom5_size),
+      QDMI_SUCCESS);
+  ASSERT_GT(custom5_size, 0);
+  std::vector<char> custom5_buf(custom5_size);
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
-                session, QDMI_DEVICE_PROPERTY_CUSTOM5, 0, nullptr, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
+                session, QDMI_DEVICE_PROPERTY_CUSTOM5, custom5_buf.size(),
+                custom5_buf.data(), nullptr),
+            QDMI_SUCCESS);
+  std::string custom5_str(custom5_buf.data());
+  EXPECT_FALSE(custom5_str.empty());
+  std::cout << "Available quantum computers: " << custom5_str << "\n";
 }
 
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
