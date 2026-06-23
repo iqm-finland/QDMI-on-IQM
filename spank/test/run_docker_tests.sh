@@ -25,7 +25,7 @@ show_logs() {
   echo "=== Slurmctld Status ==="
   sudo service slurmctld status || true
   echo "=== Slurmd Status ==="
-  sudo service slurmd status || true
+  sudo pgrep -af slurmd || true
   echo "=== Munge Status ==="
   sudo service munge status || true
   echo "=== Slurmctld Log ==="
@@ -40,56 +40,24 @@ trap show_logs ERR
 echo "=== Starting Munge service ==="
 sudo service munge start
 
-echo "=== Creating Slurm state and spool directories ==="
-sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd /var/log
-sudo chown slurm:slurm /var/spool/slurmctld
-sudo chown root:root /var/spool/slurmd
-
-# Create a minimal slurm.conf matching local hostname
-echo "=== Generating /etc/slurm/slurm.conf ==="
-HOSTNAME=$(hostname)
-cat <<EOF | sudo tee /etc/slurm/slurm.conf
-ClusterName=local-ci
-SlurmctldHost=$HOSTNAME(127.0.0.1)
-SlurmUser=slurm
-SlurmctldPort=6817
-SlurmdPort=6818
-AuthType=auth/munge
-StateSaveLocation=/var/spool/slurmctld
-SlurmdSpoolDir=/var/spool/slurmd
-SlurmdLogFile=/var/log/slurmd.log
-SlurmctldLogFile=/var/log/slurmctld.log
-ProctrackType=proctrack/pgid
-SchedulerType=sched/backfill
-SelectType=select/linear
-TaskPlugin=task/none
-SlurmdParameters=config_overrides
-PlugStackConfig=/etc/slurm/plugstack.conf
-NodeName=$HOSTNAME NodeAddr=127.0.0.1 State=UNKNOWN
-PartitionName=debug Nodes=$HOSTNAME Default=YES MaxTime=INFINITE State=UP
-EOF
-
-# Force Slurm to use cgroup/v1 backend (which won't fail inside unprivileged Docker containers)
-echo "=== Generating /etc/slurm/cgroup.conf ==="
-echo "CgroupPlugin=cgroup/v1" | sudo tee /etc/slurm/cgroup.conf
-
 echo "=== Starting Slurmctld ==="
-sudo service slurmctld start || { echo "ERROR: slurmctld failed to start"; exit 1; }
+sudo /usr/sbin/slurmctld || { echo "ERROR: slurmctld failed to start"; exit 1; }
 
 echo "=== Starting Slurmd ==="
-sudo service slurmd start || { echo "ERROR: slurmd failed to start"; exit 1; }
+# Slurmd needs to be started as root, bound to localhost.
+sudo /usr/sbin/slurmd -N localhost || { echo "ERROR: slurmd failed to start"; exit 1; }
 
 echo "=== Waiting for Slurm node to become ready ==="
 for i in {1..30}; do
-  if sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
+  if sinfo -h -n "localhost" -o "%t" | grep -qE "idle|alloc"; then
     break
   fi
   # Force resume if the node got marked DOWN/DRAINED
-  sudo scontrol update nodename="$HOSTNAME" state=resume 2>/dev/null || true
+  sudo scontrol update nodename="localhost" state=resume 2>/dev/null || true
   sleep 1
 done
 
-if ! sinfo -h -n "$HOSTNAME" -o "%t" | grep -qE "idle|alloc"; then
+if ! sinfo -h -n "localhost" -o "%t" | grep -qE "idle|alloc"; then
   echo "ERROR: Node did not become ready after 30 seconds"
   exit 1
 fi
@@ -107,11 +75,7 @@ echo "=== Installing SPANK plugin ==="
 sudo cmake --install /workspace/build-spank-docker --component iqm-spank-plugin
 
 echo "=== Activating SPANK plugin ==="
-# Create the top-level plugstack.conf with include directive
-echo "include /etc/slurm/plugstack.conf.d/*.conf" | sudo tee /etc/slurm/plugstack.conf
-
-# Resolve the Slurm plugin directory
-PLUGIN_DIR=$(scontrol show config | awk -F'= *' '/^PluginDir/ {print $2}' | xargs)
+PLUGIN_DIR=$(scontrol show config | sed -n 's/^PluginDir *= *//p')
 PLUGIN_PATH="${PLUGIN_DIR}/iqm-spank-plugin.so"
 TEST_BASE_URL="https://test.example.com"
 echo "required ${PLUGIN_PATH} iqm_base_url=${TEST_BASE_URL}" \
@@ -122,7 +86,7 @@ sudo scontrol reconfigure
 sleep 2
 
 echo "=== Running SPANK smoke tests ==="
-uv run nox -f /workspace/spank/noxfile.py -s smoke_tests -- \
+uv run nox -f /workspace/spank/noxfile.py --envdir /home/testuser/.nox -s smoke_tests -- \
   --partition debug \
   --hook-mode full \
   --require-all-hooks \
@@ -138,7 +102,7 @@ if [[ -n "${IQM_TOKEN:-}" || -n "${IQM_TOKENS_FILE:-}" ]]; then
   if [[ -n "${IQM_TOKENS_FILE:-}" ]]; then
     RESONANCE_ARGS+=("--test-tokens-file" "${IQM_TOKENS_FILE}")
   fi
-  uv run nox -f /workspace/spank/noxfile.py -s resonance_tests -- "${RESONANCE_ARGS[@]}"
+  uv run nox -f /workspace/spank/noxfile.py --envdir /home/testuser/.nox -s resonance_tests -- "${RESONANCE_ARGS[@]}"
 fi
 
 # Disable the error trap before exiting cleanly

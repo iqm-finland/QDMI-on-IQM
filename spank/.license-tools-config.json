@@ -18,8 +18,7 @@
     ".proto": "SLASH_STYLE",
     ".ts": "C_STYLE",
     ".ps1": "POUND_STYLE",
-    "Dockerfile": "POUND_STYLE",
-    "dockerfile": "POUND_STYLE"
+    "Dockerfile": "POUND_STYLE"
   },
   "exclude": [
     "^\\.[^/]+",
