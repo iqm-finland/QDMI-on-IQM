@@ -5,7 +5,7 @@
 [![Slurm SPANK](https://img.shields.io/static/v1?label=Slurm&message=SPANK&color=informational&style=flat-square)](https://slurm.schedmd.com/spank.html)
 [![Platform: Linux](https://img.shields.io/static/v1?logo=linux&label=Platform&message=Linux&color=informational&style=flat-square)](https://www.kernel.org/)
 
-This plugin integrates the QDMI-on-IQM runtime with Slurm using the [SPANK plugin interface](https://slurm.schedmd.com/spank.html). It allows Slurm to automatically inject the required `IQM_*` environment variables into jobs and registers corresponding `--iqm-*` command-line options for `srun`, `sbatch`, and `salloc`.
+This plugin integrates the QDMI-on-IQM runtime with Slurm using the [SPANK plugin interface](https://slurm.schedmd.com/spank.html). It integrates quantum computer access into the Slurm workload manager, allowing administrators to schedule QPUs as Generic Resources (GRES) and automatically mapping allocated GRES to connection variables, while registering corresponding `--iqm-*` command-line options.
 
 For details on building, installing, configuring, and using the plugin, please refer to the main [SPANK Plugin Guide](../docs/spank_plugin.md).
 

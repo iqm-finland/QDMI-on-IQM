@@ -1,6 +1,6 @@
 # Slurm SPANK Plugin
 
-The Slurm SPANK plugin for QDMI-on-IQM simplifies running quantum jobs on clusters by automatically propagating `IQM_*` environment variables to job steps. This avoids manual `export` statements in job scripts and enables administrators to configure global defaults and partition-gated access.
+The Slurm SPANK plugin for QDMI-on-IQM integrates quantum computer access into the Slurm workload manager, allowing administrators to expose QPUs as scheduled Slurm Generic Resources (GRES) and automatically inject necessary connection settings (`IQM_*` environment variables) into job steps.
 
 ---
 
@@ -10,12 +10,41 @@ The plugin registers `--iqm-*` command-line options for standard Slurm submissio
 
 ### Supported Options
 
-| Option              | Environment Variable | Description                                           |
-| :------------------ | :------------------- | :---------------------------------------------------- |
-| `--iqm-base-url`    | `IQM_BASE_URL`       | The endpoint URL of the IQM service.                  |
-| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.       |
-| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique identifier of the target quantum computer. |
-| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | The alias of the target quantum computer.             |
+| Option               | Environment Variable | Description                                           |
+| :------------------- | :------------------- | :---------------------------------------------------- |
+| `--iqm-base-url`     | `IQM_BASE_URL`       | The endpoint URL of the IQM service.                  |
+| `--iqm-tokens-file`  | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.       |
+| `--iqm-qc-id`        | `IQM_QC_ID`          | The unique identifier of the target quantum computer. |
+| `--iqm-qc-alias`     | `IQM_QC_ALIAS`       | The alias of the target quantum computer.             |
+| `--iqm-gres-name`    | (None)               | Custom GRES resource name for QPU mapping.            |
+| `--iqm-list-devices` | (None)               | Query and print available IQM quantum computers.      |
+
+### QPU Resource Discovery
+
+Users can discover which QPUs are configured and available on the cluster in two ways:
+
+1. **Via standard Slurm commands** (if the administrator has set up GRES for QPUs):
+
+   ```bash
+   sinfo -o "%N %G"
+   ```
+
+   This displays nodes and their configured QPU resources (e.g. `gres/qpu:emerald:1`).
+
+2. **Via the SPANK plugin's custom option**:
+   ```bash
+   srun --iqm-list-devices /bin/true
+   ```
+   This queries the configured IQM endpoint, lists the available devices and their status, and exits cleanly.
+
+### Slurm GRES Automatic Mapping
+
+If the cluster administrator has configured the QPU as a Generic Resource (GRES), users can submit jobs requesting specific QPU resources via the standard Slurm `--gres` option. The SPANK plugin will automatically detect the allocated QPU and map it to `IQM_QC_ALIAS`:
+
+```bash
+# The plugin detects 'emerald' from GRES and sets IQM_QC_ALIAS=emerald automatically
+srun --gres=qpu:emerald:1 python bell_state.py
+```
 
 ### Credential Security
 
@@ -102,12 +131,28 @@ Configure the plugin in `plugstack.conf`. Global defaults defined here can be ov
 required /usr/lib/slurm/iqm-spank-plugin.so \
     iqm_base_url=https://resonance.iqm.tech \
     iqm_tokens_file=/etc/iqm/tokens.json \
-    partitions=quantum,debug
+    partitions=quantum,debug \
+    iqm_gres_name=qpu
 ```
 
 - `iqm_base_url`: Default API endpoint.
 - `iqm_tokens_file`: Path to the shared token file.
 - `partitions`: Comma-separated list of partitions where this plugin will run. If omitted, the plugin evaluates all partitions.
+- `iqm_gres_name`: The Generic Resource (GRES) name used to track QPUs in Slurm (defaults to `qpu`).
+
+### Scheduling QPUs as Slurm Generic Resources (GRES)
+
+To schedule QPUs natively under Slurm, administrators should configure them as Generic Resources (GRES).
+
+1. Register the custom GRES type in `/etc/slurm/slurm.conf`:
+   ```text
+   GresTypes=qpu
+   ```
+2. Configure available QPUs in `/etc/slurm/gres.conf` on compute nodes:
+   ```text
+   NodeName=node[1-4] Name=qpu Type=emerald Count=1
+   NodeName=node[5-8] Name=qpu Type=garnet Count=1
+   ```
 
 Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration directory:
 
