@@ -20,12 +20,10 @@
 from __future__ import annotations
 
 import argparse
-import json
-from collections.abc import Iterable, Mapping
+import base64
+import pickle  # noqa: S403
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 try:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
@@ -42,36 +40,6 @@ from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-
-def _serialize_value(val: object) -> object:
-    if hasattr(val, "get_counts") and callable(getattr(val, "get_counts", None)):
-        return cast("Any", val).get_counts()
-    if isinstance(val, np.ndarray):
-        return val.tolist()  # ty: ignore[no-matching-overload]
-    if isinstance(val, (np.integer, np.floating)):
-        return val.item()
-    if isinstance(val, Mapping) or (hasattr(val, "items") and callable(getattr(val, "items", None))):
-        return {str(k): _serialize_value(v) for k, v in cast("Any", val).items()}
-    if isinstance(val, list):
-        return [_serialize_value(v) for v in val]
-    return val
-
-
-def _serialize_primitive_result(result: object) -> dict:
-    iterator = result if isinstance(result, Iterable) else [result]
-
-    serialized_pubs = [
-        {
-            "data": _serialize_value(getattr(pub, "data", pub)),
-            "metadata": _serialize_value(getattr(pub, "metadata", {})),
-        }
-        for pub in iterator
-    ]
-    return {
-        "results": serialized_pubs,
-        "metadata": _serialize_value(getattr(result, "metadata", {})),
-    }
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -111,8 +79,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     circuit_for_execution = transpile(circuit, backend)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
-    serialized = _serialize_primitive_result(job.result())
-    print(json.dumps(serialized))
+    pickled = pickle.dumps(job.result())
+    print(base64.b64encode(pickled).decode("utf-8"))
 
 
 if __name__ == "__main__":

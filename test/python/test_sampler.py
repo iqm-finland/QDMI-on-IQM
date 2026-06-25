@@ -19,7 +19,8 @@
 
 from __future__ import annotations
 
-import json
+import base64
+import pickle  # noqa: S403
 from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qpy
@@ -44,9 +45,10 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     result = script_runner.run(["iqm-sampler", str(circuit_path), "--shots", "256", "--simulator"])
     assert result.success
 
-    res = json.loads(result.stdout.strip())
-    first_pub_data = res["results"][0]["data"]
-    counts = next(iter(first_pub_data.values()))
+    decoded = base64.b64decode(result.stdout.strip().encode())
+    res = pickle.loads(decoded)  # noqa: S301
+    first_pub = next(iter(res))
+    counts = first_pub.data.meas.get_counts()
     assert sum(counts.values()) == 256
     assert set(counts) <= {"00", "11"}
     assert counts
