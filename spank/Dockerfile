@@ -87,11 +87,23 @@ WORKDIR /workspace
 # Copy the workspace into the container (used when building the self-contained image)
 COPY --chown=testuser:testuser . /workspace
 
+# Build, install, and globally activate the SPANK plugin at image build time
+RUN cmake -S /workspace -B /workspace/build-spank-docker -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON \
+    -DIQM_QDMI_SPANK_INSTALL_DIR=/usr/lib/x86_64-linux-gnu/slurm-wlm -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm && \
+    cmake --build /workspace/build-spank-docker --target iqm-spank-plugin && \
+    cmake --install /workspace/build-spank-docker --component iqm-spank-plugin
+
+RUN echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://test.example.com" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+
+# Ensure testuser owns the build outputs so they can write to it if needed
+RUN chown -R testuser:testuser /workspace/build-spank-docker
+
 # Change user to testuser
 USER testuser
 
 # Warm up the uv cache with project dependencies
 RUN uv sync --all-extras --dev --no-install-project
 
-# Set entrypoint to run the tests
-ENTRYPOINT ["/workspace/spank/test/run_docker_tests.sh"]
+# Set entrypoint to run the services and command
+ENTRYPOINT ["/workspace/spank/test/entrypoint.sh"]
+CMD ["/workspace/spank/test/run_docker_tests.sh"]
