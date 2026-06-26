@@ -30,7 +30,7 @@ if mountpoint -q /workspace; then
 
   # The CMake installation writes a commented-out template of iqm-qdmi.conf.
   # We must activate it by writing the uncommented, active required line.
-  echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://test.example.com" \
+  echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" \
     | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 fi
 

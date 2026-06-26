@@ -35,7 +35,7 @@ echo "=== Verifying basic Slurm srun connectivity ==="
 srun --partition=debug --immediate=5 /bin/true
 
 # Running smoke tests
-TEST_BASE_URL="https://test.example.com"
+TEST_BASE_URL="https://resonance.iqm.tech"
 echo "=== Running SPANK smoke tests ==="
 uv run nox -f /workspace/spank/noxfile.py --envdir /home/testuser/.nox -s smoke_tests -- \
   --partition debug \
