@@ -21,16 +21,18 @@
 set -euo pipefail
 
 # Detect bind-mounted workspace and rebuild/reinstall plugin if present
-if mountpoint -q /workspace; then
+# When bind-mounted, the sentinel file `/workspace/.built-in-image` will be shadowed and missing.
+if [[ ! -f /workspace/.built-in-image ]]; then
   echo "=== Bind-mounted workspace detected. Rebuilding/reinstalling SPANK plugin... ==="
+  SLURM_LIB_DIR=$(dpkg-architecture -qDEB_HOST_MULTIARCH | xargs -I{} echo /usr/lib/{}/slurm-wlm)
   cmake -S /workspace -B /workspace/build-spank-docker -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON \
-    -DIQM_QDMI_SPANK_INSTALL_DIR=/usr/lib/x86_64-linux-gnu/slurm-wlm -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm
+    -DIQM_QDMI_SPANK_INSTALL_DIR="$SLURM_LIB_DIR" -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm
   cmake --build /workspace/build-spank-docker --target iqm-spank-plugin
   sudo cmake --install /workspace/build-spank-docker --component iqm-spank-plugin
 
   # The CMake installation writes a commented-out template of iqm-qdmi.conf.
   # We must activate it by writing the uncommented, active required line.
-  echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" \
+  echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" \
     | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 fi
 

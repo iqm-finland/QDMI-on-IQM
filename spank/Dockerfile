@@ -88,13 +88,17 @@ WORKDIR /workspace
 COPY --chown=testuser:testuser . /workspace
 
 # Build, install, and globally activate the SPANK plugin at image build time
-RUN cmake -S /workspace -B /workspace/build-spank-docker -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON \
-    -DIQM_QDMI_SPANK_INSTALL_DIR=/usr/lib/x86_64-linux-gnu/slurm-wlm -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm && \
+# Also derive the Slurm multiarch library directory dynamically
+RUN SLURM_LIB_DIR=$(dpkg-architecture -qDEB_HOST_MULTIARCH | xargs -I{} echo /usr/lib/{}/slurm-wlm) && \
+    cmake -S /workspace -B /workspace/build-spank-docker -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON \
+    -DIQM_QDMI_SPANK_INSTALL_DIR="$SLURM_LIB_DIR" -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm && \
     cmake --build /workspace/build-spank-docker --target iqm-spank-plugin && \
     cmake --install /workspace/build-spank-docker --component iqm-spank-plugin && \
-    rm -rf /workspace/build-spank-docker
+    rm -rf /workspace/build-spank-docker && \
+    echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
-RUN echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+# Create a sentinel file to detect bind-mount shadowing
+RUN touch /workspace/.built-in-image
 
 # Change user to testuser
 USER testuser
