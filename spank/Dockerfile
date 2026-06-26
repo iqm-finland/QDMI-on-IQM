@@ -99,8 +99,8 @@ RUN echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_b
 # Change user to testuser
 USER testuser
 
-# Warm up the uv cache with project dependencies
-RUN uv sync --all-extras --dev --no-install-project
+# Warm up the uv cache with project dependencies (production only, no dev/docs/lint to save space)
+RUN uv sync --no-dev --no-install-project
 
 # Set entrypoint to run the services and command
 ENTRYPOINT ["/workspace/spank/test/entrypoint.sh"]
