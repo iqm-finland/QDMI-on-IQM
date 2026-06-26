@@ -24,7 +24,7 @@ jobs:
         run: docker build -t qdmi-spank-tests -f spank/Dockerfile .
 
       - name: Run SPANK tests in Docker
+        env:
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
         run: |
-          docker run --rm \
-            -e IQM_TOKEN="${{ secrets.IQM_TOKEN }}" \
-            qdmi-spank-tests
+          docker run --rm qdmi-spank-tests
