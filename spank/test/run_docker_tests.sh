@@ -38,21 +38,18 @@ srun --partition=debug --immediate=5 /bin/true
 cd /workspace/spank
 
 # Running smoke tests
-TEST_BASE_URL="https://resonance.iqm.tech"
 echo "=== Running SPANK smoke tests ==="
 uvx nox -s smoke_tests -- \
   --partition debug \
   --hook-mode full \
   --require-all-hooks \
-  --test-base-url "$TEST_BASE_URL"
+  --test-base-url "https://resonance.iqm.tech"
 
 # Running resonance tests if authentication is configured
 if [[ -n "${IQM_TOKEN:-}" || -n "${IQM_TOKENS_FILE:-}" ]]; then
   echo "=== Running SPANK resonance tests ==="
   RESONANCE_ARGS=(
     "--partition" "debug"
-    "--test-base-url" "https://resonance.iqm.tech"
-    "--test-qc-alias" "emerald:mock"
   )
   if [[ -n "${IQM_TOKENS_FILE:-}" ]]; then
     RESONANCE_ARGS+=("--test-tokens-file" "${IQM_TOKENS_FILE}")
