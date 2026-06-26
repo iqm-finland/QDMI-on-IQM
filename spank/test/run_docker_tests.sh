@@ -34,10 +34,13 @@ trap show_logs ERR
 echo "=== Verifying basic Slurm srun connectivity ==="
 srun --partition=debug --immediate=5 /bin/true
 
+# Change directory to the spank folder so nox automatically resolves noxfile.py
+cd /workspace/spank
+
 # Running smoke tests
 TEST_BASE_URL="https://resonance.iqm.tech"
 echo "=== Running SPANK smoke tests ==="
-uv run nox -f /workspace/spank/noxfile.py --envdir /home/testuser/.nox -s smoke_tests -- \
+uvx nox -s smoke_tests -- \
   --partition debug \
   --hook-mode full \
   --require-all-hooks \
@@ -54,7 +57,7 @@ if [[ -n "${IQM_TOKEN:-}" || -n "${IQM_TOKENS_FILE:-}" ]]; then
   if [[ -n "${IQM_TOKENS_FILE:-}" ]]; then
     RESONANCE_ARGS+=("--test-tokens-file" "${IQM_TOKENS_FILE}")
   fi
-  uv run nox -f /workspace/spank/noxfile.py --envdir /home/testuser/.nox -s resonance_tests -- "${RESONANCE_ARGS[@]}"
+  uvx nox -s resonance_tests -- "${RESONANCE_ARGS[@]}"
 fi
 
 # Disable the error trap before exiting cleanly
