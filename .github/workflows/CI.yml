@@ -177,7 +177,7 @@ jobs:
   spank-tests:
     name: 🇸 Test SPANK
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cd)
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     uses: ./.github/workflows/spank-tests.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
