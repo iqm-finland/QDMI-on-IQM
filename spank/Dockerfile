@@ -91,12 +91,10 @@ COPY --chown=testuser:testuser . /workspace
 RUN cmake -S /workspace -B /workspace/build-spank-docker -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_SPANK=ON \
     -DIQM_QDMI_SPANK_INSTALL_DIR=/usr/lib/x86_64-linux-gnu/slurm-wlm -DIQM_QDMI_SLURM_CONF_DIR=/etc/slurm && \
     cmake --build /workspace/build-spank-docker --target iqm-spank-plugin && \
-    cmake --install /workspace/build-spank-docker --component iqm-spank-plugin
+    cmake --install /workspace/build-spank-docker --component iqm-spank-plugin && \
+    rm -rf /workspace/build-spank-docker
 
-RUN echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://test.example.com" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
-
-# Ensure testuser owns the build outputs so they can write to it if needed
-RUN chown -R testuser:testuser /workspace/build-spank-docker
+RUN echo "required /usr/lib/x86_64-linux-gnu/slurm-wlm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
 # Change user to testuser
 USER testuser
