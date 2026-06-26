@@ -53,27 +53,8 @@ RUN mkdir -p /var/spool/slurmctld /var/spool/slurmd && \
     chown root:root /var/log/slurmd.log
 
 # Configure Slurm with a static localhost setup
-RUN echo "ClusterName=local-ci" > /etc/slurm/slurm.conf && \
-    echo "SlurmctldHost=localhost(127.0.0.1)" >> /etc/slurm/slurm.conf && \
-    echo "SlurmUser=slurm" >> /etc/slurm/slurm.conf && \
-    echo "SlurmctldPort=6817" >> /etc/slurm/slurm.conf && \
-    echo "SlurmdPort=6818" >> /etc/slurm/slurm.conf && \
-    echo "AuthType=auth/munge" >> /etc/slurm/slurm.conf && \
-    echo "StateSaveLocation=/var/spool/slurmctld" >> /etc/slurm/slurm.conf && \
-    echo "SlurmdSpoolDir=/var/spool/slurmd" >> /etc/slurm/slurm.conf && \
-    echo "SlurmdLogFile=/var/log/slurmd.log" >> /etc/slurm/slurm.conf && \
-    echo "SlurmctldLogFile=/var/log/slurmctld.log" >> /etc/slurm/slurm.conf && \
-    echo "ProctrackType=proctrack/pgid" >> /etc/slurm/slurm.conf && \
-    echo "SchedulerType=sched/backfill" >> /etc/slurm/slurm.conf && \
-    echo "SelectType=select/linear" >> /etc/slurm/slurm.conf && \
-    echo "TaskPlugin=task/none" >> /etc/slurm/slurm.conf && \
-    echo "SlurmdParameters=config_overrides" >> /etc/slurm/slurm.conf && \
-    echo "PlugStackConfig=/etc/slurm/plugstack.conf" >> /etc/slurm/slurm.conf && \
-    echo "NodeName=localhost NodeAddr=127.0.0.1 State=UNKNOWN" >> /etc/slurm/slurm.conf && \
-    echo "PartitionName=debug Nodes=localhost Default=YES MaxTime=INFINITE State=UP" >> /etc/slurm/slurm.conf
-
-# Force Slurm to use cgroup/v1 backend (which won't fail inside unprivileged Docker containers)
-RUN echo "CgroupPlugin=cgroup/v1" > /etc/slurm/cgroup.conf
+COPY spank/config/slurm.conf /etc/slurm/slurm.conf
+COPY spank/config/cgroup.conf /etc/slurm/cgroup.conf
 
 # Set up plugstack configuration directories
 RUN mkdir -p /etc/slurm/plugstack.conf.d && \
