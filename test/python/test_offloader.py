@@ -1,0 +1,169 @@
+# Copyright (c) 2025 - 2026 IQM Finland Oy
+# All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+"""Tests for the Slurm offloader module."""
+
+from __future__ import annotations
+
+import base64
+import math
+import pickle  # noqa: S403
+import subprocess
+from typing import TYPE_CHECKING
+
+from qiskit import QuantumCircuit
+from qiskit.circuit import Parameter
+from qiskit.quantum_info import SparsePauliOp
+
+from iqm.qdmi import offloader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+
+class FakeBitArray:
+    """Mock for Qiskit's BitArray."""
+
+    def __init__(self, counts: dict[str, int]) -> None:
+        """Initialize counts."""
+        self.counts = counts
+
+    def get_counts(self) -> dict[str, int]:
+        """Return counts."""
+        return self.counts
+
+
+class FakePubResult:
+    """Mock for PubResult."""
+
+    def __init__(self, data: dict[str, FakeBitArray]) -> None:
+        """Initialize data."""
+        self.data = data
+        self.metadata: dict[str, object] = {}
+
+
+class FakeVQEResult:
+    """Mock for VQEResult."""
+
+    def __init__(self, optimal_parameters: dict[str, float]) -> None:
+        """Initialize optimal parameters."""
+        self.optimal_parameters = optimal_parameters
+
+
+def test_sample_local_simulator() -> None:
+    """Test sampling locally using the DDSIM simulator."""
+    circuit = QuantumCircuit(2)
+    circuit.h(0)
+    circuit.cx(0, 1)
+    circuit.measure_all()
+
+    counts = offloader.sample(circuit, shots=128, local=True, simulator=True)
+    assert sum(counts.values()) == 128
+    assert set(counts) <= {"00", "11"}
+    assert counts
+
+
+def test_estimate_local_simulator() -> None:
+    """Test estimation locally using the DDSIM simulator."""
+    theta = Parameter("theta")
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(theta, 0)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    params = offloader.estimate(ansatz, operator, maxiter=5, local=True, simulator=True)
+    assert len(params) == 1
+    assert math.isfinite(float(params[0]))
+
+
+def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test sampling via Slurm offloading using a mocked subprocess."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
+    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
+    monkeypatch.setenv("IQM_QC_ALIAS", "emerald:mock")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    counts = offloader.sample(circuit, shots=7, local=False, simulator=True)
+
+    assert counts == {"0": 1}
+    assert "srun" in captured_command
+    assert "iqm-sampler" in captured_command
+    assert "--shots" in captured_command
+    assert "7" in captured_command
+    assert "--base-url" in captured_command
+    assert "https://resonance.example" in captured_command
+    assert "--tokens-file" in captured_command
+    assert "tokens_path" in captured_command
+    assert "--qc-alias" in captured_command
+    assert "emerald:mock" in captured_command
+
+
+def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test estimation via Slurm offloading using a mocked subprocess."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stderr = b""
+
+    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
+    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
+    monkeypatch.setenv("IQM_QC_ALIAS", "emerald:mock")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    params = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
+
+    assert params == [0.125]
+    assert "srun" in captured_command
+    assert "iqm-estimator" in captured_command
+    assert "--maxiter" in captured_command
+    assert "3" in captured_command
+    assert "--base-url" in captured_command
+    assert "https://resonance.example" in captured_command
+    assert "--tokens-file" in captured_command
+    assert "tokens_path" in captured_command
+    assert "--qc-alias" in captured_command
+    assert "emerald:mock" in captured_command
