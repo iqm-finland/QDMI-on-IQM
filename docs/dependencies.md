@@ -6,11 +6,11 @@ This project relies on several third-party libraries and tools. Below is a compr
 
 These dependencies are linked into the shared library and **shipped with every built wheel or binary**.
 
-| Dependency      | Version         | License                        | Purpose                                       |
-| :-------------- | :-------------- | :----------------------------- | :-------------------------------------------- |
-| [QDMI]          | 1.3.0           | Apache-2.0 with LLVM-exception | QDMI specification and interface headers      |
-| [nlohmann/json] | 3.12.0          | MIT License                    | JSON parsing and serialization                |
-| [cURL]          | system-provided | MIT/X derivative               | HTTP client library for backend communication |
+| Dependency      | Version | License                        | Purpose                                                    |
+| :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
+| [QDMI]          | 1.3.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
+| [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
+| [CPR]           | 1.14.2  | MIT License                    | C++ Requests HTTP client library for backend communication |
 
 ```{note}
 In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2, etc.) are automatically bundled by platform-specific repair tools: [`auditwheel`](https://github.com/pypa/auditwheel) on Linux, [`delocate`](https://github.com/matthew-brett/delocate) on macOS, and [`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux, the exact bundled versions correspond to those available in the [`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by [cibuildwheel](https://cibuildwheel.pypa.io/).
@@ -95,7 +95,7 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 | [ty]       | ==0.0.35   | MIT License | Static type checking                                             |
 
 [Breathe]: https://github.com/breathe-doc/breathe
-[cURL]: https://github.com/curl/curl
+[CPR]: https://github.com/libcpr/cpr
 [Doxygen]: https://github.com/doxygen/doxygen
 [Furo]: https://github.com/pradyunsg/furo
 [googletest]: https://github.com/google/googletest
