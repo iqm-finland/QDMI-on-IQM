@@ -18,12 +18,10 @@
  */
 
 /** @file
- * @brief Internal helpers for CurlHttpClient, shared between the
+ * @brief Internal helpers for CprHttpClient, shared between the
  * implementation and its unit tests.
  *
- * This header is **not** part of the public API.  It exists so that the test
- * tree can exercise internal logic (response-code mapping, retry loops, hook
- * injection) without the source file including anything from the test tree.
+ * This header is **not** part of the public API.
  */
 
 #pragma once
@@ -32,9 +30,9 @@
 #include "logging.hpp"
 
 #include <chrono>
+#include <cpr/cpr.h>
 #include <cstdint>
-#include <curl/curl.h>
-#include <curl/easy.h>
+#include <functional>
 #include <string>
 #include <thread>
 
@@ -42,15 +40,11 @@ namespace iqm::internal {
 
 /**
  * @brief Logging policy used for non-success HTTP response handling.
- *
- * This enum controls whether response failures are surfaced at ERROR level for
- * required requests or downgraded to DEBUG for optional capability probes.
  */
 enum class ERROR_LOG_POLICY : uint8_t {
   /// Log all errors at ERROR level (default for required requests)
   LOG_AS_ERROR,
-  /// Log errors at DEBUG level (use for optional capability checks to avoid
-  /// alarming users with expected failures)
+  /// Log errors at DEBUG level
   LOG_AS_DEBUG,
 };
 
@@ -58,30 +52,48 @@ enum class ERROR_LOG_POLICY : uint8_t {
 constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 5;
 
 /**
- * @brief Result of a single CURL request attempt.
+ * @brief Result of a single CPR request attempt.
  */
 struct Request_attempt_result {
-  /// The result returned by curl_easy_perform.
-  CURLcode curl_result = CURLE_OK;
+  /// The CPR error code.
+  cpr::ErrorCode error_code = cpr::ErrorCode::OK;
+  /// The CPR error message.
+  std::string error_message;
   /// The HTTP response code observed for the completed request.
   int64_t response_code = 0;
 };
 
 /**
- * @brief Function hooks used to override selected libcurl entry points.
+ * @brief Function hooks used to override CPR request entry points.
  *
  * Tests use these hooks to force specific failure paths without requiring a
  * live network interaction.
  */
-struct Curl_api_hooks {
-  /// Hook for curl_easy_init.
-  CURL *(*easy_init)() = curl_easy_init;
-  /// Hook for curl_easy_perform.
-  CURLcode (*easy_perform)(CURL *) = curl_easy_perform;
+struct Cpr_api_hooks {
+  /// Hook for GET requests.
+  std::function<cpr::Response(const cpr::Url &, const cpr::Header &,
+                              const cpr::Timeout &, const cpr::Redirect &,
+                              const cpr::VerifySsl &)>
+      get = [](const cpr::Url &url, const cpr::Header &headers,
+               const cpr::Timeout &timeout, const cpr::Redirect &redirect,
+               const cpr::VerifySsl &verify_ssl) {
+        return cpr::Get(url, headers, timeout, redirect, verify_ssl);
+      };
+
+  /// Hook for POST requests.
+  std::function<cpr::Response(const cpr::Url &, const cpr::Header &,
+                              const cpr::Body &, const cpr::Timeout &,
+                              const cpr::Redirect &, const cpr::VerifySsl &)>
+      post = [](const cpr::Url &url, const cpr::Header &headers,
+                const cpr::Body &body, const cpr::Timeout &timeout,
+                const cpr::Redirect &redirect,
+                const cpr::VerifySsl &verify_ssl) {
+        return cpr::Post(url, headers, body, timeout, redirect, verify_ssl);
+      };
 };
 
-/// Access the mutable curl hook set.
-Curl_api_hooks &Get_curl_api_hooks();
+/// Access the mutable cpr hook set.
+Cpr_api_hooks &Get_cpr_api_hooks();
 
 /**
  * @brief Helper for policy-aware error logging.
@@ -106,9 +118,6 @@ int Handle_response_code(int64_t response_code, const std::string &url,
 
 /**
  * @brief Execute a configured request and retry on HTTP 429 responses.
- *
- * The supplied callback performs one request attempt and returns both the
- * libcurl result and the resulting HTTP response code.
  */
 template <typename Perform_attempt>
 int Perform_request_with_retries(const std::string &url, std::string &response,
@@ -118,10 +127,9 @@ int Perform_request_with_retries(const std::string &url, std::string &response,
     response.clear();
     const auto attempt_result = perform_attempt();
 
-    if (attempt_result.curl_result != CURLE_OK) {
-      Log_error(error_log_policy, "curl_easy_perform() failed: " +
-                                      std::string(curl_easy_strerror(
-                                          attempt_result.curl_result)));
+    if (attempt_result.error_code != cpr::ErrorCode::OK) {
+      Log_error(error_log_policy,
+                "CPR request failed: " + attempt_result.error_message);
       return QDMI_ERROR_FATAL;
     }
 
