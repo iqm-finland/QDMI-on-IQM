@@ -29,7 +29,7 @@ if(WIN32)
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
       $<TARGET_FILE_DIR:integration_tests>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:CURL::libcurl>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:cpr::cpr>
             $<TARGET_FILE_DIR:integration_tests>)
 endif()
 
