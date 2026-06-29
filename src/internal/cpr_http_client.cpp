@@ -30,10 +30,20 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/redirect.h>
+#include <cpr/response.h>
+#include <cpr/ssl_options.h>
+#include <cpr/timeout.h>
 #include <cstddef>
 #include <cstdint>
 #include <nlohmann/json.hpp>
+#include <ranges>
 #include <string>
+#include <utility>
 
 namespace iqm {
 namespace internal {
@@ -209,8 +219,8 @@ int Perform_get_request(const std::string &url, const std::string &bearer_token,
 
   const auto ret = Perform_request_with_retries(
       url, response, error_log_policy, [&]() -> Request_attempt_result {
-        cpr::Response r = cpr_api_hooks.get(cpr::Url{url}, headers, timeout,
-                                            redirect, verify_ssl);
+        const cpr::Response r = cpr_api_hooks.get(
+            cpr::Url{url}, headers, timeout, redirect, verify_ssl);
         response = r.text;
         return {.error_code = r.error.code,
                 .error_message = r.error.message,
@@ -252,12 +262,12 @@ int CprHttpClient::post(const std::string &url, const std::string &bearer_token,
       std::string key = extra_header.substr(0, colon_pos);
       std::string val = extra_header.substr(colon_pos + 1);
       auto trim = [](std::string &s) {
-        s.erase(s.begin(),
-                std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) {
                   return !std::isspace(ch);
                 }));
-        s.erase(std::find_if(s.rbegin(), s.rend(),
-                             [](unsigned char ch) { return !std::isspace(ch); })
+        s.erase(std::ranges::find_if(
+                    s | std::views::reverse,
+                    [](unsigned char ch) { return !std::isspace(ch); })
                     .base(),
                 s.end());
       };
@@ -280,7 +290,7 @@ int CprHttpClient::post(const std::string &url, const std::string &bearer_token,
   const auto ret = internal::Perform_request_with_retries(
       url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
       [&]() -> internal::Request_attempt_result {
-        cpr::Response r =
+        const cpr::Response r =
             cpr_api_hooks.post(cpr::Url{url}, headers, cpr::Body{data}, timeout,
                                redirect, verify_ssl);
         response = r.text;

@@ -30,7 +30,14 @@
 #include "logging.hpp"
 
 #include <chrono>
-#include <cpr/cpr.h>
+#include <cpr/api.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/redirect.h>
+#include <cpr/response.h>
+#include <cpr/ssl_options.h>
+#include <cpr/timeout.h>
 #include <cstdint>
 #include <functional>
 #include <string>

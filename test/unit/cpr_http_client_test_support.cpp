@@ -29,6 +29,14 @@
 
 #include "cpr_http_client_internal.hpp"
 
+#include <cpr/api.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/redirect.h>
+#include <cpr/response.h>
+#include <cpr/ssl_options.h>
+#include <cpr/timeout.h>
 #include <cstddef>
 #include <cstdint>
 #include <string>
