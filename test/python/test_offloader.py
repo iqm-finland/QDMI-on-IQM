@@ -122,8 +122,8 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     assert "iqm-sampler" in captured_command
     assert "--shots" in captured_command
     assert "7" in captured_command
-    assert "--base-url" in captured_command
-    assert "https://resonance.example" in captured_command
+    base_url_idx = captured_command.index("--base-url")
+    assert captured_command[base_url_idx + 1] == "https://resonance.example"
     assert "--tokens-file" in captured_command
     assert "tokens_path" in captured_command
     assert "--qc-alias" in captured_command
@@ -161,8 +161,8 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
     assert "3" in captured_command
-    assert "--base-url" in captured_command
-    assert "https://resonance.example" in captured_command
+    base_url_idx = captured_command.index("--base-url")
+    assert captured_command[base_url_idx + 1] == "https://resonance.example"
     assert "--tokens-file" in captured_command
     assert "tokens_path" in captured_command
     assert "--qc-alias" in captured_command
