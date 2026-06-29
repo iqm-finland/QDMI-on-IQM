@@ -58,6 +58,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CPR_BUILD_TESTS
     OFF
     CACHE BOOL "Disable CPR tests" FORCE)
+set(CPR_CURL_USE_LIBPSL
+    OFF
+    CACHE BOOL "Disable libpsl for CPR curl" FORCE)
 if(WIN32)
   set(CPR_USE_SYSTEM_CURL
       OFF
