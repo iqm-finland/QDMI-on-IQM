@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ### Added
 
+- ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and `estimate` functions for Slurm job submissions ([#104]) ([**@marcelwa**])
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
@@ -61,6 +62,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#104]: https://github.com/iqm-finland/QDMI-on_IQM/pull/104
 [#92]: https://github.com/iqm-finland/QDMI-on_IQM/pull/92
 [#78]: https://github.com/iqm-finland/QDMI-on_IQM/pull/78
 [#74]: https://github.com/iqm-finland/QDMI-on_IQM/pull/74
