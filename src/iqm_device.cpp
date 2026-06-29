@@ -23,7 +23,7 @@
  * documentation at https://munich-quantum-software-stack.github.io/QDMI.
  */
 
-#include "curl_http_client.hpp"
+#include "cpr_http_client.hpp"
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
@@ -651,13 +651,13 @@ IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
   session->session_status_ = IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED;
   session->device_status_ = QDMI_DEVICE_STATUS_IDLE;
 
-  // Get the static quantum architecture via a curl GET request
+  // Get the static quantum architecture via a GET request
   if (const auto ret = Process_static_quantum_architecture(session);
       ret != QDMI_SUCCESS) {
     return ret;
   }
 
-  // Get the dynamic quantum architecture via a curl GET request
+  // Get the dynamic quantum architecture via a GET request
   if (const auto ret =
           IQM_QDMI_device_update_dynamic_quantum_architecture(session);
       ret != QDMI_SUCCESS) {
@@ -683,7 +683,7 @@ IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
 
 int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
   return IQM_QDMI_device_session_init_with_http_client(
-      session, std::make_unique<iqm::CurlHttpClient>());
+      session, std::make_unique<iqm::CprHttpClient>());
 }
 
 void IQM_QDMI_device_session_free(IQM_QDMI_Device_Session session) {
