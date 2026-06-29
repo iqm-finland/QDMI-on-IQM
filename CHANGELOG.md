@@ -15,6 +15,10 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
 
+### Changed
+
+- ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls ([#105]) ([**@marcelwa**])
+
 ## [1.1.1] - 2026-06-01
 
 ### Fixed
@@ -61,6 +65,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#105]: https://github.com/iqm-finland/QDMI-on_IQM/pull/105
 [#92]: https://github.com/iqm-finland/QDMI-on_IQM/pull/92
 [#78]: https://github.com/iqm-finland/QDMI-on_IQM/pull/78
 [#74]: https://github.com/iqm-finland/QDMI-on_IQM/pull/74
@@ -81,6 +86,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- General links -->
 
+[cpr]: https://github.com/libcpr/cpr
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
