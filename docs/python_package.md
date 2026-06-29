@@ -83,3 +83,39 @@ To run a parameter estimation job:
 ```console
 $ iqm-estimator ansatz.qpy observable.pkl --maxiter 10
 ```
+
+## Programmatic Offloading with the `offloader` Module
+
+For workflows running on a Slurm login node (such as Jupyter notebooks on a gateway service), the package exposes the {py:mod}`~iqm.qdmi.offloader` module. It allows you to programmatically submit quantum workloads to the Slurm quantum queue.
+
+The module provides two primary functions:
+
+- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the given circuit to QPY, submits a Slurm job using `srun iqm-sampler`, and parses the base64-encoded pickled result back to a python dictionary of counts.
+- {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable, submits a Slurm job using `srun iqm-estimator`, and parses the base64-encoded pickled VQEResult to return optimal parameters.
+
+Both functions support a `local=True` argument for running simulation/hardware compilation locally (useful for debugging) and a `simulator=True` argument when submitting Slurm jobs to target simulated devices instead of real QPU hardware.
+
+### Shared Jobs Directory
+
+When submitting Slurm workloads, a shared filesystem directory is required to serialize inputs (QPY/pickle files) for execution on the compute nodes. The directory path is resolved as follows:
+
+1. Honoring the `IQM_JOBS_DIR` environment variable, if set.
+2. Defaulting to a hidden `.qdmi_jobs` folder under the user's home directory (`~/.qdmi_jobs`).
+
+Ensure that the jobs directory is located on a shared cluster filesystem accessible by both the login node and all Slurm compute nodes.
+
+### Programmatic Sampling Example
+
+```python
+from iqm.qdmi.offloader import sample
+from qiskit import QuantumCircuit
+
+qc = QuantumCircuit(2)
+qc.h(0)
+qc.cx(0, 1)
+qc.measure_all()
+
+# programmatically offload via Slurm
+counts = sample(qc, shots=512, simulator=True)
+print("Counts:", counts)
+```
