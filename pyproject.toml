@@ -47,7 +47,9 @@ classifiers = [
 qiskit = [
   "mqt-core~=3.6.1",
   "qiskit[qasm3-import]>=1.1",
-  "qiskit-algorithms>=0.4.0"
+  "qiskit-algorithms>=0.4.0",
+  "numpy>=2.1; python_version >= '3.13'",
+  "numpy>=2.3.2; python_version >= '3.14'",
 ]
 
 [project.urls]
@@ -134,6 +136,8 @@ filterwarnings = [
   'ignore:.*datetime\.datetime\.utcfromtimestamp.*:DeprecationWarning:',
   # SciPy solver deprecation
   'ignore:.*The `disp` and `iprint` options of the L-BFGS-B solver are deprecated.*:DeprecationWarning:',
+  # SciPy OptimizeWarning for unknown options
+  'ignore:.*Unknown solver options.*::',
   # UserWarning for unmapped operations
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
@@ -189,6 +193,7 @@ convention = "google"
 "python/iqm/qdmi/__main__.py" = ["T201"]
 "python/iqm/qdmi/sampler.py" = ["T201"]
 "python/iqm/qdmi/estimator.py" = ["T201"]
+"python/iqm/qdmi/offloader.py" = ["PLW0717"]
 "test/python/**" = ["T20", "INP001"]
 "examples/**" = ["T20", "INP001"]
 "docs/**" = ["T20", "INP001"]
