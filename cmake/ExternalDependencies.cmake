@@ -133,4 +133,13 @@ if(BUILD_IQM_QDMI_DOCS)
 endif()
 
 # Make all declared dependencies available.
+set(HOLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS
+    OFF
+    CACHE BOOL "Build dependencies statically" FORCE)
+
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
+
+set(BUILD_SHARED_LIBS
+    ${HOLD_BUILD_SHARED_LIBS}
+    CACHE BOOL "Build shared libs" FORCE)
