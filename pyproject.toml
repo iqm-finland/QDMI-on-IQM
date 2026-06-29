@@ -113,6 +113,7 @@ sdist.exclude = [
 
 [tool.scikit-build.cmake.define]
 BUILD_IQM_QDMI_TESTS = "OFF"
+CPR_USE_SYSTEM_CURL = "OFF"
 
 [[tool.scikit-build.generate]]
 path = "iqm/qdmi/_version.py"
