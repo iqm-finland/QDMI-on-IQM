@@ -28,9 +28,7 @@ if(WIN32)
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
-      $<TARGET_FILE_DIR:integration_tests>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:cpr::cpr>
-            $<TARGET_FILE_DIR:integration_tests>)
+      $<TARGET_FILE_DIR:integration_tests>)
 endif()
 
 gtest_discover_tests(

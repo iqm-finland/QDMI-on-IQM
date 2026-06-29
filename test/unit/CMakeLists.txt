@@ -30,9 +30,7 @@ if(WIN32)
     TARGET unit_tests
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:${QDMI_TARGET_NAME}> $<TARGET_FILE_DIR:unit_tests>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:cpr::cpr>
-            $<TARGET_FILE_DIR:unit_tests>)
+            $<TARGET_FILE:${QDMI_TARGET_NAME}> $<TARGET_FILE_DIR:unit_tests>)
 endif()
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
