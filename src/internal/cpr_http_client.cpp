@@ -57,7 +57,7 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
                          const std::string &response,
                          const ERROR_LOG_POLICY error_log_policy) {
   // Parse JSON response for IQM-specific errors and messages
-  nlohmann::json json_response;
+  nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
   if (!response.empty()) {
     try {

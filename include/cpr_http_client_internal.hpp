@@ -29,8 +29,8 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
-#include <chrono>
-#include <cpr/api.h>
+#include <chrono>    // NOLINT(misc-include-cleaner)
+#include <cpr/api.h> // NOLINT(clang-diagnostic-error)
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
@@ -39,7 +39,7 @@
 #include <cpr/ssl_options.h>
 #include <cpr/timeout.h>
 #include <cstdint>
-#include <functional>
+#include <functional> // NOLINT(misc-include-cleaner)
 #include <string>
 #include <thread>
 
