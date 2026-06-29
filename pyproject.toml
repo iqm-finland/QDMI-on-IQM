@@ -47,7 +47,9 @@ classifiers = [
 qiskit = [
   "mqt-core~=3.6.1",
   "qiskit[qasm3-import]>=1.1",
-  "qiskit-algorithms>=0.4.0"
+  "qiskit-algorithms>=0.4.0",
+  "numpy>=2.1; python_version >= '3.13'",
+  "numpy>=2.3.2; python_version >= '3.14'",
 ]
 
 [project.urls]
