@@ -134,6 +134,8 @@ filterwarnings = [
   'ignore:.*datetime\.datetime\.utcfromtimestamp.*:DeprecationWarning:',
   # SciPy solver deprecation
   'ignore:.*The `disp` and `iprint` options of the L-BFGS-B solver are deprecated.*:DeprecationWarning:',
+  # SciPy OptimizeWarning for unknown options
+  'ignore:.*Unknown solver options.*::',
   # UserWarning for unmapped operations
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
