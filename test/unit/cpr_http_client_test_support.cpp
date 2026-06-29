@@ -18,21 +18,19 @@
  */
 
 /** @file
- * @brief Test-support function definitions for CurlHttpClient unit tests.
+ * @brief Test-support function definitions for CprHttpClient unit tests.
  *
- * These helpers wrap internal CurlHttpClient logic so that tests can exercise
+ * These helpers wrap internal CprHttpClient logic so that tests can exercise
  * response classification, retry behavior, and hook injection without needing
  * a live network connection.
  */
 
-#include "curl_http_client_test_support.hpp"
+#include "cpr_http_client_test_support.hpp"
 
-#include "curl_http_client_internal.hpp"
+#include "cpr_http_client_internal.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <string>
 #include <vector>
 
@@ -48,18 +46,26 @@ int Handle_response_code_for_testing(const int64_t response_code,
                         : internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
-namespace {
-void Set_curl_api_hooks_for_testing(CURL *(*easy_init)(),
-                                    CURLcode (*easy_perform)(CURL *)) {
-  auto &curl_api_hooks = internal::Get_curl_api_hooks();
-  curl_api_hooks.easy_init = easy_init != nullptr ? easy_init : curl_easy_init;
-  curl_api_hooks.easy_perform =
-      easy_perform != nullptr ? easy_perform : curl_easy_perform;
-}
-} // namespace
-
-void Enable_curl_easy_init_failure_for_testing() {
-  Set_curl_api_hooks_for_testing([]() -> CURL * { return nullptr; }, nullptr);
+void Enable_cpr_request_failure_for_testing() {
+  auto &cpr_api_hooks = internal::Get_cpr_api_hooks();
+  cpr_api_hooks.get = [](const cpr::Url &, const cpr::Header &,
+                         const cpr::Timeout &, const cpr::Redirect &,
+                         const cpr::VerifySsl &) {
+    cpr::Response r;
+    r.error.code = cpr::ErrorCode::COULDNT_CONNECT;
+    r.error.message = "Failed to connect to host";
+    r.status_code = 0;
+    return r;
+  };
+  cpr_api_hooks.post = [](const cpr::Url &, const cpr::Header &,
+                          const cpr::Body &, const cpr::Timeout &,
+                          const cpr::Redirect &, const cpr::VerifySsl &) {
+    cpr::Response r;
+    r.error.code = cpr::ErrorCode::COULDNT_CONNECT;
+    r.error.message = "Failed to connect to host";
+    r.status_code = 0;
+    return r;
+  };
 }
 
 Retry_test_result
@@ -74,11 +80,15 @@ Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
                         : internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
       [&]() -> internal::Request_attempt_result {
         if (next_response_code_index >= response_codes.size()) {
-          return {.curl_result = CURLE_OK, .response_code = 0};
+          return {.error_code = cpr::ErrorCode::OK,
+                  .error_message = "",
+                  .response_code = 0};
         }
         const auto response_code = response_codes[next_response_code_index];
         next_response_code_index++;
-        return {.curl_result = CURLE_OK, .response_code = response_code};
+        return {.error_code = cpr::ErrorCode::OK,
+                .error_message = "",
+                .response_code = response_code};
       });
   // Retries = total attempts - 1 (the first call is not a retry).
   const size_t retry_count =
@@ -87,8 +97,20 @@ Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
                            .sleep_call_count = retry_count};
 }
 
-void Reset_curl_api_hooks_for_testing() {
-  Set_curl_api_hooks_for_testing(nullptr, nullptr);
+void Reset_cpr_api_hooks_for_testing() {
+  auto &cpr_api_hooks = internal::Get_cpr_api_hooks();
+  cpr_api_hooks.get = [](const cpr::Url &url, const cpr::Header &headers,
+                         const cpr::Timeout &timeout,
+                         const cpr::Redirect &redirect,
+                         const cpr::VerifySsl &verify_ssl) {
+    return cpr::Get(url, headers, timeout, redirect, verify_ssl);
+  };
+  cpr_api_hooks.post = [](const cpr::Url &url, const cpr::Header &headers,
+                          const cpr::Body &body, const cpr::Timeout &timeout,
+                          const cpr::Redirect &redirect,
+                          const cpr::VerifySsl &verify_ssl) {
+    return cpr::Post(url, headers, body, timeout, redirect, verify_ssl);
+  };
 }
 
 } // namespace iqm::test_support
