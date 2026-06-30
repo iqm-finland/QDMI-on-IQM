@@ -44,7 +44,7 @@ target_sources(
          ${PUBLIC_HEADER_FILES})
 target_link_libraries(
   ${QDMI_INTERNAL_TARGET_NAME}
-  PUBLIC CURL::libcurl
+  PUBLIC cpr::cpr
   PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json)
 
 if(ENABLE_COVERAGE)

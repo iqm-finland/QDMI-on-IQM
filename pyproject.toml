@@ -113,6 +113,12 @@ sdist.exclude = [
 
 [tool.scikit-build.cmake.define]
 BUILD_IQM_QDMI_TESTS = "OFF"
+CPR_USE_SYSTEM_CURL = "OFF"
+
+[[tool.scikit-build.overrides]]
+if.platform-system = "darwin"
+cmake.define.CMAKE_IGNORE_PATH = "/opt/homebrew;/usr/local"
+cmake.define.CPR_USE_SYSTEM_CURL = "ON"
 
 [[tool.scikit-build.generate]]
 path = "iqm/qdmi/_version.py"
@@ -235,7 +241,7 @@ environment-pass = [
 ]
 
 [tool.cibuildwheel.linux]
-before-all = "yum install -y curl-devel"
+before-all = "yum install -y curl-devel openssl-devel"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
@@ -246,7 +252,7 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg 
 
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
-before-all = "apk add curl-dev"
+before-all = "apk add curl-dev openssl-dev"
 
 
 [tool.uv]

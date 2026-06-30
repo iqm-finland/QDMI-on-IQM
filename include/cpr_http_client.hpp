@@ -18,7 +18,7 @@
  */
 
 /** @file
- * @brief cURL-based HTTP client implementation for IQM QDMI device
+ * @brief CPR-based HTTP client implementation for IQM QDMI device
  * communication.
  */
 
@@ -31,28 +31,19 @@
 namespace iqm {
 
 /**
- * @brief HTTP client implementation using the cURL library.
+ * @brief HTTP client implementation using the CPR library.
  *
  * This class provides a concrete implementation of the IHttpClient interface
- * using the libcurl library for HTTP communication. It supports GET and POST
- * requests with authentication, SSL verification options, and timeout handling.
- *
- * The implementation includes:
- * - Bearer token authentication
- * - SSL certificate and hostname verification
- * - Automatic retry on HTTP 429 rate limiting
- * - Request timeouts
- * - JSON content type for POST requests
- * - Custom headers support
+ * using the CPR library for HTTP communication. It supports GET and POST
+ * requests with authentication, SSL verification, and timeout handling.
  */
-class CurlHttpClient final : public IHttpClient {
+class CprHttpClient final : public IHttpClient {
 public:
   /**
-   * @brief Perform an HTTP GET request using cURL.
+   * @brief Perform an HTTP GET request using CPR.
    *
    * Sends an HTTP GET request to the specified URL with bearer token
-   * authentication. The request includes a User-Agent header and follows
-   * redirects automatically.
+   * authentication.
    *
    * @param url The target URL for the GET request.
    * @param bearer_token The bearer token for authentication (can be empty).
@@ -63,7 +54,7 @@ public:
           std::string &response) override;
 
   /**
-   * @brief Perform an optional HTTP GET request using cURL.
+   * @brief Perform an optional HTTP GET request using CPR.
    *
    * Behaves like get(), but downgrades non-success logging for capability
    * probes where missing endpoints are expected.
@@ -77,7 +68,7 @@ public:
                    std::string &response) override;
 
   /**
-   * @brief Perform an HTTP POST request using cURL.
+   * @brief Perform an HTTP POST request using CPR.
    *
    * Sends an HTTP POST request to the specified URL with optional data payload.
    * The request automatically includes JSON content type header and supports

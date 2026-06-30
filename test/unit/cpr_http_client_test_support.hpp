@@ -37,10 +37,10 @@ struct Retry_test_result {
 };
 
 /**
- * @brief Exercise CurlHttpClient response handling with a synthetic status.
+ * @brief Exercise CprHttpClient response handling with a synthetic status.
  *
- * This helper bypasses a live CURL handle and directly invokes the internal
- * response classification logic used by CurlHttpClient.
+ * This helper bypasses a live CPR request and directly invokes the internal
+ * response classification logic used by CprHttpClient.
  *
  * @param response_code The HTTP status code to classify.
  * @param url The request URL used in generated log messages.
@@ -55,18 +55,16 @@ int Handle_response_code_for_testing(int64_t response_code,
                                      bool use_debug_logging);
 
 /**
- * @brief Make CurlHttpClient behave as if curl_easy_init failed.
- *
- * This helper is used to cover the GET and POST error paths that return
- * QDMI_ERROR_FATAL when no CURL handle can be created.
+ * @brief Make CprHttpClient behave as if the network request failed (e.g.
+ * couldn't connect).
  */
-void Enable_curl_easy_init_failure_for_testing();
+void Enable_cpr_request_failure_for_testing();
 
 /**
  * @brief Exercise HTTP 429 retry handling with a synthetic response sequence.
  *
- * This helper drives the same retry loop used by CurlHttpClient without
- * requiring a live curl handle. Retry delays are recorded instead of sleeping.
+ * This helper drives the same retry loop used by CprHttpClient without
+ * requiring a live network call. Retry delays are recorded instead of sleeping.
  *
  * @param response_codes The sequence of HTTP status codes to return.
  * @param url The request URL used in generated log messages.
@@ -80,8 +78,8 @@ Retry_response_codes_for_testing(const std::vector<int64_t> &response_codes,
                                  bool use_debug_logging);
 
 /**
- * @brief Restore the default libcurl hooks after a test override.
+ * @brief Restore the default CPR hooks after a test override.
  */
-void Reset_curl_api_hooks_for_testing();
+void Reset_cpr_api_hooks_for_testing();
 
 } // namespace iqm::test_support

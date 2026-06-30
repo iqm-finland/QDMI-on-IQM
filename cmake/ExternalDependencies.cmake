@@ -54,79 +54,29 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
                                        ${JSON_VERSION})
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CPR_BUILD_TESTS
+    OFF
+    CACHE BOOL "Disable CPR tests" FORCE)
+set(CPR_CURL_USE_LIBPSL
+    OFF
+    CACHE BOOL "Disable libpsl for CPR curl" FORCE)
 if(WIN32)
-  set(CURL_REV
-      "curl-8_19_0"
-      CACHE STRING "curl identifier (tag, branch or commit hash)")
-  set(BUILD_CURL_EXE
+  set(CPR_USE_SYSTEM_CURL
       OFF
-      CACHE BOOL "Disable curl executable for vendored builds" FORCE)
-  set(BUILD_LIBCURL_DOCS
-      OFF
-      CACHE BOOL "Disable libcurl docs for vendored builds" FORCE)
-  set(BUILD_MISC_DOCS
-      OFF
-      CACHE BOOL "Disable miscellaneous curl docs for vendored builds" FORCE)
-  set(CURL_USE_SCHANNEL
-      ON
-      CACHE BOOL "Use Schannel backend for vendored Windows curl" FORCE)
-  set(CURL_USE_OPENSSL
-      OFF
-      CACHE BOOL "Disable OpenSSL backend for vendored Windows curl" FORCE)
-  set(CURL_USE_LIBPSL
-      OFF
-      CACHE BOOL "Disable libpsl for vendored Windows curl" FORCE)
-  set(USE_NGHTTP2
-      OFF
-      CACHE BOOL "Disable nghttp2 for vendored Windows curl" FORCE)
-  set(USE_LIBIDN2
-      OFF
-      CACHE BOOL "Disable libidn2 for vendored Windows curl" FORCE)
-  set(CURL_ZLIB
-      OFF
-      CACHE BOOL "Disable zlib for vendored Windows curl" FORCE)
-  set(CURL_BROTLI
-      OFF
-      CACHE BOOL "Disable brotli for vendored Windows curl" FORCE)
-  set(CURL_ZSTD
-      OFF
-      CACHE BOOL "Disable zstd for vendored Windows curl" FORCE)
-  set(CURL_DISABLE_LDAP
-      ON
-      CACHE BOOL "Disable LDAP for vendored Windows curl" FORCE)
-  set(CURL_DISABLE_LDAPS
-      ON
-      CACHE BOOL "Disable LDAPS for vendored Windows curl" FORCE)
-
-  FetchContent_Declare(
-    CURL
-    GIT_REPOSITORY https://github.com/curl/curl.git
-    GIT_TAG ${CURL_REV})
-
-  # curl's build system defines BUILD_SHARED_LIBS; keep that setting local to
-  # the curl subproject so it does not affect other dependencies.
-  set(_iqm_build_shared_libs_was_defined OFF)
-  if(DEFINED BUILD_SHARED_LIBS)
-    set(_iqm_build_shared_libs_was_defined ON)
-    set(_iqm_build_shared_libs_previous_value "${BUILD_SHARED_LIBS}")
-  endif()
-
-  set(BUILD_SHARED_LIBS
-      ON
-      CACHE BOOL "Build shared libraries" FORCE)
-  FetchContent_MakeAvailable(CURL)
-
-  if(_iqm_build_shared_libs_was_defined)
-    set(BUILD_SHARED_LIBS
-        "${_iqm_build_shared_libs_previous_value}"
-        CACHE BOOL "Build shared libraries" FORCE)
-  else()
-    unset(BUILD_SHARED_LIBS CACHE)
-    unset(BUILD_SHARED_LIBS)
-  endif()
+      CACHE BOOL "Use system curl for CPR")
 else()
-  find_package(CURL REQUIRED)
+  set(CPR_USE_SYSTEM_CURL
+      ON
+      CACHE BOOL "Use system curl for CPR")
 endif()
+
+FetchContent_Declare(
+  cpr
+  GIT_REPOSITORY https://github.com/libcpr/cpr.git
+  GIT_TAG 1.14.2
+  FIND_PACKAGE_ARGS 1.14.2)
+list(APPEND FETCH_PACKAGES cpr)
 
 if(BUILD_IQM_SPANK)
   find_path(
@@ -183,4 +133,13 @@ if(BUILD_IQM_QDMI_DOCS)
 endif()
 
 # Make all declared dependencies available.
+set(HOLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS
+    OFF
+    CACHE BOOL "Build dependencies statically" FORCE)
+
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
+
+set(BUILD_SHARED_LIBS
+    ${HOLD_BUILD_SHARED_LIBS}
+    CACHE BOOL "Build shared libs" FORCE)

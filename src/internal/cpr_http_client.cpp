@@ -18,37 +18,46 @@
  */
 
 /** @file
- * @brief cURL-based HTTP client implementation for IQM QDMI device
+ * @brief CPR-based HTTP client implementation for IQM QDMI device
  * communication.
  */
 
-#include "curl_http_client.hpp"
+#include "cpr_http_client.hpp"
 
-#include "curl_http_client_internal.hpp"
+#include "cpr_http_client_internal.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/redirect.h>
+#include <cpr/response.h>
+#include <cpr/ssl_options.h>
+#include <cpr/timeout.h>
 #include <cstddef>
 #include <cstdint>
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
+#include <ranges>
 #include <string>
+#include <utility>
 
 namespace iqm {
 namespace internal {
 
-Curl_api_hooks &Get_curl_api_hooks() {
-  static Curl_api_hooks curl_api_hooks{};
-  return curl_api_hooks;
+Cpr_api_hooks &Get_cpr_api_hooks() {
+  static Cpr_api_hooks cpr_api_hooks{};
+  return cpr_api_hooks;
 }
 
 int Handle_response_code(const int64_t response_code, const std::string &url,
                          const std::string &response,
                          const ERROR_LOG_POLICY error_log_policy) {
   // Parse JSON response for IQM-specific errors and messages
-  nlohmann::json json_response;
+  nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
   if (!response.empty()) {
     try {
@@ -56,7 +65,6 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
       has_json = true;
     } catch (const nlohmann::json::exception &) {
       LOG_DEBUG("Response is not valid JSON");
-      // Response is not JSON or invalid JSON, continue with plain text handling
     }
   }
 
@@ -192,140 +200,104 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
 
 namespace {
 
-/**
- * @brief Build a Request_attempt_result from a curl perform result.
- *
- * When the perform call failed, the response code is left at zero.
- * Otherwise the HTTP response code is read from the handle.
- *
- * @param curl The curl handle associated with the completed request.
- * @param res  The CURLcode returned by curl_easy_perform.
- * @return The combined attempt result.
- */
-Request_attempt_result Attempt_result(CURL *curl, CURLcode res) {
-  if (res != CURLE_OK) {
-    return {.curl_result = res, .response_code = 0};
-  }
-  int64_t response_code{};
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-  return {.curl_result = CURLE_OK, .response_code = response_code};
-}
-
-// Helper for CURL responses
-size_t Curl_write_callback(void *contents, const size_t size,
-                           const size_t nmemb, std::string *response) {
-  const size_t real_size = size * nmemb;
-  response->append(static_cast<char *>(contents), real_size);
-  return real_size;
-}
-
-// Helper for default HTTP request headers
-curl_slist *Default_headers(const std::string &bearer_token) {
-  curl_slist *headers = nullptr;
-  headers = curl_slist_append(headers, "User-Agent: IQM QDMI C++ API");
-  if (!bearer_token.empty()) {
-    // Set the "Authorization" header with the bearer token
-    headers =
-        curl_slist_append(headers, ("Authorization: " + bearer_token).c_str());
-  }
-  return headers;
-}
-
 int Perform_get_request(const std::string &url, const std::string &bearer_token,
                         std::string &response,
                         const ERROR_LOG_POLICY error_log_policy) {
   LOG_INFO("Performing GET request to " + url);
-  auto &curl_api_hooks = Get_curl_api_hooks();
-  CURL *curl = curl_api_hooks.easy_init();
-  if (curl == nullptr) {
-    LOG_ERROR("curl_easy_init() failed");
-    return QDMI_ERROR_FATAL;
+
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
   }
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-  auto *headers = Default_headers(bearer_token);
-  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+  cpr::Timeout timeout{std::chrono::seconds{3600}};
+  cpr::Redirect redirect{true};
+  cpr::VerifySsl verify_ssl{true};
+
+  auto &cpr_api_hooks = Get_cpr_api_hooks();
+
   const auto ret = Perform_request_with_retries(
       url, response, error_log_policy, [&]() -> Request_attempt_result {
-        return Attempt_result(curl, curl_api_hooks.easy_perform(curl));
+        const cpr::Response r = cpr_api_hooks.get(
+            cpr::Url{url}, headers, timeout, redirect, verify_ssl);
+        response = r.text;
+        return {.error_code = r.error.code,
+                .error_message = r.error.message,
+                .response_code = r.status_code};
       });
-  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
-  curl_slist_free_all(headers);
   return ret;
 }
 
 } // namespace
 } // namespace internal
 
-int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
-                        std::string &response) {
+int CprHttpClient::get(const std::string &url, const std::string &bearer_token,
+                       std::string &response) {
   return internal::Perform_get_request(
       url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 }
 
-int CurlHttpClient::get_optional(const std::string &url,
-                                 const std::string &bearer_token,
-                                 std::string &response) {
+int CprHttpClient::get_optional(const std::string &url,
+                                const std::string &bearer_token,
+                                std::string &response) {
   return internal::Perform_get_request(
       url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG);
 }
 
-/**
- * @brief Perform an HTTP POST request using cURL.
- *
- * Sends an authenticated POST request, attaches a JSON content type header,
- * and appends an optional extra header when provided.
- *
- * @param url The target URL for the POST request.
- * @param bearer_token The bearer token for authentication.
- * @param response Reference to the response body buffer.
- * @param data The request payload to send.
- * @param extra_header An optional extra HTTP header.
- * @return The mapped QDMI status code for the request outcome.
- */
-int CurlHttpClient::post(const std::string &url,
-                         const std::string &bearer_token, std::string &response,
-                         const std::string &data,
-                         const std::string &extra_header) {
+int CprHttpClient::post(const std::string &url, const std::string &bearer_token,
+                        std::string &response, const std::string &data,
+                        const std::string &extra_header) {
   LOG_INFO("Performing POST request to " + url);
-  auto &curl_api_hooks = internal::Get_curl_api_hooks();
-  CURL *curl = curl_api_hooks.easy_init();
-  if (curl == nullptr) {
-    LOG_ERROR("curl_easy_init() failed");
-    return QDMI_ERROR_FATAL;
+
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  headers.emplace("Content-Type", "application/json");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
   }
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, internal::Curl_write_callback);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-  auto *headers = internal::Default_headers(bearer_token);
-  headers = curl_slist_append(headers, "Content-Type: application/json");
   if (!extra_header.empty()) {
-    headers = curl_slist_append(headers, extra_header.c_str());
+    const size_t colon_pos = extra_header.find(':');
+    if (colon_pos != std::string::npos) {
+      std::string key = extra_header.substr(0, colon_pos);
+      std::string val = extra_header.substr(colon_pos + 1);
+      auto trim = [](std::string &s) {
+        s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) {
+                  return !std::isspace(ch);
+                }));
+        s.erase(std::ranges::find_if(
+                    s | std::views::reverse,
+                    [](unsigned char ch) { return !std::isspace(ch); })
+                    .base(),
+                s.end());
+      };
+      trim(key);
+      trim(val);
+      headers.emplace(std::move(key), std::move(val));
+    }
   }
-  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+  cpr::Timeout timeout{std::chrono::seconds{3600}};
+  cpr::Redirect redirect{true};
+  cpr::VerifySsl verify_ssl{true};
+
   if (!data.empty()) {
     LOG_DEBUG("POST data: " + data);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
-  } else {
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   }
+
+  auto &cpr_api_hooks = internal::Get_cpr_api_hooks();
+
   const auto ret = internal::Perform_request_with_retries(
       url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
       [&]() -> internal::Request_attempt_result {
-        return internal::Attempt_result(curl,
-                                        curl_api_hooks.easy_perform(curl));
+        const cpr::Response r =
+            cpr_api_hooks.post(cpr::Url{url}, headers, cpr::Body{data}, timeout,
+                               redirect, verify_ssl);
+        response = r.text;
+        return {.error_code = r.error.code,
+                .error_message = r.error.message,
+                .response_code = r.status_code};
       });
-  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
-  curl_slist_free_all(headers);
   return ret;
 }
 

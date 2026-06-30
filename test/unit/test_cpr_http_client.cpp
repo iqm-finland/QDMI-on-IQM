@@ -17,8 +17,8 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "curl_http_client.hpp"
-#include "curl_http_client_test_support.hpp"
+#include "cpr_http_client.hpp"
+#include "cpr_http_client_test_support.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
@@ -73,29 +73,29 @@ private:
 };
 
 /**
- * @brief Restores CurlHttpClient test hooks when leaving scope.
+ * @brief Restores CPR test hooks when leaving scope.
  */
-class CurlApiHookGuard {
+class CprApiHookGuard {
 public:
   /**
-   * @brief Install a temporary curl_easy_init failure hook.
+   * @brief Install a temporary CPR request failure hook.
    */
-  CurlApiHookGuard() {
-    iqm::test_support::Enable_curl_easy_init_failure_for_testing();
+  CprApiHookGuard() {
+    iqm::test_support::Enable_cpr_request_failure_for_testing();
   }
 
-  CurlApiHookGuard(const CurlApiHookGuard &) = delete;
-  CurlApiHookGuard &operator=(const CurlApiHookGuard &) = delete;
-  CurlApiHookGuard(CurlApiHookGuard &&) = delete;
-  CurlApiHookGuard &operator=(CurlApiHookGuard &&) = delete;
+  CprApiHookGuard(const CprApiHookGuard &) = delete;
+  CprApiHookGuard &operator=(const CprApiHookGuard &) = delete;
+  CprApiHookGuard(CprApiHookGuard &&) = delete;
+  CprApiHookGuard &operator=(CprApiHookGuard &&) = delete;
 
   /**
-   * @brief Restore the default curl hooks.
+   * @brief Restore the default CPR hooks.
    */
-  ~CurlApiHookGuard() { iqm::test_support::Reset_curl_api_hooks_for_testing(); }
+  ~CprApiHookGuard() { iqm::test_support::Reset_cpr_api_hooks_for_testing(); }
 };
 
-TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
+TEST(CprHttpClientTest, SuccessMessagesAreLogged) {
   const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
@@ -111,7 +111,7 @@ TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
   EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
+TEST(CprHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
@@ -126,7 +126,7 @@ TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   EXPECT_NE(logs.find("Response: not-json"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
+TEST(CprHttpClientTest, RedirectResponseLogsAdditionalMessages) {
   const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
@@ -146,7 +146,7 @@ TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
       std::string::npos);
 }
 
-TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
+TEST(CprHttpClientTest, StructuredErrorsSuppressRawFallback) {
   const LoggerCapture logger_capture;
 
   const auto ret = iqm::test_support::Handle_response_code_for_testing(
@@ -165,56 +165,34 @@ TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
   EXPECT_EQ(logs.find("Response: {\"errors\":"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
+TEST(CprHttpClientTest, GetReturnsFatalWhenCprRequestFails) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::CurlHttpClient http_client;
+  const CprApiHookGuard cpr_api_hook_guard;
+  iqm::CprHttpClient http_client;
   std::string response;
 
   EXPECT_EQ(http_client.get("https://example.test/jobs", "", response),
             QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_init() failed"),
+  EXPECT_NE(logger_capture.str().find(
+                "CPR request failed: Failed to connect to host"),
             std::string::npos);
 }
 
-TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
+TEST(CprHttpClientTest, PostReturnsFatalWhenCprRequestFails) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::CurlHttpClient http_client;
+  const CprApiHookGuard cpr_api_hook_guard;
+  iqm::CprHttpClient http_client;
   std::string response;
 
   EXPECT_EQ(
       http_client.post("https://example.test/jobs", "", response, "{}", ""),
       QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_init() failed"),
+  EXPECT_NE(logger_capture.str().find(
+                "CPR request failed: Failed to connect to host"),
             std::string::npos);
 }
 
-TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlPerformFails) {
-  const LoggerCapture logger_capture;
-  iqm::CurlHttpClient http_client;
-  std::string response;
-
-  EXPECT_EQ(
-      http_client.get("unsupported-protocol://example.test/jobs", "", response),
-      QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_perform() failed:"),
-            std::string::npos);
-}
-
-TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlPerformFails) {
-  const LoggerCapture logger_capture;
-  iqm::CurlHttpClient http_client;
-  std::string response;
-
-  EXPECT_EQ(http_client.post("unsupported-protocol://example.test/jobs", "",
-                             response, "{}", ""),
-            QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_perform() failed:"),
-            std::string::npos);
-}
-
-TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
+TEST(CprHttpClientTest, RetriesHttp429UntilSuccess) {
   const LoggerCapture logger_capture;
   const auto result = iqm::test_support::Retry_response_codes_for_testing(
       {429, 200}, "https://example.test/jobs", false);
@@ -228,7 +206,7 @@ TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
   EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
+TEST(CprHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
   const LoggerCapture logger_capture;
   const auto result = iqm::test_support::Retry_response_codes_for_testing(
       {429, 429, 429, 429, 429, 429}, "https://example.test/jobs", false);
