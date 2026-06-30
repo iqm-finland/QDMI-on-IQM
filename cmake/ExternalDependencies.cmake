@@ -64,11 +64,11 @@ set(CPR_CURL_USE_LIBPSL
 if(WIN32)
   set(CPR_USE_SYSTEM_CURL
       OFF
-      CACHE BOOL "Use system curl for CPR" FORCE)
+      CACHE BOOL "Use system curl for CPR")
 else()
   set(CPR_USE_SYSTEM_CURL
       ON
-      CACHE BOOL "Use system curl for CPR" FORCE)
+      CACHE BOOL "Use system curl for CPR")
 endif()
 
 FetchContent_Declare(
