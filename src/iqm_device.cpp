@@ -1805,7 +1805,10 @@ int IQM_QDMI_device_session_query_operation_property(
     auto sites_vec = std::vector<IQM_QDMI_Site>(sites, sites + num_sites);
     // need to find this vector in the list of available sites
     auto it = std::ranges::find(available_sites_for_op, sites_vec);
-    if (it == available_sites_for_op.end() && num_op_sites == 2) {
+    // MOVE is directional and must stay ordered as [qubit, resonator].
+    const bool is_directional = operation->name_ == "move";
+    if (it == available_sites_for_op.end() && num_op_sites == 2 &&
+        !is_directional) {
       // try with reversed sites
       std::ranges::reverse(sites_vec);
       it = std::ranges::find(available_sites_for_op, sites_vec);
