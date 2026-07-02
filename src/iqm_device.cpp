@@ -450,8 +450,18 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   session->connectivity_.reserve(num_edges * 2);
   for (size_t i = 0; i < num_edges; ++i) {
     const auto &edge = connectivity[i];
-    const auto &site1 = session->sites_map_[edge[0].get<std::string>()];
-    const auto &site2 = session->sites_map_[edge[1].get<std::string>()];
+    const auto site_name1 = edge[0].get<std::string>();
+    const auto site_name2 = edge[1].get<std::string>();
+    const auto site1_it = session->sites_map_.find(site_name1);
+    const auto site2_it = session->sites_map_.find(site_name2);
+    if (site1_it == session->sites_map_.end() ||
+        site2_it == session->sites_map_.end()) {
+      LOG_ERROR("Connectivity references unknown site: " + site_name1 +
+                std::string(" - ").append(site_name2));
+      return QDMI_ERROR_FATAL;
+    }
+    auto site1 = site1_it->second;
+    auto site2 = site2_it->second;
     session->connectivity_.emplace_back(site1, site2);
     session->connectivity_.emplace_back(site2, site1);
   }
@@ -505,8 +515,14 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       auto &qubit_list_vec = operation_qubit_lists.emplace_back();
       qubit_list_vec.reserve(qubit_list.size());
       for (const auto &qubit : qubit_list) {
-        const auto &site = session->sites_map_[qubit.get<std::string>()];
-        qubit_list_vec.emplace_back(site);
+        const auto site_name = qubit.get<std::string>();
+        const auto site_it = session->sites_map_.find(site_name);
+        if (site_it == session->sites_map_.end()) {
+          LOG_ERROR("Operation '" + gate_name + "' references unknown site '" +
+                    site_name + "'");
+          return QDMI_ERROR_FATAL;
+        }
+        qubit_list_vec.emplace_back(site_it->second);
       }
     }
   }
