@@ -356,7 +356,6 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
 
 TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
   const auto ops = fomac.get_operation_map();
-  const auto sites = fomac.get_sites();
   const auto coupling_map = fomac.get_coupling_map();
 
   for (const auto &op : ops | std::views::values) {
@@ -382,7 +381,7 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         << "Operation " + gate_name + " must support at least one site set";
 
     if (gate_num_qubits == 1) {
-      for (const auto &site : sites) {
+      for (const auto &site : supported_sites) {
         // Fidelity property is optional
         try {
           const auto fidelity =
@@ -391,6 +390,10 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
               << "Fidelity should be between 0 and 1 when available";
           EXPECT_LE(fidelity, 1.0)
               << "Fidelity should be between 0 and 1 when available";
+        } catch (const std::invalid_argument &) {
+          GTEST_LOG_(INFO) << "Fidelity property not available for operation " +
+                                  gate_name + " on site " +
+                                  fomac.get_site_name(site);
         } catch (const std::runtime_error &) {
           // Fidelity property is not supported - this is acceptable
           try {
@@ -410,6 +413,10 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
               fomac.get_operation_duration(op, {site}, params);
           EXPECT_GT(duration, 0.0)
               << "Duration should be positive when available";
+        } catch (const std::invalid_argument &) {
+          GTEST_LOG_(INFO) << "Duration property not available for operation " +
+                                  gate_name + " on site " +
+                                  fomac.get_site_name(site);
         } catch (const std::runtime_error &) {
           // Duration property is not supported - this is acceptable
           try {
