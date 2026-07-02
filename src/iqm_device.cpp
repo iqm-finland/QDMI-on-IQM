@@ -410,15 +410,38 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto &qubits = architecture["qubits"];
   const auto num_qubits = qubits.size();
   LOG_INFO("Found " + std::to_string(num_qubits) + " qubits");
-  session->sites_.reserve(num_qubits);
-  session->sites_map_.reserve(num_qubits);
-  for (size_t i = 0; i < num_qubits; ++i) {
+
+  std::vector<std::string> computational_resonators;
+  if (architecture.contains("computational_resonators") &&
+      architecture["computational_resonators"].is_array()) {
+    const auto &resonators = architecture["computational_resonators"];
+    computational_resonators.reserve(resonators.size());
+    for (const auto &resonator : resonators) {
+      computational_resonators.emplace_back(resonator.get<std::string>());
+    }
+  }
+  LOG_INFO("Found " + std::to_string(computational_resonators.size()) +
+           " computational resonators");
+
+  const auto total_sites = num_qubits + computational_resonators.size();
+  session->sites_.reserve(total_sites);
+  session->sites_ptr_.reserve(total_sites);
+  session->sites_map_.reserve(total_sites);
+
+  auto add_site = [&](const std::string &site_name, size_t site_index) {
     auto &site =
         session->sites_.emplace_back(std::make_unique<IQM_QDMI_Site_impl_d>());
-    site->name_ = qubits[i].get<std::string>();
-    site->id_ = i;
+    site->name_ = site_name;
+    site->id_ = site_index;
     session->sites_ptr_.emplace_back(site.get());
     session->sites_map_[site->name_] = site.get();
+  };
+
+  for (size_t i = 0; i < num_qubits; ++i) {
+    add_site(qubits[i].get<std::string>(), i);
+  }
+  for (size_t i = 0; i < computational_resonators.size(); ++i) {
+    add_site(computational_resonators[i], num_qubits + i);
   }
 
   const auto &connectivity = architecture["connectivity"];
