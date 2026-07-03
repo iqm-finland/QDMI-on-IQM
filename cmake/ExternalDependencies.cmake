@@ -61,16 +61,15 @@ set(CPR_BUILD_TESTS
 set(CPR_CURL_USE_LIBPSL
     OFF
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
-if(WIN32)
-  set(CPR_USE_SYSTEM_CURL
-      OFF
-      CACHE BOOL "Use system curl for CPR")
-else()
-  set(CPR_USE_SYSTEM_CURL
-      ON
-      CACHE BOOL "Use system curl for CPR")
-endif()
-
+set(CPR_USE_SYSTEM_CURL
+    OFF
+    CACHE BOOL "Use system curl for CPR" FORCE)
+set(BUILD_STATIC_CURL
+    ON
+    CACHE BOOL "Enable static curl for CPR" FORCE)
+set(BUILD_SHARED_LIBS
+    OFF
+    CACHE BOOL "Disable shared libraries for CPR" FORCE)
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
@@ -133,13 +132,4 @@ if(BUILD_IQM_QDMI_DOCS)
 endif()
 
 # Make all declared dependencies available.
-set(HOLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(BUILD_SHARED_LIBS
-    OFF
-    CACHE BOOL "Build dependencies statically" FORCE)
-
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
-
-set(BUILD_SHARED_LIBS
-    ${HOLD_BUILD_SHARED_LIBS}
-    CACHE BOOL "Build shared libs" FORCE)
