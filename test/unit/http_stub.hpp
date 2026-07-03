@@ -45,7 +45,7 @@ struct Scripted_response {
 };
 
 /**
- * @brief Scripts HTTP responses so that iqm::http::get/get_optional/post
+ * @brief Scripts HTTP responses so that iqm::http::Get/Get_optional/Post
  * (and everything built on top of them, up to and including the public
  * `IQM_QDMI_device_session_init`) can be exercised end-to-end without any
  * live network traffic or real time delays.
@@ -65,24 +65,24 @@ struct Scripted_response {
  * The default hooks are restored on destruction (RAII), so each test that
  * owns an instance of this class gets an isolated, self-cleaning stub.
  */
-class Http_stub {
+class HttpStub {
 public:
-  Http_stub();
-  ~Http_stub();
+  HttpStub();
+  ~HttpStub();
 
-  Http_stub(const Http_stub &) = delete;
-  Http_stub &operator=(const Http_stub &) = delete;
-  Http_stub(Http_stub &&) = delete;
-  Http_stub &operator=(Http_stub &&) = delete;
+  HttpStub(const HttpStub &) = delete;
+  HttpStub &operator=(const HttpStub &) = delete;
+  HttpStub(HttpStub &&) = delete;
+  HttpStub &operator=(HttpStub &&) = delete;
 
   /// Queue the next scripted GET response.
-  Http_stub &Queue_get(int64_t status_code, std::string body = {});
+  HttpStub &queue_get(int64_t status_code, std::string body = {});
   /// Queue the next GET request to fail at the transport level.
-  Http_stub &Queue_get_connection_error();
+  HttpStub &queue_get_connection_error();
   /// Queue the next scripted POST response.
-  Http_stub &Queue_post(int64_t status_code, std::string body = {});
+  HttpStub &queue_post(int64_t status_code, std::string body = {});
   /// Queue the next POST request to fail at the transport level.
-  Http_stub &Queue_post_connection_error();
+  HttpStub &queue_post_connection_error();
 
   /// URLs requested via GET, in call order.
   [[nodiscard]] const std::vector<std::string> &get_urls() const;

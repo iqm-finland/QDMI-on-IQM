@@ -147,11 +147,11 @@ TEST(HttpClientTest, StructuredErrorsSuppressRawFallback) {
 
 TEST(HttpClientTest, GetReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
-  iqm::test_support::Http_stub http_stub;
-  http_stub.Queue_get_connection_error();
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get_connection_error();
   std::string response;
 
-  EXPECT_EQ(iqm::http::get("https://example.test/jobs", "", response),
+  EXPECT_EQ(iqm::http::Get("https://example.test/jobs", "", response),
             QDMI_ERROR_FATAL);
   EXPECT_NE(
       logger_capture.str().find("Request failed: Failed to connect to host"),
@@ -160,12 +160,12 @@ TEST(HttpClientTest, GetReturnsFatalWhenRequestFails) {
 
 TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
-  iqm::test_support::Http_stub http_stub;
-  http_stub.Queue_post_connection_error();
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_post_connection_error();
   std::string response;
 
   EXPECT_EQ(
-      iqm::http::post("https://example.test/jobs", "", response, "{}", ""),
+      iqm::http::Post("https://example.test/jobs", "", response, "{}", ""),
       QDMI_ERROR_FATAL);
   EXPECT_NE(
       logger_capture.str().find("Request failed: Failed to connect to host"),
@@ -174,11 +174,11 @@ TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
 
 TEST(HttpClientTest, RetriesHttp429UntilSuccess) {
   const LoggerCapture logger_capture;
-  iqm::test_support::Http_stub http_stub;
-  http_stub.Queue_get(429).Queue_get(200);
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get(429).queue_get(200);
   std::string response;
 
-  const auto status = iqm::http::get("https://example.test/jobs", "", response);
+  const auto status = iqm::http::Get("https://example.test/jobs", "", response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
   EXPECT_EQ(http_stub.sleep_call_count(), 1U);
@@ -191,13 +191,13 @@ TEST(HttpClientTest, RetriesHttp429UntilSuccess) {
 
 TEST(HttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
   const LoggerCapture logger_capture;
-  iqm::test_support::Http_stub http_stub;
+  iqm::test_support::HttpStub http_stub;
   for (int i = 0; i < 6; ++i) {
-    http_stub.Queue_get(429);
+    http_stub.queue_get(429);
   }
   std::string response;
 
-  const auto status = iqm::http::get("https://example.test/jobs", "", response);
+  const auto status = iqm::http::Get("https://example.test/jobs", "", response);
 
   EXPECT_EQ(status, QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(http_stub.sleep_call_count(), 5U);

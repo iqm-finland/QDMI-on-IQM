@@ -333,7 +333,7 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
 
 } // namespace internal
 
-int get(const std::string &url, const std::string &bearer_token,
+int Get(const std::string &url, const std::string &bearer_token,
         std::string &response) {
   LOG_INFO("Performing GET request to " + url);
   const auto &hooks = internal::Get_hooks();
@@ -342,7 +342,7 @@ int get(const std::string &url, const std::string &bearer_token,
       [&]() { return hooks.get(url, bearer_token); });
 }
 
-int get_optional(const std::string &url, const std::string &bearer_token,
+int Get_optional(const std::string &url, const std::string &bearer_token,
                  std::string &response) {
   LOG_INFO("Performing GET request to " + url);
   const auto &hooks = internal::Get_hooks();
@@ -351,7 +351,7 @@ int get_optional(const std::string &url, const std::string &bearer_token,
       [&]() { return hooks.get(url, bearer_token); });
 }
 
-int post(const std::string &url, const std::string &bearer_token,
+int Post(const std::string &url, const std::string &bearer_token,
          std::string &response, const std::string &data,
          const std::string &extra_header) {
   LOG_INFO("Performing POST request to " + url);

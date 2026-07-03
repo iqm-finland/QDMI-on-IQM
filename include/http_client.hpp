@@ -38,13 +38,13 @@ namespace iqm::http {
  * @param response Reference to string that will contain the response body.
  * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
  */
-int get(const std::string &url, const std::string &bearer_token,
+int Get(const std::string &url, const std::string &bearer_token,
         std::string &response);
 
 /**
  * @brief Perform an optional HTTP GET request.
  *
- * Behaves like get(), but downgrades non-success logging for capability
+ * Behaves like Get(), but downgrades non-success logging for capability
  * probes where missing endpoints are expected.
  *
  * @param url The target URL for the GET request.
@@ -52,7 +52,7 @@ int get(const std::string &url, const std::string &bearer_token,
  * @param response Reference to string that will contain the response body.
  * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
  */
-int get_optional(const std::string &url, const std::string &bearer_token,
+int Get_optional(const std::string &url, const std::string &bearer_token,
                  std::string &response);
 
 /**
@@ -70,7 +70,7 @@ int get_optional(const std::string &url, const std::string &bearer_token,
  * "Key: Value" (can be empty).
  * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
  */
-int post(const std::string &url, const std::string &bearer_token,
+int Post(const std::string &url, const std::string &bearer_token,
          std::string &response, const std::string &data,
          const std::string &extra_header);
 

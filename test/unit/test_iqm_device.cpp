@@ -145,7 +145,7 @@ protected:
 class DeviceIntegrationMockTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
-  iqm::test_support::Http_stub http_stub;
+  iqm::test_support::HttpStub http_stub;
 
 private:
   ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
@@ -473,12 +473,12 @@ protected:
    * dynamic quantum architectures, the calibration set quality metrics, and
    * the optional CoCoS health probe.
    */
-  void Queue_successful_initialization() {
-    http_stub.Queue_get(200, list_quantum_computers_response);
-    http_stub.Queue_get(200, get_static_quantum_architectures_response);
-    http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
-    http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
-    http_stub.Queue_get(200, cocos_health_response);
+  void queue_successful_initialization() {
+    http_stub.queue_get(200, list_quantum_computers_response);
+    http_stub.queue_get(200, get_static_quantum_architectures_response);
+    http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
+    http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
+    http_stub.queue_get(200, cocos_health_response);
   }
 
   static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
@@ -525,7 +525,7 @@ protected:
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
 
-    Queue_successful_initialization();
+    queue_successful_initialization();
 
     ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 
@@ -559,7 +559,7 @@ TEST_F(DeviceIntegrationEnvMockTest,
   ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
   ASSERT_STREQ(std::getenv("IQM_BASE_URL"), "https://environment.example");
 
-  Queue_successful_initialization();
+  queue_successful_initialization();
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
   ASSERT_FALSE(http_stub.get_urls().empty());
@@ -572,7 +572,7 @@ TEST_F(DeviceIntegrationMockTest,
   const ScopedEnvVar base_url_env("IQM_BASE_URL");
   ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
 
-  Queue_successful_initialization();
+  queue_successful_initialization();
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
   ASSERT_FALSE(http_stub.get_urls().empty());
@@ -685,9 +685,9 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_results_response =
       R"([{"counts": {"0": 100, "1": 0}}])";
 
-  http_stub.Queue_post(200, job_submission_response);
-  http_stub.Queue_get(200, job_status_response);
-  http_stub.Queue_get(200, job_results_response);
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_results_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -731,9 +731,9 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   const std::string job_measurements_response =
       R"([{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[0], [0], [1], [1]]}])";
 
-  http_stub.Queue_post(200, job_submission_response);
-  http_stub.Queue_get(200, job_status_response);
-  http_stub.Queue_get(200, job_measurements_response);
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_measurements_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -818,7 +818,7 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
   const std::string job_submission_response = R"({"id": "job-789"})";
 
-  http_stub.Queue_post(200, job_submission_response);
+  http_stub.queue_post(200, job_submission_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -843,9 +843,9 @@ TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_measurements_response = R"([{"m": [[0], [0]]}])";
 
-  http_stub.Queue_post(200, job_submission_response);
-  http_stub.Queue_get(200, job_status_response);
-  http_stub.Queue_get(200, job_measurements_response);
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -871,7 +871,7 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
       R"({"id": "job-123", "queue_position": "invalid"})";
 
   // Test with string queue_position - should succeed but ignore queue position
-  http_stub.Queue_post(200, job_submission_response_string_queue);
+  http_stub.queue_post(200, job_submission_response_string_queue);
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
@@ -889,9 +889,9 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   // Invalid: qubit result value is a string instead of an integer
   const std::string job_measurements_response = R"([{"meas_2_0_0": [["0"]]}])";
 
-  http_stub.Queue_post(200, job_submission_response);
-  http_stub.Queue_get(200, job_status_response);
-  http_stub.Queue_get(200, job_measurements_response);
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -917,9 +917,9 @@ TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   // Empty measurements array - no shots
   const std::string job_measurements_response = R"([])";
 
-  http_stub.Queue_post(200, job_submission_response);
-  http_stub.Queue_get(200, job_status_response);
-  http_stub.Queue_get(200, job_measurements_response);
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -979,12 +979,12 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_submission_response = R"({"id": "job-123"})";
-  http_stub.Queue_post(200, job_submission_response);
+  http_stub.queue_post(200, job_submission_response);
   ret = IQM_QDMI_device_job_submit(job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_status_response = R"({"status": "ready"})";
-  http_stub.Queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_status_response);
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   const std::string job_results_response = R"({
@@ -1000,9 +1000,9 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
     "end_time": "2025-12-09T23:58:24.465053",
     "run_config": {}
   })";
-  http_stub.Queue_get(200, job_results_response);
-  http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
-  http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
+  http_stub.queue_get(200, job_results_response);
+  http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
+  http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
 
   size_t size = 0;
   ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
@@ -1023,7 +1023,7 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
 TEST_F(DeviceIntegrationMockTest, HTTPTimeoutHandling) {
 
   // Test network timeout (HTTP 408 Request Timeout)
-  http_stub.Queue_get(408);
+  http_stub.queue_get(408);
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_TIMEOUT);
 }
@@ -1031,7 +1031,7 @@ TEST_F(DeviceIntegrationMockTest, HTTPTimeoutHandling) {
 TEST_F(DeviceIntegrationMockTest, HTTPAuthenticationFailure) {
 
   // Test authentication failure (HTTP 401 Unauthorized)
-  http_stub.Queue_get(401);
+  http_stub.queue_get(401);
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_PERMISSIONDENIED);
 }
@@ -1062,12 +1062,12 @@ TEST_F(DeviceIntegrationMockTest,
   logger.set_level(iqm::LOG_LEVEL::DEBUG);
   logger.set_output(log_stream);
 
-  http_stub.Queue_get(200, list_quantum_computers_response);
-  http_stub.Queue_get(200, get_static_quantum_architectures_response);
-  http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
-  http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
+  http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
   // Optional CoCoS health probe: 404 means calibration jobs are unsupported.
-  http_stub.Queue_get(404);
+  http_stub.queue_get(404);
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 
@@ -1090,7 +1090,7 @@ TEST_F(DeviceIntegrationMockTest,
 TEST_F(DeviceIntegrationMockTest, MalformedJSONResponse) {
 
   // Test malformed JSON responses
-  http_stub.Queue_get(200, "invalid json");
+  http_stub.queue_get(200, "invalid json");
 
   // Expect a JSON parsing exception to be thrown
   EXPECT_THROW(IQM_QDMI_device_session_init(session), std::exception);
@@ -1104,7 +1104,7 @@ TEST_F(DeviceJobMockTest, DoubleInitializationPrevention) {
 
 TEST_F(DeviceJobMockTest, JobSubmissionFailure) {
   // Mock job submission failure (HTTP 500 Internal Server Error)
-  http_stub.Queue_post(500);
+  http_stub.queue_post(500);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,

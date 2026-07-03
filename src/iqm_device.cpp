@@ -323,7 +323,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       session->api_config_->url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS);
   std::string qc_list_response;
   const auto &bearer_token = session->token_manager_->get_bearer_token();
-  auto status = iqm::http::get(qc_list_url, bearer_token, qc_list_response);
+  auto status = iqm::http::Get(qc_list_url, bearer_token, qc_list_response);
   if (status != QDMI_SUCCESS) {
     return status;
   }
@@ -387,7 +387,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       iqm::API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_);
   std::string arch_response;
-  status = iqm::http::get(arch_url, bearer_token, arch_response);
+  status = iqm::http::Get(arch_url, bearer_token, arch_response);
   if (status != QDMI_SUCCESS) {
     return status;
   }
@@ -471,7 +471,7 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       *session->quantum_computer_alias_, session->calibration_set_id_);
   std::string dyn_arch_response;
   const auto status =
-      iqm::http::get(dyn_arch_url, bearer_token, dyn_arch_response);
+      iqm::http::Get(dyn_arch_url, bearer_token, dyn_arch_response);
   if (status != QDMI_SUCCESS) {
     return status;
   }
@@ -538,7 +538,7 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   std::string calibration_response;
   const auto &bearer_token = session->token_manager_->get_bearer_token();
   const auto status =
-      iqm::http::get(calibration_url, bearer_token, calibration_response);
+      iqm::http::Get(calibration_url, bearer_token, calibration_response);
   if (status != QDMI_SUCCESS) {
     return status;
   }
@@ -701,7 +701,7 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
   std::string cocos_health_response;
-  const auto status = iqm::http::get_optional(
+  const auto status = iqm::http::Get_optional(
       cocos_health_url, session->token_manager_->get_bearer_token(),
       cocos_health_response);
   session->supports_calibration_jobs_ = (status == QDMI_SUCCESS);
@@ -1003,7 +1003,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,
                                       *job->session_->quantum_computer_alias_);
   std::string job_submission_response;
-  const auto status = iqm::http::post(
+  const auto status = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
       job_submission_response, json_program.dump(), "Expect: 100-continue");
   if (status != QDMI_SUCCESS) {
@@ -1042,7 +1042,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   std::string job_submission_response;
-  const auto status = iqm::http::post(
+  const auto status = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
       job_submission_response, static_cast<const char *>(job->program_),
       "Expect: 100-continue");
@@ -1113,7 +1113,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
                                             job->job_id_);
   std::string job_abortion_response;
-  const auto status = iqm::http::post(
+  const auto status = iqm::http::Post(
       job_abortion_url, job->session_->token_manager_->get_bearer_token(),
       job_abortion_response, "", "");
   if (status != QDMI_SUCCESS) {
@@ -1144,7 +1144,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
                                             job->job_id_);
   std::string job_status_response;
-  const auto status_code = iqm::http::get(
+  const auto status_code = iqm::http::Get(
       job_status_url, job->session_->token_manager_->get_bearer_token(),
       job_status_response);
   if (status_code != QDMI_SUCCESS) {
@@ -1272,7 +1272,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       const auto job_results_url = job->session_->api_config_->url(
           iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS, job->job_id_);
       std::string job_results_response;
-      const auto status = iqm::http::get(
+      const auto status = iqm::http::Get(
           job_results_url, job->session_->token_manager_->get_bearer_token(),
           job_results_response);
       if (status != QDMI_SUCCESS) {
@@ -1355,7 +1355,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     const auto job_calibration_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_);
     std::string job_calibration_response;
-    const auto status = iqm::http::get(
+    const auto status = iqm::http::Get(
         job_calibration_url, job->session_->token_manager_->get_bearer_token(),
         job_calibration_response);
     if (status != QDMI_SUCCESS) {
@@ -1420,7 +1420,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     const auto job_measurements_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
     std::string job_measurements_response;
-    const auto status = iqm::http::get(
+    const auto status = iqm::http::Get(
         job_measurements_url, job->session_->token_manager_->get_bearer_token(),
         job_measurements_response);
     if (status != QDMI_SUCCESS) {

@@ -21,9 +21,12 @@
 
 #include "http_client_internal.hpp"
 
+#include <cstddef>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace iqm::test_support {
 
@@ -43,7 +46,7 @@ Make_raw_response(const Scripted_response &scripted) {
 
 } // namespace
 
-Http_stub::Http_stub() {
+HttpStub::HttpStub() {
   auto &hooks = http::internal::Get_hooks();
 
   hooks.get = [this](const std::string &url,
@@ -79,42 +82,40 @@ Http_stub::Http_stub() {
   hooks.sleep = [this](int /*seconds*/) { ++sleep_call_count_; };
 }
 
-Http_stub::~Http_stub() { http::internal::Reset_hooks(); }
+HttpStub::~HttpStub() { http::internal::Reset_hooks(); }
 
-Http_stub &Http_stub::Queue_get(const int64_t status_code, std::string body) {
+HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body) {
   get_responses_.push_back({.status_code = status_code,
                             .body = std::move(body),
                             .connection_error = false});
   return *this;
 }
 
-Http_stub &Http_stub::Queue_get_connection_error() {
+HttpStub &HttpStub::queue_get_connection_error() {
   get_responses_.push_back(
       {.status_code = 0, .body = {}, .connection_error = true});
   return *this;
 }
 
-Http_stub &Http_stub::Queue_post(const int64_t status_code, std::string body) {
+HttpStub &HttpStub::queue_post(const int64_t status_code, std::string body) {
   post_responses_.push_back({.status_code = status_code,
                              .body = std::move(body),
                              .connection_error = false});
   return *this;
 }
 
-Http_stub &Http_stub::Queue_post_connection_error() {
+HttpStub &HttpStub::queue_post_connection_error() {
   post_responses_.push_back(
       {.status_code = 0, .body = {}, .connection_error = true});
   return *this;
 }
 
-const std::vector<std::string> &Http_stub::get_urls() const {
-  return get_urls_;
-}
+const std::vector<std::string> &HttpStub::get_urls() const { return get_urls_; }
 
-const std::vector<std::string> &Http_stub::post_urls() const {
+const std::vector<std::string> &HttpStub::post_urls() const {
   return post_urls_;
 }
 
-size_t Http_stub::sleep_call_count() const { return sleep_call_count_; }
+size_t HttpStub::sleep_call_count() const { return sleep_call_count_; }
 
 } // namespace iqm::test_support
