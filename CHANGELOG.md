@@ -11,9 +11,14 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ### Added
 
+- ✨ Expose the current calibration set ID as a device property via `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**])
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
+
+### Fixed
+
+- 🩹 Ensure the QDMI device can handle devices with computational resonators ([#107]) ([**@burgholzer**])
 
 ### Changed
 
@@ -57,26 +62,28 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.1...HEAD
-[1.1.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.1...v1.1.0
-[1.0.1]: https://github.com/iqm-finland/QDMI-on_IQM/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/iqm-finland/QDMI-on_IQM/compare/...v1.0.0
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/...v1.0.0
 
 <!-- PR links -->
 
-[#105]: https://github.com/iqm-finland/QDMI-on_IQM/pull/105
-[#92]: https://github.com/iqm-finland/QDMI-on_IQM/pull/92
-[#78]: https://github.com/iqm-finland/QDMI-on_IQM/pull/78
-[#74]: https://github.com/iqm-finland/QDMI-on_IQM/pull/74
-[#73]: https://github.com/iqm-finland/QDMI-on_IQM/pull/73
+[#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
+[#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107
+[#105]: https://github.com/iqm-finland/QDMI-on-IQM/pull/105
+[#92]: https://github.com/iqm-finland/QDMI-on-IQM/pull/92
+[#78]: https://github.com/iqm-finland/QDMI-on-IQM/pull/78
+[#74]: https://github.com/iqm-finland/QDMI-on-IQM/pull/74
+[#73]: https://github.com/iqm-finland/QDMI-on-IQM/pull/73
 [#67]: https://github.com/iqm-finland/QDMI-on-IQM/pull/67
-[#56]: https://github.com/iqm-finland/QDMI-on_IQM/pull/56
-[#53]: https://github.com/iqm-finland/QDMI-on_IQM/pull/53
-[#52]: https://github.com/iqm-finland/QDMI-on_IQM/pull/52
-[#51]: https://github.com/iqm-finland/QDMI-on_IQM/pull/51
-[#49]: https://github.com/iqm-finland/QDMI-on_IQM/pull/49
-[#37]: https://github.com/iqm-finland/QDMI-on_IQM/pull/37
+[#56]: https://github.com/iqm-finland/QDMI-on-IQM/pull/56
+[#53]: https://github.com/iqm-finland/QDMI-on-IQM/pull/53
+[#52]: https://github.com/iqm-finland/QDMI-on-IQM/pull/52
+[#51]: https://github.com/iqm-finland/QDMI-on-IQM/pull/51
+[#49]: https://github.com/iqm-finland/QDMI-on-IQM/pull/49
+[#37]: https://github.com/iqm-finland/QDMI-on-IQM/pull/37
 
 <!-- Contributor -->
 

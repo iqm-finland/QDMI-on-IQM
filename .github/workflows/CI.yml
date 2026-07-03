@@ -40,6 +40,9 @@ jobs:
           - runs-on: ubuntu-24.04
             config: Release
             iqm-qc-alias: "garnet:mock"
+          - runs-on: ubuntu-24.04
+            config: Release
+            iqm-qc-alias: "sirius:mock"
     uses: ./.github/workflows/cpp-tests-ubuntu.yml
     with:
       runs-on: ${{ matrix.runs-on }}

@@ -72,6 +72,8 @@ public:
 
   [[nodiscard]] auto get_duration_scale_factor() const -> double;
 
+  [[nodiscard]] auto get_calibration_set_id() const -> std::string;
+
   [[nodiscard]] auto get_site_index(IQM_QDMI_Site site) const -> uint64_t;
 
   [[nodiscard]] auto get_site_t1(IQM_QDMI_Site site) const -> uint64_t;

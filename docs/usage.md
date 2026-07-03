@@ -189,6 +189,7 @@ The following properties about the device can be queried via the {cpp:func}`IQM_
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_SITES`: The list of available qubit sites on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_OPERATIONS`: The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`: The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The current calibration set ID used by the session.
 
 The following properties about every site (qubit) can be queried via the {cpp:func}`IQM_QDMI_device_session_query_site_property` function:
 

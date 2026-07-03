@@ -272,6 +272,19 @@ auto FoMaC::get_duration_scale_factor() const -> double {
   return scale_factor;
 }
 
+auto FoMaC::get_calibration_set_id() const -> std::string {
+  size_t size = 0;
+  const int ret = IQM_QDMI_device_session_query_device_property(
+      session_, QDMI_DEVICE_PROPERTY_CUSTOM1, 0, nullptr, &size);
+  throw_if_error(ret, "Failed to query the calibration set ID size");
+  std::string calibration_set_id(size - 1, '\0');
+  const int ret2 = IQM_QDMI_device_session_query_device_property(
+      session_, QDMI_DEVICE_PROPERTY_CUSTOM1, size, calibration_set_id.data(),
+      nullptr);
+  throw_if_error(ret2, "Failed to query the calibration set ID");
+  return calibration_set_id;
+}
+
 auto FoMaC::get_site_index(IQM_QDMI_Site site) const -> uint64_t {
   uint64_t site_id = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
@@ -562,7 +575,6 @@ auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
   }
   return results;
 }
-
 auto FoMaC::get_calibration_set_id(IQM_QDMI_Device_Job job) -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1,
