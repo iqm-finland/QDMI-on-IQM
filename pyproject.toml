@@ -114,6 +114,11 @@ sdist.exclude = [
 [tool.scikit-build.cmake.define]
 BUILD_IQM_QDMI_TESTS = "OFF"
 
+[[tool.scikit-build.overrides]]
+if.platform-system = "darwin"
+cmake.define.CMAKE_IGNORE_PATH = "/opt/homebrew;/usr/local"
+cmake.define.CPR_USE_SYSTEM_CURL = "ON"
+
 [[tool.scikit-build.generate]]
 path = "iqm/qdmi/_version.py"
 template = '''
