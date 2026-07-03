@@ -17,35 +17,21 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "http_client.hpp"
+#include "http_stub.hpp"
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
-#include "mock_http_client.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
-
-using testing::_; // NOLINT(bugprone-reserved-identifier)
-using testing::DoAll;
-using testing::InSequence;
-using testing::Return;
-using testing::SetArgReferee;
-
-// Forward declaration of the internal init function
-int IQM_QDMI_device_session_init_with_http_client(
-    IQM_QDMI_Device_Session session,
-    std::unique_ptr<iqm::IHttpClient> http_client);
 
 namespace {
 
@@ -159,8 +145,7 @@ protected:
 class DeviceIntegrationMockTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
-  std::unique_ptr<iqm::MockHttpClient> mock_http_client_;
-  iqm::MockHttpClient *mock_handle_{};
+  iqm::test_support::Http_stub http_stub;
 
 private:
   ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
@@ -467,8 +452,6 @@ protected:
 
   void SetUp() override {
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
-    mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
-    mock_handle_ = mock_http_client_.get();
     EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
     const std::string base_url = "https://localhost";
     EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
@@ -484,42 +467,18 @@ protected:
     EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
   }
 
-  void expect_successful_initialization(
-      const std::string *first_url = nullptr) const {
-    if (first_url != nullptr) {
-      InSequence sequence;
-      EXPECT_CALL(*mock_http_client_, get(*first_url, _, _))
-          .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
-                          Return(QDMI_SUCCESS)));
-      EXPECT_CALL(*mock_http_client_, get(_, _, _))
-          .WillOnce(
-              DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
-                    Return(QDMI_SUCCESS)))
-          .WillOnce(DoAll(
-              SetArgReferee<2>(get_dynamic_quantum_architectures_response),
-              Return(QDMI_SUCCESS)))
-          .WillOnce(DoAll(
-              SetArgReferee<2>(get_calibration_set_quality_metrics_response),
-              Return(QDMI_SUCCESS)))
-          .WillOnce(DoAll(SetArgReferee<2>(cocos_health_response),
-                          Return(QDMI_SUCCESS)));
-      return;
-    }
-
-    EXPECT_CALL(*mock_http_client_, get(_, _, _))
-        .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
-                        Return(QDMI_SUCCESS)))
-        .WillOnce(
-            DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
-                  Return(QDMI_SUCCESS)))
-        .WillOnce(
-            DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
-                  Return(QDMI_SUCCESS)))
-        .WillOnce(DoAll(
-            SetArgReferee<2>(get_calibration_set_quality_metrics_response),
-            Return(QDMI_SUCCESS)))
-        .WillOnce(DoAll(SetArgReferee<2>(cocos_health_response),
-                        Return(QDMI_SUCCESS)));
+  /**
+   * @brief Queue the sequence of GET responses that a successful session
+   * initialization requires: the quantum-computer listing, the static and
+   * dynamic quantum architectures, the calibration set quality metrics, and
+   * the optional CoCoS health probe.
+   */
+  void Queue_successful_initialization() {
+    http_stub.Queue_get(200, list_quantum_computers_response);
+    http_stub.Queue_get(200, get_static_quantum_architectures_response);
+    http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
+    http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
+    http_stub.Queue_get(200, cocos_health_response);
   }
 
   static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
@@ -566,11 +525,9 @@ protected:
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
 
-    expect_successful_initialization();
+    Queue_successful_initialization();
 
-    ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                  session, std::move(mock_http_client_)),
-              QDMI_SUCCESS);
+    ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 
     ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
               QDMI_SUCCESS);
@@ -588,8 +545,6 @@ class DeviceIntegrationEnvMockTest : public DeviceIntegrationMockTest {
 protected:
   void SetUp() override {
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
-    mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
-    mock_handle_ = mock_http_client_.get();
     EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
   }
 };
@@ -604,13 +559,12 @@ TEST_F(DeviceIntegrationEnvMockTest,
   ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
   ASSERT_STREQ(std::getenv("IQM_BASE_URL"), "https://environment.example");
 
-  const std::string expected_url =
-      "https://environment.example/api/v1/quantum-computers";
-  expect_successful_initialization(&expected_url);
+  Queue_successful_initialization();
 
-  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  ASSERT_FALSE(http_stub.get_urls().empty());
+  EXPECT_EQ(http_stub.get_urls().front(),
+            "https://environment.example/api/v1/quantum-computers");
 }
 
 TEST_F(DeviceIntegrationMockTest,
@@ -618,12 +572,12 @@ TEST_F(DeviceIntegrationMockTest,
   const ScopedEnvVar base_url_env("IQM_BASE_URL");
   ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
 
-  const std::string expected_url = "https://localhost/api/v1/quantum-computers";
-  expect_successful_initialization(&expected_url);
+  Queue_successful_initialization();
 
-  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  ASSERT_FALSE(http_stub.get_urls().empty());
+  EXPECT_EQ(http_stub.get_urls().front(),
+            "https://localhost/api/v1/quantum-computers");
 }
 
 TEST_F(DeviceTest, SessionAllocation) {
@@ -731,14 +685,9 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_results_response =
       R"([{"counts": {"0": 100, "1": 0}}])";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_results_response), Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
+  http_stub.Queue_get(200, job_status_response);
+  http_stub.Queue_get(200, job_results_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -782,14 +731,9 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   const std::string job_measurements_response =
       R"([{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[0], [0], [1], [1]]}])";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)))
-      .WillOnce(DoAll(SetArgReferee<2>(job_measurements_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
+  http_stub.Queue_get(200, job_status_response);
+  http_stub.Queue_get(200, job_measurements_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -829,7 +773,8 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
                                             small_buffer.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  // This should NOT trigger another API call (mock expects only 2 GET calls)
+  // This should NOT trigger another API call (only 2 GET responses were
+  // queued above; an unscripted call would fail the test).
   size_t hist_keys_size{};
   ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
                                             nullptr, &hist_keys_size),
@@ -873,9 +818,7 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
   const std::string job_submission_response = R"({"id": "job-789"})";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
 
   // Job submission
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -900,14 +843,9 @@ TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_measurements_response = R"([{"m": [[0], [0]]}])";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)))
-      .WillOnce(DoAll(SetArgReferee<2>(job_measurements_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
+  http_stub.Queue_get(200, job_status_response);
+  http_stub.Queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -933,9 +871,7 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
       R"({"id": "job-123", "queue_position": "invalid"})";
 
   // Test with string queue_position - should succeed but ignore queue position
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response_string_queue),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response_string_queue);
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
@@ -953,14 +889,9 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   // Invalid: qubit result value is a string instead of an integer
   const std::string job_measurements_response = R"([{"meas_2_0_0": [["0"]]}])";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)))
-      .WillOnce(DoAll(SetArgReferee<2>(job_measurements_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
+  http_stub.Queue_get(200, job_status_response);
+  http_stub.Queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -986,14 +917,9 @@ TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   // Empty measurements array - no shots
   const std::string job_measurements_response = R"([])";
 
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)))
-      .WillOnce(DoAll(SetArgReferee<2>(job_measurements_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
+  http_stub.Queue_get(200, job_status_response);
+  http_stub.Queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -1053,16 +979,12 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_submission_response = R"({"id": "job-123"})";
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(job_submission_response),
-                      Return(QDMI_SUCCESS)));
+  http_stub.Queue_post(200, job_submission_response);
   ret = IQM_QDMI_device_job_submit(job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_status_response = R"({"status": "ready"})";
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_status_response), Return(QDMI_SUCCESS)));
+  http_stub.Queue_get(200, job_status_response);
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   const std::string job_results_response = R"({
@@ -1078,15 +1000,9 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
     "end_time": "2025-12-09T23:58:24.465053",
     "run_config": {}
   })";
-  EXPECT_CALL(*mock_handle_, get(_, _, _))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(job_results_response), Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
-                Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(get_calibration_set_quality_metrics_response),
-                Return(QDMI_SUCCESS)));
+  http_stub.Queue_get(200, job_results_response);
+  http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
+  http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
 
   size_t size = 0;
   ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
@@ -1106,24 +1022,18 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
 
 TEST_F(DeviceIntegrationMockTest, HTTPTimeoutHandling) {
 
-  // Test network timeout
-  EXPECT_CALL(*mock_http_client_, get(_, _, _))
-      .WillOnce(Return(QDMI_ERROR_TIMEOUT));
+  // Test network timeout (HTTP 408 Request Timeout)
+  http_stub.Queue_get(408);
 
-  EXPECT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_ERROR_TIMEOUT);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_TIMEOUT);
 }
 
 TEST_F(DeviceIntegrationMockTest, HTTPAuthenticationFailure) {
 
-  // Test authentication failure
-  EXPECT_CALL(*mock_http_client_, get(_, _, _))
-      .WillOnce(Return(QDMI_ERROR_PERMISSIONDENIED));
+  // Test authentication failure (HTTP 401 Unauthorized)
+  http_stub.Queue_get(401);
 
-  EXPECT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_ERROR_PERMISSIONDENIED);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_PERMISSIONDENIED);
 }
 
 TEST_F(DeviceIntegrationMockTest,
@@ -1152,23 +1062,14 @@ TEST_F(DeviceIntegrationMockTest,
   logger.set_level(iqm::LOG_LEVEL::DEBUG);
   logger.set_output(log_stream);
 
-  EXPECT_CALL(*mock_http_client_, get(_, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(list_quantum_computers_response),
-                      Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(get_static_quantum_architectures_response),
-                Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(get_dynamic_quantum_architectures_response),
-                Return(QDMI_SUCCESS)))
-      .WillOnce(
-          DoAll(SetArgReferee<2>(get_calibration_set_quality_metrics_response),
-                Return(QDMI_SUCCESS)))
-      .WillOnce(Return(QDMI_ERROR_NOTFOUND));
+  http_stub.Queue_get(200, list_quantum_computers_response);
+  http_stub.Queue_get(200, get_static_quantum_architectures_response);
+  http_stub.Queue_get(200, get_dynamic_quantum_architectures_response);
+  http_stub.Queue_get(200, get_calibration_set_quality_metrics_response);
+  // Optional CoCoS health probe: 404 means calibration jobs are unsupported.
+  http_stub.Queue_get(404);
 
-  ASSERT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 
   IQM_QDMI_Device_Job job = nullptr;
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
@@ -1189,26 +1090,21 @@ TEST_F(DeviceIntegrationMockTest,
 TEST_F(DeviceIntegrationMockTest, MalformedJSONResponse) {
 
   // Test malformed JSON responses
-  EXPECT_CALL(*mock_http_client_, get(_, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>("invalid json"), Return(QDMI_SUCCESS)));
+  http_stub.Queue_get(200, "invalid json");
 
   // Expect a JSON parsing exception to be thrown
-  EXPECT_THROW(IQM_QDMI_device_session_init_with_http_client(
-                   session, std::move(mock_http_client_)),
-               std::exception);
+  EXPECT_THROW(IQM_QDMI_device_session_init(session), std::exception);
 }
 
 TEST_F(DeviceJobMockTest, DoubleInitializationPrevention) {
-  mock_http_client_ = std::make_unique<iqm::MockHttpClient>();
-  EXPECT_EQ(IQM_QDMI_device_session_init_with_http_client(
-                session, std::move(mock_http_client_)),
-            QDMI_ERROR_BADSTATE);
+  // The session was already initialized in SetUp(); re-initializing must be
+  // rejected before any HTTP request is made.
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_BADSTATE);
 }
 
 TEST_F(DeviceJobMockTest, JobSubmissionFailure) {
-  // Mock job submission failure
-  EXPECT_CALL(*mock_handle_, post(_, _, _, _, _))
-      .WillOnce(Return(QDMI_ERROR_FATAL));
+  // Mock job submission failure (HTTP 500 Internal Server Error)
+  http_stub.Queue_post(500);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,

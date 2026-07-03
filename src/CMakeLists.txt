@@ -27,11 +27,6 @@ add_subdirectory(internal)
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
-target_compile_definitions(
-  ${QDMI_TARGET_NAME}
-  PRIVATE QDMI_VERSION="${QDMI_VERSION}"
-          IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
-          IQM_QDMI_device_EXPORTS)
 set_target_properties(
   ${QDMI_TARGET_NAME}
   PROPERTIES C_VISIBILITY_PRESET hidden
@@ -39,7 +34,6 @@ set_target_properties(
              VISIBILITY_INLINES_HIDDEN 1)
 target_sources(
   ${QDMI_TARGET_NAME}
-  PRIVATE iqm_device.cpp
   PUBLIC FILE_SET
          public_headers
          TYPE

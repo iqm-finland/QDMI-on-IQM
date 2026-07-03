@@ -18,19 +18,23 @@
  */
 
 /** @file
- * @brief CPR-based HTTP client implementation for IQM QDMI device
- * communication.
+ * @brief HTTP client used by the IQM QDMI device to talk to remote services.
+ *
+ * This is the only translation unit that depends on CPR. Everything outside
+ * of this file (including tests) interacts with iqm::http purely through
+ * plain strings and status codes.
  */
 
-#include "cpr_http_client.hpp"
+#include "http_client.hpp"
 
-#include "cpr_http_client_internal.hpp"
+#include "http_client_internal.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cpr/api.h>
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
@@ -43,14 +47,143 @@
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <string>
+#include <thread>
 #include <utility>
 
-namespace iqm {
+namespace iqm::http {
 namespace internal {
 
-Cpr_api_hooks &Get_cpr_api_hooks() {
-  static Cpr_api_hooks cpr_api_hooks{};
-  return cpr_api_hooks;
+namespace {
+
+/// Split a "Key: Value" header string into a trimmed key/value pair. Returns
+/// an empty key if no colon separator is present.
+std::pair<std::string, std::string>
+Split_header(const std::string &extra_header) {
+  const size_t colon_pos = extra_header.find(':');
+  if (colon_pos == std::string::npos) {
+    return {};
+  }
+  auto trim = [](std::string s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) {
+              return std::isspace(ch) == 0;
+            }));
+    s.erase(std::ranges::find_if(
+                s | std::views::reverse,
+                [](const unsigned char ch) { return std::isspace(ch) == 0; })
+                .base(),
+            s.end());
+    return s;
+  };
+  return {trim(extra_header.substr(0, colon_pos)),
+          trim(extra_header.substr(colon_pos + 1))};
+}
+
+Raw_response Make_raw_response(const cpr::Response &response) {
+  if (response.error.code != cpr::ErrorCode::OK) {
+    return {
+        .status_code = 0, .body = {}, .error_message = response.error.message};
+  }
+  return {.status_code = response.status_code,
+          .body = response.text,
+          .error_message = {}};
+}
+
+Raw_response Default_get(const std::string &url,
+                         const std::string &bearer_token) {
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
+  }
+  return Make_raw_response(cpr::Get(cpr::Url{url}, headers,
+                                    cpr::Timeout{std::chrono::seconds{3600}},
+                                    cpr::Redirect{true}, cpr::VerifySsl{true}));
+}
+
+Raw_response Default_post(const std::string &url,
+                          const std::string &bearer_token,
+                          const std::string &data,
+                          const std::string &extra_header) {
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  headers.emplace("Content-Type", "application/json");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
+  }
+  if (!extra_header.empty()) {
+    auto [key, value] = Split_header(extra_header);
+    if (!key.empty()) {
+      headers.emplace(std::move(key), std::move(value));
+    }
+  }
+  return Make_raw_response(cpr::Post(cpr::Url{url}, headers, cpr::Body{data},
+                                     cpr::Timeout{std::chrono::seconds{3600}},
+                                     cpr::Redirect{true},
+                                     cpr::VerifySsl{true}));
+}
+
+void Default_sleep(const int seconds) {
+  std::this_thread::sleep_for(std::chrono::seconds(seconds));
+}
+
+/// Number of retries to attempt after receiving HTTP 429.
+constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 5;
+
+void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
+  if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
+    LOG_DEBUG(message);
+    return;
+  }
+  LOG_ERROR(message);
+}
+
+/// Execute a hooked request and retry on HTTP 429 responses.
+template <typename Perform_attempt>
+int Perform_with_retries(const std::string &url, std::string &response,
+                         const ERROR_LOG_POLICY error_log_policy,
+                         Perform_attempt perform_attempt) {
+  auto &hooks = Get_hooks();
+  for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
+    const auto raw = perform_attempt();
+
+    if (raw.status_code == 0) {
+      Log_error(error_log_policy, "Request failed: " + raw.error_message);
+      response.clear();
+      return QDMI_ERROR_FATAL;
+    }
+
+    if (raw.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
+      response = raw.body;
+      return Handle_response_code(raw.status_code, url, raw.body,
+                                  error_log_policy);
+    }
+
+    const int delay_seconds = 2 << attempt;
+    LOG_DEBUG("Request to URL '" + url +
+              "' hit HTTP 429 rate limiting; retrying in " +
+              std::to_string(delay_seconds) + " second(s) (attempt " +
+              std::to_string(attempt + 1) + "/" +
+              std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
+    hooks.sleep(delay_seconds);
+  }
+
+  response.clear();
+  return QDMI_ERROR_FATAL;
+}
+
+} // namespace
+
+Hooks &Get_hooks() {
+  static Hooks hooks{
+      .get = Default_get, .post = Default_post, .sleep = Default_sleep};
+  return hooks;
+}
+
+void Reset_hooks() {
+  auto &[get, post, sleep] = Get_hooks();
+  get = Default_get;
+  post = Default_post;
+  sleep = Default_sleep;
 }
 
 int Handle_response_code(const int64_t response_code, const std::string &url,
@@ -198,107 +331,37 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   return QDMI_ERROR_FATAL;
 }
 
-namespace {
-
-int Perform_get_request(const std::string &url, const std::string &bearer_token,
-                        std::string &response,
-                        const ERROR_LOG_POLICY error_log_policy) {
-  LOG_INFO("Performing GET request to " + url);
-
-  cpr::Header headers;
-  headers.emplace("User-Agent", "IQM QDMI C++ API");
-  if (!bearer_token.empty()) {
-    headers.emplace("Authorization", bearer_token);
-  }
-
-  cpr::Timeout timeout{std::chrono::seconds{3600}};
-  cpr::Redirect redirect{true};
-  cpr::VerifySsl verify_ssl{true};
-
-  auto &cpr_api_hooks = Get_cpr_api_hooks();
-
-  const auto ret = Perform_request_with_retries(
-      url, response, error_log_policy, [&]() -> Request_attempt_result {
-        const cpr::Response r = cpr_api_hooks.get(
-            cpr::Url{url}, headers, timeout, redirect, verify_ssl);
-        response = r.text;
-        return {.error_code = r.error.code,
-                .error_message = r.error.message,
-                .response_code = r.status_code};
-      });
-  return ret;
-}
-
-} // namespace
 } // namespace internal
 
-int CprHttpClient::get(const std::string &url, const std::string &bearer_token,
-                       std::string &response) {
-  return internal::Perform_get_request(
-      url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
+int get(const std::string &url, const std::string &bearer_token,
+        std::string &response) {
+  LOG_INFO("Performing GET request to " + url);
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
+      url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
+      [&]() { return hooks.get(url, bearer_token); });
 }
 
-int CprHttpClient::get_optional(const std::string &url,
-                                const std::string &bearer_token,
-                                std::string &response) {
-  return internal::Perform_get_request(
-      url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG);
+int get_optional(const std::string &url, const std::string &bearer_token,
+                 std::string &response) {
+  LOG_INFO("Performing GET request to " + url);
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
+      url, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG,
+      [&]() { return hooks.get(url, bearer_token); });
 }
 
-int CprHttpClient::post(const std::string &url, const std::string &bearer_token,
-                        std::string &response, const std::string &data,
-                        const std::string &extra_header) {
+int post(const std::string &url, const std::string &bearer_token,
+         std::string &response, const std::string &data,
+         const std::string &extra_header) {
   LOG_INFO("Performing POST request to " + url);
-
-  cpr::Header headers;
-  headers.emplace("User-Agent", "IQM QDMI C++ API");
-  headers.emplace("Content-Type", "application/json");
-  if (!bearer_token.empty()) {
-    headers.emplace("Authorization", bearer_token);
-  }
-  if (!extra_header.empty()) {
-    const size_t colon_pos = extra_header.find(':');
-    if (colon_pos != std::string::npos) {
-      std::string key = extra_header.substr(0, colon_pos);
-      std::string val = extra_header.substr(colon_pos + 1);
-      auto trim = [](std::string &s) {
-        s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) {
-                  return !std::isspace(ch);
-                }));
-        s.erase(std::ranges::find_if(
-                    s | std::views::reverse,
-                    [](unsigned char ch) { return !std::isspace(ch); })
-                    .base(),
-                s.end());
-      };
-      trim(key);
-      trim(val);
-      headers.emplace(std::move(key), std::move(val));
-    }
-  }
-
-  cpr::Timeout timeout{std::chrono::seconds{3600}};
-  cpr::Redirect redirect{true};
-  cpr::VerifySsl verify_ssl{true};
-
   if (!data.empty()) {
     LOG_DEBUG("POST data: " + data);
   }
-
-  auto &cpr_api_hooks = internal::Get_cpr_api_hooks();
-
-  const auto ret = internal::Perform_request_with_retries(
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
       url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
-      [&]() -> internal::Request_attempt_result {
-        const cpr::Response r =
-            cpr_api_hooks.post(cpr::Url{url}, headers, cpr::Body{data}, timeout,
-                               redirect, verify_ssl);
-        response = r.text;
-        return {.error_code = r.error.code,
-                .error_message = r.error.message,
-                .response_code = r.status_code};
-      });
-  return ret;
+      [&]() { return hooks.post(url, bearer_token, data, extra_header); });
 }
 
-} // namespace iqm
+} // namespace iqm::http

@@ -22,6 +22,5 @@ set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
 
 if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
-  add_subdirectory(mock)
   add_subdirectory(unit)
 endif()

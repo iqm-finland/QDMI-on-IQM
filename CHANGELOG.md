@@ -23,6 +23,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 ### Changed
 
 - ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls ([#105]) ([**@marcelwa**])
+- ♻️ Considerably simplify the internal HTTP client implementation ([#105]) ([**@burgholzer**])
 
 ## [1.1.1] - 2026-06-01
 
