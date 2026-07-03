@@ -410,15 +410,38 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto &qubits = architecture["qubits"];
   const auto num_qubits = qubits.size();
   LOG_INFO("Found " + std::to_string(num_qubits) + " qubits");
-  session->sites_.reserve(num_qubits);
-  session->sites_map_.reserve(num_qubits);
-  for (size_t i = 0; i < num_qubits; ++i) {
+
+  std::vector<std::string> computational_resonators;
+  if (architecture.contains("computational_resonators") &&
+      architecture["computational_resonators"].is_array()) {
+    const auto &resonators = architecture["computational_resonators"];
+    computational_resonators.reserve(resonators.size());
+    for (const auto &resonator : resonators) {
+      computational_resonators.emplace_back(resonator.get<std::string>());
+    }
+  }
+  LOG_INFO("Found " + std::to_string(computational_resonators.size()) +
+           " computational resonators");
+
+  const auto total_sites = num_qubits + computational_resonators.size();
+  session->sites_.reserve(total_sites);
+  session->sites_ptr_.reserve(total_sites);
+  session->sites_map_.reserve(total_sites);
+
+  auto add_site = [&](const std::string &site_name, size_t site_index) {
     auto &site =
         session->sites_.emplace_back(std::make_unique<IQM_QDMI_Site_impl_d>());
-    site->name_ = qubits[i].get<std::string>();
-    site->id_ = i;
+    site->name_ = site_name;
+    site->id_ = site_index;
     session->sites_ptr_.emplace_back(site.get());
     session->sites_map_[site->name_] = site.get();
+  };
+
+  for (size_t i = 0; i < num_qubits; ++i) {
+    add_site(qubits[i].get<std::string>(), i);
+  }
+  for (size_t i = 0; i < computational_resonators.size(); ++i) {
+    add_site(computational_resonators[i], num_qubits + i);
   }
 
   const auto &connectivity = architecture["connectivity"];
@@ -427,8 +450,18 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   session->connectivity_.reserve(num_edges * 2);
   for (size_t i = 0; i < num_edges; ++i) {
     const auto &edge = connectivity[i];
-    const auto &site1 = session->sites_map_[edge[0].get<std::string>()];
-    const auto &site2 = session->sites_map_[edge[1].get<std::string>()];
+    const auto site_name1 = edge[0].get<std::string>();
+    const auto site_name2 = edge[1].get<std::string>();
+    const auto site1_it = session->sites_map_.find(site_name1);
+    const auto site2_it = session->sites_map_.find(site_name2);
+    if (site1_it == session->sites_map_.end() ||
+        site2_it == session->sites_map_.end()) {
+      LOG_ERROR("Connectivity references unknown site: " + site_name1 +
+                std::string(" - ").append(site_name2));
+      return QDMI_ERROR_FATAL;
+    }
+    auto *site1 = site1_it->second;
+    auto *site2 = site2_it->second;
     session->connectivity_.emplace_back(site1, site2);
     session->connectivity_.emplace_back(site2, site1);
   }
@@ -482,8 +515,18 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       auto &qubit_list_vec = operation_qubit_lists.emplace_back();
       qubit_list_vec.reserve(qubit_list.size());
       for (const auto &qubit : qubit_list) {
-        const auto &site = session->sites_map_[qubit.get<std::string>()];
-        qubit_list_vec.emplace_back(site);
+        const auto site_name = qubit.get<std::string>();
+        const auto site_it = session->sites_map_.find(site_name);
+        if (site_it == session->sites_map_.end()) [[unlikely]] {
+          std::string msg = "Operation '";
+          msg += gate_name;
+          msg += "' references unknown site '";
+          msg += site_name;
+          msg += "'";
+          LOG_ERROR(msg);
+          return QDMI_ERROR_FATAL;
+        }
+        qubit_list_vec.emplace_back(site_it->second);
       }
     }
   }
@@ -1766,7 +1809,10 @@ int IQM_QDMI_device_session_query_operation_property(
     auto sites_vec = std::vector<IQM_QDMI_Site>(sites, sites + num_sites);
     // need to find this vector in the list of available sites
     auto it = std::ranges::find(available_sites_for_op, sites_vec);
-    if (it == available_sites_for_op.end() && num_op_sites == 2) {
+    // MOVE is directional and must stay ordered as [qubit, resonator].
+    const bool is_directional = operation->name_ == "move";
+    if (it == available_sites_for_op.end() && num_op_sites == 2 &&
+        !is_directional) {
       // try with reversed sites
       std::ranges::reverse(sites_vec);
       it = std::ranges::find(available_sites_for_op, sites_vec);
