@@ -1730,6 +1730,10 @@ int IQM_QDMI_device_session_query_device_property(
                       QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop,
                       size, value, size_ret)
   }
+  // Custom device property 1 exposes the current calibration set ID.
+  ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_CUSTOM1,
+                      session->calibration_set_id_.c_str(), prop, size, value,
+                      size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
 }
 

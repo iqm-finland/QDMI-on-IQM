@@ -378,15 +378,20 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   const auto duration_scale_factor = fomac.get_duration_scale_factor();
   ASSERT_GT(duration_scale_factor, 0.0);
 
+  const auto calibration_set_id = fomac.get_calibration_set_id();
+  ASSERT_FALSE(calibration_set_id.empty())
+      << "Device must provide a calibration set ID";
+
   // The MAX property is not a valid value for any device.
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_MAX, 0, nullptr, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  // The IQM device does not support custom properties for sites.
+  // Custom property 1 exposes the calibration set ID.
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM1, 0, nullptr, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
+            QDMI_SUCCESS);
+  // The IQM device does not support the remaining custom device properties.
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM2, 0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
