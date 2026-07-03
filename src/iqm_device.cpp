@@ -460,8 +460,8 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
                 std::string(" - ").append(site_name2));
       return QDMI_ERROR_FATAL;
     }
-    auto site1 = site1_it->second;
-    auto site2 = site2_it->second;
+    auto *site1 = site1_it->second;
+    auto *site2 = site2_it->second;
     session->connectivity_.emplace_back(site1, site2);
     session->connectivity_.emplace_back(site2, site1);
   }
@@ -517,9 +517,13 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       for (const auto &qubit : qubit_list) {
         const auto site_name = qubit.get<std::string>();
         const auto site_it = session->sites_map_.find(site_name);
-        if (site_it == session->sites_map_.end()) {
-          LOG_ERROR("Operation '" + gate_name + "' references unknown site '" +
-                    site_name + "'");
+        if (site_it == session->sites_map_.end()) [[unlikely]] {
+          std::string msg = "Operation '";
+          msg += gate_name;
+          msg += "' references unknown site '";
+          msg += site_name;
+          msg += "'";
+          LOG_ERROR(msg);
           return QDMI_ERROR_FATAL;
         }
         qubit_list_vec.emplace_back(site_it->second);

@@ -129,7 +129,7 @@ protected:
       throw std::runtime_error("No qubit site supports both prx and measure.");
     }
 
-    const auto q1 = eligible_single_sites.front();
+    auto *const q1 = eligible_single_sites.front();
     const auto q1_name = fomac.get_site_name(q1);
 
     auto build_single_qubit = [&] {
