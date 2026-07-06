@@ -98,6 +98,14 @@ def smoke_tests(session: nox.Session) -> None:
 
     session.run(*env_args, external=True)
 
+    license_args = [
+        "bash",
+        "test/test_license_alignment.sh",
+        "--partition",
+        args.partition,
+    ]
+    session.run(*license_args, external=True)
+
 
 @nox.session(reuse_venv=True)
 def resonance_tests(session: nox.Session) -> None:
