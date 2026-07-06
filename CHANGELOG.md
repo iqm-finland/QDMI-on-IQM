@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ## [Unreleased]
 
+## [1.2.0] - TBD
+
 ### Added
 
 - ✨ Expose the current calibration set ID as a device property via `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**])
@@ -63,7 +65,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.0...v1.0.1
