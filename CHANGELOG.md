@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ### Added
 
+- ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on on-premise QCs ([**@marcelwa**])
 - ✨ Expose the current calibration set ID as a device property via `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**])
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
