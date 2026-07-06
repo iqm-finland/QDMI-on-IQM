@@ -68,6 +68,14 @@ skip() {
 
 # Run a command via srun and capture combined stdout+stderr, without
 # aborting the script on a non-zero exit (the caller inspects $rc).
+#
+# --immediate=3 makes srun give up after 3s instead of blocking/queuing if
+# the allocation (including any Slurm license) isn't immediately available.
+# This is purely so the test suite fails fast and deterministically instead
+# of hanging; it does not reflect production behavior. Without --immediate,
+# srun/sbatch block/queue normally when a requested Slurm license is at
+# capacity, and are dispatched once it's released (see docs/spank_plugin.md,
+# "Limiting Concurrent Access with Slurm Licenses").
 run_srun_capture() {
   local -a args=(--immediate=3 -N1 -n1)
   if [[ -n "$partition" ]]; then
