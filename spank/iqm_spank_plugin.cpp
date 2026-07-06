@@ -66,19 +66,23 @@
  * `<iqm_license_prefix><alias>`. This is a *Slurm* license — a
  * capacity-limiting scheduler resource configured via `Licenses=` in
  * slurm.conf, unrelated to GPLv3/software licensing — used to bound
- * concurrent access to a QC. This matters most for on-premise QPUs, which
+ * concurrent access to a QC. This matters most for on-premise QCs, which
  * are typically single-tenant hardware with no cloud-side queue to absorb
  * overlapping requests. Since aliases may contain characters reserved by
  * Slurm's `name:count` license syntax (e.g. the `:mock` suffix used to
  * select simulator variants, as in `emerald:mock`), `:` and `,` are replaced
  * with `_` when deriving the expected license name. By default a mismatch
- * only logs a warning; `iqm_require_license=1` rejects the job outright.
- * This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`); on older Slurm,
- * or when the job has no alias, it is a silent no-op.
+ * only logs a warning; `iqm_require_license=1` fails the task at launch
+ * instead (this happens in `slurm_spank_task_init`, i.e. *after* the job has
+ * already been allocated — it is not a submission-time rejection — and only
+ * takes effect if the plugin is declared `required`, not `optional`, in
+ * plugstack.conf). This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`);
+ * on older Slurm, or when the job has no alias, it is a silent no-op.
  */
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -198,7 +202,7 @@ public:
       }
 
       if (!matched && key == "iqm_require_license") {
-        require_license_ = (value == "1" || value == "true" || value == "yes");
+        require_license_ = parse_bool_arg(value, "iqm_require_license");
         matched = true;
       }
 
@@ -360,7 +364,15 @@ public:
    *   - `SLURM_JOB_LICENSES` is absent — true both on Slurm < 23.02 (the
    *     variable does not exist there) and when the user requested no
    *     `--licenses` at all. These two cases cannot be distinguished from
-   *     inside the plugin, so absence is always treated as a no-op.
+   *     inside the plugin, so absence is always treated as a no-op. A
+   *     value too long to fit the lookup buffer is treated as a mismatch
+   *     instead (fail closed, not skipped).
+   *
+   * Note on enforcement: returning `ESPANK_ERROR` here fails the task at
+   * launch in `slurm_spank_task_init` (remote context) — i.e. *after* the
+   * job has already been submitted, queued, and allocated, not at
+   * submission time — and only takes effect if the plugin is declared
+   * `required` (not `optional`) in plugstack.conf.
    *
    * @param spank SPANK handle for the current hook invocation.
    * @return `ESPANK_SUCCESS` if valid or skipped, `ESPANK_ERROR` only when
@@ -377,8 +389,17 @@ public:
 
     const auto expected_license = expected_license_name(alias.value());
 
-    const auto licenses_env = get_spank_env(spank, "SLURM_JOB_LICENSES");
-    if (!licenses_env.has_value()) {
+    // Read SLURM_JOB_LICENSES directly (rather than via get_spank_env())
+    // so ESPANK_NOSPACE (value too long for the buffer) can be told apart
+    // from a truly absent variable: silently skipping in the former case
+    // would fail open under iqm_require_license.
+    constexpr int k_licenses_buf_size = 4096;
+    std::array<char, k_licenses_buf_size> licenses_buf{};
+    const auto licenses_rc =
+        spank_getenv(spank, "SLURM_JOB_LICENSES", licenses_buf.data(),
+                     static_cast<int>(licenses_buf.size()));
+
+    if (licenses_rc != ESPANK_SUCCESS && licenses_rc != ESPANK_NOSPACE) {
       slurm_debug(
           "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
           "environment (requires Slurm >=23.02, or no --licenses requested); "
@@ -386,7 +407,22 @@ public:
       return ESPANK_SUCCESS;
     }
 
-    if (license_list_contains(licenses_env.value(), expected_license)) {
+    bool aligned = false;
+    if (licenses_rc == ESPANK_NOSPACE) {
+      // The value doesn't fit the buffer; treat as unverifiable rather than
+      // silently skipping the check (which would fail open under
+      // iqm_require_license).
+      slurm_debug(
+          "[iqm_spank_plugin] SLURM_JOB_LICENSES exceeds %d bytes, cannot "
+          "verify Slurm license alignment for QC alias '%s'; treating as a "
+          "mismatch",
+          k_licenses_buf_size, alias->c_str());
+    } else {
+      aligned = license_list_contains(std::string_view{licenses_buf.data()},
+                                      expected_license);
+    }
+
+    if (aligned) {
       slurm_debug(
           "[iqm_spank_plugin] Slurm license alignment ok: '%s' requested for "
           "QC alias '%s'",
@@ -397,7 +433,7 @@ public:
     if (!require_license_) {
       slurm_spank_log(
           "[iqm_spank_plugin] warning: Slurm license not requested for QC "
-          "alias '%s' (expected --licenses=%s:<n>); on-premise QPUs may "
+          "alias '%s' (expected --licenses=%s:<n>); on-premise QCs may "
           "experience uncontrolled concurrency without it since there is no "
           "cloud-side queue to absorb overlapping requests. Set "
           "iqm_require_license=1 to enforce this as a hard requirement",
@@ -581,6 +617,41 @@ private:
   }
 
   /**
+   * @brief Parse a boolean-ish plugstack argument value, case-insensitively.
+   *
+   * Recognizes `1`/`true`/`yes`/`on`/`enabled` as true and
+   * `0`/`false`/`no`/`off`/`disabled` as false. Logs a warning and returns
+   * `false` for any other value, so a misspelled value (e.g. `TRUE`, `on`,
+   * or a typo) is never silently mistaken for `false` without a trace in
+   * the logs.
+   *
+   * @param value The raw plugstack argument value.
+   * @param arg_name The plugstack key name, used only for the warning message.
+   * @return The parsed boolean value.
+   */
+  [[nodiscard]] static bool parse_bool_arg(std::string_view value,
+                                           const char *arg_name) {
+    std::string normalized{value};
+    std::ranges::transform(normalized, normalized.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    if (normalized == "1" || normalized == "true" || normalized == "yes" ||
+        normalized == "on" || normalized == "enabled") {
+      return true;
+    }
+    if (normalized == "0" || normalized == "false" || normalized == "no" ||
+        normalized == "off" || normalized == "disabled") {
+      return false;
+    }
+    slurm_spank_log(
+        "[iqm_spank_plugin] warning: unrecognized value '%.*s' for %s, "
+        "treating as false (expected one of: 1, true, yes, on, enabled / 0, "
+        "false, no, off, disabled)",
+        static_cast<int>(value.size()), value.data(), arg_name);
+    return false;
+  }
+
+  /**
    * @brief Compute the expected Slurm license name for a QC alias.
    *
    * Replaces `:` and `,` in the alias with `_`, since Slurm's `name:count`
@@ -614,7 +685,13 @@ private:
   /**
    * @brief Check whether a Slurm license list (as found in
    * `SLURM_JOB_LICENSES`, e.g. "name:count,name2:count2") contains a given
-   * license name (the `:count` suffix, if any, is ignored).
+   * license name.
+   *
+   * Each comma-separated token is cut at its first `:` (count separator),
+   * `*` (legacy count separator on some Slurm versions), or `@` (remote/
+   * federated license server qualifier) before comparison, so qualified
+   * tokens like `name@server:count` still match a bare `name`.
+   *
    * @param licenses_value The raw SLURM_JOB_LICENSES value.
    * @param license_name The license name to look for.
    * @return `true` if `license_name` appears in `licenses_value`.
@@ -625,8 +702,9 @@ private:
     while (!licenses_value.empty()) {
       const auto comma = licenses_value.find(',');
       auto token = licenses_value.substr(0, comma);
-      if (const auto colon = token.find(':'); colon != std::string_view::npos) {
-        token = token.substr(0, colon);
+      if (const auto sep = token.find_first_of(":*@");
+          sep != std::string_view::npos) {
+        token = token.substr(0, sep);
       }
       while (!token.empty() && token.front() == ' ') {
         token.remove_prefix(1);
