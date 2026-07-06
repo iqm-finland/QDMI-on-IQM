@@ -19,6 +19,7 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 ### Fixed
 
+- 🐛 Fix the SPANK plugin silently launching jobs despite failed validation (missing `IQM_BASE_URL`, conflicting auth, or an unmet Slurm license requirement), since `ESPANK_ERROR` is a positive value and Slurm's task launcher only aborts on a negative hook return ([#114]) ([**@marcelwa**])
 - 🩹 Ensure the QDMI device can handle devices with computational resonators ([#107]) ([**@burgholzer**])
 
 ## [1.1.1] - 2026-06-01
