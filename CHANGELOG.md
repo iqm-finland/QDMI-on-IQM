@@ -20,6 +20,11 @@ This project adheres to [Semantic Versioning], with the exception that minor rel
 
 - 🩹 Ensure the QDMI device can handle devices with computational resonators ([#107]) ([**@burgholzer**])
 
+### Changed
+
+- ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls ([#105]) ([**@marcelwa**])
+- ♻️ Considerably simplify the internal HTTP client implementation ([#105]) ([**@burgholzer**])
+
 ## [1.1.1] - 2026-06-01
 
 ### Fixed
@@ -68,6 +73,7 @@ Compatible with QDMI `v1.3.0`.
 
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
 [#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107
+[#105]: https://github.com/iqm-finland/QDMI-on-IQM/pull/105
 [#92]: https://github.com/iqm-finland/QDMI-on-IQM/pull/92
 [#78]: https://github.com/iqm-finland/QDMI-on-IQM/pull/78
 [#74]: https://github.com/iqm-finland/QDMI-on-IQM/pull/74
@@ -88,6 +94,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- General links -->
 
+[cpr]: https://github.com/libcpr/cpr
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html

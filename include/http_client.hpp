@@ -18,79 +18,60 @@
  */
 
 /** @file
- * @brief HTTP client interface for IQM QDMI device communication.
+ * @brief HTTP client used by the IQM QDMI device to talk to remote services.
  */
 
 #pragma once
 
 #include <string>
 
-namespace iqm {
+namespace iqm::http {
 
 /**
- * @brief Interface for HTTP client implementations.
+ * @brief Perform an HTTP GET request.
  *
- * This interface defines the contract for HTTP clients used by the IQM QDMI
- * device to communicate with remote services. Implementations should handle
- * authentication, error handling, and proper HTTP protocol management.
+ * Sends an HTTP GET request to the specified URL with bearer token
+ * authentication, retrying on HTTP 429 responses.
+ *
+ * @param url The target URL for the GET request.
+ * @param bearer_token The bearer token for authentication (can be empty).
+ * @param response Reference to string that will contain the response body.
+ * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
  */
-class IHttpClient {
-public:
-  IHttpClient() = default;
-  IHttpClient(const IHttpClient &) = default;
-  IHttpClient(IHttpClient &&) = default;
-  IHttpClient &operator=(const IHttpClient &) = default;
-  IHttpClient &operator=(IHttpClient &&) = default;
-  virtual ~IHttpClient() = default;
+int Get(const std::string &url, const std::string &bearer_token,
+        std::string &response);
 
-  /**
-   * @brief Perform an HTTP GET request.
-   *
-   * Sends an HTTP GET request to the specified URL with optional bearer token
-   * authentication.
-   *
-   * @param url The target URL for the GET request.
-   * @param bearer_token The bearer token for authentication (can be empty).
-   * @param response Reference to string that will contain the response body.
-   * @return HTTP status code or error code from qdmi/constants.h.
-   */
-  virtual int get(const std::string &url, const std::string &bearer_token,
-                  std::string &response) = 0;
+/**
+ * @brief Perform an optional HTTP GET request.
+ *
+ * Behaves like Get(), but downgrades non-success logging for capability
+ * probes where missing endpoints are expected.
+ *
+ * @param url The target URL for the GET request.
+ * @param bearer_token The bearer token for authentication (can be empty).
+ * @param response Reference to string that will contain the response body.
+ * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+ */
+int Get_optional(const std::string &url, const std::string &bearer_token,
+                 std::string &response);
 
-  /**
-   * @brief Perform an optional HTTP GET request.
-   *
-   * Uses the same request semantics as get(), but callers may use this for
-   * capability probes where a non-success response is expected and should not
-   * be surfaced as an error log.
-   *
-   * @param url The target URL for the GET request.
-   * @param bearer_token The bearer token for authentication (can be empty).
-   * @param response Reference to string that will contain the response body.
-   * @return HTTP status code or error code from qdmi/constants.h.
-   */
-  virtual int get_optional(const std::string &url,
-                           const std::string &bearer_token,
-                           std::string &response) {
-    return get(url, bearer_token, response);
-  }
+/**
+ * @brief Perform an HTTP POST request.
+ *
+ * Sends an HTTP POST request to the specified URL with a JSON body. The
+ * request automatically includes a JSON content type header and supports one
+ * additional custom header, retrying on HTTP 429 responses.
+ *
+ * @param url The target URL for the POST request.
+ * @param bearer_token The bearer token for authentication (can be empty).
+ * @param response Reference to string that will contain the response body.
+ * @param data The request body data.
+ * @param extra_header Additional HTTP header to include, formatted as
+ * "Key: Value" (can be empty).
+ * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+ */
+int Post(const std::string &url, const std::string &bearer_token,
+         std::string &response, const std::string &data,
+         const std::string &extra_header);
 
-  /**
-   * @brief Perform an HTTP POST request.
-   *
-   * Sends an HTTP POST request to the specified URL with optional data payload,
-   * bearer token authentication, and additional headers.
-   *
-   * @param url The target URL for the POST request.
-   * @param bearer_token The bearer token for authentication (can be empty).
-   * @param response Reference to string that will contain the response body.
-   * @param data The request body data (default: empty string).
-   * @param extra_header Additional HTTP header to include (default: empty
-   * string).
-   * @return HTTP status code or error code from qdmi/constants.h.
-   */
-  virtual int post(const std::string &url, const std::string &bearer_token,
-                   std::string &response, const std::string &data,
-                   const std::string &extra_header) = 0;
-};
-} // namespace iqm
+} // namespace iqm::http

@@ -16,23 +16,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_executable(
-  unit_tests
-  curl_http_client_test_support.cpp test_curl_http_client.cpp
-  test_iqm_api_config.cpp test_iqm_auth.cpp test_iqm_device.cpp
-  test_logging.cpp)
+  unit_tests http_stub.cpp test_http_client.cpp test_iqm_api_config.cpp
+             test_iqm_auth.cpp test_iqm_device.cpp test_logging.cpp)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
-  unit_tests PRIVATE GTest::gmock_main GTest::gtest qdmi::qdmi_project_warnings
-                     ${QDMI_TARGET_NAME} iqm::qdmi_device_internals mocks)
-
-if(WIN32)
-  add_custom_command(
-    TARGET unit_tests
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:${QDMI_TARGET_NAME}> $<TARGET_FILE_DIR:unit_tests>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:CURL::libcurl>
-            $<TARGET_FILE_DIR:unit_tests>)
-endif()
+  unit_tests PRIVATE GTest::gtest_main GTest::gtest qdmi::qdmi_project_warnings
+                     iqm::qdmi_device_internals)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)

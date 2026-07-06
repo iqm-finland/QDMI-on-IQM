@@ -18,37 +18,179 @@
  */
 
 /** @file
- * @brief cURL-based HTTP client implementation for IQM QDMI device
- * communication.
+ * @brief HTTP client used by the IQM QDMI device to talk to remote services.
+ *
+ * This is the only translation unit that depends on CPR. Everything outside
+ * of this file (including tests) interacts with iqm::http purely through
+ * plain strings and status codes.
  */
 
-#include "curl_http_client.hpp"
+#include "http_client.hpp"
 
-#include "curl_http_client_internal.hpp"
+#include "http_client_internal.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <cpr/api.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/redirect.h>
+#include <cpr/response.h>
+#include <cpr/ssl_options.h>
+#include <cpr/timeout.h>
 #include <cstddef>
 #include <cstdint>
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
+#include <ranges>
 #include <string>
+#include <thread>
+#include <utility>
 
-namespace iqm {
+namespace iqm::http {
 namespace internal {
 
-Curl_api_hooks &Get_curl_api_hooks() {
-  static Curl_api_hooks curl_api_hooks{};
-  return curl_api_hooks;
+namespace {
+
+/// Split a "Key: Value" header string into a trimmed key/value pair. Returns
+/// an empty key if no colon separator is present.
+std::pair<std::string, std::string>
+Split_header(const std::string &extra_header) {
+  const size_t colon_pos = extra_header.find(':');
+  if (colon_pos == std::string::npos) {
+    return {};
+  }
+  auto trim = [](std::string s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) {
+              return std::isspace(ch) == 0;
+            }));
+    s.erase(std::ranges::find_if(
+                s | std::views::reverse,
+                [](const unsigned char ch) { return std::isspace(ch) == 0; })
+                .base(),
+            s.end());
+    return s;
+  };
+  return {trim(extra_header.substr(0, colon_pos)),
+          trim(extra_header.substr(colon_pos + 1))};
+}
+
+Raw_response Make_raw_response(const cpr::Response &response) {
+  if (response.error.code != cpr::ErrorCode::OK) {
+    return {
+        .status_code = 0, .body = {}, .error_message = response.error.message};
+  }
+  return {.status_code = response.status_code,
+          .body = response.text,
+          .error_message = {}};
+}
+
+Raw_response Default_get(const std::string &url,
+                         const std::string &bearer_token) {
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
+  }
+  return Make_raw_response(cpr::Get(cpr::Url{url}, headers,
+                                    cpr::Timeout{std::chrono::seconds{3600}},
+                                    cpr::Redirect{true}, cpr::VerifySsl{true}));
+}
+
+Raw_response Default_post(const std::string &url,
+                          const std::string &bearer_token,
+                          const std::string &data,
+                          const std::string &extra_header) {
+  cpr::Header headers;
+  headers.emplace("User-Agent", "IQM QDMI C++ API");
+  headers.emplace("Content-Type", "application/json");
+  if (!bearer_token.empty()) {
+    headers.emplace("Authorization", bearer_token);
+  }
+  if (!extra_header.empty()) {
+    auto [key, value] = Split_header(extra_header);
+    if (!key.empty()) {
+      headers.emplace(std::move(key), std::move(value));
+    }
+  }
+  return Make_raw_response(cpr::Post(cpr::Url{url}, headers, cpr::Body{data},
+                                     cpr::Timeout{std::chrono::seconds{3600}},
+                                     cpr::Redirect{true},
+                                     cpr::VerifySsl{true}));
+}
+
+void Default_sleep(const int seconds) {
+  std::this_thread::sleep_for(std::chrono::seconds(seconds));
+}
+
+/// Number of retries to attempt after receiving HTTP 429.
+constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 5;
+
+void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
+  if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
+    LOG_DEBUG(message);
+    return;
+  }
+  LOG_ERROR(message);
+}
+
+/// Execute a hooked request and retry on HTTP 429 responses.
+template <typename Perform_attempt>
+int Perform_with_retries(const std::string &url, std::string &response,
+                         const ERROR_LOG_POLICY error_log_policy,
+                         Perform_attempt perform_attempt) {
+  auto &hooks = Get_hooks();
+  for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
+    const auto raw = perform_attempt();
+
+    if (raw.status_code == 0) {
+      Log_error(error_log_policy, "Request failed: " + raw.error_message);
+      response.clear();
+      return QDMI_ERROR_FATAL;
+    }
+
+    if (raw.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
+      response = raw.body;
+      return Handle_response_code(raw.status_code, url, raw.body,
+                                  error_log_policy);
+    }
+
+    const int delay_seconds = 2 << attempt;
+    LOG_DEBUG("Request to URL '" + url +
+              "' hit HTTP 429 rate limiting; retrying in " +
+              std::to_string(delay_seconds) + " second(s) (attempt " +
+              std::to_string(attempt + 1) + "/" +
+              std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
+    hooks.sleep(delay_seconds);
+  }
+
+  response.clear();
+  return QDMI_ERROR_FATAL;
+}
+
+} // namespace
+
+Hooks &Get_hooks() {
+  static Hooks hooks{
+      .get = Default_get, .post = Default_post, .sleep = Default_sleep};
+  return hooks;
+}
+
+void Reset_hooks() {
+  auto &[get, post, sleep] = Get_hooks();
+  get = Default_get;
+  post = Default_post;
+  sleep = Default_sleep;
 }
 
 int Handle_response_code(const int64_t response_code, const std::string &url,
                          const std::string &response,
                          const ERROR_LOG_POLICY error_log_policy) {
   // Parse JSON response for IQM-specific errors and messages
-  nlohmann::json json_response;
+  nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
   if (!response.empty()) {
     try {
@@ -56,7 +198,6 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
       has_json = true;
     } catch (const nlohmann::json::exception &) {
       LOG_DEBUG("Response is not valid JSON");
-      // Response is not JSON or invalid JSON, continue with plain text handling
     }
   }
 
@@ -190,143 +331,37 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   return QDMI_ERROR_FATAL;
 }
 
-namespace {
-
-/**
- * @brief Build a Request_attempt_result from a curl perform result.
- *
- * When the perform call failed, the response code is left at zero.
- * Otherwise the HTTP response code is read from the handle.
- *
- * @param curl The curl handle associated with the completed request.
- * @param res  The CURLcode returned by curl_easy_perform.
- * @return The combined attempt result.
- */
-Request_attempt_result Attempt_result(CURL *curl, CURLcode res) {
-  if (res != CURLE_OK) {
-    return {.curl_result = res, .response_code = 0};
-  }
-  int64_t response_code{};
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-  return {.curl_result = CURLE_OK, .response_code = response_code};
-}
-
-// Helper for CURL responses
-size_t Curl_write_callback(void *contents, const size_t size,
-                           const size_t nmemb, std::string *response) {
-  const size_t real_size = size * nmemb;
-  response->append(static_cast<char *>(contents), real_size);
-  return real_size;
-}
-
-// Helper for default HTTP request headers
-curl_slist *Default_headers(const std::string &bearer_token) {
-  curl_slist *headers = nullptr;
-  headers = curl_slist_append(headers, "User-Agent: IQM QDMI C++ API");
-  if (!bearer_token.empty()) {
-    // Set the "Authorization" header with the bearer token
-    headers =
-        curl_slist_append(headers, ("Authorization: " + bearer_token).c_str());
-  }
-  return headers;
-}
-
-int Perform_get_request(const std::string &url, const std::string &bearer_token,
-                        std::string &response,
-                        const ERROR_LOG_POLICY error_log_policy) {
-  LOG_INFO("Performing GET request to " + url);
-  auto &curl_api_hooks = Get_curl_api_hooks();
-  CURL *curl = curl_api_hooks.easy_init();
-  if (curl == nullptr) {
-    LOG_ERROR("curl_easy_init() failed");
-    return QDMI_ERROR_FATAL;
-  }
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, Curl_write_callback);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-  auto *headers = Default_headers(bearer_token);
-  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-  const auto ret = Perform_request_with_retries(
-      url, response, error_log_policy, [&]() -> Request_attempt_result {
-        return Attempt_result(curl, curl_api_hooks.easy_perform(curl));
-      });
-  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
-  curl_slist_free_all(headers);
-  return ret;
-}
-
-} // namespace
 } // namespace internal
 
-int CurlHttpClient::get(const std::string &url, const std::string &bearer_token,
-                        std::string &response) {
-  return internal::Perform_get_request(
-      url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
+int Get(const std::string &url, const std::string &bearer_token,
+        std::string &response) {
+  LOG_INFO("Performing GET request to " + url);
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
+      url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
+      [&]() { return hooks.get(url, bearer_token); });
 }
 
-int CurlHttpClient::get_optional(const std::string &url,
-                                 const std::string &bearer_token,
-                                 std::string &response) {
-  return internal::Perform_get_request(
-      url, bearer_token, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG);
+int Get_optional(const std::string &url, const std::string &bearer_token,
+                 std::string &response) {
+  LOG_INFO("Performing GET request to " + url);
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
+      url, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG,
+      [&]() { return hooks.get(url, bearer_token); });
 }
 
-/**
- * @brief Perform an HTTP POST request using cURL.
- *
- * Sends an authenticated POST request, attaches a JSON content type header,
- * and appends an optional extra header when provided.
- *
- * @param url The target URL for the POST request.
- * @param bearer_token The bearer token for authentication.
- * @param response Reference to the response body buffer.
- * @param data The request payload to send.
- * @param extra_header An optional extra HTTP header.
- * @return The mapped QDMI status code for the request outcome.
- */
-int CurlHttpClient::post(const std::string &url,
-                         const std::string &bearer_token, std::string &response,
-                         const std::string &data,
-                         const std::string &extra_header) {
+int Post(const std::string &url, const std::string &bearer_token,
+         std::string &response, const std::string &data,
+         const std::string &extra_header) {
   LOG_INFO("Performing POST request to " + url);
-  auto &curl_api_hooks = internal::Get_curl_api_hooks();
-  CURL *curl = curl_api_hooks.easy_init();
-  if (curl == nullptr) {
-    LOG_ERROR("curl_easy_init() failed");
-    return QDMI_ERROR_FATAL;
-  }
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, internal::Curl_write_callback);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-  auto *headers = internal::Default_headers(bearer_token);
-  headers = curl_slist_append(headers, "Content-Type: application/json");
-  if (!extra_header.empty()) {
-    headers = curl_slist_append(headers, extra_header.c_str());
-  }
-  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   if (!data.empty()) {
     LOG_DEBUG("POST data: " + data);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
-  } else {
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   }
-  const auto ret = internal::Perform_request_with_retries(
+  const auto &hooks = internal::Get_hooks();
+  return internal::Perform_with_retries(
       url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
-      [&]() -> internal::Request_attempt_result {
-        return internal::Attempt_result(curl,
-                                        curl_api_hooks.easy_perform(curl));
-      });
-  curl_easy_cleanup(curl); // NOLINT(misc-include-cleaner)
-  curl_slist_free_all(headers);
-  return ret;
+      [&]() { return hooks.post(url, bearer_token, data, extra_header); });
 }
 
-} // namespace iqm
+} // namespace iqm::http

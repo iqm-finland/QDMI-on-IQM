@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    libssl-dev \
     libcurl4-openssl-dev \
     libslurm-dev \
     slurm-wlm \
