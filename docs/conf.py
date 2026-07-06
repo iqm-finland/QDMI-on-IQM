@@ -35,15 +35,15 @@ except metadata.PackageNotFoundError:
 release = version.split("+")[0]
 
 extensions = [
-    "myst_nb",
     "autoapi.extension",
+    "breathe",
+    "myst_nb",
+    "sphinx_copybutton",
+    "sphinx_design",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
-    "sphinx_copybutton",
-    "sphinx_design",
     "sphinx.ext.viewcode",
-    "breathe",
 ]
 
 source_suffix = [".rst", ".md"]
