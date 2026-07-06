@@ -74,7 +74,7 @@ If your administrator has configured a Slurm license for the target QC (see [Lim
 srun --partition=quantum --iqm-qc-alias=emerald --licenses=iqm_qc_emerald:1 python bell_state.py
 ```
 
-This matters most for **on-premise QCs**: unlike the cloud Resonance API, which queues overlapping requests on its own, an on-premise QC is typically single-tenant hardware with no such queue, so Slurm itself must serialize access. If you omit `--licenses` on a cluster where it's expected, the plugin logs a warning (or, if the administrator has set `iqm_require_license=1`, rejects the job outright).
+This matters most for **on-premise QCs**: unlike the cloud Resonance API, which queues overlapping requests on its own, an on-premise QC is typically single-tenant hardware with no such queue, so Slurm itself must serialize access. If you omit `--licenses` on a cluster where it's expected, the plugin logs a warning (or, if the administrator has set `iqm_require_license=1`, fails your job step at launch instead — after it has already been allocated, not at submission time).
 
 ### Executing via CLI Scripts
 
@@ -133,7 +133,7 @@ required /usr/lib/slurm/iqm-spank-plugin.so \
 - `iqm_tokens_file`: Path to the shared token file.
 - `partitions`: Comma-separated list of partitions where this plugin will run. If omitted, the plugin evaluates all partitions.
 - `iqm_license_prefix`: Prefix used to derive the expected Slurm license name from `IQM_QC_ALIAS` (default: `iqm_qc_`). See [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses).
-- `iqm_require_license`: When set to `1`/`true`/`yes`, rejects jobs whose Slurm license request does not match the derived name, instead of only logging a warning (default: off).
+- `iqm_require_license`: When set to a truthy value (`1`/`true`/`yes`/`on`/`enabled`, case-insensitive), fails at launch jobs whose Slurm license request does not match the derived name, instead of only logging a warning (default: off). See [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses) for the exact semantics. An unrecognized value logs a warning and is treated as off.
 
 Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration directory:
 
@@ -168,7 +168,7 @@ Each QC can be modeled as a flat, cluster-wide Slurm license so that Slurm itsel
    ```
 
 3. The plugin derives the expected license name as `<iqm_license_prefix><alias>` (default prefix `iqm_qc_`). Since QC aliases may themselves contain a colon (e.g. `emerald:mock`, as seen in the [Qiskit Integration](qiskit.md) examples), and Slurm's `name:count` license syntax reserves `:` as a separator, the plugin replaces `:` and `,` in the alias with `_` when deriving the name (e.g. alias `emerald:mock` → license `iqm_qc_emerald_mock`).
-4. By default, a mismatch (or a missing `--licenses` request) only logs a warning — set `iqm_require_license=1` to reject such jobs outright.
+4. By default, a mismatch (or a missing `--licenses` request) only logs a warning. Setting `iqm_require_license=1` instead fails the job step at launch — after the job has already been allocated, not at submission time — and only takes effect if the plugin is declared `required` (not `optional`) in `plugstack.conf`.
 5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf` to track its usage in Slurm accounting.
 
 ### Troubleshooting
