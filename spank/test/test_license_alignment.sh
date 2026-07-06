@@ -233,23 +233,27 @@ fi
 
 echo "--- Test 5: iqm_require_license=1 rejects a mismatched request ---" >&2
 
-if [[ ! -f "$plugstack_conf" ]] || ! sudo test -w "$(dirname "$plugstack_conf")" 2>/dev/null; then
-  skip "Cannot locate/write $plugstack_conf; skipping hard-reject scenario (likely running against a real external cluster rather than the Docker test fixture)"
+if [[ ! -f "$plugstack_conf" ]] || ! sudo -n test -w "$(dirname "$plugstack_conf")" 2>/dev/null; then
+  skip "Cannot locate/write $plugstack_conf; skipping hard-reject scenario (likely running against a real external cluster rather than the Docker test fixture, or without passwordless sudo)"
 else
-  original_conf=$(sudo cat "$plugstack_conf")
+  original_conf=$(sudo -n cat "$plugstack_conf")
 
   restore_conf() {
-    echo "$original_conf" | sudo tee "$plugstack_conf" >/dev/null
-    sudo scontrol reconfigure >/dev/null 2>&1 || true
+    echo "$original_conf" | sudo -n tee "$plugstack_conf" >/dev/null
+    sudo -n scontrol reconfigure >/dev/null 2>&1 || true
   }
   trap restore_conf EXIT
 
-  {
-    echo "$original_conf"
-    echo "    iqm_require_license=1"
-  } | sudo tee "$plugstack_conf" >/dev/null
-  sudo scontrol reconfigure >/dev/null 2>&1 || true
-  sleep 1
+  # Append to the *same* logical plugin line (not a new physical line):
+  # plugstack.conf only joins lines via a trailing '\' on the previous line,
+  # so a naive extra line would be parsed as a separate, invalid statement
+  # and iqm_require_license would silently never reach the plugin.
+  printf '%s iqm_require_license=1\n' "$original_conf" | sudo -n tee "$plugstack_conf" >/dev/null
+  # Not strictly required (slurmstepd/srun re-read plugstack.conf per
+  # invocation), but matches the documented "apply changes" convention in
+  # docs/spank_plugin.md.
+  sudo -n scontrol reconfigure >/dev/null 2>&1 || true
+  sleep 2
 
   run_srun_capture --iqm-qc-alias="$test_qc_alias" "--licenses=${test_other_license}:1" env
   if [[ $rc -eq 0 ]]; then
