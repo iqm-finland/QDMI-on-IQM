@@ -19,10 +19,10 @@ application areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature]
   to estimate the ground-state energy of an H2 molecule.
-- **Benchmarking:** running [MQT Bench][mqt-bench] programs such as [GHZ
-  states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
-  [QFT][quantum-fourier-transform], [graph states][graph-state], [W
-  states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
+- **Benchmarking:** running [MQT Bench][mqt-bench] programs such as
+  [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
+  [QFT][quantum-fourier-transform], [graph states][graph-state],
+  [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
 
 :::{important}
 The example scripts live in the QDMI-on-IQM repository and are not shipped with
@@ -92,11 +92,11 @@ The QSCI example depends on PySCF for classical chemistry calculations, and
 
 ## MQT Bench Programs
 
-To understand how the backend behaves on standard programs, we move on to [MQT
-Bench][mqt-bench]. MQT Bench is an open-source benchmark suite that collects
-representative quantum algorithms across several abstraction levels. In this
-repository, the benchmark scripts show how to generate those programs, transpile
-them for the selected target, execute them through
+To understand how the backend behaves on standard programs, we move on to
+[MQT Bench][mqt-bench]. MQT Bench is an open-source benchmark suite that
+collects representative quantum algorithms across several abstraction levels. In
+this repository, the benchmark scripts show how to generate those programs,
+transpile them for the selected target, execute them through
 {py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the
 resulting bitstring distributions.
 
@@ -112,8 +112,8 @@ algorithms:
   central building block used in algorithms such as phase estimation and Shor's
   algorithm.
 - `graphstate`: Generates [graph states][graph-state], an important family of
-  entangled states that also serve as key resources for [measurement-based
-  quantum computing][measurement-based-quantum-computing].
+  entangled states that also serve as key resources for
+  [measurement-based quantum computing][measurement-based-quantum-computing].
 - `wstate`: Creates a [W state][w-state], a multipartite entangled state that
   retains pairwise entanglement even if one qubit is lost.
 - `grover`: Implements [Grover's algorithm][grover], a quantum search algorithm
