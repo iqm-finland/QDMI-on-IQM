@@ -52,9 +52,29 @@
  *
  * Additional plugstack-only arguments:
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
+ *   - iqm_license_prefix=iqm_qc_ (prefix used to derive the expected Slurm
+ *     license name from IQM_QC_ALIAS; default: "iqm_qc_")
+ *   - iqm_require_license=1 (reject jobs whose Slurm license request does
+ *     not match the derived name; default: off, warn only)
  *
  * Partition detection uses the `SLURM_JOB_PARTITION` environment variable
  * (set by Slurm in every job), which is portable across all Slurm versions.
+ *
+ * When `IQM_QC_ALIAS` is resolved, the plugin can optionally check that the
+ * job's Slurm license request (the native `--licenses`/`-L` submission
+ * option, surfaced in the job environment as `SLURM_JOB_LICENSES`) matches
+ * `<iqm_license_prefix><alias>`. This is a *Slurm* license — a
+ * capacity-limiting scheduler resource configured via `Licenses=` in
+ * slurm.conf, unrelated to GPLv3/software licensing — used to bound
+ * concurrent access to a QC. This matters most for on-premise QPUs, which
+ * are typically single-tenant hardware with no cloud-side queue to absorb
+ * overlapping requests. Since aliases may contain characters reserved by
+ * Slurm's `name:count` license syntax (e.g. the `:mock` suffix used to
+ * select simulator variants, as in `emerald:mock`), `:` and `,` are replaced
+ * with `_` when deriving the expected license name. By default a mismatch
+ * only logs a warning; `iqm_require_license=1` rejects the job outright.
+ * This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`); on older Slurm,
+ * or when the job has no alias, it is a silent no-op.
  */
 
 #include <algorithm>
@@ -127,6 +147,9 @@ constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
  *   4. `validate_environment()` is called after injection to perform
  *      superficial configuration validation. Deeper validation is deferred to
  *      the IQM QDMI device implementation.
+ *   5. `validate_license_alignment()` is called after `validate_environment()`
+ *      to check that the job's Slurm license request matches the targeted
+ *      QC alias.
  */
 class IQMSpankConfigManager final {
 public:
@@ -165,6 +188,17 @@ public:
       // Handle the partition filter argument.
       if (!matched && key == "partitions") {
         parse_partition_list(value);
+        matched = true;
+      }
+
+      // Handle the Slurm license naming/enforcement arguments.
+      if (!matched && key == "iqm_license_prefix") {
+        license_prefix_ = std::string{value};
+        matched = true;
+      }
+
+      if (!matched && key == "iqm_require_license") {
+        require_license_ = (value == "1" || value == "true" || value == "yes");
         matched = true;
       }
 
@@ -309,6 +343,77 @@ public:
   }
 
   /**
+   * @brief Validate that the job's requested Slurm license (native
+   * `--licenses`/`-L`) aligns with the targeted QC alias.
+   *
+   * Note: "Slurm license" refers to Slurm's native countable-resource
+   * mechanism (`Licenses=` in slurm.conf, `--licenses` at submission) — a
+   * capacity-limiting scheduler resource, unrelated to GPLv3/software
+   * licensing.
+   *
+   * The expected license name is `<iqm_license_prefix><alias>`, with `:`
+   * and `,` in the alias replaced by `_` since Slurm's `name:count` syntax
+   * reserves those characters (see `sanitize_alias_for_license()`). The
+   * check is skipped (returns `ESPANK_SUCCESS`, debug log only) when:
+   *   - No `IQM_QC_ALIAS` is resolved (`IQM_QC_ID`-only jobs are not
+   *     checked; raw IDs are not reliably convertible into license names).
+   *   - `SLURM_JOB_LICENSES` is absent — true both on Slurm < 23.02 (the
+   *     variable does not exist there) and when the user requested no
+   *     `--licenses` at all. These two cases cannot be distinguished from
+   *     inside the plugin, so absence is always treated as a no-op.
+   *
+   * @param spank SPANK handle for the current hook invocation.
+   * @return `ESPANK_SUCCESS` if valid or skipped, `ESPANK_ERROR` only when
+   *   `iqm_require_license` is enabled and the expected license is missing.
+   */
+  [[nodiscard]] int validate_license_alignment(spank_t spank) const {
+    const auto alias = get_spank_env(spank, "IQM_QC_ALIAS");
+    if (!alias.has_value() || alias->empty()) {
+      slurm_debug(
+          "[iqm_spank_plugin] no IQM_QC_ALIAS resolved, skipping Slurm "
+          "license alignment check (IQM_QC_ID-only jobs are not checked)");
+      return ESPANK_SUCCESS;
+    }
+
+    const auto expected_license = expected_license_name(alias.value());
+
+    const auto licenses_env = get_spank_env(spank, "SLURM_JOB_LICENSES");
+    if (!licenses_env.has_value()) {
+      slurm_debug(
+          "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
+          "environment (requires Slurm >=23.02, or no --licenses requested); "
+          "skipping Slurm license alignment check");
+      return ESPANK_SUCCESS;
+    }
+
+    if (license_list_contains(licenses_env.value(), expected_license)) {
+      slurm_debug(
+          "[iqm_spank_plugin] Slurm license alignment ok: '%s' requested for "
+          "QC alias '%s'",
+          expected_license.c_str(), alias->c_str());
+      return ESPANK_SUCCESS;
+    }
+
+    if (!require_license_) {
+      slurm_spank_log(
+          "[iqm_spank_plugin] warning: Slurm license not requested for QC "
+          "alias '%s' (expected --licenses=%s:<n>); on-premise QPUs may "
+          "experience uncontrolled concurrency without it since there is no "
+          "cloud-side queue to absorb overlapping requests. Set "
+          "iqm_require_license=1 to enforce this as a hard requirement",
+          alias->c_str(), expected_license.c_str());
+      return ESPANK_SUCCESS;
+    }
+
+    slurm_spank_log(
+        "[iqm_spank_plugin] error: missing required Slurm license '%s' for "
+        "QC alias '%s' — resubmit with --licenses=%s:<n> "
+        "(iqm_require_license is enabled)",
+        expected_license.c_str(), alias->c_str(), expected_license.c_str());
+    return ESPANK_ERROR;
+  }
+
+  /**
    * @brief Check whether the plugin is active for the given partition.
    *
    * If no partition filter is configured, the plugin is active on all
@@ -371,10 +476,11 @@ public:
    * Format:
    *   [iqm_spank_plugin] job=<id> partition=<name> base_url=<set|unset>
    *     auth=<token|tokens_file|unset> tokens_file_ok=<yes|no|n/a>
+   *     license=<name>:<ok|missing|n/a>
    *
    * @param spank SPANK handle.
    */
-  static void emit_diagnostics(spank_t spank) {
+  void emit_diagnostics(spank_t spank) const {
     const auto job_id = get_spank_env(spank, "SLURM_JOB_ID");
     const auto partition = get_spank_env(spank, "SLURM_JOB_PARTITION");
 
@@ -400,11 +506,26 @@ public:
       }
     }
 
+    // Slurm license alignment (see validate_license_alignment()).
+    auto license_str = std::string{"none:n/a"};
+    if (const auto alias = get_spank_env(spank, "IQM_QC_ALIAS");
+        alias.has_value() && !alias->empty()) {
+      const auto expected_license = expected_license_name(alias.value());
+      if (const auto licenses_env = get_spank_env(spank, "SLURM_JOB_LICENSES");
+          licenses_env.has_value()) {
+        const bool found =
+            license_list_contains(licenses_env.value(), expected_license);
+        license_str = expected_license + ":" + (found ? "ok" : "missing");
+      } else {
+        license_str = expected_license + ":n/a";
+      }
+    }
+
     const auto msg = std::format(
         "[iqm_spank_plugin] job={} partition={} base_url={} auth={} "
-        "tokens_file_ok={}",
+        "tokens_file_ok={} license={}",
         job_id.value_or("unknown"), partition.value_or("unknown"),
-        has_base_url ? "set" : "unset", auth_str, tf_ok);
+        has_base_url ? "set" : "unset", auth_str, tf_ok, license_str);
 
     slurm_spank_log("%s", msg.c_str());
   }
@@ -416,8 +537,9 @@ public:
         std::count_if(plugstack_values_.cbegin(), plugstack_values_.cend(),
                       [](const auto &v) { return v.has_value(); }));
     slurm_debug("[iqm_spank_plugin] parsed %d plugstack argument(s), "
-                "%zu active partition(s)",
-                configured_count, active_partitions_.size());
+                "%zu active partition(s), require_license=%s",
+                configured_count, active_partitions_.size(),
+                require_license_ ? "true" : "false");
   }
 
 private:
@@ -456,6 +578,70 @@ private:
       }
       value = (comma == std::string_view::npos) ? "" : value.substr(comma + 1);
     }
+  }
+
+  /**
+   * @brief Compute the expected Slurm license name for a QC alias.
+   *
+   * Replaces `:` and `,` in the alias with `_`, since Slurm's `name:count`
+   * license syntax reserves those characters (aliases may legitimately
+   * contain a colon, e.g. the `:mock` suffix used to select simulator
+   * variants, as in `emerald:mock`).
+   *
+   * @param alias The resolved IQM_QC_ALIAS value.
+   * @return `<license_prefix_><sanitized alias>`.
+   */
+  [[nodiscard]] std::string
+  expected_license_name(std::string_view alias) const {
+    return license_prefix_.value_or("iqm_qc_") +
+           sanitize_alias_for_license(alias);
+  }
+
+  /**
+   * @brief Replace `:` and `,` in a QC alias with `_` so it is safe to use
+   * as a Slurm license name.
+   * @param alias The QC alias to sanitize.
+   * @return The sanitized alias.
+   */
+  [[nodiscard]] static std::string
+  sanitize_alias_for_license(std::string_view alias) {
+    std::string sanitized{alias};
+    std::ranges::replace(sanitized, ':', '_');
+    std::ranges::replace(sanitized, ',', '_');
+    return sanitized;
+  }
+
+  /**
+   * @brief Check whether a Slurm license list (as found in
+   * `SLURM_JOB_LICENSES`, e.g. "name:count,name2:count2") contains a given
+   * license name (the `:count` suffix, if any, is ignored).
+   * @param licenses_value The raw SLURM_JOB_LICENSES value.
+   * @param license_name The license name to look for.
+   * @return `true` if `license_name` appears in `licenses_value`.
+   */
+  [[nodiscard]] static bool
+  license_list_contains(std::string_view licenses_value,
+                        std::string_view license_name) {
+    while (!licenses_value.empty()) {
+      const auto comma = licenses_value.find(',');
+      auto token = licenses_value.substr(0, comma);
+      if (const auto colon = token.find(':'); colon != std::string_view::npos) {
+        token = token.substr(0, colon);
+      }
+      while (!token.empty() && token.front() == ' ') {
+        token.remove_prefix(1);
+      }
+      while (!token.empty() && token.back() == ' ') {
+        token.remove_suffix(1);
+      }
+      if (token == license_name) {
+        return true;
+      }
+      licenses_value = (comma == std::string_view::npos)
+                           ? ""
+                           : licenses_value.substr(comma + 1);
+    }
+    return false;
   }
 
   /**
@@ -519,6 +705,17 @@ private:
   /// Partition filter: when non-empty, the plugin is only active on jobs
   /// targeting one of these partitions.
   std::vector<std::string> active_partitions_;
+
+  /// Prefix used to derive the expected Slurm license name from
+  /// IQM_QC_ALIAS. Configurable via the `iqm_license_prefix` plugstack
+  /// argument (default: "iqm_qc_").
+  std::optional<std::string> license_prefix_;
+
+  /// When true, jobs that resolve an IQM_QC_ALIAS but do not request the
+  /// corresponding Slurm license via --licenses are rejected outright
+  /// instead of only receiving a warning. Configurable via
+  /// `iqm_require_license` (default: false/off).
+  bool require_license_ = false;
 };
 
 /// Global plugin configuration instance. Populated once during SPANK init,
@@ -613,14 +810,18 @@ int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
   }
 
   const auto validation_rc = IQMSpankConfigManager::validate_environment(spank);
+  const auto license_validation_rc = g_config.validate_license_alignment(spank);
 
   // Auth file accessibility check (warning only).
   IQMSpankConfigManager::check_tokens_file_access(spank);
 
   // Structured diagnostic summary.
-  IQMSpankConfigManager::emit_diagnostics(spank);
+  g_config.emit_diagnostics(spank);
 
-  return validation_rc;
+  if (validation_rc != ESPANK_SUCCESS) {
+    return validation_rc;
+  }
+  return license_validation_rc;
 }
 
 /**
