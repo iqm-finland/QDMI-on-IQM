@@ -68,21 +68,13 @@ srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 
 ### Limiting Concurrent Access to a QC
 
-If your administrator has configured a Slurm license for the target QC (see
-[Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
-below), request it alongside `--iqm-qc-alias` using Slurm's native
-`--licenses`/`-L` option:
+If your administrator has configured a Slurm license for the target QC (see [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses) below), request it alongside `--iqm-qc-alias` using Slurm's native `--licenses`/`-L` option:
 
 ```bash
 srun --partition=quantum --iqm-qc-alias=emerald --licenses=iqm_qc_emerald:1 python bell_state.py
 ```
 
-This matters most for **on-premise QPUs**: unlike the cloud Resonance API,
-which queues overlapping requests on its own, an on-premise QPU is typically
-single-tenant hardware with no such queue, so Slurm itself must serialize
-access. If you omit `--licenses` on a cluster where it's expected, the
-plugin logs a warning (or, if the administrator has set
-`iqm_require_license=1`, rejects the job outright).
+This matters most for **on-premise QCs**: unlike the cloud Resonance API, which queues overlapping requests on its own, an on-premise QC is typically single-tenant hardware with no such queue, so Slurm itself must serialize access. If you omit `--licenses` on a cluster where it's expected, the plugin logs a warning (or, if the administrator has set `iqm_require_license=1`, rejects the job outright).
 
 ### Executing via CLI Scripts
 
@@ -157,9 +149,11 @@ sudo scontrol reconfigure
 
 ### Limiting Concurrent Access with Slurm Licenses
 
-> **Note:** "Slurm license" here refers to Slurm's native `Licenses=`/`--licenses` capacity-limiting scheduler resource — unrelated to the GPLv3/Apache-2.0 software licensing described elsewhere in this repository.
+:::{note}
+"Slurm license" here refers to Slurm's native `Licenses=`/`--licenses` capacity-limiting scheduler resource — unrelated to the GPLv3/Apache-2.0 software licensing described elsewhere in this repository.
+:::
 
-Each QC can be modeled as a flat, cluster-wide Slurm license so that Slurm itself enforces a concurrency limit, rather than relying on jobs to behave. This is especially important for **on-premise QPUs**: unlike the cloud Resonance API, which absorbs overlapping requests in its own queue, an on-premise QPU is typically single-tenant hardware, so uncontrolled concurrency risks real hardware contention.
+Each QC can be modeled as a flat, cluster-wide Slurm license so that Slurm itself enforces a concurrency limit, rather than relying on jobs to behave. This is especially important for **on-premise QCs**: unlike the cloud Resonance API, which absorbs overlapping requests in its own queue, an on-premise QC is typically single-tenant hardware, so uncontrolled concurrency risks real hardware contention.
 
 1. Define a license pool for each QC in `/etc/slurm/slurm.conf` (a flat, cluster-wide pool, not tied to specific nodes — the QC is reached over the network from any node in the partition):
 
