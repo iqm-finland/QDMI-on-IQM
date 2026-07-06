@@ -1,12 +1,18 @@
 # Slurm SPANK Plugin
 
-The Slurm SPANK plugin for QDMI-on-IQM simplifies running quantum jobs on clusters by automatically propagating `IQM_*` environment variables to job steps. This avoids manual `export` statements in job scripts and enables administrators to configure global defaults and partition-gated access.
+The Slurm SPANK plugin for QDMI-on-IQM simplifies running quantum jobs on
+clusters by automatically propagating `IQM_*` environment variables to job
+steps. This avoids manual `export` statements in job scripts and enables
+administrators to configure global defaults and partition-gated access.
 
 ---
 
 ## For Users
 
-The plugin registers `--iqm-*` command-line options for standard Slurm submission tools (`srun`, `sbatch`, `salloc`). When these options are provided, the plugin translates them into the corresponding environment variables for the job tasks.
+The plugin registers `--iqm-*` command-line options for standard Slurm
+submission tools (`srun`, `sbatch`, `salloc`). When these options are provided,
+the plugin translates them into the corresponding environment variables for the
+job tasks.
 
 ### Supported Options
 
@@ -19,19 +25,23 @@ The plugin registers `--iqm-*` command-line options for standard Slurm submissio
 
 ### Credential Security
 
-Direct token passing is intentionally unsupported on the command line. Slurm command arguments may be captured in shell history, process listings, scheduler logs, or accounting records.
+Direct token passing is intentionally unsupported on the command line. Slurm
+command arguments may be captured in shell history, process listings, scheduler
+logs, or accounting records.
 
 To run authenticated jobs:
 
 1. Save your tokens to a secure file.
 2. Pass the path to this file using the `--iqm-tokens-file` option.
-3. Ensure the token file is readable on the compute nodes where the tasks execute.
+3. Ensure the token file is readable on the compute nodes where the tasks
+   execute.
 
 ---
 
 ## Example
 
-The {py:class}`~iqm.qdmi.qiskit.IQMBackend` class automatically resolves configuration values from the environment variables injected by the plugin.
+The {py:class}`~iqm.qdmi.qiskit.IQMBackend` class automatically resolves
+configuration values from the environment variables injected by the plugin.
 
 **`bell_state.py`**
 
@@ -68,7 +78,10 @@ srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 
 ### Executing via CLI Scripts
 
-Alternatively, if you already have serialized circuits (in QPY format), you can execute them directly on the cluster using the packaged CLI scripts (see the [Sampler and Estimator CLI Utilities](python_package.md#sampler-and-estimator-cli-utilities) documentation for details) without writing any custom Python code:
+Alternatively, if you already have serialized circuits (in QPY format), you can
+execute them directly on the cluster using the packaged CLI scripts (see the
+[Sampler and Estimator CLI Utilities](python_package.md#sampler-and-estimator-cli-utilities)
+documentation for details) without writing any custom Python code:
 
 ```bash
 # Run a serialized circuit using the sampler CLI
@@ -82,13 +95,17 @@ srun --partition=quantum --iqm-qc-alias=emerald iqm-estimator ansatz.qpy observa
 
 ## For HPC Administrators
 
-The SPANK plugin is a lightweight C++ module that intercepts job launches to parse options and inject environment variables. It does not implement scheduler policy or handle backend-side queue management.
+The SPANK plugin is a lightweight C++ module that intercepts job launches to
+parse options and inject environment variables. It does not implement scheduler
+policy or handle backend-side queue management.
 
 ### Compatibility and Requirements
 
 - **Slurm Version**: Slurm 17.11 or newer.
 - **C++ Compiler**: C++20 standard library support (GCC 13+ or Clang 16+).
-- **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI. You must compile the plugin against the target cluster's Slurm header files (`slurm/spank.h`) and rebuild the plugin after any major/minor Slurm upgrades.
+- **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI.
+  You must compile the plugin against the target cluster's Slurm header files
+  (`slurm/spank.h`) and rebuild the plugin after any major/minor Slurm upgrades.
 
 ### Installation
 
@@ -100,13 +117,17 @@ cmake --build build-spank --target iqm-spank-plugin --parallel
 sudo cmake --install build-spank --component iqm-spank-plugin
 ```
 
-This installs the compiled `.so` file to the Slurm plugin directory and places the template configuration in `plugstack.conf.d/`.
+This installs the compiled `.so` file to the Slurm plugin directory and places
+the template configuration in `plugstack.conf.d/`.
 
-Deploy the plugin on login/submit nodes (for `srun`/`sbatch` command line parsing) and on compute nodes running `slurmd`/`slurmstepd`. Controller-only nodes do not require the plugin.
+Deploy the plugin on login/submit nodes (for `srun`/`sbatch` command line
+parsing) and on compute nodes running `slurmd`/`slurmstepd`. Controller-only
+nodes do not require the plugin.
 
 ### Configuration
 
-Configure the plugin in `plugstack.conf`. Global defaults defined here can be overridden by users at submission time.
+Configure the plugin in `plugstack.conf`. Global defaults defined here can be
+overridden by users at submission time.
 
 **`/etc/slurm/plugstack.conf.d/iqm-qdmi.conf`**
 
@@ -119,9 +140,11 @@ required /usr/lib/slurm/iqm-spank-plugin.so \
 
 - `iqm_base_url`: Default API endpoint.
 - `iqm_tokens_file`: Path to the shared token file.
-- `partitions`: Comma-separated list of partitions where this plugin will run. If omitted, the plugin evaluates all partitions.
+- `partitions`: Comma-separated list of partitions where this plugin will run.
+  If omitted, the plugin evaluates all partitions.
 
-Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration directory:
+Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration
+directory:
 
 ```text
 include /etc/slurm/plugstack.conf.d/*.conf
@@ -135,21 +158,29 @@ sudo scontrol reconfigure
 
 ### Troubleshooting
 
-The plugin logs to the standard `slurmd.log` on compute nodes. Successful activation prints a log entry when a job starts on an active partition:
+The plugin logs to the standard `slurmd.log` on compute nodes. Successful
+activation prints a log entry when a job starts on an active partition:
 
 `[iqm_spank_plugin] job=12345 partition=quantum base_url=set auth=tokens_file tokens_file_ok=yes`
 
 **Common Issues:**
 
-- **"Plugin metadata symbol missing"**: The plugin was compiled with incompatible headers or toolchain. Rebuild the plugin from source on the target environment.
-- **Options/variables not showing up**: Verify that `scontrol show config | grep PlugStackConfig` references your `plugstack.conf` directory and that the drop-in file is read-permitted.
-- **Permission Denied**: The `slurmd` process user must have read access to the compiled `.so` library and the specified `iqm_tokens_file`.
+- **"Plugin metadata symbol missing"**: The plugin was compiled with
+  incompatible headers or toolchain. Rebuild the plugin from source on the
+  target environment.
+- **Options/variables not showing up**: Verify that
+  `scontrol show config | grep PlugStackConfig` references your `plugstack.conf`
+  directory and that the drop-in file is read-permitted.
+- **Permission Denied**: The `slurmd` process user must have read access to the
+  compiled `.so` library and the specified `iqm_tokens_file`.
 
 ---
 
 ## Testing with Docker
 
-To test the SPANK plugin locally without installing Slurm or configuring services on your host machine, you can run the test suite inside an isolated Docker container.
+To test the SPANK plugin locally without installing Slurm or configuring
+services on your host machine, you can run the test suite inside an isolated
+Docker container.
 
 First, build the Docker image from the repository root:
 
@@ -163,13 +194,15 @@ Then, run the tests:
 docker run --rm qdmi-spank-tests
 ```
 
-To run integration tests targeting the Resonance backend, pass your `IQM_TOKEN` as an environment variable:
+To run integration tests targeting the Resonance backend, pass your `IQM_TOKEN`
+as an environment variable:
 
 ```bash
 docker run --rm -e IQM_TOKEN="your-token" qdmi-spank-tests
 ```
 
-For a faster development loop, you can bind-mount your local workspace. This avoids rebuilding the image when you make changes to the code or test scripts:
+For a faster development loop, you can bind-mount your local workspace. This
+avoids rebuilding the image when you make changes to the code or test scripts:
 
 ```bash
 docker run --rm -v "$(pwd):/workspace" qdmi-spank-tests
