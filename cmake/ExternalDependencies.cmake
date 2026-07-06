@@ -63,7 +63,7 @@ set(CPR_CURL_USE_LIBPSL
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
 set(CPR_USE_SYSTEM_CURL
     OFF
-    CACHE BOOL "Use system curl for CPR")
+    CACHE BOOL "Use system curl for CPR" FORCE)
 set(BUILD_STATIC_CURL
     ON
     CACHE BOOL "Enable static curl for CPR" FORCE)
