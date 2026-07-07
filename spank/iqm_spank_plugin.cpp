@@ -597,7 +597,15 @@ int slurm_spank_init_post_opt(spank_t /* spank */, const int /* ac */,
  * Injects IQM environment variables into the job environment and performs
  * validation of the resulting configuration.
  *
- * @return `ESPANK_SUCCESS` on success, otherwise `ESPANK_ERROR`.
+ * Slurm-ABI note: slurmstepd (`task.c`, `spank_user_task(...) < 0`) only
+ * treats a *negative* return from this specific hook as fatal — it does
+ * NOT check for nonzero. `ESPANK_ERROR` is `+3000` (see
+ * `slurm/slurm_errno.h`), so returning it directly here would only log
+ * "task_init() failed with rc=3000" and let the task launch anyway. This
+ * wrapper therefore translates any internal validation failure to a plain
+ * `-1` before returning, so a `required` plugin actually blocks the task.
+ *
+ * @return `ESPANK_SUCCESS` on success, `-1` if validation failed.
  */
 int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
   Emit_hook_log("slurm_spank_task_init");
@@ -609,7 +617,7 @@ int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
 
   if (const auto rc = g_config.inject_environment(spank);
       rc != ESPANK_SUCCESS) {
-    return rc;
+    return -1;
   }
 
   const auto validation_rc = IQMSpankConfigManager::validate_environment(spank);
@@ -620,7 +628,10 @@ int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
   // Structured diagnostic summary.
   IQMSpankConfigManager::emit_diagnostics(spank);
 
-  return validation_rc;
+  if (validation_rc != ESPANK_SUCCESS) {
+    return -1;
+  }
+  return ESPANK_SUCCESS;
 }
 
 /**
