@@ -217,11 +217,11 @@ jobs:
               && 'cpp-linter,' || ''
             }}
             ${{
-              fromJSON(needs.change-detection.outputs.run-python-tests)
+              !fromJSON(needs.change-detection.outputs.run-python-tests)
               && 'examples,' || ''
             }}
             ${{
-              fromJSON(needs.change-detection.outputs.run-python-linter)
+              !fromJSON(needs.change-detection.outputs.run-python-linter)
               && 'python-linter,' || ''
             }}
             ${{
