@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -31,7 +31,7 @@ authors = [
 ]
 
 license = "Apache-2.0 WITH LLVM-exception"
-license-files = ["LICENSE.md"]
+license-files = ["LICENSE"]
 
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -113,6 +113,11 @@ sdist.exclude = [
 
 [tool.scikit-build.cmake.define]
 BUILD_IQM_QDMI_TESTS = "OFF"
+
+[[tool.scikit-build.overrides]]
+if.platform-system = "darwin"
+cmake.define.CMAKE_IGNORE_PATH = "/opt/homebrew;/usr/local"
+cmake.define.CPR_USE_SYSTEM_CURL = "ON"
 
 [[tool.scikit-build.generate]]
 path = "iqm/qdmi/_version.py"
@@ -210,7 +215,7 @@ delocate = "delocate"
 [tool.repo-review.ignore]
 GH200 = "We use Renovate instead of Dependabot"
 MY100 = "We use ty instead of mypy"
-PC140 = "We use ty instead of mypy"
+PC111 = "We use ruff instead of blacken-docs"
 PC160 = "We use a mirror of crate-ci/typos"
 PC170 = "We do not use rST files"
 
@@ -235,18 +240,17 @@ environment-pass = [
 ]
 
 [tool.cibuildwheel.linux]
-before-all = "yum install -y curl-devel"
+before-all = "yum install -y openssl-devel"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
 
 [tool.cibuildwheel.windows]
-before-build = "uv pip install delvewheel>=1.12.0"
 repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg iqm"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
-before-all = "apk add curl-dev"
+before-all = "apk add openssl-dev"
 
 
 [tool.uv]

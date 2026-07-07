@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -22,6 +22,5 @@ set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
 
 if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
-  add_subdirectory(mock)
   add_subdirectory(unit)
 endif()

@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+ * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,8 +17,9 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "curl_http_client.hpp"
-#include "curl_http_client_test_support.hpp"
+#include "http_client.hpp"
+#include "http_client_internal.hpp"
+#include "http_stub.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
@@ -72,36 +73,13 @@ private:
   std::stringstream log_stream_;
 };
 
-/**
- * @brief Restores CurlHttpClient test hooks when leaving scope.
- */
-class CurlApiHookGuard {
-public:
-  /**
-   * @brief Install a temporary curl_easy_init failure hook.
-   */
-  CurlApiHookGuard() {
-    iqm::test_support::Enable_curl_easy_init_failure_for_testing();
-  }
-
-  CurlApiHookGuard(const CurlApiHookGuard &) = delete;
-  CurlApiHookGuard &operator=(const CurlApiHookGuard &) = delete;
-  CurlApiHookGuard(CurlApiHookGuard &&) = delete;
-  CurlApiHookGuard &operator=(CurlApiHookGuard &&) = delete;
-
-  /**
-   * @brief Restore the default curl hooks.
-   */
-  ~CurlApiHookGuard() { iqm::test_support::Reset_curl_api_hooks_for_testing(); }
-};
-
-TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
+TEST(HttpClientTest, SuccessMessagesAreLogged) {
   const LoggerCapture logger_capture;
 
-  const auto ret = iqm::test_support::Handle_response_code_for_testing(
+  const auto ret = iqm::http::internal::Handle_response_code(
       200, "https://example.test/jobs",
       R"({"messages":[{"message":"alpha"},{"message":7},{"ignored":true}]})",
-      false);
+      iqm::http::internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 
   EXPECT_EQ(ret, QDMI_SUCCESS);
 
@@ -111,11 +89,12 @@ TEST(CurlHttpClientTest, SuccessMessagesAreLogged) {
   EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
+TEST(HttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   const LoggerCapture logger_capture;
 
-  const auto ret = iqm::test_support::Handle_response_code_for_testing(
-      503, "https://example.test/jobs", "not-json", false);
+  const auto ret = iqm::http::internal::Handle_response_code(
+      503, "https://example.test/jobs", "not-json",
+      iqm::http::internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 
   EXPECT_EQ(ret, QDMI_ERROR_FATAL);
 
@@ -126,12 +105,13 @@ TEST(CurlHttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   EXPECT_NE(logs.find("Response: not-json"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
+TEST(HttpClientTest, RedirectResponseLogsAdditionalMessages) {
   const LoggerCapture logger_capture;
 
-  const auto ret = iqm::test_support::Handle_response_code_for_testing(
+  const auto ret = iqm::http::internal::Handle_response_code(
       302, "https://example.test/jobs",
-      R"({"messages":[{"message":"follow redirect"}]})", false);
+      R"({"messages":[{"message":"follow redirect"}]})",
+      iqm::http::internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 
   EXPECT_EQ(ret, QDMI_ERROR_FATAL);
 
@@ -146,13 +126,13 @@ TEST(CurlHttpClientTest, RedirectResponseLogsAdditionalMessages) {
       std::string::npos);
 }
 
-TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
+TEST(HttpClientTest, StructuredErrorsSuppressRawFallback) {
   const LoggerCapture logger_capture;
 
-  const auto ret = iqm::test_support::Handle_response_code_for_testing(
+  const auto ret = iqm::http::internal::Handle_response_code(
       600, "https://example.test/jobs",
       R"({"errors":[{"error_code":"E1","message":"boom"},{"message":"detail"},{"error_code":7},{"ignored":true}]})",
-      false);
+      iqm::http::internal::ERROR_LOG_POLICY::LOG_AS_ERROR);
 
   EXPECT_EQ(ret, QDMI_ERROR_FATAL);
 
@@ -165,62 +145,43 @@ TEST(CurlHttpClientTest, StructuredErrorsSuppressRawFallback) {
   EXPECT_EQ(logs.find("Response: {\"errors\":"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlInitFails) {
+TEST(HttpClientTest, GetReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::CurlHttpClient http_client;
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get_connection_error();
   std::string response;
 
-  EXPECT_EQ(http_client.get("https://example.test/jobs", "", response),
+  EXPECT_EQ(iqm::http::Get("https://example.test/jobs", "", response),
             QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_init() failed"),
-            std::string::npos);
+  EXPECT_NE(
+      logger_capture.str().find("Request failed: Failed to connect to host"),
+      std::string::npos);
 }
 
-TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlInitFails) {
+TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
-  const CurlApiHookGuard curl_api_hook_guard;
-  iqm::CurlHttpClient http_client;
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_post_connection_error();
   std::string response;
 
   EXPECT_EQ(
-      http_client.post("https://example.test/jobs", "", response, "{}", ""),
+      iqm::http::Post("https://example.test/jobs", "", response, "{}", ""),
       QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_init() failed"),
-            std::string::npos);
+  EXPECT_NE(
+      logger_capture.str().find("Request failed: Failed to connect to host"),
+      std::string::npos);
 }
 
-TEST(CurlHttpClientTest, GetReturnsFatalWhenCurlPerformFails) {
+TEST(HttpClientTest, RetriesHttp429UntilSuccess) {
   const LoggerCapture logger_capture;
-  iqm::CurlHttpClient http_client;
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get(429).queue_get(200);
   std::string response;
 
-  EXPECT_EQ(
-      http_client.get("unsupported-protocol://example.test/jobs", "", response),
-      QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_perform() failed:"),
-            std::string::npos);
-}
+  const auto status = iqm::http::Get("https://example.test/jobs", "", response);
 
-TEST(CurlHttpClientTest, PostReturnsFatalWhenCurlPerformFails) {
-  const LoggerCapture logger_capture;
-  iqm::CurlHttpClient http_client;
-  std::string response;
-
-  EXPECT_EQ(http_client.post("unsupported-protocol://example.test/jobs", "",
-                             response, "{}", ""),
-            QDMI_ERROR_FATAL);
-  EXPECT_NE(logger_capture.str().find("curl_easy_perform() failed:"),
-            std::string::npos);
-}
-
-TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
-  const LoggerCapture logger_capture;
-  const auto result = iqm::test_support::Retry_response_codes_for_testing(
-      {429, 200}, "https://example.test/jobs", false);
-
-  EXPECT_EQ(result.status_code, QDMI_SUCCESS);
-  EXPECT_EQ(result.sleep_call_count, 1U);
+  EXPECT_EQ(status, QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.sleep_call_count(), 1U);
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("hit HTTP 429 rate limiting; retrying in 2 second(s)"),
@@ -228,13 +189,18 @@ TEST(CurlHttpClientTest, RetriesHttp429UntilSuccess) {
   EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
 }
 
-TEST(CurlHttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
+TEST(HttpClientTest, RetriesExhaustedForHttp429ReturnInvalidArgument) {
   const LoggerCapture logger_capture;
-  const auto result = iqm::test_support::Retry_response_codes_for_testing(
-      {429, 429, 429, 429, 429, 429}, "https://example.test/jobs", false);
+  iqm::test_support::HttpStub http_stub;
+  for (int i = 0; i < 6; ++i) {
+    http_stub.queue_get(429);
+  }
+  std::string response;
 
-  EXPECT_EQ(result.status_code, QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(result.sleep_call_count, 5U);
+  const auto status = iqm::http::Get("https://example.test/jobs", "", response);
+
+  EXPECT_EQ(status, QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(http_stub.sleep_call_count(), 5U);
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("failed with HTTP 429 (Client Error)"),

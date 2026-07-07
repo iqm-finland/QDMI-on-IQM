@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -27,11 +27,6 @@ add_subdirectory(internal)
 
 add_library(${QDMI_TARGET_NAME} SHARED)
 target_compile_features(${QDMI_TARGET_NAME} PRIVATE cxx_std_20)
-target_compile_definitions(
-  ${QDMI_TARGET_NAME}
-  PRIVATE QDMI_VERSION="${QDMI_VERSION}"
-          IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
-          IQM_QDMI_device_EXPORTS)
 set_target_properties(
   ${QDMI_TARGET_NAME}
   PROPERTIES C_VISIBILITY_PRESET hidden
@@ -39,7 +34,6 @@ set_target_properties(
              VISIBILITY_INLINES_HIDDEN 1)
 target_sources(
   ${QDMI_TARGET_NAME}
-  PRIVATE iqm_device.cpp
   PUBLIC FILE_SET
          public_headers
          TYPE
