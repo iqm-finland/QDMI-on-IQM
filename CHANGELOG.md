@@ -17,16 +17,12 @@ releases may include breaking changes.
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging
   `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and
-  session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
+  session parameters into Slurm jobs ([#74], [#117]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and
   `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
 
 ### Fixed
 
-- 🐛 Fix the SPANK plugin silently launching jobs despite failed validation
-  (missing `IQM_BASE_URL` or conflicting auth), since `ESPANK_ERROR` is a
-  positive value and Slurm's task launcher only aborts on a negative hook return
-  ([#117]) ([**@marcelwa**])
 - 🩹 Ensure the QDMI device can handle devices with computational resonators
   ([#107]) ([**@burgholzer**])
 
