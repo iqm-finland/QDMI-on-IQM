@@ -17,7 +17,7 @@ releases may include breaking changes.
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging
   `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and
-  session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
+  session parameters into Slurm jobs ([#74], [#117]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and
   `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
 
@@ -89,6 +89,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
 [#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107
 [#105]: https://github.com/iqm-finland/QDMI-on-IQM/pull/105
