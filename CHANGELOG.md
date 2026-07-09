@@ -10,6 +10,8 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-09
+
 ### Added
 
 - ✨ Expose the current calibration set ID as a device property via
@@ -83,7 +85,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.0...v1.0.1
