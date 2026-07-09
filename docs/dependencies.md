@@ -107,9 +107,9 @@ under the project's own license terms.
 
 Used for local development workflows, **not shipped** in any binary or wheel.
 
-| Dependency | Version    | License     | Purpose                                                          |
-| :--------- | :--------- | :---------- | :--------------------------------------------------------------- |
-| [nox]      | ≥2026.4.10 | Apache-2.0  | Session runner for tests, linting, docs, packaging, and examples |
+| Dependency | Version    | License    | Purpose                                                          |
+| :--------- | :--------- | :--------- | :--------------------------------------------------------------- |
+| [nox]      | ≥2026.4.10 | Apache-2.0 | Session runner for tests, linting, docs, packaging, and examples |
 
 [Breathe]: https://github.com/breathe-doc/breathe
 [CPR]: https://github.com/libcpr/cpr
