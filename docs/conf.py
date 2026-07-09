@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -35,15 +35,15 @@ except metadata.PackageNotFoundError:
 release = version.split("+")[0]
 
 extensions = [
-    "myst_nb",
     "autoapi.extension",
+    "breathe",
+    "myst_nb",
+    "sphinx_copybutton",
+    "sphinx_design",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
-    "sphinx_copybutton",
-    "sphinx_design",
     "sphinx.ext.viewcode",
-    "breathe",
 ]
 
 source_suffix = [".rst", ".md"]
