@@ -28,6 +28,8 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update `mqt-core` to version 3.7.0 ([#120]) ([**@denialhaag**])
+- ⬆️ Update QDMI to version 1.3.2 ([#120]) ([**@denialhaag**])
 - ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls
   ([#105]) ([**@marcelwa**])
 - ♻️ Considerably simplify the internal HTTP client implementation ([#105])
@@ -89,6 +91,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#120]: https://github.com/iqm-finland/QDMI-on-IQM/pull/120
 [#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
 [#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107
