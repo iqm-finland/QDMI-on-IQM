@@ -11,7 +11,7 @@ These dependencies are linked into the shared library and
 
 | Dependency      | Version | License                        | Purpose                                                    |
 | :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
-| [QDMI]          | 1.3.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
+| [QDMI]          | 1.3.2   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
 | [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
 | [CPR]           | 1.14.2  | MIT License                    | C++ Requests HTTP client library for backend communication |
 
@@ -110,7 +110,6 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 | Dependency | Version    | License     | Purpose                                                          |
 | :--------- | :--------- | :---------- | :--------------------------------------------------------------- |
 | [nox]      | ≥2026.4.10 | Apache-2.0  | Session runner for tests, linting, docs, packaging, and examples |
-| [ty]       | ==0.0.35   | MIT License | Static type checking                                             |
 
 [Breathe]: https://github.com/breathe-doc/breathe
 [CPR]: https://github.com/libcpr/cpr
@@ -135,4 +134,3 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 [Sphinx AutoAPI]: https://github.com/readthedocs/sphinx-autoapi
 [Sphinx Copybutton]: https://github.com/executablebooks/sphinx-copybutton
 [Sphinx Design]: https://github.com/executablebooks/sphinx-design
-[ty]: https://github.com/astral-sh/ty
