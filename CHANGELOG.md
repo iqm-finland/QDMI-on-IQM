@@ -10,7 +10,7 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
-## [1.2.0] - TBD
+## [1.2.0] - 2026-07-09
 
 ### Added
 
