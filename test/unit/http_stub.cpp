@@ -22,6 +22,7 @@
 #include "http_client_internal.hpp"
 
 #include <cpr/bearer.h>
+#include <cpr/body.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
 #include <cpr/response.h>

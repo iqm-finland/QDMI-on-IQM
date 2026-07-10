@@ -23,6 +23,7 @@
 #include "logging.hpp"
 
 #include <cpr/cprtypes.h>
+#include <cpr/response.h>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <iostream>

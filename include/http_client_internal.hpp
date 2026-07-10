@@ -26,12 +26,16 @@
 
 #pragma once
 
-#include <cpr/bearer.h>
-#include <cpr/body.h>
-#include <cpr/cprtypes.h>
-#include <cpr/response.h>
 #include <functional>
 #include <optional>
+
+// Forward declarations for cpr types used in the hooks.
+namespace cpr {
+class Url;
+class Bearer;
+class Body;
+class Response;
+} // namespace cpr
 
 namespace iqm::http::internal {
 
