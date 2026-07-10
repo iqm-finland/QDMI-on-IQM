@@ -10,6 +10,16 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
+  ([#122]) ([**@burgholzer**])
+
+### Fixed
+
+- 🩹 Fix rate limit handling and retry logic for API requests ([#122])
+  ([**@burgholzer**])
+
 ## [1.2.0] - 2026-07-09
 
 ### Added
@@ -94,6 +104,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#122]: https://github.com/iqm-finland/QDMI-on-IQM/pull/122
 [#120]: https://github.com/iqm-finland/QDMI-on-IQM/pull/120
 [#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108

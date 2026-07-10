@@ -19,11 +19,17 @@
 
 #include "http_stub.hpp"
 
-#include "http_client_internal.hpp"
+#include "http_client.hpp"
 
+#include <cpr/bearer.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/error.h>
+#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,16 +38,19 @@ namespace iqm::test_support {
 
 namespace {
 
-http::internal::Raw_response
-Make_raw_response(const Scripted_response &scripted) {
+int Cpr_error_code(const cpr::ErrorCode code) { return static_cast<int>(code); }
+
+cpr::Response Make_response(const Scripted_response &scripted) {
+  cpr::Response response;
   if (scripted.connection_error) {
-    return {.status_code = 0,
-            .body = {},
-            .error_message = "Failed to connect to host"};
+    response.error = cpr::Error{Cpr_error_code(cpr::ErrorCode::COULDNT_CONNECT),
+                                "Failed to connect to host"};
+    return response;
   }
-  return {.status_code = scripted.status_code,
-          .body = scripted.body,
-          .error_message = {}};
+  response.status_code = scripted.status_code;
+  response.text = scripted.body;
+  response.header = scripted.headers;
+  return response;
 }
 
 } // namespace
@@ -49,73 +58,104 @@ Make_raw_response(const Scripted_response &scripted) {
 HttpStub::HttpStub() {
   auto &hooks = http::internal::Get_hooks();
 
-  hooks.get = [this](const std::string &url,
-                     const std::string & /*bearer_token*/) {
-    get_urls_.push_back(url);
+  hooks.get = [this](const cpr::Url &url,
+                     const std::optional<cpr::Bearer> &bearer_token,
+                     const cpr::Header & /*headers*/) {
+    get_urls_.push_back(url.str());
+    get_bearer_tokens_.push_back(bearer_token);
     if (get_responses_.empty()) {
       ADD_FAILURE() << "Unexpected GET request to '" << url
                     << "': no scripted response was queued";
-      return http::internal::Raw_response{
-          .status_code = 500, .body = {}, .error_message = {}};
+      cpr::Response response;
+      response.status_code = 500;
+      response.url = url;
+      return response;
     }
     const auto scripted = get_responses_.front();
     get_responses_.pop_front();
-    return Make_raw_response(scripted);
+    auto response = Make_response(scripted);
+    response.url = url;
+    return response;
   };
 
-  hooks.post = [this](const std::string &url,
-                      const std::string & /*bearer_token*/,
-                      const std::string & /*data*/,
-                      const std::string & /*extra_header*/) {
-    post_urls_.push_back(url);
+  hooks.post = [this](const cpr::Url &url,
+                      const std::optional<cpr::Bearer> &bearer_token,
+                      const cpr::Header & /*headers*/,
+                      const cpr::Body & /*body*/) {
+    post_urls_.push_back(url.str());
+    post_bearer_tokens_.push_back(bearer_token);
     if (post_responses_.empty()) {
       ADD_FAILURE() << "Unexpected POST request to '" << url
                     << "': no scripted response was queued";
-      return http::internal::Raw_response{
-          .status_code = 500, .body = {}, .error_message = {}};
+      cpr::Response response;
+      response.status_code = 500;
+      response.url = url;
+      return response;
     }
     const auto scripted = post_responses_.front();
     post_responses_.pop_front();
-    return Make_raw_response(scripted);
+    auto response = Make_response(scripted);
+    response.url = url;
+    return response;
   };
 
-  hooks.sleep = [this](int /*seconds*/) { ++sleep_call_count_; };
+  hooks.sleep = [this](const int seconds) {
+    sleep_durations_.push_back(seconds);
+  };
 }
 
 HttpStub::~HttpStub() { http::internal::Reset_hooks(); }
 
-HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body) {
+HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body,
+                              cpr::Header headers) {
   get_responses_.push_back({.status_code = status_code,
                             .body = std::move(body),
-                            .connection_error = false});
+                            .connection_error = false,
+                            .headers = std::move(headers)});
   return *this;
 }
 
 HttpStub &HttpStub::queue_get_connection_error() {
   get_responses_.push_back(
-      {.status_code = 0, .body = {}, .connection_error = true});
+      {.status_code = 0, .body = {}, .connection_error = true, .headers = {}});
   return *this;
 }
 
-HttpStub &HttpStub::queue_post(const int64_t status_code, std::string body) {
+HttpStub &HttpStub::queue_post(const int64_t status_code, std::string body,
+                               cpr::Header headers) {
   post_responses_.push_back({.status_code = status_code,
                              .body = std::move(body),
-                             .connection_error = false});
+                             .connection_error = false,
+                             .headers = std::move(headers)});
   return *this;
 }
 
 HttpStub &HttpStub::queue_post_connection_error() {
   post_responses_.push_back(
-      {.status_code = 0, .body = {}, .connection_error = true});
+      {.status_code = 0, .body = {}, .connection_error = true, .headers = {}});
   return *this;
 }
 
 const std::vector<std::string> &HttpStub::get_urls() const { return get_urls_; }
 
+const std::vector<std::optional<cpr::Bearer>> &
+HttpStub::get_bearer_tokens() const {
+  return get_bearer_tokens_;
+}
+
 const std::vector<std::string> &HttpStub::post_urls() const {
   return post_urls_;
 }
 
-size_t HttpStub::sleep_call_count() const { return sleep_call_count_; }
+const std::vector<std::optional<cpr::Bearer>> &
+HttpStub::post_bearer_tokens() const {
+  return post_bearer_tokens_;
+}
+
+size_t HttpStub::sleep_call_count() const { return sleep_durations_.size(); }
+
+const std::vector<int> &HttpStub::sleep_durations() const {
+  return sleep_durations_;
+}
 
 } // namespace iqm::test_support
