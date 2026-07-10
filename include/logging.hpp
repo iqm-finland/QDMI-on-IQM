@@ -28,6 +28,13 @@
 #include <mutex>
 #include <string>
 
+// Windows headers may define ERROR as a macro. That breaks the LOG_LEVEL
+// enumerator below when CPR/CURL or other dependencies pull platform headers in
+// before this header.
+#ifdef ERROR
+#undef ERROR
+#endif
+
 namespace iqm {
 
 /**

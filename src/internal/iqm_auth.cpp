@@ -208,7 +208,7 @@ int TokenManager::time_left_seconds(const std::string &token) {
 
     // Get expiration time
     const int exp_time = json.value("exp", 0);
-    return std::max(0, exp_time - static_cast<int>(std::time(nullptr)));
+    return (std::max)(0, exp_time - static_cast<int>(std::time(nullptr)));
   } catch (const std::exception &e) {
     LOG_DEBUG("Failed to parse token body: " + std::string(e.what()));
     return 0;

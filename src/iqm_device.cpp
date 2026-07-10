@@ -1229,7 +1229,7 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
       }
       std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
       // Exponential backoff: double the sleep duration, but cap it
-      sleep_duration = std::min(sleep_duration * 2, max_sleep_duration);
+      sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
     }
     LOG_ERROR("Job " + job->job_id_ + " timed out");
     return QDMI_ERROR_TIMEOUT;
@@ -1246,7 +1246,7 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
     }
     std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
     // Exponential backoff: double the sleep duration, but cap it
-    sleep_duration = std::min(sleep_duration * 2, max_sleep_duration);
+    sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
   }
   return QDMI_SUCCESS;
 }
