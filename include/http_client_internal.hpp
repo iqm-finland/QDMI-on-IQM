@@ -26,12 +26,12 @@
 
 #pragma once
 
+#include <cpr/cprtypes.h>
 #include <functional>
 #include <optional>
 
 // Forward declarations for cpr types used in the hooks.
 namespace cpr {
-class Url;
 class Bearer;
 class Body;
 class Response;
@@ -51,14 +51,14 @@ struct Hooks {
   std::function<cpr::Response(const cpr::Url &url,
                               const std::optional<cpr::Bearer> &bearer_token,
                               const cpr::Header &headers)>
-      get{};
+      get;
   /// Hook for POST requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::Header &headers, const cpr::Body &body)>
-      post{};
+      post;
   /// Hook for the retry backoff delay, given a delay in seconds.
-  std::function<void(int)> sleep{};
+  std::function<void(int)> sleep;
 };
 
 /// Access the mutable, process-wide hook set.
