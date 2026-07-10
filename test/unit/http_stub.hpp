@@ -56,7 +56,7 @@ struct Scripted_response {
  * live network traffic or real time delays.
  *
  * This is the single test double for all HTTP-dependent tests: it installs
- * hooks via `iqm::http::internal::Get_hooks()` (see http_client_internal.hpp)
+ * hooks via `iqm::http::internal::Get_hooks()` (see http_client.hpp)
  * so tests exercise the real response-code mapping and retry logic instead
  * of bypassing it behind a mocked interface.
  *

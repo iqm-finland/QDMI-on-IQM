@@ -19,7 +19,7 @@
 
 #include "http_stub.hpp"
 
-#include "http_client_internal.hpp"
+#include "http_client.hpp"
 
 #include <cpr/bearer.h>
 #include <cpr/body.h>

@@ -99,4 +99,35 @@ QDMI_STATUS Handle_response(
     const cpr::Response &response,
     ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
 
+namespace internal {
+/**
+ * @brief Function hooks used to intercept HTTP calls and retry delays.
+ *
+ * Tests override these to exercise get()/post()/retry logic without a live
+ * network connection or real time delays. Production code uses the defaults
+ * installed by Get_hooks(), which perform real requests and real sleeps.
+ */
+struct Hooks {
+  /// Hook for GET requests.
+  std::function<cpr::Response(const cpr::Url &url,
+                              const std::optional<cpr::Bearer> &bearer_token,
+                              const cpr::Header &headers)>
+      get;
+  /// Hook for POST requests.
+  std::function<cpr::Response(
+      const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+      const cpr::Header &headers, const cpr::Body &body)>
+      post;
+  /// Hook for the retry backoff delay, given a delay in seconds.
+  std::function<void(int)> sleep;
+};
+
+/// Access the mutable, process-wide hook set.
+Hooks &Get_hooks();
+
+/// Restore the default (real) hooks. Used by tests to clean up after
+/// themselves.
+void Reset_hooks();
+} // namespace internal
+
 } // namespace iqm::http

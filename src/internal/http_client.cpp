@@ -23,7 +23,6 @@
 
 #include "http_client.hpp"
 
-#include "http_client_internal.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
