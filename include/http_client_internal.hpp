@@ -47,14 +47,14 @@ struct Hooks {
   std::function<cpr::Response(const cpr::Url &url,
                               const std::optional<cpr::Bearer> &bearer_token,
                               const cpr::Header &headers)>
-      get;
+      get{};
   /// Hook for POST requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::Header &headers, const cpr::Body &body)>
-      post;
+      post{};
   /// Hook for the retry backoff delay, given a delay in seconds.
-  std::function<void(int)> sleep;
+  std::function<void(int)> sleep{};
 };
 
 /// Access the mutable, process-wide hook set.

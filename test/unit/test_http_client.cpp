@@ -18,16 +18,18 @@
  */
 
 #include "http_client.hpp"
-#include "http_client_internal.hpp"
 #include "http_stub.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <cpr/cprtypes.h>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -75,7 +77,7 @@ private:
   std::stringstream log_stream_;
 };
 
-cpr::Response Make_response(const long status_code, std::string url,
+cpr::Response Make_response(const int64_t status_code, std::string url,
                             std::string body) {
   cpr::Response response;
   response.status_code = status_code;

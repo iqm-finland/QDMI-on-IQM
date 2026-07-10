@@ -31,7 +31,6 @@
 #include <cpr/response.h>
 #include <cstdint>
 #include <optional>
-#include <string>
 
 namespace iqm::http {
 

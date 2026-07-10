@@ -29,7 +29,6 @@
 
 #include <cerrno>
 #include <chrono>
-#include <cpr/api.h>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>

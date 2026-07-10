@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cpr/bearer.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -35,6 +36,7 @@
 #include <fstream>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <sstream>
@@ -239,13 +241,13 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
   }
 
   if (auth_parameters.empty()) {
-    token_source_ = TokenSource::NONE;
+    token_source_ = TOKEN_SOURCE::NONE;
   } else if (auth_parameters.size() == 1 && auth_parameters.contains("token")) {
-    token_source_ = TokenSource::EXTERNAL_TOKEN;
+    token_source_ = TOKEN_SOURCE::EXTERNAL_TOKEN;
     token_source_value_ = auth_parameters["token"];
   } else if (auth_parameters.size() == 1 &&
              auth_parameters.contains("tokens_file")) {
-    token_source_ = TokenSource::TOKENS_FILE;
+    token_source_ = TOKEN_SOURCE::TOKENS_FILE;
     token_source_value_ = auth_parameters["tokens_file"];
   } else {
     std::string keys;
@@ -262,7 +264,7 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
 }
 
 std::optional<cpr::Bearer> TokenManager::get_bearer_token(const int retries) {
-  if (token_source_ == TokenSource::NONE) {
+  if (token_source_ == TOKEN_SOURCE::NONE) {
     return std::nullopt;
   }
 
@@ -274,16 +276,16 @@ std::optional<cpr::Bearer> TokenManager::get_bearer_token(const int retries) {
 
   try {
     switch (token_source_) {
-    case TokenSource::EXTERNAL_TOKEN:
+    case TOKEN_SOURCE::EXTERNAL_TOKEN:
       access_token_ = token_source_value_;
       break;
-    case TokenSource::TOKENS_FILE:
+    case TOKEN_SOURCE::TOKENS_FILE:
       if (!token_source_value_.has_value()) {
         throw ClientAuthenticationError("No tokens file available");
       }
       access_token_ = Read_access_token_from_file(*token_source_value_);
       break;
-    case TokenSource::NONE:
+    case TOKEN_SOURCE::NONE:
       return std::nullopt;
     }
 

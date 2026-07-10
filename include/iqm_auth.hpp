@@ -24,6 +24,7 @@
 #pragma once
 
 #include <cpr/bearer.h>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -87,9 +88,9 @@ public:
   std::optional<cpr::Bearer> get_bearer_token(int retries = 1);
 
 private:
-  enum class TokenSource { NONE, EXTERNAL_TOKEN, TOKENS_FILE };
+  enum class TOKEN_SOURCE : uint8_t { NONE, EXTERNAL_TOKEN, TOKENS_FILE };
 
-  TokenSource token_source_ = TokenSource::NONE;
+  TOKEN_SOURCE token_source_ = TOKEN_SOURCE::NONE;
   std::optional<std::string> token_source_value_;
   std::optional<std::string> access_token_;
 };

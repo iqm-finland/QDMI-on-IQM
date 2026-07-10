@@ -41,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <string>
