@@ -21,44 +21,19 @@
  * @brief Internal test seam for iqm::http, shared between the implementation
  * and its unit tests.
  *
- * This header is **not** part of the public API. It deliberately does not
- * expose any transport-library types (e.g. CPR types): hooks are expressed
- * purely in terms of plain strings and status codes, so tests never need to
- * know which HTTP library backs iqm::http.
+ * This header is **not** part of the public API.
  */
 
 #pragma once
 
-#include <cstdint>
+#include <cpr/bearer.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/response.h>
 #include <functional>
-#include <string>
+#include <optional>
 
 namespace iqm::http::internal {
-
-/**
- * @brief Logging policy used for non-success HTTP response handling.
- */
-enum class ERROR_LOG_POLICY : uint8_t {
-  /// Log all errors at ERROR level (default for required requests)
-  LOG_AS_ERROR,
-  /// Log errors at DEBUG level
-  LOG_AS_DEBUG,
-};
-
-/**
- * @brief Outcome of a single low-level HTTP attempt.
- *
- * Deliberately decoupled from any particular HTTP transport library.
- */
-struct Raw_response {
-  /// The HTTP status code, or 0 if the request failed at the transport level
-  /// (e.g. couldn't connect).
-  int64_t status_code = 0;
-  /// The response body (empty on transport-level failure).
-  std::string body;
-  /// Describes the transport-level failure; only set when status_code == 0.
-  std::string error_message;
-};
 
 /**
  * @brief Function hooks used to intercept HTTP calls and retry delays.
@@ -69,13 +44,14 @@ struct Raw_response {
  */
 struct Hooks {
   /// Hook for GET requests.
-  std::function<Raw_response(const std::string &url,
-                             const std::string &bearer_token)>
+  std::function<cpr::Response(const cpr::Url &url,
+                              const std::optional<cpr::Bearer> &bearer_token,
+                              const cpr::Header &headers)>
       get;
   /// Hook for POST requests.
-  std::function<Raw_response(
-      const std::string &url, const std::string &bearer_token,
-      const std::string &data, const std::string &extra_header)>
+  std::function<cpr::Response(
+      const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+      const cpr::Header &headers, const cpr::Body &body)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;
@@ -87,14 +63,5 @@ Hooks &Get_hooks();
 /// Restore the default (real) hooks. Used by tests to clean up after
 /// themselves.
 void Reset_hooks();
-
-/**
- * @brief Classify an HTTP response code and log diagnostics.
- *
- * @return The mapped QDMI status code.
- */
-int Handle_response_code(int64_t response_code, const std::string &url,
-                         const std::string &response,
-                         ERROR_LOG_POLICY error_log_policy);
 
 } // namespace iqm::http::internal

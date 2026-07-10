@@ -101,18 +101,12 @@ private:
   std::string path_;
 };
 
-testing::AssertionResult
-Is_bearer_token_for(const std::string &actual,
-                    const std::string &expected_token) {
-  constexpr std::string_view bearer_prefix = "Bearer ";
-  if (!actual.starts_with(bearer_prefix)) {
-    return testing::AssertionFailure() << "missing Bearer prefix";
+testing::AssertionResult Is_bearer_for(const std::optional<cpr::Bearer> &actual,
+                                       const std::string &expected_token) {
+  if (!actual.has_value()) {
+    return testing::AssertionFailure() << "missing bearer token";
   }
-  if (actual.size() != bearer_prefix.size() + expected_token.size()) {
-    return testing::AssertionFailure() << "unexpected bearer token length";
-  }
-  if (actual.compare(bearer_prefix.size(), std::string::npos, expected_token) !=
-      0) {
+  if (std::string{actual->GetToken()} != expected_token) {
     return testing::AssertionFailure() << "unexpected bearer token content";
   }
   return testing::AssertionSuccess();
@@ -150,7 +144,7 @@ TEST(TokenManagerTest, ConstructorWithExplicitToken) {
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
 
   iqm::TokenManager tm(std::make_optional("my_token"), std::nullopt);
-  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), "my_token"));
 }
 
 TEST(TokenManagerTest, ConstructorWithTokenFromEnvironment) {
@@ -158,7 +152,7 @@ TEST(TokenManagerTest, ConstructorWithTokenFromEnvironment) {
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
 
   iqm::TokenManager tm(std::nullopt, std::nullopt);
-  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), "my_token"));
 }
 
 TEST(TokenManagerTest, ConstructorWithExplicitTokenOverridesEnvironment) {
@@ -166,7 +160,7 @@ TEST(TokenManagerTest, ConstructorWithExplicitTokenOverridesEnvironment) {
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", "different_file");
 
   iqm::TokenManager tm(std::make_optional("my_token"), std::nullopt);
-  EXPECT_TRUE(Is_bearer_token_for(tm.get_bearer_token(), "my_token"));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), "my_token"));
 }
 
 TEST(TokenManagerTest, ConstructorWithExplicitTokensFile) {
@@ -177,7 +171,7 @@ TEST(TokenManagerTest, ConstructorWithExplicitTokensFile) {
 
   iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
   EXPECT_TRUE(
-      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
 }
 
 TEST(TokenManagerTest, ConstructorWithTokensFileFromEnvironment) {
@@ -189,7 +183,7 @@ TEST(TokenManagerTest, ConstructorWithTokensFileFromEnvironment) {
 
   iqm::TokenManager tm(std::nullopt, std::nullopt);
   EXPECT_TRUE(
-      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
 }
 
 TEST(TokenManagerTest, ConstructorWithExplicitTokensFileOverridesEnvironment) {
@@ -200,7 +194,7 @@ TEST(TokenManagerTest, ConstructorWithExplicitTokensFileOverridesEnvironment) {
 
   iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
   EXPECT_TRUE(
-      Is_bearer_token_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
 }
 
 TEST(TokenManagerTest, ConstructorWithInvalidExplicitParameters) {
@@ -224,7 +218,7 @@ TEST(TokenManagerTest, GetBearerTokenNoProvider) {
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
 
   iqm::TokenManager tm;
-  EXPECT_TRUE(tm.get_bearer_token().empty());
+  EXPECT_FALSE(tm.get_bearer_token().has_value());
 }
 
 TEST(TokenManagerTest, TimeLeftSecondsInvalidJson) {
@@ -235,12 +229,7 @@ TEST(TokenManagerTest, TimeLeftSecondsInvalidJson) {
   EXPECT_EQ(iqm::TokenManager::time_left_seconds(invalid_json_token), 0);
 }
 
-TEST(ExternalTokenTest, GetToken) {
-  iqm::ExternalToken et("my_token");
-  EXPECT_EQ(et.get_token(), "my_token");
-}
-
-TEST(TokensFileReaderTest, GetToken) {
+TEST(TokenManagerTokensFileTest, GetToken) {
   // Create a temporary tokens file
   const std::string filename = "test_tokens.json";
   std::ofstream file(filename);
@@ -248,16 +237,17 @@ TEST(TokensFileReaderTest, GetToken) {
       << R"({"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIwMCwiaWF0IjoxNjIwNjc1MjAwfQ.signature"})";
   file.close();
 
-  iqm::TokensFileReader tfr(filename);
-  EXPECT_EQ(tfr.get_token(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-                             "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIwMCwia"
-                             "WF0IjoxNjIwNjc1MjAwfQ.signature");
+  iqm::TokenManager tm(std::nullopt, filename);
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(),
+                            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                            "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIwMCwia"
+                            "WF0IjoxNjIwNjc1MjAwfQ.signature"));
 
   // Clean up the temporary file
   std::remove(filename.c_str());
 }
 
-TEST(TokensFileReaderTest, GetTokenExpired) {
+TEST(TokenManagerTokensFileTest, GetTokenExpired) {
   // Create a temporary tokens file with an expired token
   const std::string filename = "test_tokens_expired.json";
   std::ofstream file(filename);
@@ -265,54 +255,54 @@ TEST(TokensFileReaderTest, GetTokenExpired) {
       << R"({"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MjA2NzUyMDAsIm5iZiI6MTYyMDY3NTIwMCwiaWF0IjoxNjIwNjc1MjAwfQ.signature"})";
   file.close();
 
-  iqm::TokensFileReader tfr(filename);
-  EXPECT_THROW(tfr.get_token(), iqm::ClientAuthenticationError);
+  iqm::TokenManager tm(std::nullopt, filename);
+  EXPECT_THROW(tm.get_bearer_token(), iqm::ClientAuthenticationError);
 
   // Clean up the temporary file
   std::remove(filename.c_str());
 }
 
-TEST(TokensFileReaderTest, GetTokenInvalidJson) {
+TEST(TokenManagerTokensFileTest, GetTokenInvalidJson) {
   // Create a temporary tokens file with invalid JSON
   const std::string filename = "test_tokens_invalid.json";
   std::ofstream file(filename);
   file << "{invalid_json}";
   file.close();
 
-  iqm::TokensFileReader tfr(filename);
-  EXPECT_THROW(tfr.get_token(), iqm::ClientAuthenticationError);
+  iqm::TokenManager tm(std::nullopt, filename);
+  EXPECT_THROW(tm.get_bearer_token(), iqm::ClientAuthenticationError);
 
   // Clean up the temporary file
   std::remove(filename.c_str());
 }
 
-TEST(TokensFileReaderTest, GetTokenFileNotFound) {
-  iqm::TokensFileReader tfr("non_existent_file.json");
-  EXPECT_THROW(tfr.get_token(), iqm::ClientAuthenticationError);
+TEST(TokenManagerTokensFileTest, GetTokenFileNotFound) {
+  iqm::TokenManager tm(std::nullopt, "non_existent_file.json");
+  EXPECT_THROW(tm.get_bearer_token(), iqm::ClientAuthenticationError);
 }
 
-TEST(TokensFileReaderTest, GetTokenNoAccessToken) {
+TEST(TokenManagerTokensFileTest, GetTokenNoAccessToken) {
   // Create a temporary tokens file without an access_token key
   const std::string filename = "test_tokens_no_access_token.json";
   std::ofstream file(filename);
   file << R"({"other_key": "some_value"})";
   file.close();
 
-  iqm::TokensFileReader tfr(filename);
-  EXPECT_THROW(tfr.get_token(), iqm::ClientAuthenticationError);
+  iqm::TokenManager tm(std::nullopt, filename);
+  EXPECT_THROW(tm.get_bearer_token(), iqm::ClientAuthenticationError);
 
   // Clean up the temporary file
   std::remove(filename.c_str());
 }
 
-TEST(TokensFileReaderTest, GetTokenEmptyFile) {
+TEST(TokenManagerTokensFileTest, GetTokenEmptyFile) {
   // Create an empty temporary tokens file
   const std::string filename = "test_tokens_empty.json";
   std::ofstream file(filename);
   file.close();
 
-  iqm::TokensFileReader tfr(filename);
-  EXPECT_THROW(tfr.get_token(), iqm::ClientAuthenticationError);
+  iqm::TokenManager tm(std::nullopt, filename);
+  EXPECT_THROW(tm.get_bearer_token(), iqm::ClientAuthenticationError);
 
   // Clean up the temporary file
   std::remove(filename.c_str());

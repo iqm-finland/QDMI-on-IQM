@@ -34,7 +34,6 @@
 #include <exception>
 #include <fstream>
 #include <map>
-#include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <ranges>
@@ -136,6 +135,34 @@ std::optional<std::string> Get_env_var(const std::string &name) {
   }
   return std::nullopt;
 }
+
+std::string Read_access_token_from_file(const std::string &path) {
+  try {
+    LOG_INFO("Reading tokens from file: " + path);
+    const std::ifstream file(path);
+    if (!file.good()) {
+      throw ClientAuthenticationError("Failed to open tokens file: " + path);
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto json_data = nlohmann::json::parse(buffer.str());
+
+    const std::string token = json_data.value("access_token", "");
+    if (TokenManager::time_left_seconds(token) <= 0) {
+      throw ClientAuthenticationError(
+          "Access token in file has expired or is not valid");
+    }
+
+    return token;
+  } catch (const nlohmann::json::exception &e) {
+    throw ClientAuthenticationError("Failed to parse tokens file: " +
+                                    std::string(e.what()));
+  } catch (const std::exception &e) {
+    throw ClientAuthenticationError("Failed to read access token from file '" +
+                                    path + "': " + e.what());
+  }
+}
 } // namespace
 
 //
@@ -190,7 +217,7 @@ int TokenManager::time_left_seconds(const std::string &token) {
 
 TokenManager::TokenManager(const std::optional<std::string> &token,
                            const std::optional<std::string> &tokens_file)
-    : token_provider_(nullptr), access_token_(std::nullopt) {
+    : access_token_(std::nullopt) {
   std::map<std::string, std::string> auth_parameters;
 
   if (token.has_value() || tokens_file.has_value()) {
@@ -211,16 +238,15 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
     }
   }
 
-  // Initialize appropriate token provider
   if (auth_parameters.empty()) {
-    token_provider_ = nullptr;
+    token_source_ = TokenSource::NONE;
   } else if (auth_parameters.size() == 1 && auth_parameters.contains("token")) {
-    // This is not necessarily a JWT token
-    token_provider_ = std::make_unique<ExternalToken>(auth_parameters["token"]);
+    token_source_ = TokenSource::EXTERNAL_TOKEN;
+    token_source_value_ = auth_parameters["token"];
   } else if (auth_parameters.size() == 1 &&
              auth_parameters.contains("tokens_file")) {
-    token_provider_ =
-        std::make_unique<TokensFileReader>(auth_parameters["tokens_file"]);
+    token_source_ = TokenSource::TOKENS_FILE;
+    token_source_value_ = auth_parameters["tokens_file"];
   } else {
     std::string keys;
     for (const auto &key : auth_parameters | std::views::keys) {
@@ -235,21 +261,36 @@ TokenManager::TokenManager(const std::optional<std::string> &token,
   }
 }
 
-std::string TokenManager::get_bearer_token(const int retries) {
-  if (!token_provider_) {
-    return ""; // Authentication is not used
+std::optional<cpr::Bearer> TokenManager::get_bearer_token(const int retries) {
+  if (token_source_ == TokenSource::NONE) {
+    return std::nullopt;
   }
 
   // Use the existing access token if it is still valid
   if (access_token_.has_value() &&
       time_left_seconds(*access_token_) > REFRESH_MARGIN_SECONDS) {
-    return "Bearer " + *access_token_;
+    return cpr::Bearer{*access_token_};
   }
 
-  // Otherwise, get a new access token from token provider
   try {
-    access_token_ = token_provider_->get_token();
-    return "Bearer " + *access_token_;
+    switch (token_source_) {
+    case TokenSource::EXTERNAL_TOKEN:
+      access_token_ = token_source_value_;
+      break;
+    case TokenSource::TOKENS_FILE:
+      if (!token_source_value_.has_value()) {
+        throw ClientAuthenticationError("No tokens file available");
+      }
+      access_token_ = Read_access_token_from_file(*token_source_value_);
+      break;
+    case TokenSource::NONE:
+      return std::nullopt;
+    }
+
+    if (!access_token_.has_value()) {
+      throw ClientAuthenticationError("No external token available");
+    }
+    return cpr::Bearer{*access_token_};
   } catch (const ClientAuthenticationError &e) {
     LOG_ERROR("Failed to get access token: " + std::string(e.what()));
     if (retries < 1) {
@@ -260,63 +301,6 @@ std::string TokenManager::get_bearer_token(const int retries) {
   // Try again
   LOG_INFO("Retrying to get access token");
   return get_bearer_token(retries - 1);
-}
-
-//
-// ExternalToken implementation
-//
-
-ExternalToken::ExternalToken(const std::string &token) : token_(token) {}
-
-std::string ExternalToken::get_token() {
-  if (!token_) {
-    throw ClientAuthenticationError("No external token available");
-  }
-  return *token_;
-}
-
-//
-// TokensFileReader implementation
-//
-
-TokensFileReader::TokensFileReader(const std::string &tokens_file)
-    : path_(tokens_file) {}
-
-std::string TokensFileReader::get_token() {
-  try {
-    if (!path_) {
-      throw ClientAuthenticationError("No tokens file available");
-    }
-    LOG_INFO("Reading tokens from file: " + *path_);
-    const std::ifstream file(*path_);
-    if (!file.good()) {
-      throw ClientAuthenticationError("Failed to open tokens file: " + *path_);
-    }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    const std::string raw_data = buffer.str();
-    auto json_data = nlohmann::json::parse(raw_data);
-
-    std::string token = json_data.value("access_token", "");
-    if (TokenManager::time_left_seconds(token) <= 0) {
-      throw ClientAuthenticationError(
-          "Access token in file has expired or is not valid");
-    }
-
-    return token;
-  } catch (const nlohmann::json::exception &e) {
-    throw ClientAuthenticationError("Failed to parse tokens file: " +
-                                    std::string(e.what()));
-  } catch (const std::exception &e) {
-    if (path_) {
-      throw ClientAuthenticationError(
-          "Failed to read access token from file '" + *path_ +
-          "': " + e.what());
-    }
-    throw ClientAuthenticationError("Failed to read access token from file: " +
-                                    std::string(e.what()));
-  }
 }
 
 } // namespace iqm

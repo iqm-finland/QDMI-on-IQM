@@ -321,14 +321,14 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
 
   const auto qc_list_url =
       session->api_config_->url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS);
-  std::string qc_list_response;
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
-  auto status = iqm::http::Get(qc_list_url, bearer_token, qc_list_response);
-  if (status != QDMI_SUCCESS) {
+  const auto bearer_token = session->token_manager_->get_bearer_token();
+  const auto qc_list_response = iqm::http::Get(qc_list_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(qc_list_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
-  const auto json_response =
-      nlohmann::json::parse(qc_list_response); // NOLINT(misc-include-cleaner)
+  const auto json_response = nlohmann::json::parse(
+      qc_list_response.text); // NOLINT(misc-include-cleaner)
   LOG_DEBUG("Received quantum computers response: " + json_response.dump());
 
   // Extract the quantum_computers array from the response
@@ -386,13 +386,13 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto arch_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_);
-  std::string arch_response;
-  status = iqm::http::Get(arch_url, bearer_token, arch_response);
-  if (status != QDMI_SUCCESS) {
+  const auto arch_response = iqm::http::Get(arch_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(arch_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
   const auto arch_array =
-      nlohmann::json::parse(arch_response); // NOLINT(misc-include-cleaner)
+      nlohmann::json::parse(arch_response.text); // NOLINT(misc-include-cleaner)
   LOG_DEBUG("Received quantum architecture response: " + arch_array.dump());
 
   // Extract first element from array (API returns array with single object)
@@ -465,17 +465,17 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
 
 int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
   LOG_INFO("Processing calibrated gates");
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
+  const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto dyn_arch_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_, session->calibration_set_id_);
-  std::string dyn_arch_response;
-  const auto status =
-      iqm::http::Get(dyn_arch_url, bearer_token, dyn_arch_response);
-  if (status != QDMI_SUCCESS) {
+  const auto dyn_arch_response = iqm::http::Get(dyn_arch_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(dyn_arch_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
-  const auto dynamic_architecture = nlohmann::json::parse(dyn_arch_response);
+  const auto dynamic_architecture =
+      nlohmann::json::parse(dyn_arch_response.text);
   LOG_DEBUG("Received dynamic quantum architecture response: " +
             dynamic_architecture.dump());
 
@@ -535,15 +535,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   const auto calibration_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_CALIBRATION_SET_QUALITY_METRICS,
       *session->quantum_computer_alias_, session->calibration_set_id_);
-  std::string calibration_response;
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
-  const auto status =
-      iqm::http::Get(calibration_url, bearer_token, calibration_response);
-  if (status != QDMI_SUCCESS) {
+  const auto bearer_token = session->token_manager_->get_bearer_token();
+  const auto calibration_response =
+      iqm::http::Get(calibration_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(calibration_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
   const auto calibration_json_response =
-      nlohmann::json::parse(calibration_response);
+      nlohmann::json::parse(calibration_response.text);
   LOG_DEBUG("Received calibration set quality metrics response: " +
             calibration_json_response.dump());
 
@@ -700,10 +700,10 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
   LOG_INFO("Checking whether calibration jobs are supported");
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
-  std::string cocos_health_response;
-  const auto status = iqm::http::Get_optional(
-      cocos_health_url, session->token_manager_->get_bearer_token(),
-      cocos_health_response);
+  const auto cocos_health_response = iqm::http::Get_optional(
+      cocos_health_url, session->token_manager_->get_bearer_token());
+  const auto status = iqm::http::Handle_response(
+      cocos_health_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG);
   session->supports_calibration_jobs_ = (status == QDMI_SUCCESS);
   if (!session->supports_calibration_jobs_) {
     LOG_DEBUG("Calibration jobs are unavailable on this backend; "
@@ -1002,16 +1002,16 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   const auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,
                                       *job->session_->quantum_computer_alias_);
-  std::string job_submission_response;
-  const auto status = iqm::http::Post(
+  const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job_submission_response, json_program.dump(), "Expect: 100-continue");
+      json_program.dump(), {{"Expect", "100-continue"}});
+  const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response);
+      nlohmann::json::parse(job_submission_response.text);
   LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response["id"];
@@ -1041,17 +1041,16 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting calibration job");
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
-  std::string job_submission_response;
-  const auto status = iqm::http::Post(
+  const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job_submission_response, static_cast<const char *>(job->program_),
-      "Expect: 100-continue");
+      static_cast<const char *>(job->program_), {{"Expect", "100-continue"}});
+  const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response);
+      nlohmann::json::parse(job_submission_response.text);
   LOG_DEBUG("Calibration job submission response:\n" +
             job_submission_json_response.dump());
 
@@ -1112,16 +1111,15 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
                 iqm::API_ENDPOINT::ABORT_CALIBRATION_JOB, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
                                             job->job_id_);
-  std::string job_abortion_response;
-  const auto status = iqm::http::Post(
-      job_abortion_url, job->session_->token_manager_->get_bearer_token(),
-      job_abortion_response, "", "");
+  const auto job_abortion_response = iqm::http::Post(
+      job_abortion_url, job->session_->token_manager_->get_bearer_token(), "");
+  const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
-  LOG_DEBUG("Job cancellation response:\n" + job_abortion_response);
+  LOG_DEBUG("Job cancellation response:\n" + job_abortion_response.text);
   LOG_INFO("Job with ID: " + job->job_id_ + " canceled");
   return QDMI_SUCCESS;
 }
@@ -1143,16 +1141,15 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
                 iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
                                             job->job_id_);
-  std::string job_status_response;
-  const auto status_code = iqm::http::Get(
-      job_status_url, job->session_->token_manager_->get_bearer_token(),
-      job_status_response);
+  const auto job_status_response = iqm::http::Get(
+      job_status_url, job->session_->token_manager_->get_bearer_token());
+  const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_status_json_response =
-      nlohmann::json::parse(job_status_response);
+      nlohmann::json::parse(job_status_response.text);
   LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
   const auto job_status = job_status_json_response["status"].get<std::string>();
@@ -1271,10 +1268,9 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       LOG_INFO("Fetching results for job " + job->job_id_);
       const auto job_results_url = job->session_->api_config_->url(
           iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS, job->job_id_);
-      std::string job_results_response;
-      const auto status = iqm::http::Get(
-          job_results_url, job->session_->token_manager_->get_bearer_token(),
-          job_results_response);
+      const auto job_results_response = iqm::http::Get(
+          job_results_url, job->session_->token_manager_->get_bearer_token());
+      const auto status = iqm::http::Handle_response(job_results_response);
       if (status != QDMI_SUCCESS) {
         // Only mark the job as failed for truly fatal errors, but always
         // propagate the underlying status code to the caller.
@@ -1284,7 +1280,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         return status;
       }
       const auto job_results_json_response =
-          nlohmann::json::parse(job_results_response);
+          nlohmann::json::parse(job_results_response.text);
       LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
 
       // Response is an array with a single object containing counts
@@ -1354,10 +1350,9 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     LOG_INFO("Fetching calibration results for job " + job->job_id_);
     const auto job_calibration_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_);
-    std::string job_calibration_response;
-    const auto status = iqm::http::Get(
-        job_calibration_url, job->session_->token_manager_->get_bearer_token(),
-        job_calibration_response);
+    const auto job_calibration_response = iqm::http::Get(
+        job_calibration_url, job->session_->token_manager_->get_bearer_token());
+    const auto status = iqm::http::Handle_response(job_calibration_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
       // propagate the underlying status code to the caller.
@@ -1367,7 +1362,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
       return status;
     }
     const auto job_calibration_json_response =
-        nlohmann::json::parse(job_calibration_response);
+        nlohmann::json::parse(job_calibration_response.text);
     LOG_DEBUG("Calibration job status response:\n" +
               job_calibration_json_response.dump());
 
@@ -1419,10 +1414,10 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     LOG_INFO("Fetching shot measurements for job " + job->job_id_);
     const auto job_measurements_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
-    std::string job_measurements_response;
-    const auto status = iqm::http::Get(
-        job_measurements_url, job->session_->token_manager_->get_bearer_token(),
-        job_measurements_response);
+    const auto job_measurements_response =
+        iqm::http::Get(job_measurements_url,
+                       job->session_->token_manager_->get_bearer_token());
+    const auto status = iqm::http::Handle_response(job_measurements_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
       // propagate the underlying status code to the caller.
@@ -1433,7 +1428,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     }
 
     const auto job_measurements_json_response =
-        nlohmann::json::parse(job_measurements_response);
+        nlohmann::json::parse(job_measurements_response.text);
     LOG_DEBUG("Job measurements response:\n" +
               job_measurements_json_response.dump());
 

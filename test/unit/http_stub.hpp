@@ -24,9 +24,12 @@
 
 #pragma once
 
+#include <cpr/bearer.h>
+#include <cpr/cprtypes.h>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,6 +45,8 @@ struct Scripted_response {
   /// If true, simulate a transport-level failure (e.g. connection refused)
   /// instead of returning a status code.
   bool connection_error = false;
+  /// Response headers to report.
+  cpr::Header headers;
 };
 
 /**
@@ -76,27 +81,39 @@ public:
   HttpStub &operator=(HttpStub &&) = delete;
 
   /// Queue the next scripted GET response.
-  HttpStub &queue_get(int64_t status_code, std::string body = {});
+  HttpStub &queue_get(int64_t status_code, std::string body = {},
+                      cpr::Header headers = {});
   /// Queue the next GET request to fail at the transport level.
   HttpStub &queue_get_connection_error();
   /// Queue the next scripted POST response.
-  HttpStub &queue_post(int64_t status_code, std::string body = {});
+  HttpStub &queue_post(int64_t status_code, std::string body = {},
+                       cpr::Header headers = {});
   /// Queue the next POST request to fail at the transport level.
   HttpStub &queue_post_connection_error();
 
   /// URLs requested via GET, in call order.
   [[nodiscard]] const std::vector<std::string> &get_urls() const;
+  /// Bearer tokens passed to GET requests, in call order.
+  [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
+  get_bearer_tokens() const;
   /// URLs requested via POST, in call order.
   [[nodiscard]] const std::vector<std::string> &post_urls() const;
+  /// Bearer tokens passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
+  post_bearer_tokens() const;
   /// Number of retry-delay ("sleep") calls triggered by HTTP 429 retries.
   [[nodiscard]] size_t sleep_call_count() const;
+  /// Retry-delay durations requested by HTTP 429 handling, in call order.
+  [[nodiscard]] const std::vector<int> &sleep_durations() const;
 
 private:
   std::deque<Scripted_response> get_responses_;
   std::deque<Scripted_response> post_responses_;
   std::vector<std::string> get_urls_;
+  std::vector<std::optional<cpr::Bearer>> get_bearer_tokens_;
   std::vector<std::string> post_urls_;
-  size_t sleep_call_count_ = 0;
+  std::vector<std::optional<cpr::Bearer>> post_bearer_tokens_;
+  std::vector<int> sleep_durations_;
 };
 
 } // namespace iqm::test_support
