@@ -30,6 +30,7 @@
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace iqm::http {
