@@ -120,9 +120,6 @@ int Retry_after_seconds(const cpr::Response &http_response) {
   if (const auto seconds = std::strtol(retry_after->second.c_str(), &end, 10);
       end != retry_after->second.c_str() && *end == '\0' && errno != ERANGE &&
       seconds >= 0) {
-    if (seconds > std::numeric_limits<int>::max()) {
-      return std::numeric_limits<int>::max();
-    }
     return static_cast<int>(seconds);
   }
   return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
