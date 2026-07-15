@@ -2,7 +2,8 @@
 
 ## C++
 
-- Configure: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON`
+- Configure:
+  `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON`
 - Build: `cmake --build build --config Release`
 - Run unit tests without IQM access:
   `ctest -C Release --test-dir build/test/unit --output-on-failure`
@@ -38,8 +39,8 @@ explicit intent, valid credentials, and an appropriate target.
 ## SPANK Plugin
 
 - Sources: `spank/`
-- Build with the core project by configuring CMake with
-  `-DBUILD_IQM_SPANK=ON` on a Linux system with Slurm development headers.
+- Build with the core project by configuring CMake with `-DBUILD_IQM_SPANK=ON`
+  on a Linux system with Slurm development headers.
 - The SPANK plugin is GPLv3-licensed, unlike the Apache-2.0-with-LLVM-exception
   core project. Preserve this license boundary and the applicable file headers.
 - Smoke and Resonance sessions in `spank/noxfile.py` require an active Slurm
@@ -58,8 +59,7 @@ explicit intent, valid credentials, and an appropriate target.
 
 - C++20
 - CMake 3.24+
-- `FetchContent` for dependency management in
-  `cmake/ExternalDependencies.cmake`
+- `FetchContent` for dependency management in `cmake/ExternalDependencies.cmake`
 - GoogleTest for tests in `test/unit/` and `test/integration/`
 - `clang-format` and `clang-tidy` configured by `.clang-format` and
   `.clang-tidy`
@@ -87,8 +87,8 @@ explicit intent, valid credentials, and an appropriate target.
 - MUST run `uvx nox -s lint` after every batch of changes. This runs the full
   `prek` hook set from `.pre-commit-config.yaml`, including formatting, linting,
   spelling, license-header, metadata, lockfile, and type checks.
-- MUST add or update tests for every code change, including regression tests
-  for bug fixes.
+- MUST add or update tests for every code change, including regression tests for
+  bug fixes.
 - MUST keep changes focused and avoid unrelated refactors or formatting.
 - MUST follow existing patterns in neighboring source and test files.
 - MUST document new user-facing behavior and update `CHANGELOG.md` for
@@ -98,8 +98,7 @@ explicit intent, valid credentials, and an appropriate target.
   the file's component.
 - MUST include a commit footer attribution in the form
   `Assisted-by: [Model Name] via [Tool Name]` if AI tools are used to prepare a
-  commit. For example:
-  `Assisted-by: gpt-5.6-sol via Codex CLI`.
+  commit. For example: `Assisted-by: gpt-5.6-sol via Codex CLI`.
 - NEVER expose, print, store, or commit IQM tokens or token-file contents.
 - NEVER run live IQM, Resonance, or Slurm integration workflows unless the task
   explicitly requires them.
@@ -113,7 +112,6 @@ explicit intent, valid credentials, and an appropriate target.
   begin with the following disclaimer:
 
   `🤖 *AI text below* 🤖`
-
 - This requirement applies to pull request descriptions, review bodies, inline
   review comments, issue-style comments, replies, and other agent-produced text
   bodies. Pull request titles are exempt and MUST NOT include the disclaimer.
