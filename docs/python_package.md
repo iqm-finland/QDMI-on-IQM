@@ -34,12 +34,7 @@ The package itself makes the following variables available for import:
 - {py:data}`~iqm.qdmi.IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
 
 ```{code-cell} ipython3
-from iqm.qdmi import (
-    IQM_QDMI_CMAKE_DIR,
-    IQM_QDMI_INCLUDE_DIR,
-    IQM_QDMI_LIBRARY_PATH,
-    __version__,
-)
+from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH
 
 print(f"QDMI on IQM version: {__version__}")
 print(f"Include directory: {IQM_QDMI_INCLUDE_DIR}")

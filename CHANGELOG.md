@@ -14,8 +14,8 @@ releases may include breaking changes.
 
 - ✨ Validate IQM backend and target-QC availability once per node for each
   Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
-- ✨ Export IQM provider metadata for MQT Core's relocatable device
-  configuration
+- ✨ Export the stable IQM device ID and symbol prefix on the installed CMake
+  target so MQT Core can synthesize relocatable manifests
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])
@@ -30,8 +30,8 @@ releases may include breaking changes.
   environment variables, bound each launch-time request to 30 seconds by
   default, emit task diagnostics once per node and step, and require Slurm 20.02
   or newer ([#136]) ([**@burgholzer**])
-- ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registration
-  API in the Qiskit backend
+- ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry while
+  opening a fresh owning session for every `IQMBackend`
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
   ([#122]) ([**@burgholzer**])
 

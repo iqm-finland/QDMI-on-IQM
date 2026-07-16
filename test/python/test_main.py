@@ -21,12 +21,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from iqm.qdmi import (
-    IQM_QDMI_CMAKE_DIR,
-    IQM_QDMI_INCLUDE_DIR,
-    IQM_QDMI_LIBRARY_PATH,
-    __version__,
-)
+from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
 
 if TYPE_CHECKING:
     from pytest_console_scripts import ScriptRunner

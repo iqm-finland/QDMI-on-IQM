@@ -21,12 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from iqm.qdmi import (
-    IQM_QDMI_CMAKE_DIR,
-    IQM_QDMI_INCLUDE_DIR,
-    IQM_QDMI_LIBRARY_PATH,
-    __version__,
-)
+from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
 
 
 def test_version_exists() -> None:

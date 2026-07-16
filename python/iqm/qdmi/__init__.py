@@ -20,12 +20,7 @@
 from ._paths import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH
 from ._version import version as __version__
 
-__all__ = [
-    "IQM_QDMI_CMAKE_DIR",
-    "IQM_QDMI_INCLUDE_DIR",
-    "IQM_QDMI_LIBRARY_PATH",
-    "__version__",
-]
+__all__ = ["IQM_QDMI_CMAKE_DIR", "IQM_QDMI_INCLUDE_DIR", "IQM_QDMI_LIBRARY_PATH", "__version__"]
 
 
 def __dir__() -> list[str]:

@@ -49,9 +49,10 @@ If no explicit arguments are provided, the wrapper resolves `IQM_BASE_URL`,
 environment. Alternatively, pass any of those values directly to
 `IQMBackend(...)`.
 
-The wrapper registers the packaged provider under the stable ID `iqm.default`.
-Each backend instance opens an independent session with its own configuration,
-without adding another registration or using the legacy dynamic-library loader.
+The wrapper registers the packaged provider as a fallback under the stable ID
+`iqm.default`, preserving an existing configured definition with that ID. Every
+backend opens a fresh session with its own configuration. The returned FoMaC
+device owns that session for the backend's lifetime.
 
 ## Sampler and Estimator Primitives
 

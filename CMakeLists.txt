@@ -85,6 +85,17 @@ endif()
 
 # Add the tests
 if(BUILD_IQM_QDMI_TESTS)
+  get_target_property(IQM_QDMI_DEVICE_ID ${QDMI_TARGET_NAME} MQT_QDMI_DEVICE_ID)
+  get_target_property(IQM_QDMI_DEVICE_PREFIX ${QDMI_TARGET_NAME}
+                      MQT_QDMI_DEVICE_PREFIX)
+  if(NOT IQM_QDMI_DEVICE_ID STREQUAL "iqm.default")
+    message(
+      FATAL_ERROR "The IQM QDMI target does not export its stable device ID")
+  endif()
+  if(NOT IQM_QDMI_DEVICE_PREFIX STREQUAL "${QDMI_PREFIX}")
+    message(FATAL_ERROR "The IQM QDMI target does not export its symbol prefix")
+  endif()
+
   enable_testing()
   include(GoogleTest)
   add_subdirectory(test)

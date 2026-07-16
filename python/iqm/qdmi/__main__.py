@@ -68,6 +68,7 @@ def main() -> None:
         action="store_true",
         help="Print the path to the iqm-qdmi shared library",
     )
+
     args = parser.parse_args()
 
     if args.include_dir:
