@@ -211,10 +211,11 @@ mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
 ```
 
 For dynamically linked consumers, automatic discovery searches beside the driver
-library rather than the executable. Such consumers must register the generated
-manifest explicitly or select it through MQT Core's configuration environment
-variables. Python integrations instead register the same stable ID directly from
-the packaged library path and open a fresh owning session for each backend.
+library rather than the executable. Such consumers must place the generated
+manifest in a discovered location or select a complete configuration with
+`MQT_CORE_QDMI_CONFIG_FILE`. Python integrations instead register the same
+stable ID directly from the packaged library path and open a fresh owning
+session for each backend.
 
 ## Running Jobs via Slurm
 
