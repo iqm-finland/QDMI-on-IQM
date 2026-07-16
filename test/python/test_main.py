@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 
 from iqm.qdmi import (
     IQM_QDMI_CMAKE_DIR,
-    IQM_QDMI_CONFIG_PATH,
     IQM_QDMI_INCLUDE_DIR,
     IQM_QDMI_LIBRARY_PATH,
     __version__,
@@ -67,10 +66,3 @@ def test_cli_lib_path(script_runner: ScriptRunner) -> None:
     result = script_runner.run(["iqm-qdmi", "--lib_path"])
     assert result.success
     assert str(IQM_QDMI_LIBRARY_PATH) in result.stdout
-
-
-def test_cli_config_file(script_runner: ScriptRunner) -> None:
-    """Test CLI with --config_file."""
-    result = script_runner.run(["iqm-qdmi", "--config_file"])
-    assert result.success
-    assert str(IQM_QDMI_CONFIG_PATH) in result.stdout

@@ -49,54 +49,40 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
         def __init__(
             self,
             device_id: str,
-            *,
             library_path: str,
             prefix: str,
-            base_url: str,
-            token: str | None,
-            auth_file: str | None,
-            custom1: str | None,
-            custom2: str | None,
         ) -> None:
             captured["definition"] = self
-            captured["kwargs"] = {
+            captured["definition_kwargs"] = {
                 "device_id": device_id,
                 "library_path": library_path,
                 "prefix": prefix,
-                "base_url": base_url,
-                "token": token,
-                "auth_file": auth_file,
-                "custom1": custom1,
-                "custom2": custom2,
             }
 
-    def fake_register_device(definition: object) -> None:
+    def fake_register_device_if_absent(definition: object) -> bool:
         captured["registered"] = definition
+        return True
 
-    def fake_open_device(device_id: str) -> object:
+    def fake_open_device(device_id: str, **session: str | None) -> object:
         captured["opened_id"] = device_id
+        captured["session"] = session
         return fake_device
-
-    def fake_device_id() -> str:
-        return "test-device-id"
 
     def fake_qdmi_backend_init(_self: IQMBackend, device: object) -> None:
         captured["device"] = device
 
     monkeypatch.setattr(iqm_qiskit, "DeviceDefinition", FakeDeviceDefinition)
-    monkeypatch.setattr(iqm_qiskit, "register_device", fake_register_device)
+    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", fake_register_device_if_absent)
     monkeypatch.setattr(iqm_qiskit, "open_device", fake_open_device)
-    monkeypatch.setattr(iqm_qiskit, "uuid4", fake_device_id)
     monkeypatch.setattr(iqm_qiskit.QDMIBackend, "__init__", fake_qdmi_backend_init)
     return captured
 
 
-def _expected_registration(**session: str | None) -> dict[str, str | None]:
+def _expected_definition() -> dict[str, str]:
     return {
-        "device_id": "iqm.runtime.test-device-id",
+        "device_id": "iqm.default",
         "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
         "prefix": "IQM",
-        **session,
     }
 
 
@@ -114,14 +100,15 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
 
     assert captured["device"] is not None
     assert captured["registered"] is captured["definition"]
-    assert captured["opened_id"] == "iqm.runtime.test-device-id"
-    assert captured["kwargs"] == _expected_registration(
-        base_url="https://environment.example",
-        token=environment_token,
-        auth_file=ENVIRONMENT_TOKENS_FILE,
-        custom1="environment-qc-id",
-        custom2="environment-qc-alias",
-    )
+    assert captured["definition_kwargs"] == _expected_definition()
+    assert captured["opened_id"] == "iqm.default"
+    assert captured["session"] == {
+        "base_url": "https://environment.example",
+        "token": environment_token,
+        "auth_file": ENVIRONMENT_TOKENS_FILE,
+        "custom1": "environment-qc-id",
+        "custom2": "environment-qc-alias",
+    }
 
 
 def test_iqm_backend_prefers_explicit_arguments_over_environment(
@@ -144,13 +131,13 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
         qc_alias="explicit-qc-alias",
     )
 
-    assert captured["kwargs"] == _expected_registration(
-        base_url="https://explicit.example",
-        token=explicit_token,
-        auth_file=EXPLICIT_TOKENS_FILE,
-        custom1="explicit-qc-id",
-        custom2="explicit-qc-alias",
-    )
+    assert captured["session"] == {
+        "base_url": "https://explicit.example",
+        "token": explicit_token,
+        "auth_file": EXPLICIT_TOKENS_FILE,
+        "custom1": "explicit-qc-id",
+        "custom2": "explicit-qc-alias",
+    }
 
 
 def test_iqm_backend_does_not_use_legacy_resonance_api_key(
@@ -167,13 +154,41 @@ def test_iqm_backend_does_not_use_legacy_resonance_api_key(
 
     IQMBackend()
 
-    assert captured["kwargs"] == _expected_registration(
-        base_url="https://resonance.iqm.tech",
-        token=None,
-        auth_file=None,
-        custom1=None,
-        custom2=None,
-    )
+    assert captured["session"] == {
+        "base_url": "https://resonance.iqm.tech",
+        "token": None,
+        "auth_file": None,
+        "custom1": None,
+        "custom2": None,
+    }
+
+
+def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An existing configured definition should win over the packaged fallback."""
+    captured = _stub_backend_construction(monkeypatch)
+
+    def existing_registration(_definition: object) -> bool:
+        return False
+
+    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", existing_registration)
+
+    IQMBackend()
+
+    assert captured["opened_id"] == "iqm.default"
+
+
+def test_iqm_backend_propagates_invalid_registration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invalid packaged definitions should not be mistaken for existing IDs."""
+    _stub_backend_construction(monkeypatch)
+
+    def invalid_registration(_definition: object) -> bool:
+        msg = "invalid provider definition"
+        raise ValueError(msg)
+
+    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", invalid_registration)
+
+    with pytest.raises(ValueError, match="invalid provider definition"):
+        IQMBackend()
 
 
 def _skip_without_iqm_access() -> None:

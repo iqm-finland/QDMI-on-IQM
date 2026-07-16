@@ -14,7 +14,8 @@ releases may include breaking changes.
 
 - ✨ Validate IQM backend and target-QC availability once per node for each
   Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
-- ✨ Ship a relocatable MQT Core QDMI device configuration for the IQM provider
+- ✨ Export IQM provider metadata for MQT Core's relocatable device
+  configuration
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])

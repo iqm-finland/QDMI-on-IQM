@@ -21,10 +21,9 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from uuid import uuid4
 
 try:
-    from mqt.core.fomac import DeviceDefinition, open_device, register_device
+    from mqt.core.fomac import DeviceDefinition, open_device, register_device_if_absent
     from mqt.core.plugins.qiskit.backend import QDMIBackend
     from mqt.core.plugins.qiskit.estimator import QDMIEstimator
     from mqt.core.plugins.qiskit.sampler import QDMISampler
@@ -38,6 +37,8 @@ except ImportError as e:
 from ._paths import IQM_QDMI_LIBRARY_PATH
 
 __all__ = ["IQMBackend"]
+
+IQM_DEVICE_ID = "iqm.default"
 
 
 def __dir__() -> list[str]:
@@ -75,19 +76,15 @@ class IQMBackend(QDMIBackend):
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
         resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
 
-        device_id = f"iqm.runtime.{uuid4()}"
-        definition = DeviceDefinition(
-            device_id,
-            library_path=str(IQM_QDMI_LIBRARY_PATH),
-            prefix="IQM",
+        register_device_if_absent(DeviceDefinition(IQM_DEVICE_ID, str(IQM_QDMI_LIBRARY_PATH), "IQM"))
+        device = open_device(
+            IQM_DEVICE_ID,
             base_url=resolved_base_url,
             token=resolved_token,
             auth_file=resolved_tokens_file,
             custom1=resolved_qc_id,
             custom2=resolved_qc_alias,
         )
-        register_device(definition)
-        device = open_device(device_id)
         super().__init__(device=device)
 
     def sampler(

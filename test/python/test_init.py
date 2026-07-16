@@ -19,12 +19,10 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from iqm.qdmi import (
     IQM_QDMI_CMAKE_DIR,
-    IQM_QDMI_CONFIG_PATH,
     IQM_QDMI_INCLUDE_DIR,
     IQM_QDMI_LIBRARY_PATH,
     __version__,
@@ -66,33 +64,11 @@ def test_library_path_exists() -> None:
     assert "iqm-qdmi-device" in str(IQM_QDMI_LIBRARY_PATH)
 
 
-def test_mqt_core_device_configuration() -> None:
-    """The packaged manifest should register the relocatable IQM provider."""
-    with IQM_QDMI_CONFIG_PATH.open(encoding="utf-8") as config_file:
-        config = json.load(config_file)
-
-    assert config == {
-        "schema-version": 1,
-        "qdmi": {
-            "devices": [
-                {
-                    "id": "iqm.default",
-                    "library": IQM_QDMI_LIBRARY_PATH.name,
-                    "prefix": "IQM",
-                    "enabled": True,
-                    "session": {},
-                }
-            ]
-        },
-    }
-
-
 def test_paths_are_pathlib_objects() -> None:
     """Test that all path variables are pathlib.Path objects."""
     assert isinstance(IQM_QDMI_INCLUDE_DIR, Path)
     assert isinstance(IQM_QDMI_CMAKE_DIR, Path)
     assert isinstance(IQM_QDMI_LIBRARY_PATH, Path)
-    assert isinstance(IQM_QDMI_CONFIG_PATH, Path)
 
 
 def test_paths_are_absolute() -> None:
@@ -100,4 +76,3 @@ def test_paths_are_absolute() -> None:
     assert IQM_QDMI_INCLUDE_DIR.is_absolute()
     assert IQM_QDMI_CMAKE_DIR.is_absolute()
     assert IQM_QDMI_LIBRARY_PATH.is_absolute()
-    assert IQM_QDMI_CONFIG_PATH.is_absolute()
