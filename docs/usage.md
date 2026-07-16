@@ -194,6 +194,26 @@ For the REST API endpoints called during each of these steps, see
 [IQM API Usage in QDMI Device Implementation](contributing.md#iqm-api-usage-in-qdmi-device-implementation)
 in the Contributing guide.
 
+## Using the Device with MQT Core
+
+The installed package includes a relocatable MQT Core device definition with the
+stable ID `iqm.default`. For applications that link MQT Core statically, the
+package exports the manifest metadata needed by MQT Core's runtime-copy helper:
+
+```cmake
+find_package(mqt-core 3.8 CONFIG REQUIRED)
+find_package(iqm-qdmi-device CONFIG REQUIRED)
+
+add_executable(my-application main.cpp)
+target_link_libraries(my-application PRIVATE MQT::CoreFoMaC)
+mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
+```
+
+This copies the IQM provider library and its configuration beside the
+application. Other installations can point `MQT_CORE_QDMI_CONFIG_FILE` at the
+packaged `iqm-qdmi-device.qdmi.json` file and use `MQT_CORE_QDMI_CONFIG_JSON` to
+add session values for `iqm.default`.
+
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the

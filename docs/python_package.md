@@ -31,14 +31,23 @@ The package itself makes the following variables available for import:
   headers.
 - {py:data}`~iqm.qdmi.IQM_QDMI_CMAKE_DIR`: CMake package directory for
   `find_package` integration.
+- {py:data}`~iqm.qdmi.IQM_QDMI_CONFIG_PATH`: MQT Core QDMI device configuration
+  file.
 - {py:data}`~iqm.qdmi.IQM_QDMI_LIBRARY_PATH`: full path to the shared library.
 
 ```{code-cell} ipython3
-from iqm.qdmi import __version__, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_CMAKE_DIR, IQM_QDMI_LIBRARY_PATH
+from iqm.qdmi import (
+    IQM_QDMI_CMAKE_DIR,
+    IQM_QDMI_CONFIG_PATH,
+    IQM_QDMI_INCLUDE_DIR,
+    IQM_QDMI_LIBRARY_PATH,
+    __version__,
+)
 
 print(f"QDMI on IQM version: {__version__}")
 print(f"Include directory: {IQM_QDMI_INCLUDE_DIR}")
 print(f"CMake directory: {IQM_QDMI_CMAKE_DIR}")
+print(f"MQT Core configuration: {IQM_QDMI_CONFIG_PATH}")
 print(f"Library path: {IQM_QDMI_LIBRARY_PATH}")
 ```
 
@@ -66,6 +75,15 @@ The above values can also be conveniently queried from the command line via the
 ```{code-cell} ipython3
 !iqm-qdmi --lib_path
 ```
+
+```{code-cell} ipython3
+!iqm-qdmi --config_file
+```
+
+The configuration file defines the provider as `iqm.default` with a relative
+library path. It can be selected explicitly through `MQT_CORE_QDMI_CONFIG_FILE`
+or used as the base for a project configuration that supplies session values
+such as `base-url` and `auth-file`.
 
 ## Sampler and Estimator CLI Utilities
 

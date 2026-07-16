@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from uuid import uuid4
 
 try:
-    from mqt.core.fomac import add_dynamic_device_library
+    from mqt.core.fomac import DeviceDefinition, open_device, register_device
     from mqt.core.plugins.qiskit.backend import QDMIBackend
     from mqt.core.plugins.qiskit.estimator import QDMIEstimator
     from mqt.core.plugins.qiskit.sampler import QDMISampler
@@ -74,7 +75,9 @@ class IQMBackend(QDMIBackend):
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
         resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
 
-        device = add_dynamic_device_library(
+        device_id = f"iqm.runtime.{uuid4()}"
+        definition = DeviceDefinition(
+            device_id,
             library_path=str(IQM_QDMI_LIBRARY_PATH),
             prefix="IQM",
             base_url=resolved_base_url,
@@ -83,6 +86,8 @@ class IQMBackend(QDMIBackend):
             custom1=resolved_qc_id,
             custom2=resolved_qc_alias,
         )
+        register_device(definition)
+        device = open_device(device_id)
         super().__init__(device=device)
 
     def sampler(

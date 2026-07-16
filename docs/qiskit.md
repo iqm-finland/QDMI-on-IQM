@@ -49,6 +49,10 @@ If no explicit arguments are provided, the wrapper resolves `IQM_BASE_URL`,
 environment. Alternatively, pass any of those values directly to
 `IQMBackend(...)`.
 
+Each backend instance registers an MQT Core device definition and opens it by
+ID. This uses MQT Core's configuration-aware device registry instead of the
+legacy dynamic-library loading helper.
+
 ## Sampler and Estimator Primitives
 
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see

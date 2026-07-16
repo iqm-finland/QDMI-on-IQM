@@ -45,7 +45,7 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.7.0",
+  "mqt-core~=3.8.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -64,7 +64,7 @@ iqm-estimator = "iqm.qdmi.estimator:main"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core~=3.7.0",
+  "mqt-core~=3.8.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -91,6 +91,14 @@ dev = [
   {include-group = "test"},
   "nox>=2026.4.10",
 ]
+
+[tool.uv.sources]
+# Remove this source override once MQT Core 3.8.0 containing PR #1912 is
+# released on PyPI.
+mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "86a14a3c738e0293236afc20df98bbbf6d482464" }
+
+[tool.uv.extra-build-variables]
+mqt-core = { SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MQT_CORE = "3.8.0", SKBUILD_CMAKE_DEFINE = "BUILD_MQT_CORE_MLIR=OFF", SKBUILD_BUILD_TARGETS = "mqt-core-ir;mqt-core-algorithms;mqt-core-circuit-optimizer;mqt-core-dd;mqt-core-zx;mqt-core-na;mqt-core-ir-bindings;mqt-core-dd-bindings;mqt-core-fomac-bindings;mqt-core-na-bindings;mqt-core-qdmi-ddsim-device;mqt-core-qdmi-na-device;mqt-core-qdmi-sc-device" }
 
 
 [tool.scikit-build]

@@ -21,7 +21,7 @@ import argparse
 import sys
 from functools import partial
 
-from . import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
+from . import IQM_QDMI_CMAKE_DIR, IQM_QDMI_CONFIG_PATH, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
 
 
 def main() -> None:
@@ -31,7 +31,7 @@ def main() -> None:
 
     .. code-block:: bash
 
-        iqm-qdmi [--version] [--include_dir] [--cmake_dir] [--lib_path]
+        iqm-qdmi [--version] [--include_dir] [--cmake_dir] [--lib_path] [--config_file]
 
     It provides the following command line options:
 
@@ -68,6 +68,11 @@ def main() -> None:
         action="store_true",
         help="Print the path to the iqm-qdmi shared library",
     )
+    group.add_argument(
+        "--config_file",
+        action="store_true",
+        help="Print the path to the MQT Core QDMI device configuration",
+    )
 
     args = parser.parse_args()
 
@@ -77,6 +82,8 @@ def main() -> None:
         print(IQM_QDMI_CMAKE_DIR)
     elif args.lib_path:
         print(IQM_QDMI_LIBRARY_PATH)
+    elif args.config_file:
+        print(IQM_QDMI_CONFIG_PATH)
     else:
         parser.print_help()
 

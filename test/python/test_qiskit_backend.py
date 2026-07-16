@@ -40,38 +40,64 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
     """Stub backend construction so environment-resolution tests stay hermetic.
 
     Returns:
-        Captured constructor state from the fake device loader and backend base class.
+        Captured constructor state from the fake device registry and backend base class.
     """
     captured: dict[str, Any] = {}
     fake_device = object()
 
-    def fake_add_dynamic_device_library(
-        *,
-        library_path: str,
-        prefix: str,
-        base_url: str,
-        token: str | None,
-        auth_file: str | None,
-        custom1: str | None,
-        custom2: str | None,
-    ) -> object:
-        captured["kwargs"] = {
-            "library_path": library_path,
-            "prefix": prefix,
-            "base_url": base_url,
-            "token": token,
-            "auth_file": auth_file,
-            "custom1": custom1,
-            "custom2": custom2,
-        }
+    class FakeDeviceDefinition:
+        def __init__(
+            self,
+            device_id: str,
+            *,
+            library_path: str,
+            prefix: str,
+            base_url: str,
+            token: str | None,
+            auth_file: str | None,
+            custom1: str | None,
+            custom2: str | None,
+        ) -> None:
+            captured["definition"] = self
+            captured["kwargs"] = {
+                "device_id": device_id,
+                "library_path": library_path,
+                "prefix": prefix,
+                "base_url": base_url,
+                "token": token,
+                "auth_file": auth_file,
+                "custom1": custom1,
+                "custom2": custom2,
+            }
+
+    def fake_register_device(definition: object) -> None:
+        captured["registered"] = definition
+
+    def fake_open_device(device_id: str) -> object:
+        captured["opened_id"] = device_id
         return fake_device
+
+    def fake_device_id() -> str:
+        return "test-device-id"
 
     def fake_qdmi_backend_init(_self: IQMBackend, device: object) -> None:
         captured["device"] = device
 
-    monkeypatch.setattr(iqm_qiskit, "add_dynamic_device_library", fake_add_dynamic_device_library)
+    monkeypatch.setattr(iqm_qiskit, "DeviceDefinition", FakeDeviceDefinition)
+    monkeypatch.setattr(iqm_qiskit, "register_device", fake_register_device)
+    monkeypatch.setattr(iqm_qiskit, "open_device", fake_open_device)
+    monkeypatch.setattr(iqm_qiskit, "uuid4", fake_device_id)
     monkeypatch.setattr(iqm_qiskit.QDMIBackend, "__init__", fake_qdmi_backend_init)
     return captured
+
+
+def _expected_registration(**session: str | None) -> dict[str, str | None]:
+    return {
+        "device_id": "iqm.runtime.test-device-id",
+        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
+        "prefix": "IQM",
+        **session,
+    }
 
 
 def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,19 +108,20 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
+    environment_token = "environment-token"  # noqa: S105
 
     IQMBackend()
 
     assert captured["device"] is not None
-    assert captured["kwargs"] == {
-        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
-        "prefix": "IQM",
-        "base_url": "https://environment.example",
-        "token": "environment-token",
-        "auth_file": ENVIRONMENT_TOKENS_FILE,
-        "custom1": "environment-qc-id",
-        "custom2": "environment-qc-alias",
-    }
+    assert captured["registered"] is captured["definition"]
+    assert captured["opened_id"] == "iqm.runtime.test-device-id"
+    assert captured["kwargs"] == _expected_registration(
+        base_url="https://environment.example",
+        token=environment_token,
+        auth_file=ENVIRONMENT_TOKENS_FILE,
+        custom1="environment-qc-id",
+        custom2="environment-qc-alias",
+    )
 
 
 def test_iqm_backend_prefers_explicit_arguments_over_environment(
@@ -117,15 +144,13 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
         qc_alias="explicit-qc-alias",
     )
 
-    assert captured["kwargs"] == {
-        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
-        "prefix": "IQM",
-        "base_url": "https://explicit.example",
-        "token": explicit_token,
-        "auth_file": EXPLICIT_TOKENS_FILE,
-        "custom1": "explicit-qc-id",
-        "custom2": "explicit-qc-alias",
-    }
+    assert captured["kwargs"] == _expected_registration(
+        base_url="https://explicit.example",
+        token=explicit_token,
+        auth_file=EXPLICIT_TOKENS_FILE,
+        custom1="explicit-qc-id",
+        custom2="explicit-qc-alias",
+    )
 
 
 def test_iqm_backend_does_not_use_legacy_resonance_api_key(
@@ -142,15 +167,13 @@ def test_iqm_backend_does_not_use_legacy_resonance_api_key(
 
     IQMBackend()
 
-    assert captured["kwargs"] == {
-        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
-        "prefix": "IQM",
-        "base_url": "https://resonance.iqm.tech",
-        "token": None,
-        "auth_file": None,
-        "custom1": None,
-        "custom2": None,
-    }
+    assert captured["kwargs"] == _expected_registration(
+        base_url="https://resonance.iqm.tech",
+        token=None,
+        auth_file=None,
+        custom1=None,
+        custom2=None,
+    )
 
 
 def _skip_without_iqm_access() -> None:

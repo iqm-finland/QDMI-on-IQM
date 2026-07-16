@@ -48,6 +48,30 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json
           iqm::qdmi_device_internals)
 
+# MQT Core can discover this provider through its versioned QDMI configuration
+# registry. Keep the manifest beside the provider library so its relative
+# library path remains valid after installation or wheel relocation.
+set(IQM_QDMI_MANIFEST_NAME "${QDMI_TARGET_NAME}.qdmi.json")
+set(IQM_QDMI_MANIFEST
+    "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/${IQM_QDMI_MANIFEST_NAME}")
+file(
+  GENERATE
+  OUTPUT "${IQM_QDMI_MANIFEST}"
+  CONTENT
+    "{\n  \"schema-version\": 1,\n  \"qdmi\": {\n    \"devices\": [\n      {\n        \"id\": \"iqm.default\",\n        \"library\": \"$<TARGET_FILE_NAME:${QDMI_TARGET_NAME}>\",\n        \"prefix\": \"${QDMI_PREFIX}\",\n        \"enabled\": true,\n        \"session\": {}\n      }\n    ]\n  }\n}\n"
+)
+add_custom_command(
+  TARGET ${QDMI_TARGET_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${IQM_QDMI_MANIFEST}"
+          "$<TARGET_FILE_DIR:${QDMI_TARGET_NAME}>/${IQM_QDMI_MANIFEST_NAME}")
+set_property(TARGET ${QDMI_TARGET_NAME} PROPERTY MQT_QDMI_MANIFEST_NAME
+                                                 "${IQM_QDMI_MANIFEST_NAME}")
+set_property(
+  TARGET ${QDMI_TARGET_NAME}
+  APPEND
+  PROPERTY EXPORT_PROPERTIES MQT_QDMI_MANIFEST_NAME)
+
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"
     CACHE INTERNAL "Config install directory")
@@ -82,6 +106,16 @@ install(
           FILE_SET public_headers
           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
           COMPONENT ${QDMI_TARGET_NAME}_Development)
+
+if(WIN32)
+  set(IQM_QDMI_MANIFEST_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
+else()
+  set(IQM_QDMI_MANIFEST_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+endif()
+install(
+  FILES "${IQM_QDMI_MANIFEST}"
+  DESTINATION ${IQM_QDMI_MANIFEST_INSTALL_DIR}
+  COMPONENT ${QDMI_TARGET_NAME}_Runtime)
 
 install(
   EXPORT ${QDMI_TARGET_NAME}-targets
