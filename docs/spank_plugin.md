@@ -87,13 +87,14 @@ below), request it alongside `--iqm-qc-alias` using Slurm's native
 srun --partition=quantum --iqm-qc-alias=emerald --licenses=iqm_qc_emerald:1 python bell_state.py
 ```
 
-This matters most for **on-premise QCs**: unlike the cloud Resonance API, which
-queues overlapping requests on its own, an on-premise QC is typically
-single-tenant hardware with no such queue, so Slurm itself must serialize
-access. If you omit `--licenses` on a cluster where it's expected, the plugin
-logs a warning (or, if the administrator has set `iqm_require_license=1`, fails
-your job step at launch instead — after it has already been allocated, not at
-submission time).
+This matters most for **on-premise QCs**: like Resonance, an on-premise setup
+still runs its own internal queue, but it typically fronts single-tenant
+hardware, so uncontrolled Slurm-side concurrency puts unnecessary pressure on
+that queue. Requesting the license lets Slurm regulate that pressure itself,
+ahead of the QC's own queue. If you omit `--licenses` on a cluster where it's
+expected, the plugin logs a warning (or, if the administrator has set
+`iqm_require_license=1`, fails your job step at launch instead — after it has
+already been allocated, not at submission time).
 
 ### Executing via CLI Scripts
 
@@ -202,10 +203,11 @@ software licensing described elsewhere in this repository.
 
 Each QC can be modeled as a flat, cluster-wide Slurm license so that Slurm
 itself enforces a concurrency limit, rather than relying on jobs to behave. This
-is especially important for **on-premise QCs**: unlike the cloud Resonance API,
-which absorbs overlapping requests in its own queue, an on-premise QC is
-typically single-tenant hardware, so uncontrolled concurrency risks real
-hardware contention.
+is especially important for **on-premise QCs**: like Resonance, an on-premise
+setup still runs its own internal queue, but it typically fronts single-tenant
+hardware, so uncontrolled concurrency puts unnecessary pressure on that queue
+and risks real hardware contention. A Slurm license lets the cluster regulate
+that pressure itself, ahead of the QC's own queue.
 
 1. Define a license pool for each QC in `/etc/slurm/slurm.conf` (a flat,
    cluster-wide pool, not tied to specific nodes — the QC is reached over the

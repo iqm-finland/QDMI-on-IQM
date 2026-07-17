@@ -66,11 +66,12 @@
  * `<iqm_license_prefix><alias>`. This is a *Slurm* license — a
  * capacity-limiting scheduler resource configured via `Licenses=` in
  * slurm.conf, unrelated to GPLv3/software licensing — used to bound
- * concurrent access to a QC. This matters most for on-premise QCs, which
- * are typically single-tenant hardware with no cloud-side queue to absorb
- * overlapping requests. Since aliases may contain characters reserved by
- * Slurm's `name:count` license syntax (e.g. the `:mock` suffix used to
- * select simulator variants, as in `emerald:mock`), `:` and `,` are replaced
+ * concurrent access to a QC. This matters most for on-premise QCs: like
+ * Resonance, they still run their own internal queue, but typically front
+ * single-tenant hardware, so uncontrolled Slurm-side concurrency puts
+ * unnecessary pressure on that queue. Since aliases may contain characters
+ * reserved by Slurm's `name:count` license syntax (e.g. the `:mock` suffix used
+ * to select simulator variants, as in `emerald:mock`), `:` and `,` are replaced
  * with `_` when deriving the expected license name. By default a mismatch
  * only logs a warning; `iqm_require_license=1` fails the task at launch
  * instead (this happens in `slurm_spank_task_init`, i.e. *after* the job has

@@ -16,12 +16,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 [build-system]
-requires = ["scikit-build-core>=0.12.2"]
+requires = ["scikit-build-core>=1.0.1"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.1.1"
+version = "1.2.0"
 requires-python = ">=3.10"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
@@ -45,7 +45,7 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.6.1",
+  "mqt-core~=3.7.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0"
 ]
@@ -62,7 +62,7 @@ iqm-estimator = "iqm.qdmi.estimator:main"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core~=3.6.1",
+  "mqt-core~=3.7.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",

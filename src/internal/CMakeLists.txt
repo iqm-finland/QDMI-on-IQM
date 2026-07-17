@@ -29,8 +29,8 @@ set(QDMI_INTERNAL_TARGET_NAME iqm_qdmi_device_internals)
 # shared library (it has no sources of its own). Compiling iqm_device.cpp into
 # the same binary as the unit tests (instead of only into a separate shared
 # library that tests would call across a DSO boundary) also means test-only
-# hooks such as the HTTP hook seam (see http_client_internal.hpp) and the
-# device-session logic under test share the same in-process global state, so no
+# hooks such as the HTTP hook seam (see http_client.hpp) and the device-session
+# logic under test share the same in-process global state, so no
 # dynamic-library-boundary tricks are needed to make them observe each other.
 add_library(${QDMI_INTERNAL_TARGET_NAME} OBJECT)
 add_library(iqm::qdmi_device_internals ALIAS ${QDMI_INTERNAL_TARGET_NAME})

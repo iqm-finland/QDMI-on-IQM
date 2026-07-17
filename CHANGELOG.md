@@ -15,26 +15,39 @@ releases may include breaking changes.
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
   on-premise QCs ([#114]) ([**@marcelwa**])
+
+### Changed
+
+- ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
+  ([#122]) ([**@burgholzer**])
+
+### Fixed
+
+- 🩹 Fix rate limit handling and retry logic for API requests ([#122])
+  ([**@burgholzer**])
+
+## [1.2.0] - 2026-07-09
+
+### Added
+
 - ✨ Expose the current calibration set ID as a device property via
   `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**])
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging
   `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and
-  session parameters into Slurm jobs ([#74]) ([**@marcelwa**])
+  session parameters into Slurm jobs ([#74], [#117]) ([**@marcelwa**])
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and
   `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
 
 ### Fixed
 
-- 🐛 Fix the SPANK plugin silently launching jobs despite failed validation
-  (missing `IQM_BASE_URL`, conflicting auth, or an unmet Slurm license
-  requirement), since `ESPANK_ERROR` is a positive value and Slurm's task
-  launcher only aborts on a negative hook return ([#114]) ([**@marcelwa**])
 - 🩹 Ensure the QDMI device can handle devices with computational resonators
   ([#107]) ([**@burgholzer**])
 
 ### Changed
 
+- ⬆️ Update `mqt-core` to version 3.7.0 ([#120]) ([**@denialhaag**])
+- ⬆️ Update QDMI to version 1.3.2 ([#120]) ([**@denialhaag**])
 - ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls
   ([#105]) ([**@marcelwa**])
 - ♻️ Considerably simplify the internal HTTP client implementation ([#105])
@@ -88,7 +101,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.0...v1.0.1
@@ -96,6 +110,9 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#122]: https://github.com/iqm-finland/QDMI-on-IQM/pull/122
+[#120]: https://github.com/iqm-finland/QDMI-on-IQM/pull/120
+[#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
 [#114]: https://github.com/iqm-finland/QDMI-on-IQM/pull/114
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
 [#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107

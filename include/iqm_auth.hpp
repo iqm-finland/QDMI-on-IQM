@@ -23,7 +23,8 @@
 
 #pragma once
 
-#include <memory>
+#include <cpr/bearer.h>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -49,49 +50,6 @@ class ClientConfigurationError final : public std::runtime_error {
 public:
   explicit ClientConfigurationError(const std::string &message)
       : std::runtime_error(message) {}
-};
-
-/**
- * Interface for token providers.
- */
-class TokenProviderInterface {
-public:
-  TokenProviderInterface() = default;
-  TokenProviderInterface(const TokenProviderInterface &) = default;
-  TokenProviderInterface(TokenProviderInterface &&) = default;
-  TokenProviderInterface &operator=(const TokenProviderInterface &) = default;
-  TokenProviderInterface &operator=(TokenProviderInterface &&) = default;
-  virtual ~TokenProviderInterface() = default;
-
-  /**
-   * Returns a valid access token.
-   * @throws ClientAuthenticationError if acquiring the token fails.
-   */
-  virtual std::string get_token() = 0;
-};
-
-/**
- * Holds an external token.
- */
-class ExternalToken final : public TokenProviderInterface {
-public:
-  explicit ExternalToken(const std::string &token);
-  std::string get_token() override;
-
-private:
-  std::optional<std::string> token_;
-};
-
-/**
- * Reads token from a file.
- */
-class TokensFileReader final : public TokenProviderInterface {
-public:
-  explicit TokensFileReader(const std::string &tokens_file);
-  std::string get_token() override;
-
-private:
-  std::optional<std::string> path_;
 };
 
 /**
@@ -121,16 +79,19 @@ public:
       const std::optional<std::string> &tokens_file = std::nullopt);
 
   /**
-   * Returns a valid bearer token, or empty string if no user authentication has
-   * been configured.
+   * Returns a bearer token, or no value if no user
+   * authentication has been configured.
    * @param retries Number of retry attempts
-   * @return Bearer token or empty string
+   * @return Bearer token for CPR requests
    * @throws ClientAuthenticationError if getting the token fails
    */
-  std::string get_bearer_token(int retries = 1);
+  std::optional<cpr::Bearer> get_bearer_token(int retries = 1);
 
 private:
-  std::unique_ptr<TokenProviderInterface> token_provider_;
+  enum class TOKEN_SOURCE : uint8_t { NONE, EXTERNAL_TOKEN, TOKENS_FILE };
+
+  TOKEN_SOURCE token_source_ = TOKEN_SOURCE::NONE;
+  std::optional<std::string> token_source_value_;
   std::optional<std::string> access_token_;
 };
 

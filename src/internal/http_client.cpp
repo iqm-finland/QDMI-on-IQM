@@ -19,33 +19,29 @@
 
 /** @file
  * @brief HTTP client used by the IQM QDMI device to talk to remote services.
- *
- * This is the only translation unit that depends on CPR. Everything outside
- * of this file (including tests) interacts with iqm::http purely through
- * plain strings and status codes.
  */
 
 #include "http_client.hpp"
 
-#include "http_client_internal.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
-#include <algorithm>
-#include <cctype>
+#include <cerrno>
 #include <chrono>
-#include <cpr/api.h>
+#include <cpr/bearer.h>
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
 #include <cpr/redirect.h>
 #include <cpr/response.h>
+#include <cpr/session.h>
 #include <cpr/ssl_options.h>
 #include <cpr/timeout.h>
-#include <cstddef>
+#include <cpr/user_agent.h>
 #include <cstdint>
+#include <cstdlib>
 #include <nlohmann/json.hpp>
-#include <ranges>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -55,79 +51,77 @@ namespace internal {
 
 namespace {
 
-/// Split a "Key: Value" header string into a trimmed key/value pair. Returns
-/// an empty key if no colon separator is present.
-std::pair<std::string, std::string>
-Split_header(const std::string &extra_header) {
-  const size_t colon_pos = extra_header.find(':');
-  if (colon_pos == std::string::npos) {
-    return {};
-  }
-  auto trim = [](std::string s) {
-    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) {
-              return std::isspace(ch) == 0;
-            }));
-    s.erase(std::ranges::find_if(
-                s | std::views::reverse,
-                [](const unsigned char ch) { return std::isspace(ch) == 0; })
-                .base(),
-            s.end());
-    return s;
-  };
-  return {trim(extra_header.substr(0, colon_pos)),
-          trim(extra_header.substr(colon_pos + 1))};
-}
-
-Raw_response Make_raw_response(const cpr::Response &response) {
-  if (response.error.code != cpr::ErrorCode::OK) {
-    return {
-        .status_code = 0, .body = {}, .error_message = response.error.message};
-  }
-  return {.status_code = response.status_code,
-          .body = response.text,
-          .error_message = {}};
-}
-
-Raw_response Default_get(const std::string &url,
-                         const std::string &bearer_token) {
+cpr::Header Make_headers(const cpr::Header &additional_headers = {}) {
   cpr::Header headers;
-  headers.emplace("User-Agent", "IQM QDMI C++ API");
-  if (!bearer_token.empty()) {
-    headers.emplace("Authorization", bearer_token);
+  for (const auto &[key, value] : additional_headers) {
+    headers.insert_or_assign(key, value);
   }
-  return Make_raw_response(cpr::Get(cpr::Url{url}, headers,
-                                    cpr::Timeout{std::chrono::seconds{3600}},
-                                    cpr::Redirect{true}, cpr::VerifySsl{true}));
+  return headers;
 }
 
-Raw_response Default_post(const std::string &url,
-                          const std::string &bearer_token,
-                          const std::string &data,
-                          const std::string &extra_header) {
-  cpr::Header headers;
-  headers.emplace("User-Agent", "IQM QDMI C++ API");
+cpr::Header Make_json_headers(const cpr::Header &additional_headers) {
+  auto headers = Make_headers(additional_headers);
   headers.emplace("Content-Type", "application/json");
-  if (!bearer_token.empty()) {
-    headers.emplace("Authorization", bearer_token);
+  return headers;
+}
+
+void Apply_common_options(cpr::Session &session, const cpr::Url &url,
+                          const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::Header &headers) {
+  session.SetUrl(url);
+  session.SetHeader(headers);
+  session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
+  session.SetTimeout(cpr::Timeout{std::chrono::seconds{3600}});
+  session.SetRedirect(cpr::Redirect{true});
+  session.SetVerifySsl(cpr::VerifySsl{true});
+  if (bearer_token.has_value()) {
+    session.SetBearer(*bearer_token);
   }
-  if (!extra_header.empty()) {
-    auto [key, value] = Split_header(extra_header);
-    if (!key.empty()) {
-      headers.emplace(std::move(key), std::move(value));
-    }
-  }
-  return Make_raw_response(cpr::Post(cpr::Url{url}, headers, cpr::Body{data},
-                                     cpr::Timeout{std::chrono::seconds{3600}},
-                                     cpr::Redirect{true},
-                                     cpr::VerifySsl{true}));
+}
+
+cpr::Response Default_get(const cpr::Url &url,
+                          const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::Header &headers) {
+  cpr::Session session;
+  Apply_common_options(session, url, bearer_token, headers);
+  return session.Get();
+}
+
+cpr::Response Default_post(const cpr::Url &url,
+                           const std::optional<cpr::Bearer> &bearer_token,
+                           const cpr::Header &headers, const cpr::Body &body) {
+  cpr::Session session;
+  Apply_common_options(session, url, bearer_token, headers);
+  session.SetBody(body);
+  return session.Post();
 }
 
 void Default_sleep(const int seconds) {
   std::this_thread::sleep_for(std::chrono::seconds(seconds));
 }
 
-/// Number of retries to attempt after receiving HTTP 429.
-constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 5;
+/// Number of times to retry after receiving HTTP 429. Each retry waits for the
+/// server-provided Retry-After duration.
+constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 10;
+/// Conservative fallback for malformed test servers or proxies that strip
+/// Retry-After from HTTP 429 responses. IQM's documented block duration is 30s.
+constexpr int DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS = 30;
+
+int Retry_after_seconds(const cpr::Response &http_response) {
+  const auto retry_after = http_response.header.find("Retry-After");
+  if (retry_after == http_response.header.end()) {
+    return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+  }
+
+  errno = 0;
+  char *end = nullptr;
+  if (const auto seconds = std::strtol(retry_after->second.c_str(), &end, 10);
+      end != retry_after->second.c_str() && *end == '\0' && errno != ERANGE &&
+      seconds >= 0) {
+    return static_cast<int>(seconds);
+  }
+  return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+}
 
 void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
@@ -137,38 +131,38 @@ void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   LOG_ERROR(message);
 }
 
-/// Execute a hooked request and retry on HTTP 429 responses.
+/// Execute a hooked request, obeying IQM Server API Retry-After headers for
+/// HTTP 429 rate limiting.
 template <typename Perform_attempt>
-int Perform_with_retries(const std::string &url, std::string &response,
-                         const ERROR_LOG_POLICY error_log_policy,
-                         Perform_attempt perform_attempt) {
-  auto &hooks = Get_hooks();
+cpr::Response Perform_with_retries(const cpr::Url &url,
+                                   Perform_attempt perform_attempt) {
+  const auto &hooks = Get_hooks();
   for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
-    const auto raw = perform_attempt();
+    const auto http_response = perform_attempt();
 
-    if (raw.status_code == 0) {
-      Log_error(error_log_policy, "Request failed: " + raw.error_message);
-      response.clear();
-      return QDMI_ERROR_FATAL;
+    if (http_response.error) {
+      return http_response;
     }
 
-    if (raw.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
-      response = raw.body;
-      return Handle_response_code(raw.status_code, url, raw.body,
-                                  error_log_policy);
+    if (http_response.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
+      return http_response;
     }
 
-    const int delay_seconds = 2 << attempt;
-    LOG_DEBUG("Request to URL '" + url +
-              "' hit HTTP 429 rate limiting; retrying in " +
-              std::to_string(delay_seconds) + " second(s) (attempt " +
+    const int delay_seconds = Retry_after_seconds(http_response);
+    LOG_DEBUG("Request to URL '" + url.str() +
+              "' hit HTTP 429 rate limiting; retrying after " +
+              std::to_string(delay_seconds) +
+              " second(s) from the Retry-After header (attempt " +
               std::to_string(attempt + 1) + "/" +
               std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
     hooks.sleep(delay_seconds);
   }
 
-  response.clear();
-  return QDMI_ERROR_FATAL;
+  cpr::Response response;
+  response.url = url;
+  response.error = cpr::Error{static_cast<int>(cpr::ErrorCode::UNKNOWN_ERROR),
+                              "Rate-limit retry loop ended without a response"};
+  return response;
 }
 
 } // namespace
@@ -186,15 +180,24 @@ void Reset_hooks() {
   sleep = Default_sleep;
 }
 
-int Handle_response_code(const int64_t response_code, const std::string &url,
-                         const std::string &response,
-                         const ERROR_LOG_POLICY error_log_policy) {
+} // namespace internal
+
+QDMI_STATUS Handle_response(const cpr::Response &response,
+                            const ERROR_LOG_POLICY error_log_policy) {
+  if (response.error) {
+    internal::Log_error(error_log_policy,
+                        "Request failed: " + response.error.message);
+    return QDMI_ERROR_FATAL;
+  }
+
+  const auto response_code = response.status_code;
+
   // Parse JSON response for IQM-specific errors and messages
   nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
-  if (!response.empty()) {
+  if (!response.text.empty()) {
     try {
-      json_response = nlohmann::json::parse(response);
+      json_response = nlohmann::json::parse(response.text);
       has_json = true;
     } catch (const nlohmann::json::exception &) {
       LOG_DEBUG("Response is not valid JSON");
@@ -227,7 +230,8 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   }
 
   // Handle error responses (4xx client errors, 5xx server errors, etc.)
-  std::string error_context = "Request to URL '" + url + "' failed with HTTP " +
+  std::string error_context = "Request to URL '" + response.url.str() +
+                              "' failed with HTTP " +
                               std::to_string(response_code);
 
   if (response_code >= 400 && response_code < 500) {
@@ -244,7 +248,7 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
     error_context += " (Unexpected Response Code)";
   }
 
-  Log_error(error_log_policy, error_context);
+  internal::Log_error(error_log_policy, error_context);
 
   // Log IQM-specific errors if present
   bool logged_structured_error = false;
@@ -253,10 +257,10 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   if (has_json && json_response.contains("errors") &&
       !json_response["errors"].is_null() &&
       json_response["errors"].is_array() && !json_response["errors"].empty()) {
-    Log_error(error_log_policy,
-              "Response contains " +
-                  std::to_string(json_response["errors"].size()) +
-                  " error(s):");
+    internal::Log_error(error_log_policy,
+                        "Response contains " +
+                            std::to_string(json_response["errors"].size()) +
+                            " error(s):");
     for (const auto &error : json_response["errors"]) {
       std::string error_msg;
       if (error.contains("error_code") && error["error_code"].is_string()) {
@@ -266,7 +270,7 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
         error_msg += error["message"].get<std::string>();
       }
       if (!error_msg.empty()) {
-        Log_error(error_log_policy, "  - " + error_msg);
+        internal::Log_error(error_log_policy, "  - " + error_msg);
       }
     }
     logged_structured_error = true;
@@ -286,14 +290,14 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
       error_msg += json_response["message"].get<std::string>();
     }
     if (!error_msg.empty()) {
-      Log_error(error_log_policy, "Error: " + error_msg);
+      internal::Log_error(error_log_policy, "Error: " + error_msg);
       logged_structured_error = true;
     }
   }
 
   // Fall back to raw response if no structured errors are available
-  if (!logged_structured_error && !response.empty()) {
-    Log_error(error_log_policy, "Response: " + response);
+  if (!logged_structured_error && !response.text.empty()) {
+    internal::Log_error(error_log_policy, "Response: " + response.text);
   }
 
   // Log IQM messages if present (might contain additional context)
@@ -331,37 +335,36 @@ int Handle_response_code(const int64_t response_code, const std::string &url,
   return QDMI_ERROR_FATAL;
 }
 
-} // namespace internal
-
-int Get(const std::string &url, const std::string &bearer_token,
-        std::string &response) {
-  LOG_INFO("Performing GET request to " + url);
+cpr::Response Get(const cpr::Url &url,
+                  const std::optional<cpr::Bearer> &bearer_token) {
+  LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
+  const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
-      [&]() { return hooks.get(url, bearer_token); });
+      url, [&]() { return hooks.get(url, bearer_token, headers); });
 }
 
-int Get_optional(const std::string &url, const std::string &bearer_token,
-                 std::string &response) {
-  LOG_INFO("Performing GET request to " + url);
+cpr::Response Get_optional(const cpr::Url &url,
+                           const std::optional<cpr::Bearer> &bearer_token) {
+  LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
+  const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, response, internal::ERROR_LOG_POLICY::LOG_AS_DEBUG,
-      [&]() { return hooks.get(url, bearer_token); });
+      url, [&]() { return hooks.get(url, bearer_token, headers); });
 }
 
-int Post(const std::string &url, const std::string &bearer_token,
-         std::string &response, const std::string &data,
-         const std::string &extra_header) {
-  LOG_INFO("Performing POST request to " + url);
-  if (!data.empty()) {
-    LOG_DEBUG("POST data: " + data);
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::Body &data,
+                   const cpr::Header &additional_headers) {
+  LOG_INFO("Performing POST request to " + url.str());
+  if (const auto &data_str = data.str(); !data_str.empty()) {
+    LOG_DEBUG("POST data: " + data_str);
   }
   const auto &hooks = internal::Get_hooks();
+  const auto headers = internal::Make_json_headers(additional_headers);
   return internal::Perform_with_retries(
-      url, response, internal::ERROR_LOG_POLICY::LOG_AS_ERROR,
-      [&]() { return hooks.post(url, bearer_token, data, extra_header); });
+      url, [&]() { return hooks.post(url, bearer_token, headers, data); });
 }
 
 } // namespace iqm::http

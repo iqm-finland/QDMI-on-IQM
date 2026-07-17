@@ -23,23 +23,41 @@
 
 #pragma once
 
-#include <string>
+#include "iqm_qdmi/constants.h"
+
+#include <cpr/bearer.h>
+#include <cpr/body.h>
+#include <cpr/cprtypes.h>
+#include <cpr/response.h>
+#include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace iqm::http {
+
+/**
+ * @brief Logging policy used for non-success HTTP response handling.
+ */
+enum class ERROR_LOG_POLICY : uint8_t {
+  /// Log all errors at ERROR level (default for required requests)
+  LOG_AS_ERROR,
+  /// Log errors at DEBUG level
+  LOG_AS_DEBUG,
+};
 
 /**
  * @brief Perform an HTTP GET request.
  *
  * Sends an HTTP GET request to the specified URL with bearer token
- * authentication, retrying on HTTP 429 responses.
+ * authentication. HTTP 429 responses are retried according to the server's
+ * Retry-After header.
  *
  * @param url The target URL for the GET request.
- * @param bearer_token The bearer token for authentication (can be empty).
- * @param response Reference to string that will contain the response body.
- * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+ * @param bearer_token Bearer token used for authentication, if configured.
+ * @return CPR response object.
  */
-int Get(const std::string &url, const std::string &bearer_token,
-        std::string &response);
+cpr::Response Get(const cpr::Url &url,
+                  const std::optional<cpr::Bearer> &bearer_token);
 
 /**
  * @brief Perform an optional HTTP GET request.
@@ -48,30 +66,69 @@ int Get(const std::string &url, const std::string &bearer_token,
  * probes where missing endpoints are expected.
  *
  * @param url The target URL for the GET request.
- * @param bearer_token The bearer token for authentication (can be empty).
- * @param response Reference to string that will contain the response body.
- * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+ * @param bearer_token Bearer token used for authentication, if configured.
+ * @return CPR response object.
  */
-int Get_optional(const std::string &url, const std::string &bearer_token,
-                 std::string &response);
+cpr::Response Get_optional(const cpr::Url &url,
+                           const std::optional<cpr::Bearer> &bearer_token);
 
 /**
  * @brief Perform an HTTP POST request.
  *
  * Sends an HTTP POST request to the specified URL with a JSON body. The
- * request automatically includes a JSON content type header and supports one
- * additional custom header, retrying on HTTP 429 responses.
+ * request automatically includes a JSON content type header and supports
+ * additional custom headers. HTTP 429 responses are retried according to the
+ * server's Retry-After header.
  *
  * @param url The target URL for the POST request.
- * @param bearer_token The bearer token for authentication (can be empty).
- * @param response Reference to string that will contain the response body.
+ * @param bearer_token Bearer token used for authentication, if configured.
  * @param data The request body data.
- * @param extra_header Additional HTTP header to include, formatted as
- * "Key: Value" (can be empty).
- * @return QDMI_SUCCESS on success, otherwise the mapped QDMI error code.
+ * @param additional_headers Additional HTTP headers to include.
+ * @return CPR response object.
  */
-int Post(const std::string &url, const std::string &bearer_token,
-         std::string &response, const std::string &data,
-         const std::string &extra_header);
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::Body &data,
+                   const cpr::Header &additional_headers = {});
+
+/**
+ * @brief Classify an HTTP response and log diagnostics.
+ *
+ * @return The mapped QDMI status code.
+ */
+QDMI_STATUS Handle_response(
+    const cpr::Response &response,
+    ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+namespace internal {
+/**
+ * @brief Function hooks used to intercept HTTP calls and retry delays.
+ *
+ * Tests override these to exercise get()/post()/retry logic without a live
+ * network connection or real time delays. Production code uses the defaults
+ * installed by Get_hooks(), which perform real requests and real sleeps.
+ */
+struct Hooks {
+  /// Hook for GET requests.
+  std::function<cpr::Response(const cpr::Url &url,
+                              const std::optional<cpr::Bearer> &bearer_token,
+                              const cpr::Header &headers)>
+      get;
+  /// Hook for POST requests.
+  std::function<cpr::Response(
+      const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+      const cpr::Header &headers, const cpr::Body &body)>
+      post;
+  /// Hook for the retry backoff delay, given a delay in seconds.
+  std::function<void(int)> sleep;
+};
+
+/// Access the mutable, process-wide hook set.
+Hooks &Get_hooks();
+
+/// Restore the default (real) hooks. Used by tests to clean up after
+/// themselves.
+void Reset_hooks();
+} // namespace internal
 
 } // namespace iqm::http
