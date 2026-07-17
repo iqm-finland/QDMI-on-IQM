@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+ * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -71,6 +71,8 @@ public:
   [[nodiscard]] auto get_duration_unit() const -> std::string;
 
   [[nodiscard]] auto get_duration_scale_factor() const -> double;
+
+  [[nodiscard]] auto get_calibration_set_id() const -> std::string;
 
   [[nodiscard]] auto get_site_index(IQM_QDMI_Site site) const -> uint64_t;
 

@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -19,7 +19,7 @@ cmake_minimum_required(VERSION 3.24...4.2)
 project(
   iqm-qdmi-device
   LANGUAGES C CXX
-  VERSION 1.1.1
+  VERSION 1.2.0
   DESCRIPTION "Implementation of a QDMI device for IQM Quantum Computers")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

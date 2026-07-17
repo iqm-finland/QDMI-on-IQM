@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+ * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -23,7 +23,6 @@
  * documentation at https://munich-quantum-software-stack.github.io/QDMI.
  */
 
-#include "curl_http_client.hpp"
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
@@ -42,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -73,9 +73,6 @@ struct IQM_QDMI_Device_Session_impl_d {
   /// Authentication parameters
   std::optional<std::string> token_ = std::nullopt;
   std::optional<std::string> tokens_file_ = std::nullopt;
-
-  /// HTTP client
-  std::unique_ptr<iqm::IHttpClient> http_client_;
 
   /// Authentication manager
   std::unique_ptr<iqm::TokenManager> token_manager_;
@@ -325,15 +322,14 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
 
   const auto qc_list_url =
       session->api_config_->url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS);
-  std::string qc_list_response;
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
-  auto status =
-      session->http_client_->get(qc_list_url, bearer_token, qc_list_response);
-  if (status != QDMI_SUCCESS) {
+  const auto bearer_token = session->token_manager_->get_bearer_token();
+  const auto qc_list_response = iqm::http::Get(qc_list_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(qc_list_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
-  const auto json_response =
-      nlohmann::json::parse(qc_list_response); // NOLINT(misc-include-cleaner)
+  const auto json_response = nlohmann::json::parse(
+      qc_list_response.text); // NOLINT(misc-include-cleaner)
   LOG_DEBUG("Received quantum computers response: " + json_response.dump());
 
   // Extract the quantum_computers array from the response
@@ -391,13 +387,13 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto arch_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_);
-  std::string arch_response;
-  status = session->http_client_->get(arch_url, bearer_token, arch_response);
-  if (status != QDMI_SUCCESS) {
+  const auto arch_response = iqm::http::Get(arch_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(arch_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
   const auto arch_array =
-      nlohmann::json::parse(arch_response); // NOLINT(misc-include-cleaner)
+      nlohmann::json::parse(arch_response.text); // NOLINT(misc-include-cleaner)
   LOG_DEBUG("Received quantum architecture response: " + arch_array.dump());
 
   // Extract first element from array (API returns array with single object)
@@ -410,15 +406,38 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto &qubits = architecture["qubits"];
   const auto num_qubits = qubits.size();
   LOG_INFO("Found " + std::to_string(num_qubits) + " qubits");
-  session->sites_.reserve(num_qubits);
-  session->sites_map_.reserve(num_qubits);
-  for (size_t i = 0; i < num_qubits; ++i) {
+
+  std::vector<std::string> computational_resonators;
+  if (architecture.contains("computational_resonators") &&
+      architecture["computational_resonators"].is_array()) {
+    const auto &resonators = architecture["computational_resonators"];
+    computational_resonators.reserve(resonators.size());
+    for (const auto &resonator : resonators) {
+      computational_resonators.emplace_back(resonator.get<std::string>());
+    }
+  }
+  LOG_INFO("Found " + std::to_string(computational_resonators.size()) +
+           " computational resonators");
+
+  const auto total_sites = num_qubits + computational_resonators.size();
+  session->sites_.reserve(total_sites);
+  session->sites_ptr_.reserve(total_sites);
+  session->sites_map_.reserve(total_sites);
+
+  auto add_site = [&](const std::string &site_name, size_t site_index) {
     auto &site =
         session->sites_.emplace_back(std::make_unique<IQM_QDMI_Site_impl_d>());
-    site->name_ = qubits[i].get<std::string>();
-    site->id_ = i;
+    site->name_ = site_name;
+    site->id_ = site_index;
     session->sites_ptr_.emplace_back(site.get());
     session->sites_map_[site->name_] = site.get();
+  };
+
+  for (size_t i = 0; i < num_qubits; ++i) {
+    add_site(qubits[i].get<std::string>(), i);
+  }
+  for (size_t i = 0; i < computational_resonators.size(); ++i) {
+    add_site(computational_resonators[i], num_qubits + i);
   }
 
   const auto &connectivity = architecture["connectivity"];
@@ -427,8 +446,18 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   session->connectivity_.reserve(num_edges * 2);
   for (size_t i = 0; i < num_edges; ++i) {
     const auto &edge = connectivity[i];
-    const auto &site1 = session->sites_map_[edge[0].get<std::string>()];
-    const auto &site2 = session->sites_map_[edge[1].get<std::string>()];
+    const auto site_name1 = edge[0].get<std::string>();
+    const auto site_name2 = edge[1].get<std::string>();
+    const auto site1_it = session->sites_map_.find(site_name1);
+    const auto site2_it = session->sites_map_.find(site_name2);
+    if (site1_it == session->sites_map_.end() ||
+        site2_it == session->sites_map_.end()) {
+      LOG_ERROR("Connectivity references unknown site: " + site_name1 +
+                std::string(" - ").append(site_name2));
+      return QDMI_ERROR_FATAL;
+    }
+    auto *site1 = site1_it->second;
+    auto *site2 = site2_it->second;
     session->connectivity_.emplace_back(site1, site2);
     session->connectivity_.emplace_back(site2, site1);
   }
@@ -437,17 +466,17 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
 
 int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
   LOG_INFO("Processing calibrated gates");
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
+  const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto dyn_arch_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_, session->calibration_set_id_);
-  std::string dyn_arch_response;
-  const auto status =
-      session->http_client_->get(dyn_arch_url, bearer_token, dyn_arch_response);
-  if (status != QDMI_SUCCESS) {
+  const auto dyn_arch_response = iqm::http::Get(dyn_arch_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(dyn_arch_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
-  const auto dynamic_architecture = nlohmann::json::parse(dyn_arch_response);
+  const auto dynamic_architecture =
+      nlohmann::json::parse(dyn_arch_response.text);
   LOG_DEBUG("Received dynamic quantum architecture response: " +
             dynamic_architecture.dump());
 
@@ -482,8 +511,18 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       auto &qubit_list_vec = operation_qubit_lists.emplace_back();
       qubit_list_vec.reserve(qubit_list.size());
       for (const auto &qubit : qubit_list) {
-        const auto &site = session->sites_map_[qubit.get<std::string>()];
-        qubit_list_vec.emplace_back(site);
+        const auto site_name = qubit.get<std::string>();
+        const auto site_it = session->sites_map_.find(site_name);
+        if (site_it == session->sites_map_.end()) [[unlikely]] {
+          std::string msg = "Operation '";
+          msg += gate_name;
+          msg += "' references unknown site '";
+          msg += site_name;
+          msg += "'";
+          LOG_ERROR(msg);
+          return QDMI_ERROR_FATAL;
+        }
+        qubit_list_vec.emplace_back(site_it->second);
       }
     }
   }
@@ -497,15 +536,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   const auto calibration_url = session->api_config_->url(
       iqm::API_ENDPOINT::GET_CALIBRATION_SET_QUALITY_METRICS,
       *session->quantum_computer_alias_, session->calibration_set_id_);
-  std::string calibration_response;
-  const auto &bearer_token = session->token_manager_->get_bearer_token();
-  const auto status = session->http_client_->get(calibration_url, bearer_token,
-                                                 calibration_response);
-  if (status != QDMI_SUCCESS) {
+  const auto bearer_token = session->token_manager_->get_bearer_token();
+  const auto calibration_response =
+      iqm::http::Get(calibration_url, bearer_token);
+  if (const auto status = iqm::http::Handle_response(calibration_response);
+      status != QDMI_SUCCESS) {
     return status;
   }
   const auto calibration_json_response =
-      nlohmann::json::parse(calibration_response);
+      nlohmann::json::parse(calibration_response.text);
   LOG_DEBUG("Received calibration set quality metrics response: " +
             calibration_json_response.dump());
 
@@ -622,10 +661,7 @@ int IQM_QDMI_device_update_dynamic_quantum_architecture(
 }
 } // namespace
 
-// NOLINTNEXTLINE(misc-use-internal-linkage)
-IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
-    IQM_QDMI_Device_Session session,
-    std::unique_ptr<iqm::IHttpClient> http_client) {
+int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
   if (session == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -644,20 +680,18 @@ IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
   }
   session->api_config_ = std::make_unique<iqm::APIConfig>(session->base_url_);
 
-  session->http_client_ = std::move(http_client);
-
   session->token_manager_ = std::make_unique<iqm::TokenManager>(
       session->token_, session->tokens_file_);
   session->session_status_ = IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED;
   session->device_status_ = QDMI_DEVICE_STATUS_IDLE;
 
-  // Get the static quantum architecture via a curl GET request
+  // Get the static quantum architecture via a GET request
   if (const auto ret = Process_static_quantum_architecture(session);
       ret != QDMI_SUCCESS) {
     return ret;
   }
 
-  // Get the dynamic quantum architecture via a curl GET request
+  // Get the dynamic quantum architecture via a GET request
   if (const auto ret =
           IQM_QDMI_device_update_dynamic_quantum_architecture(session);
       ret != QDMI_SUCCESS) {
@@ -667,10 +701,10 @@ IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
   LOG_INFO("Checking whether calibration jobs are supported");
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
-  std::string cocos_health_response;
-  const auto status = session->http_client_->get_optional(
-      cocos_health_url, session->token_manager_->get_bearer_token(),
-      cocos_health_response);
+  const auto cocos_health_response = iqm::http::Get_optional(
+      cocos_health_url, session->token_manager_->get_bearer_token());
+  const auto status = iqm::http::Handle_response(
+      cocos_health_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG);
   session->supports_calibration_jobs_ = (status == QDMI_SUCCESS);
   if (!session->supports_calibration_jobs_) {
     LOG_DEBUG("Calibration jobs are unavailable on this backend; "
@@ -679,11 +713,6 @@ IQM_QDMI_EXPORT int IQM_QDMI_device_session_init_with_http_client(
 
   LOG_INFO("Device session initialized successfully");
   return QDMI_SUCCESS;
-}
-
-int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
-  return IQM_QDMI_device_session_init_with_http_client(
-      session, std::make_unique<iqm::CurlHttpClient>());
 }
 
 void IQM_QDMI_device_session_free(IQM_QDMI_Device_Session session) {
@@ -974,16 +1003,16 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   const auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,
                                       *job->session_->quantum_computer_alias_);
-  std::string job_submission_response;
-  const auto status = job->session_->http_client_->post(
+  const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job_submission_response, json_program.dump(), "Expect: 100-continue");
+      json_program.dump(), {{"Expect", "100-continue"}});
+  const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response);
+      nlohmann::json::parse(job_submission_response.text);
   LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response["id"];
@@ -1013,17 +1042,16 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting calibration job");
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
-  std::string job_submission_response;
-  const auto status = job->session_->http_client_->post(
+  const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job_submission_response, static_cast<const char *>(job->program_),
-      "Expect: 100-continue");
+      static_cast<const char *>(job->program_), {{"Expect", "100-continue"}});
+  const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response);
+      nlohmann::json::parse(job_submission_response.text);
   LOG_DEBUG("Calibration job submission response:\n" +
             job_submission_json_response.dump());
 
@@ -1084,16 +1112,15 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
                 iqm::API_ENDPOINT::ABORT_CALIBRATION_JOB, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
                                             job->job_id_);
-  std::string job_abortion_response;
-  const auto status = job->session_->http_client_->post(
-      job_abortion_url, job->session_->token_manager_->get_bearer_token(),
-      job_abortion_response, "", "");
+  const auto job_abortion_response = iqm::http::Post(
+      job_abortion_url, job->session_->token_manager_->get_bearer_token(), "");
+  const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
-  LOG_DEBUG("Job cancellation response:\n" + job_abortion_response);
+  LOG_DEBUG("Job cancellation response:\n" + job_abortion_response.text);
   LOG_INFO("Job with ID: " + job->job_id_ + " canceled");
   return QDMI_SUCCESS;
 }
@@ -1115,16 +1142,15 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
                 iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
                                             job->job_id_);
-  std::string job_status_response;
-  const auto status_code = job->session_->http_client_->get(
-      job_status_url, job->session_->token_manager_->get_bearer_token(),
-      job_status_response);
+  const auto job_status_response = iqm::http::Get(
+      job_status_url, job->session_->token_manager_->get_bearer_token());
+  const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
   const auto job_status_json_response =
-      nlohmann::json::parse(job_status_response);
+      nlohmann::json::parse(job_status_response.text);
   LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
   const auto job_status = job_status_json_response["status"].get<std::string>();
@@ -1204,7 +1230,7 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
       }
       std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
       // Exponential backoff: double the sleep duration, but cap it
-      sleep_duration = std::min(sleep_duration * 2, max_sleep_duration);
+      sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
     }
     LOG_ERROR("Job " + job->job_id_ + " timed out");
     return QDMI_ERROR_TIMEOUT;
@@ -1221,7 +1247,7 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
     }
     std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
     // Exponential backoff: double the sleep duration, but cap it
-    sleep_duration = std::min(sleep_duration * 2, max_sleep_duration);
+    sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
   }
   return QDMI_SUCCESS;
 }
@@ -1243,10 +1269,9 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       LOG_INFO("Fetching results for job " + job->job_id_);
       const auto job_results_url = job->session_->api_config_->url(
           iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS, job->job_id_);
-      std::string job_results_response;
-      const auto status = job->session_->http_client_->get(
-          job_results_url, job->session_->token_manager_->get_bearer_token(),
-          job_results_response);
+      const auto job_results_response = iqm::http::Get(
+          job_results_url, job->session_->token_manager_->get_bearer_token());
+      const auto status = iqm::http::Handle_response(job_results_response);
       if (status != QDMI_SUCCESS) {
         // Only mark the job as failed for truly fatal errors, but always
         // propagate the underlying status code to the caller.
@@ -1256,7 +1281,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         return status;
       }
       const auto job_results_json_response =
-          nlohmann::json::parse(job_results_response);
+          nlohmann::json::parse(job_results_response.text);
       LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
 
       // Response is an array with a single object containing counts
@@ -1326,10 +1351,9 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     LOG_INFO("Fetching calibration results for job " + job->job_id_);
     const auto job_calibration_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_);
-    std::string job_calibration_response;
-    const auto status = job->session_->http_client_->get(
-        job_calibration_url, job->session_->token_manager_->get_bearer_token(),
-        job_calibration_response);
+    const auto job_calibration_response = iqm::http::Get(
+        job_calibration_url, job->session_->token_manager_->get_bearer_token());
+    const auto status = iqm::http::Handle_response(job_calibration_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
       // propagate the underlying status code to the caller.
@@ -1339,7 +1363,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
       return status;
     }
     const auto job_calibration_json_response =
-        nlohmann::json::parse(job_calibration_response);
+        nlohmann::json::parse(job_calibration_response.text);
     LOG_DEBUG("Calibration job status response:\n" +
               job_calibration_json_response.dump());
 
@@ -1391,10 +1415,10 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     LOG_INFO("Fetching shot measurements for job " + job->job_id_);
     const auto job_measurements_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
-    std::string job_measurements_response;
-    const auto status = job->session_->http_client_->get(
-        job_measurements_url, job->session_->token_manager_->get_bearer_token(),
-        job_measurements_response);
+    const auto job_measurements_response =
+        iqm::http::Get(job_measurements_url,
+                       job->session_->token_manager_->get_bearer_token());
+    const auto status = iqm::http::Handle_response(job_measurements_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
       // propagate the underlying status code to the caller.
@@ -1405,7 +1429,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     }
 
     const auto job_measurements_json_response =
-        nlohmann::json::parse(job_measurements_response);
+        nlohmann::json::parse(job_measurements_response.text);
     LOG_DEBUG("Job measurements response:\n" +
               job_measurements_json_response.dump());
 
@@ -1687,6 +1711,10 @@ int IQM_QDMI_device_session_query_device_property(
                       QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop,
                       size, value, size_ret)
   }
+  // Custom device property 1 exposes the current calibration set ID.
+  ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_CUSTOM1,
+                      session->calibration_set_id_.c_str(), prop, size, value,
+                      size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
 }
 
@@ -1766,7 +1794,10 @@ int IQM_QDMI_device_session_query_operation_property(
     auto sites_vec = std::vector<IQM_QDMI_Site>(sites, sites + num_sites);
     // need to find this vector in the list of available sites
     auto it = std::ranges::find(available_sites_for_op, sites_vec);
-    if (it == available_sites_for_op.end() && num_op_sites == 2) {
+    // MOVE is directional and must stay ordered as [qubit, resonator].
+    const bool is_directional = operation->name_ == "move";
+    if (it == available_sites_for_op.end() && num_op_sites == 2 &&
+        !is_directional) {
       // try with reversed sites
       std::ranges::reverse(sites_vec);
       it = std::ranges::find(available_sites_for_op, sites_vec);

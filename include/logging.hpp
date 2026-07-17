@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+ * https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -27,6 +27,13 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+
+// Windows headers may define ERROR as a macro. That breaks the LOG_LEVEL
+// enumerator below when CPR/CURL or other dependencies pull platform headers in
+// before this header.
+#ifdef ERROR
+#undef ERROR
+#endif
 
 namespace iqm {
 

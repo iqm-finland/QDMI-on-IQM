@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE.md
+# https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -28,9 +28,7 @@ if(WIN32)
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
-      $<TARGET_FILE_DIR:integration_tests>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:CURL::libcurl>
-            $<TARGET_FILE_DIR:integration_tests>)
+      $<TARGET_FILE_DIR:integration_tests>)
 endif()
 
 gtest_discover_tests(
