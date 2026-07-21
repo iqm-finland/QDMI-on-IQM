@@ -28,7 +28,7 @@ import subprocess
 import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, SupportsInt, cast
+from typing import TYPE_CHECKING, Any, SupportsInt, cast
 
 import numpy as np
 
@@ -102,26 +102,6 @@ def extract_counts(pub_result: PubResult) -> dict[str, int]:
     raise RuntimeError(msg)
 
 
-def _new_job_id() -> str:
-    """Return a unique ID for a single offloading call."""
-    return uuid.uuid4().hex
-
-
-def _make_job_dir(jobs_dir: Path, job_id: str) -> Path:
-    """Create and return a per-call job directory under *jobs_dir*.
-
-    Args:
-        jobs_dir: The base directory for job storage.
-        job_id: Unique identifier for the job.
-
-    Returns:
-        Path to the newly created job directory.
-    """
-    job_dir = jobs_dir / job_id
-    job_dir.mkdir(parents=True, exist_ok=False)
-    return job_dir
-
-
 def _get_jobs_dir() -> Path:
     """Get the jobs directory path.
 
@@ -129,17 +109,76 @@ def _get_jobs_dir() -> Path:
     or defaults to the user's home directory under `.qdmi_jobs`.
 
     Returns:
-        Path to the jobs directory.
+        Path to the jobs directory. The directory is not created; callers
+        are responsible for creating it.
     """
-    # Check if environment variable is set
     env_dir = os.getenv("IQM_JOBS_DIR")
     if env_dir:
         return Path(env_dir)
 
-    # Default to user's home directory
-    default_dir = Path.home() / ".qdmi_jobs"
-    default_dir.mkdir(parents=True, exist_ok=True)
-    return default_dir
+    return Path.home() / ".qdmi_jobs"
+
+
+def _new_job_dir() -> Path:
+    """Create and return a fresh per-call job directory on the shared jobs filesystem.
+
+    Returns:
+        Path to the newly created job directory.
+    """
+    jobs_dir = _get_jobs_dir()
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    job_dir = jobs_dir / uuid.uuid4().hex
+    job_dir.mkdir(exist_ok=False)
+    return job_dir
+
+
+def _run_srun(command: list[str]) -> subprocess.CompletedProcess[bytes]:
+    """Run *command* via `srun` and return the completed process.
+
+    Returns:
+        The completed process, with captured stdout/stderr.
+
+    Raises:
+        RuntimeError: If the Slurm job returns a non-zero exit code.
+    """
+    process = subprocess.run(command, capture_output=True, check=False)
+    if process.returncode != 0:
+        stderr = process.stderr.decode().strip()
+        msg = f"Error while submitting job to Slurm: {stderr}"
+        raise RuntimeError(msg)
+    return process
+
+
+def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
+    """Extract and base64-decode the job's stdout payload.
+
+    Returns:
+        The decoded, still-pickled result payload.
+
+    Raises:
+        RuntimeError: If the job produced no output.
+    """
+    stdout = process.stdout.decode().strip()
+    if not stdout:
+        msg = "No output from the job."
+        raise RuntimeError(msg)
+    return base64.b64decode(stdout.encode())
+
+
+def _load_pickled_result(payload: bytes) -> object:
+    """Unpickle a decoded job result payload.
+
+    Returns:
+        The unpickled result object.
+
+    Raises:
+        RuntimeError: If the payload cannot be unpickled.
+    """
+    try:
+        return pickle.loads(payload)  # noqa: S301
+    except Exception as e:
+        msg = f"Error parsing the output: {e}"
+        raise RuntimeError(msg) from e
 
 
 def sample(
@@ -189,11 +228,7 @@ def sample(
         return extract_counts(first_pub)
 
     # Make sure the `jobs` directory exists on the shared filesystem
-    jobs_dir = _get_jobs_dir()
-    jobs_dir.mkdir(parents=True, exist_ok=True)
-
-    job_id = _new_job_id()
-    job_dir = _make_job_dir(jobs_dir, job_id)
+    job_dir = _new_job_dir()
 
     # Serialize the circuit to QPY format
     qc_path = job_dir / "qc.qpy"
@@ -218,38 +253,17 @@ def sample(
     if timeout:
         command.extend(["--timeout", str(timeout)])
 
-    process = subprocess.run(
-        command,
-        capture_output=True,
-        check=False,
-    )
-
-    # Check for errors before deleting the file
-    if process.returncode != 0:
-        # Keep the file for debugging
-        stderr = process.stderr.decode().strip()
-        msg = f"Error while submitting job to Slurm: {stderr}"
-        raise RuntimeError(msg)
+    process = _run_srun(command)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    # Parse the counts from the output
-    stdout = process.stdout.decode().strip()
-    if not stdout:
-        msg = "No output from the job."
-        raise RuntimeError(msg)
-    try:
-        decoded = base64.b64decode(stdout.encode())
-        primitive_result = pickle.loads(decoded)  # noqa: S301
-        first_pub = next(iter(primitive_result))
-        counts = extract_counts(first_pub)
-    except Exception as e:
-        msg = f"Error parsing the output: {e}"
-        raise RuntimeError(msg) from e
-    return counts
+    payload = _decode_payload(process)
+    primitive_result = cast("Iterable[PubResult]", _load_pickled_result(payload))
+    first_pub = next(iter(primitive_result))
+    return extract_counts(first_pub)
 
 
 def estimate(
@@ -309,11 +323,7 @@ def estimate(
         return list(optimal_parameters.values())
 
     # Make sure the `jobs` directory exists on the shared filesystem
-    jobs_dir = _get_jobs_dir()
-    jobs_dir.mkdir(parents=True, exist_ok=True)
-
-    job_id = _new_job_id()
-    job_dir = _make_job_dir(jobs_dir, job_id)
+    job_dir = _new_job_dir()
 
     # Serialize the circuit to QPY format
     qc_path = job_dir / "ansatz.qpy"
@@ -343,16 +353,7 @@ def estimate(
     if timeout:
         command.extend(["--timeout", str(timeout)])
 
-    process = subprocess.run(
-        command,
-        capture_output=True,
-        check=False,
-    )
-
-    if process.returncode != 0:
-        stderr = process.stderr.decode().strip()
-        msg = f"Error while submitting job to Slurm: {stderr}"
-        raise RuntimeError(msg)
+    process = _run_srun(command)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
@@ -360,19 +361,6 @@ def estimate(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    # Parse the optimal parameters from the output
-    stdout = process.stdout.decode().strip()
-    if not stdout:
-        msg = "No output from the job."
-        raise RuntimeError(msg)
-
-    # Convert the output to a list of floats
-    try:
-        decoded = base64.b64decode(stdout.encode())
-        vqe_result = pickle.loads(decoded)  # noqa: S301
-        optimal_params = [np.float64(val) for val in vqe_result.optimal_parameters.values()]
-    except Exception as e:
-        msg = f"Error parsing the output: {e}"
-        raise RuntimeError(msg) from e
-
-    return optimal_params
+    payload = _decode_payload(process)
+    vqe_result = cast("Any", _load_pickled_result(payload))
+    return [np.float64(val) for val in vqe_result.optimal_parameters.values()]
