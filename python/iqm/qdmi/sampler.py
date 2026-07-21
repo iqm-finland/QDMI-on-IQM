@@ -26,17 +26,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 try:
-    from mqt.core.plugins.qiskit.provider import QDMIProvider
-    from mqt.core.plugins.qiskit.sampler import QDMISampler
     from qiskit import qpy, transpile
+
+    from ._backends import build_sampler
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
         "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
     )
     raise ImportError(msg) from e
-
-from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -65,17 +63,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.circuit).open("rb") as file_obj:
         circuit = qpy.load(file_obj)[0]
 
-    if args.simulator:
-        backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
-        sampler = QDMISampler(backend)
-    else:
-        backend = IQMBackend(
-            base_url=args.base_url,
-            tokens_file=args.tokens_file,
-            qc_id=args.qc_id,
-            qc_alias=args.qc_alias,
-        )
-        sampler = backend.sampler()
+    backend, sampler = build_sampler(
+        simulator=args.simulator,
+        base_url=args.base_url,
+        tokens_file=args.tokens_file,
+        qc_id=args.qc_id,
+        qc_alias=args.qc_alias,
+    )
 
     circuit_for_execution = transpile(circuit, backend)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)

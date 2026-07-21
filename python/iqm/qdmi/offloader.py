@@ -34,14 +34,11 @@ import numpy as np
 
 _IMPORT_ERROR: ImportError | None = None
 try:
-    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-    from mqt.core.plugins.qiskit.provider import QDMIProvider
-    from mqt.core.plugins.qiskit.sampler import QDMISampler
     from qiskit import QuantumCircuit, qpy, transpile
     from qiskit_algorithms import VQE
     from qiskit_algorithms.optimizers import L_BFGS_B
 
-    from iqm.qdmi.qiskit import IQMBackend
+    from ._backends import build_estimator, build_sampler
 except ImportError as e:
     _IMPORT_ERROR = e
 
@@ -211,15 +208,8 @@ def sample(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        if simulator:
-            backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
-            qc_for_execution = qc
-            sampler = QDMISampler(backend)
-        else:
-            backend = IQMBackend()
-            qc_for_execution = transpile(qc, backend, optimization_level=3)
-            sampler = backend.sampler()
-
+        backend, sampler = build_sampler(simulator=simulator)
+        qc_for_execution = transpile(qc, backend, optimization_level=3)
         job = sampler.run([(qc_for_execution,)], shots=shots)
         first_pub = next(iter(job.result()))
         return extract_counts(first_pub)
@@ -335,11 +325,7 @@ def estimate(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        estimator = (
-            QDMIEstimator(QDMIProvider().get_backend("MQT Core DDSIM QDMI Device"))
-            if simulator
-            else IQMBackend().estimator()
-        )
+        _, estimator = build_estimator(simulator=simulator)
 
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
         result = vqe.compute_minimum_eigenvalue(operator=operator)

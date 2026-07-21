@@ -26,19 +26,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 try:
-    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-    from mqt.core.plugins.qiskit.provider import QDMIProvider
     from qiskit import qpy
     from qiskit_algorithms import VQE
     from qiskit_algorithms.optimizers import L_BFGS_B
+
+    from ._backends import build_estimator
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin and VQE requirements. "
         "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
     )
     raise ImportError(msg) from e
-
-from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -73,17 +71,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.observable).open("rb") as file_obj:
         observable: SparsePauliOp = pickle.load(file_obj)  # noqa: S301
 
-    if args.simulator:
-        backend = QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
-        estimator = QDMIEstimator(backend)
-    else:
-        backend = IQMBackend(
-            base_url=args.base_url,
-            tokens_file=args.tokens_file,
-            qc_id=args.qc_id,
-            qc_alias=args.qc_alias,
-        )
-        estimator = backend.estimator()
+    _, estimator = build_estimator(
+        simulator=args.simulator,
+        base_url=args.base_url,
+        tokens_file=args.tokens_file,
+        qc_id=args.qc_id,
+        qc_alias=args.qc_alias,
+    )
 
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
