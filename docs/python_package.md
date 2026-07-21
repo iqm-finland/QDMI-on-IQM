@@ -115,6 +115,16 @@ Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when
 submitting Slurm jobs to target simulated devices instead of real QPU hardware.
 
+### Slurm Partition Requirement
+
+Both functions submit their `srun` jobs to a partition named `quantum`
+(`srun --partition=quantum ...`). This assumes the cluster has a partition of
+that exact name configured, typically gating access to nodes with the quantum
+computer exposed as a Slurm GRES resource. Ensure such a `quantum` partition
+exists before using the offloader; see the
+[SPANK plugin documentation](spank_plugin.md) for an example cluster
+configuration.
+
 ### Shared Jobs Directory
 
 When submitting Slurm workloads, a shared filesystem directory is required to
