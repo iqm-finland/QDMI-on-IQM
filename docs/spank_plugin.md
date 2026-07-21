@@ -76,6 +76,26 @@ To run this job:
 srun --partition=quantum --iqm-qc-alias=emerald python bell_state.py
 ```
 
+### Limiting Concurrent Access to a QC
+
+If your administrator has configured a Slurm license for the target QC (see
+[Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
+below), request it alongside `--iqm-qc-alias` using Slurm's native
+`--licenses`/`-L` option:
+
+```bash
+srun --partition=quantum --iqm-qc-alias=emerald --licenses=iqm_qc_emerald:1 python bell_state.py
+```
+
+This matters most for **on-premise QCs**: like Resonance, an on-premise setup
+still runs its own internal queue, but it typically fronts single-tenant
+hardware, so uncontrolled Slurm-side concurrency puts unnecessary pressure on
+that queue. Requesting the license lets Slurm regulate that pressure itself,
+ahead of the QC's own queue. If you omit `--licenses` on a cluster where it's
+expected, the plugin logs a warning (or, if the administrator has set
+`iqm_require_license=1`, fails your job step at launch instead — after it has
+already been allocated, not at submission time).
+
 ### Executing via CLI Scripts
 
 Alternatively, if you already have serialized circuits (in QPY format), you can
@@ -101,7 +121,12 @@ policy or handle backend-side queue management.
 
 ### Compatibility and Requirements
 
-- **Slurm Version**: Slurm 17.11 or newer.
+- **Slurm Version**: Slurm 17.11 or newer. The optional Slurm license alignment
+  check (see
+  [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses))
+  additionally requires Slurm 23.02 or newer, since it relies on the
+  `SLURM_JOB_LICENSES` job environment variable; on older Slurm versions it is a
+  silent no-op.
 - **C++ Compiler**: C++20 standard library support (GCC 13+ or Clang 16+).
 - **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI.
   You must compile the plugin against the target cluster's Slurm header files
@@ -135,13 +160,25 @@ overridden by users at submission time.
 required /usr/lib/slurm/iqm-spank-plugin.so \
     iqm_base_url=https://resonance.iqm.tech \
     iqm_tokens_file=/etc/iqm/tokens.json \
-    partitions=quantum,debug
+    partitions=quantum,debug \
+    iqm_license_prefix=iqm_qc_ \
+    iqm_require_license=1
 ```
 
 - `iqm_base_url`: Default API endpoint.
 - `iqm_tokens_file`: Path to the shared token file.
 - `partitions`: Comma-separated list of partitions where this plugin will run.
   If omitted, the plugin evaluates all partitions.
+- `iqm_license_prefix`: Prefix used to derive the expected Slurm license name
+  from `IQM_QC_ALIAS` (default: `iqm_qc_`). See
+  [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses).
+- `iqm_require_license`: When set to a truthy value
+  (`1`/`true`/`yes`/`on`/`enabled`, case-insensitive), fails at launch jobs
+  whose Slurm license request does not match the derived name, instead of only
+  logging a warning (default: off). See
+  [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
+  for the exact semantics. An unrecognized value logs a warning and is treated
+  as off.
 
 Ensure your main `/etc/slurm/plugstack.conf` includes your drop-in configuration
 directory:
@@ -156,12 +193,60 @@ After modifying the configuration, apply changes to the cluster:
 sudo scontrol reconfigure
 ```
 
+### Limiting Concurrent Access with Slurm Licenses
+
+:::{note}
+"Slurm license" here refers to Slurm's native `Licenses=`/`--licenses`
+capacity-limiting scheduler resource — unrelated to the GPLv3/Apache-2.0
+software licensing described elsewhere in this repository.
+:::
+
+Each QC can be modeled as a flat, cluster-wide Slurm license so that Slurm
+itself enforces a concurrency limit, rather than relying on jobs to behave. This
+is especially important for **on-premise QCs**: like Resonance, an on-premise
+setup still runs its own internal queue, but it typically fronts single-tenant
+hardware, so uncontrolled concurrency puts unnecessary pressure on that queue
+and risks real hardware contention. A Slurm license lets the cluster regulate
+that pressure itself, ahead of the QC's own queue.
+
+1. Define a license pool for each QC in `/etc/slurm/slurm.conf` (a flat,
+   cluster-wide pool, not tied to specific nodes — the QC is reached over the
+   network from any node in the partition):
+
+   ```text
+   Licenses=iqm_qc_emerald:4
+   ```
+
+2. Users request the license alongside `--iqm-qc-alias` (see
+   [Limiting Concurrent Access to a QC](#limiting-concurrent-access-to-a-qc)):
+
+   ```bash
+   srun --iqm-qc-alias=emerald --licenses=iqm_qc_emerald:1 ...
+   ```
+
+3. The plugin derives the expected license name as `<iqm_license_prefix><alias>`
+   (default prefix `iqm_qc_`). Since QC aliases may themselves contain a colon
+   (e.g. `emerald:mock`, as seen in the [Qiskit Integration](qiskit.md)
+   examples), and Slurm's `name:count` license syntax reserves `:` as a
+   separator, the plugin replaces `:` and `,` in the alias with `_` when
+   deriving the name (e.g. alias `emerald:mock` → license
+   `iqm_qc_emerald_mock`).
+4. By default, a mismatch (or a missing `--licenses` request) only logs a
+   warning. Setting `iqm_require_license=1` instead fails the job step at launch
+   — after the job has already been allocated, not at submission time — and only
+   takes effect if the plugin is declared `required` (not `optional`) in
+   `plugstack.conf`.
+5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf`
+   to track its usage in Slurm accounting.
+
 ### Troubleshooting
 
 The plugin logs to the standard `slurmd.log` on compute nodes. Successful
 activation prints a log entry when a job starts on an active partition:
 
-`[iqm_spank_plugin] job=12345 partition=quantum base_url=set auth=tokens_file tokens_file_ok=yes`
+```text
+[iqm_spank_plugin] job=12345 partition=quantum base_url=set auth=tokens_file tokens_file_ok=yes license=iqm_qc_emerald:ok
+```
 
 **Common Issues:**
 

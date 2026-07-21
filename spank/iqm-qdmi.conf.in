@@ -27,4 +27,6 @@
 #     iqm_base_url= \
 #     iqm_tokens_file= \
 #     iqm_qc_id= \
-#     iqm_qc_alias=
+#     iqm_qc_alias= \
+#     iqm_license_prefix= \
+#     iqm_require_license=

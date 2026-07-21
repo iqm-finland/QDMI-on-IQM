@@ -10,6 +10,12 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
+  SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
+  on-premise QCs ([#114]) ([**@marcelwa**])
+
 ### Changed
 
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
@@ -107,6 +113,7 @@ Compatible with QDMI `v1.3.0`.
 [#122]: https://github.com/iqm-finland/QDMI-on-IQM/pull/122
 [#120]: https://github.com/iqm-finland/QDMI-on-IQM/pull/120
 [#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
+[#114]: https://github.com/iqm-finland/QDMI-on-IQM/pull/114
 [#108]: https://github.com/iqm-finland/QDMI-on-IQM/pull/108
 [#107]: https://github.com/iqm-finland/QDMI-on-IQM/pull/107
 [#105]: https://github.com/iqm-finland/QDMI-on-IQM/pull/105
