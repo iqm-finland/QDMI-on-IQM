@@ -107,9 +107,6 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         return FakeCompletedProcess()
 
     monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
-    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
-    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
-    monkeypatch.setenv("IQM_QC_ALIAS", "emerald:mock")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     circuit = QuantumCircuit(1)
@@ -122,12 +119,9 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     assert "iqm-sampler" in captured_command
     assert "--shots" in captured_command
     assert "7" in captured_command
-    base_url_idx = captured_command.index("--base-url")
-    assert captured_command[base_url_idx + 1] == "https://resonance.example"
-    assert "--tokens-file" in captured_command
-    assert "tokens_path" in captured_command
-    assert "--qc-alias" in captured_command
-    assert "emerald:mock" in captured_command
+    # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
+    # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
+    assert "--base-url" not in captured_command
 
 
 def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -146,9 +140,6 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
         return FakeCompletedProcess()
 
     monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
-    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
-    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
-    monkeypatch.setenv("IQM_QC_ALIAS", "emerald:mock")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
@@ -161,9 +152,6 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
     assert "3" in captured_command
-    base_url_idx = captured_command.index("--base-url")
-    assert captured_command[base_url_idx + 1] == "https://resonance.example"
-    assert "--tokens-file" in captured_command
-    assert "tokens_path" in captured_command
-    assert "--qc-alias" in captured_command
-    assert "emerald:mock" in captured_command
+    # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
+    # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
+    assert "--base-url" not in captured_command

@@ -142,32 +142,6 @@ def _get_jobs_dir() -> Path:
     return default_dir
 
 
-def _build_worker_backend_args() -> list[str]:
-    """Build worker CLI backend options from environment variables.
-
-    Reads the canonical IQM environment contract and converts it to
-    worker CLI arguments so remote jobs can reconstruct the same backend
-    configuration.
-
-    Returns:
-        List of worker CLI options for IQM configuration.
-    """
-    args = []
-
-    if base_url := os.getenv("IQM_BASE_URL"):
-        args.extend(["--base-url", base_url])
-
-    if tokens_file := os.getenv("IQM_TOKENS_FILE"):
-        args.extend(["--tokens-file", tokens_file])
-
-    if qc_id := os.getenv("IQM_QC_ID"):
-        args.extend(["--qc-id", qc_id])
-    if qc_alias := os.getenv("IQM_QC_ALIAS"):
-        args.extend(["--qc-alias", qc_alias])
-
-    return args
-
-
 def sample(
     qc: QuantumCircuit,
     shots: int = 1024,
@@ -238,7 +212,6 @@ def sample(
         str(qc_path.absolute()),
         "--shots",
         str(shots),
-        *_build_worker_backend_args(),
     ]
     if simulator:
         command.append("--simulator")
@@ -364,7 +337,6 @@ def estimate(
         str(operator_path.absolute()),
         "--maxiter",
         str(maxiter),
-        *_build_worker_backend_args(),
     ]
     if simulator:
         command.append("--simulator")
