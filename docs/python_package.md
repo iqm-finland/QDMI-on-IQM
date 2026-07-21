@@ -108,7 +108,8 @@ The module provides two primary functions:
   pickled result back to a python dictionary of counts.
 - {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable,
   submits a Slurm job using `srun iqm-estimator`, and parses the base64-encoded
-  pickled VQEResult to return optimal parameters.
+  pickled `VQEResult` to return it, matching the semantics of running `VQE`
+  directly against the regular (non-offloaded) estimator.
 
 Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when

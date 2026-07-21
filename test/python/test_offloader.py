@@ -86,7 +86,10 @@ def test_estimate_local_simulator() -> None:
     ansatz.ry(theta, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
-    params = offloader.estimate(ansatz, operator, maxiter=5, local=True, simulator=True)
+    result = offloader.estimate(ansatz, operator, maxiter=5, local=True, simulator=True)
+    optimal_parameters = result.optimal_parameters
+    assert optimal_parameters is not None
+    params = list(optimal_parameters.values())
     assert len(params) == 1
     assert math.isfinite(float(params[0]))
 
@@ -145,9 +148,9 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     ansatz = QuantumCircuit(1)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
-    params = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
+    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
-    assert params == [0.125]
+    assert result.optimal_parameters == {"theta": 0.125}
     assert "srun" in captured_command
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command

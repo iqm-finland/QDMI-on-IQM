@@ -28,9 +28,7 @@ import subprocess
 import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, SupportsInt, cast
-
-import numpy as np
+from typing import TYPE_CHECKING, SupportsInt, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
@@ -45,6 +43,7 @@ except ImportError as e:
 if TYPE_CHECKING:
     from qiskit.primitives.containers.pub_result import PubResult
     from qiskit.quantum_info import SparsePauliOp
+    from qiskit_algorithms import VQEResult
 
 
 def _count_to_int(count: object) -> int:
@@ -274,16 +273,19 @@ def estimate(
     local: bool = False,
     simulator: bool = False,
     timeout: float | None = None,
-) -> list[np.float64]:
+) -> VQEResult:
     """Estimate the optimal parameters for a given ansatz circuit and operator.
 
     When `local=False` (default), serializes the given ansatz and operator to
     QPY/pickle format and submits them to the Slurm workload manager using the
-    `srun` command. After completion, the optimal parameters are parsed and
-    returned as a list of floats.
+    `srun` command. After completion, the VQE result is parsed and returned.
 
     When `local=True`, runs the VQE algorithm locally using either the MQT Core
     DDSIM simulator backend or the packaged IQM backend.
+
+    The returned result has the same semantics as calling
+    `VQE(...).compute_minimum_eigenvalue(...)` directly against the regular
+    (non-offloaded) estimator.
 
     Args:
         ansatz: The ansatz circuit to run.
@@ -298,12 +300,11 @@ def estimate(
             Only used when `local=False`.
 
     Returns:
-        A list of optimal parameters.
+        The VQE result, including the optimal parameters and eigenvalue.
 
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-        ValueError: If the VQE result has no optimal parameters.
     """
     if _IMPORT_ERROR is not None:
         msg = (
@@ -313,14 +314,8 @@ def estimate(
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
         _, estimator = build_estimator(simulator=simulator)
-
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
-        result = vqe.compute_minimum_eigenvalue(operator=operator)
-        optimal_parameters = result.optimal_parameters
-        if optimal_parameters is None:
-            msg = "VQE result has no optimal parameters."
-            raise ValueError(msg)
-        return list(optimal_parameters.values())
+        return vqe.compute_minimum_eigenvalue(operator=operator)
 
     # Make sure the `jobs` directory exists on the shared filesystem
     job_dir = _new_job_dir()
@@ -362,5 +357,4 @@ def estimate(
         job_dir.rmdir()
 
     payload = _decode_payload(process)
-    vqe_result = cast("Any", _load_pickled_result(payload))
-    return [np.float64(val) for val in vqe_result.optimal_parameters.values()]
+    return cast("VQEResult", _load_pickled_result(payload))
