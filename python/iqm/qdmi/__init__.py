@@ -19,15 +19,12 @@
 
 from ._paths import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH
 from ._version import version as __version__
-from .offloader import estimate, sample
 
 __all__ = [
     "IQM_QDMI_CMAKE_DIR",
     "IQM_QDMI_INCLUDE_DIR",
     "IQM_QDMI_LIBRARY_PATH",
     "__version__",
-    "estimate",
-    "sample",
 ]
 
 
