@@ -216,7 +216,7 @@ def sample(
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """
+    """  # noqa: DOC502
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "
@@ -309,7 +309,7 @@ def estimate(
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """
+    """  # noqa: DOC502
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "
