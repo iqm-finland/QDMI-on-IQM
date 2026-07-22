@@ -25,6 +25,7 @@ import pickle  # noqa: S403
 import subprocess
 from typing import TYPE_CHECKING
 
+import pytest
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter
 from qiskit.quantum_info import SparsePauliOp
@@ -33,8 +34,6 @@ from iqm.qdmi import offloader
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 
 class FakeBitArray:
@@ -158,3 +157,32 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
     # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
     assert "--base-url" not in captured_command
+
+
+def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A failed Slurm job leaves its input files in place and reports where to find them."""
+
+    class FakeCompletedProcess:
+        returncode = 1
+        stdout = b""
+        stderr = b"srun: error: something went wrong"
+
+    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    with pytest.raises(RuntimeError, match=str(tmp_path)):
+        offloader.sample(circuit, shots=7, local=False, simulator=True)
+
+    # The job directory and its serialized circuit must survive the failure for debugging.
+    job_dirs = list(tmp_path.iterdir())
+    assert len(job_dirs) == 1
+    assert (job_dirs[0] / "qc.qpy").exists()

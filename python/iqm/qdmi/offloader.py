@@ -131,8 +131,12 @@ def _new_job_dir() -> Path:
     return job_dir
 
 
-def _run_srun(command: list[str]) -> subprocess.CompletedProcess[bytes]:
+def _run_srun(command: list[str], job_dir: Path) -> subprocess.CompletedProcess[bytes]:
     """Run *command* via `srun` and return the completed process.
+
+    On failure, *job_dir* (containing the serialized inputs) is intentionally
+    left on disk rather than cleaned up, so its path is included in the raised
+    error to make it discoverable for debugging.
 
     Returns:
         The completed process, with captured stdout/stderr.
@@ -143,7 +147,7 @@ def _run_srun(command: list[str]) -> subprocess.CompletedProcess[bytes]:
     process = subprocess.run(command, capture_output=True, check=False)
     if process.returncode != 0:
         stderr = process.stderr.decode().strip()
-        msg = f"Error while submitting job to Slurm: {stderr}"
+        msg = f"Error while submitting job to Slurm: {stderr} (job inputs kept at {job_dir} for debugging)"
         raise RuntimeError(msg)
     return process
 
@@ -252,7 +256,7 @@ def sample(
     if timeout:
         command.extend(["--timeout", str(timeout)])
 
-    process = _run_srun(command)
+    process = _run_srun(command, job_dir)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
@@ -348,7 +352,7 @@ def estimate(
     if timeout:
         command.extend(["--timeout", str(timeout)])
 
-    process = _run_srun(command)
+    process = _run_srun(command, job_dir)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
