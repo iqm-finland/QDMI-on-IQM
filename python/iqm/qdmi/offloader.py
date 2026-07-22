@@ -147,7 +147,12 @@ def _new_job_dir() -> Path:
     return job_dir
 
 
-def _run_srun(command: list[str], job_dir: Path) -> subprocess.CompletedProcess[bytes]:
+def _run_srun(
+    command: list[str],
+    job_dir: Path,
+    *,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     """Run *command* via `srun` and return the completed process.
 
     On failure, *job_dir* (containing the serialized inputs) is intentionally
@@ -158,9 +163,14 @@ def _run_srun(command: list[str], job_dir: Path) -> subprocess.CompletedProcess[
         The completed process, with captured stdout/stderr.
 
     Raises:
-        RuntimeError: If the Slurm job returns a non-zero exit code.
+        RuntimeError: If the Slurm job times out or returns a non-zero exit
+            code.
     """
-    process = subprocess.run(command, capture_output=True, check=False)
+    try:
+        process = subprocess.run(command, capture_output=True, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        msg = f"Slurm job timed out after {timeout}s (job inputs kept at {job_dir} for debugging)"
+        raise RuntimeError(msg) from e
     if process.returncode != 0:
         stderr = process.stderr.decode().strip()
         msg = f"Error while submitting job to Slurm: {stderr} (job inputs kept at {job_dir} for debugging)"
@@ -223,8 +233,8 @@ def sample(
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
             Only used when `local=False`.
-        timeout: The timeout passed to the IQM Backend in seconds.
-            Only used when `local=False`.
+        timeout: How long to wait for the Slurm job to complete, in seconds,
+            before giving up. Only used when `local=False`.
 
     Returns:
         A dictionary of measurement counts.
@@ -269,10 +279,8 @@ def sample(
     ]
     if simulator:
         command.append("--simulator")
-    if timeout:
-        command.extend(["--timeout", str(timeout)])
 
-    process = _run_srun(command, job_dir)
+    process = _run_srun(command, job_dir, timeout=timeout)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
@@ -316,8 +324,8 @@ def estimate(
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
             Only used when `local=False`.
-        timeout: The timeout passed to the IQM Backend in seconds.
-            Only used when `local=False`.
+        timeout: How long to wait for the Slurm job to complete, in seconds,
+            before giving up. Only used when `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -365,10 +373,8 @@ def estimate(
     ]
     if simulator:
         command.append("--simulator")
-    if timeout:
-        command.extend(["--timeout", str(timeout)])
 
-    process = _run_srun(command, job_dir)
+    process = _run_srun(command, job_dir, timeout=timeout)
 
     # Cleanup artifacts after successful completion.
     qc_path.unlink(missing_ok=True)
