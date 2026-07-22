@@ -101,6 +101,22 @@ def extract_counts(pub_result: PubResult) -> dict[str, int]:
     raise RuntimeError(msg)
 
 
+def _first_pub(primitive_result: Iterable[PubResult]) -> PubResult:
+    """Return the first pub result from a primitive result.
+
+    Returns:
+        The first pub result.
+
+    Raises:
+        RuntimeError: If the primitive result contains no pubs.
+    """
+    first_pub = next(iter(primitive_result), None)
+    if first_pub is None:
+        msg = "Primitive result contained no pubs."
+        raise RuntimeError(msg)
+    return first_pub
+
+
 def _get_jobs_dir() -> Path:
     """Get the jobs directory path.
 
@@ -227,7 +243,7 @@ def sample(
         backend, sampler = build_sampler(simulator=simulator)
         qc_for_execution = transpile(qc, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
-        first_pub = next(iter(job.result()))
+        first_pub = _first_pub(cast("Iterable[PubResult]", job.result()))
         return extract_counts(first_pub)
 
     # Make sure the `jobs` directory exists on the shared filesystem
@@ -265,7 +281,7 @@ def sample(
 
     payload = _decode_payload(process)
     primitive_result = cast("Iterable[PubResult]", _load_pickled_result(payload))
-    first_pub = next(iter(primitive_result))
+    first_pub = _first_pub(primitive_result)
     return extract_counts(first_pub)
 
 

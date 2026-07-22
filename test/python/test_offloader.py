@@ -187,3 +187,9 @@ def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.Mo
     job_dirs = list(tmp_path.iterdir())
     assert len(job_dirs) == 1
     assert (job_dirs[0] / "qc.qpy").exists()
+
+
+def test_first_pub_raises_on_empty_result() -> None:
+    """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
+    with pytest.raises(RuntimeError, match="no pubs"):
+        offloader._first_pub([])  # noqa: SLF001
