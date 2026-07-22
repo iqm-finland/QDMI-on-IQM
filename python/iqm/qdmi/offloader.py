@@ -36,7 +36,7 @@ try:
     from qiskit_algorithms import VQE
     from qiskit_algorithms.optimizers import L_BFGS_B
 
-    from ._backends import build_estimator, build_sampler
+    from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_estimator, build_sampler
 except ImportError as e:
     _IMPORT_ERROR = e
 
@@ -225,7 +225,7 @@ def sample(
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
         backend, sampler = build_sampler(simulator=simulator)
-        qc_for_execution = transpile(qc, backend, optimization_level=3)
+        qc_for_execution = transpile(qc, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
         first_pub = next(iter(job.result()))
         return extract_counts(first_pub)

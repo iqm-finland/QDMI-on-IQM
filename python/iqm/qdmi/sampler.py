@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 try:
     from qiskit import qpy, transpile
 
-    from ._backends import build_sampler
+    from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -71,7 +71,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         qc_alias=args.qc_alias,
     )
 
-    circuit_for_execution = transpile(circuit, backend)
+    circuit_for_execution = transpile(circuit, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
     pickled = pickle.dumps(job.result())
     print(base64.b64encode(pickled).decode("utf-8"))

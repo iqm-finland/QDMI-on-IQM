@@ -32,6 +32,11 @@ if TYPE_CHECKING:
 
 _SIMULATOR_DEVICE = "MQT Core DDSIM QDMI Device"
 
+#: Optimization level used whenever a circuit is transpiled for execution
+#: (offloader local path and the `iqm-sampler` Slurm worker), so the two
+#: paths stay in sync instead of drifting to different Qiskit defaults.
+TRANSPILE_OPTIMIZATION_LEVEL = 3
+
 
 def build_sampler(
     *,
