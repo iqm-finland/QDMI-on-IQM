@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 import math
 import pickle  # noqa: S403
+import re
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -179,7 +180,7 @@ def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.Mo
     circuit = QuantumCircuit(1)
     circuit.measure_all()
 
-    with pytest.raises(RuntimeError, match=str(tmp_path)):
+    with pytest.raises(RuntimeError, match=re.escape(str(tmp_path))):
         offloader.sample(circuit, shots=7, local=False, simulator=True)
 
     # The job directory and its serialized circuit must survive the failure for debugging.
