@@ -25,6 +25,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Reject missing Slurm license requests when the SPANK plugin has
+  `iqm_require_license=1` enabled
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 

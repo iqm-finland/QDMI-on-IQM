@@ -400,11 +400,20 @@ public:
                      static_cast<int>(licenses_buf.size()));
 
     if (licenses_rc != ESPANK_SUCCESS && licenses_rc != ESPANK_NOSPACE) {
-      slurm_debug(
-          "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
-          "environment (requires Slurm >=23.02, or no --licenses requested); "
-          "skipping Slurm license alignment check");
-      return ESPANK_SUCCESS;
+      if (!require_license_) {
+        slurm_debug(
+            "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
+            "environment (requires Slurm >=23.02, or no --licenses requested); "
+            "skipping Slurm license alignment check");
+        return ESPANK_SUCCESS;
+      }
+
+      slurm_spank_log(
+          "[iqm_spank_plugin] error: missing required Slurm license '%s' for "
+          "QC alias '%s' — resubmit with --licenses=%s:<n> "
+          "(iqm_require_license is enabled)",
+          expected_license.c_str(), alias->c_str(), expected_license.c_str());
+      return ESPANK_ERROR;
     }
 
     bool aligned = false;

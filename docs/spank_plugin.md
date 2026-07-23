@@ -173,7 +173,8 @@ required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.t
 - `iqm_require_license`: When set to a truthy value
   (`1`/`true`/`yes`/`on`/`enabled`, case-insensitive), fails at launch jobs
   whose Slurm license request does not match the derived name, instead of only
-  logging a warning (default: off). See
+  logging a warning (default: off). This fails closed when `SLURM_JOB_LICENSES`
+  is unavailable, so only enable it on Slurm 23.02 or newer. See
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
   for the exact semantics. An unrecognized value logs a warning and is treated
   as off.
@@ -233,7 +234,8 @@ that pressure itself, ahead of the QC's own queue.
    warning. Setting `iqm_require_license=1` instead fails the job step at launch
    — after the job has already been allocated, not at submission time — and only
    takes effect if the plugin is declared `required` (not `optional`) in
-   `plugstack.conf`.
+   `plugstack.conf`. The hard requirement fails closed when `SLURM_JOB_LICENSES`
+   is unavailable and therefore requires Slurm 23.02 or newer.
 5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf`
    to track its usage in Slurm accounting.
 
