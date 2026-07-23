@@ -131,6 +131,28 @@ def _new_job_dir() -> Path:
     return job_dir
 
 
+def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[str]:
+    """Build `srun` options for an explicit per-job quantum computer selection.
+
+    Unlike backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`), which reach
+    the job purely through the environment -- either plain Slurm propagation
+    from the submitting shell, or the QDMI-on-IQM SPANK plugin's own
+    plugstack.conf.d defaults on the `quantum` partition -- QC selection is a
+    per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
+    `srun` itself, which the SPANK plugin resolves into the job's
+    `IQM_QC_ID`/`IQM_QC_ALIAS` environment variable.
+
+    Returns:
+        List of `srun` options for the requested quantum computer selection.
+    """
+    args = []
+    if qc_id:
+        args.append(f"--iqm-qc-id={qc_id}")
+    if qc_alias:
+        args.append(f"--iqm-qc-alias={qc_alias}")
+    return args
+
+
 def _run_srun(command: list[str], job_dir: Path) -> subprocess.CompletedProcess[bytes]:
     """Run *command* via `srun` and return the completed process.
 
@@ -191,6 +213,8 @@ def sample(
     local: bool = False,
     simulator: bool = False,
     timeout: float | None = None,
+    qc_id: str | None = None,
+    qc_alias: str | None = None,
 ) -> dict[str, int]:
     """Sample from a quantum circuit.
 
@@ -209,6 +233,12 @@ def sample(
             Only used when `local=False`.
         timeout: The timeout passed to the IQM Backend in seconds.
             Only used when `local=False`.
+        qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
+            SPANK plugin resolves into the `IQM_QC_ID` job environment variable.
+            Only used when `local=False`.
+        qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
+            QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
+            environment variable. Only used when `local=False`.
 
     Returns:
         A dictionary of measurement counts.
@@ -246,6 +276,7 @@ def sample(
         f"--job-name={job_name}",
         "--nodes=1",
         "--partition=quantum",
+        *_spank_qc_selection_args(qc_id, qc_alias),
         "iqm-sampler",
         str(qc_path.absolute()),
         "--shots",
@@ -277,6 +308,8 @@ def estimate(
     local: bool = False,
     simulator: bool = False,
     timeout: float | None = None,
+    qc_id: str | None = None,
+    qc_alias: str | None = None,
 ) -> VQEResult:
     """Estimate the optimal parameters for a given ansatz circuit and operator.
 
@@ -302,6 +335,12 @@ def estimate(
             Only used when `local=False`.
         timeout: The timeout passed to the IQM Backend in seconds.
             Only used when `local=False`.
+        qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
+            SPANK plugin resolves into the `IQM_QC_ID` job environment variable.
+            Only used when `local=False`.
+        qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
+            QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
+            environment variable. Only used when `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -341,6 +380,7 @@ def estimate(
         f"--job-name={job_name}",
         "--nodes=1",
         "--partition=quantum",
+        *_spank_qc_selection_args(qc_id, qc_alias),
         "iqm-estimator",
         str(qc_path.absolute()),
         str(operator_path.absolute()),
