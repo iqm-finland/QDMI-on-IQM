@@ -37,6 +37,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Preserve a configured `iqm.default` endpoint unless `IQMBackend` receives
+  an explicit or environment-provided base URL
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 

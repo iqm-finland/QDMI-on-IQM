@@ -51,12 +51,15 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
             device_id: str,
             library_path: str,
             prefix: str,
+            *,
+            base_url: str | None = None,
         ) -> None:
             captured["definition"] = self
             captured["definition_kwargs"] = {
                 "device_id": device_id,
                 "library_path": library_path,
                 "prefix": prefix,
+                "base_url": base_url,
             }
 
     def fake_register_device_if_absent(definition: object) -> bool:
@@ -83,6 +86,7 @@ def _expected_definition() -> dict[str, str]:
         "device_id": "iqm.default",
         "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
         "prefix": "IQM",
+        "base_url": "https://resonance.iqm.tech",
     }
 
 
@@ -154,8 +158,9 @@ def test_iqm_backend_does_not_use_legacy_resonance_api_key(
 
     IQMBackend()
 
+    assert captured["definition_kwargs"] == _expected_definition()
     assert captured["session"] == {
-        "base_url": "https://resonance.iqm.tech",
+        "base_url": None,
         "token": None,
         "auth_file": None,
         "custom1": None,
@@ -166,6 +171,7 @@ def test_iqm_backend_does_not_use_legacy_resonance_api_key(
 def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyPatch) -> None:
     """An existing configured definition should win over the packaged fallback."""
     captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.delenv("IQM_BASE_URL", raising=False)
 
     def existing_registration(_definition: object) -> bool:
         return False
@@ -175,6 +181,25 @@ def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyP
     IQMBackend()
 
     assert captured["opened_id"] == "iqm.default"
+    assert captured["session"]["base_url"] is None
+
+
+def test_iqm_backend_propagates_disabled_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A disabled stable ID should not be re-enabled by the packaged fallback."""
+    _stub_backend_construction(monkeypatch)
+
+    def disabled_registration(_definition: object) -> bool:
+        return False
+
+    def disabled_open(_device_id: str, **_session: str | None) -> object:
+        msg = "QDMI device ID 'iqm.default' is disabled by configuration"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", disabled_registration)
+    monkeypatch.setattr(iqm_qiskit, "open_device", disabled_open)
+
+    with pytest.raises(RuntimeError, match="disabled by configuration"):
+        IQMBackend()
 
 
 def test_iqm_backend_propagates_invalid_registration(monkeypatch: pytest.MonkeyPatch) -> None:

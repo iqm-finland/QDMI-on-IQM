@@ -44,13 +44,14 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-If no explicit arguments are provided, the wrapper resolves `IQM_BASE_URL`,
+Explicit arguments to `IQMBackend(...)` take precedence over `IQM_BASE_URL`,
 `IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QC_ALIAS` from the
-environment. Alternatively, pass any of those values directly to
-`IQMBackend(...)`.
+environment. For the endpoint, an explicit argument takes precedence over
+`IQM_BASE_URL`, which takes precedence over the registered device default.
 
 The wrapper registers the packaged provider as a fallback under the stable ID
-`iqm.default`, preserving an existing configured definition with that ID. Every
+`iqm.default` with the standard Resonance endpoint as its default. An existing
+configured definition with that ID is preserved, including its endpoint. Every
 backend opens a fresh session with its own configuration. The returned FoMaC
 device owns that session for the backend's lifetime.
 
