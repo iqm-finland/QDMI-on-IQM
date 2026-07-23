@@ -361,12 +361,12 @@ public:
    * check is skipped (returns `ESPANK_SUCCESS`, debug log only) when:
    *   - No `IQM_QC_ALIAS` is resolved (`IQM_QC_ID`-only jobs are not
    *     checked; raw IDs are not reliably convertible into license names).
-   *   - `SLURM_JOB_LICENSES` is absent — true both on Slurm < 23.02 (the
-   *     variable does not exist there) and when the user requested no
-   *     `--licenses` at all. These two cases cannot be distinguished from
-   *     inside the plugin, so absence is always treated as a no-op. A
-   *     value too long to fit the lookup buffer is treated as a mismatch
-   *     instead (fail closed, not skipped).
+   *   - `SLURM_JOB_LICENSES` is absent and `iqm_require_license` is disabled.
+   *     Absence means either Slurm < 23.02 (where the variable does not exist)
+   *     or that the user requested no `--licenses`; these cases cannot be
+   *     distinguished. With `iqm_require_license` enabled, either case is
+   *     rejected. A value too long to fit the lookup buffer is treated as a
+   *     mismatch instead (fail closed, not skipped).
    *
    * Note on enforcement: returning `ESPANK_ERROR` here fails the task at
    * launch in `slurm_spank_task_init` (remote context) — i.e. *after* the

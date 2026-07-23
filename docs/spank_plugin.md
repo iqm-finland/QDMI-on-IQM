@@ -230,12 +230,13 @@ that pressure itself, ahead of the QC's own queue.
    separator, the plugin replaces `:` and `,` in the alias with `_` when
    deriving the name (e.g. alias `emerald:mock` → license
    `iqm_qc_emerald_mock`).
-4. By default, a mismatch (or a missing `--licenses` request) only logs a
-   warning. Setting `iqm_require_license=1` instead fails the job step at launch
-   — after the job has already been allocated, not at submission time — and only
-   takes effect if the plugin is declared `required` (not `optional`) in
-   `plugstack.conf`. The hard requirement fails closed when `SLURM_JOB_LICENSES`
-   is unavailable and therefore requires Slurm 23.02 or newer.
+4. By default, a mismatched request logs a warning, while a missing `--licenses`
+   request is a silent no-op. Setting `iqm_require_license=1` instead fails
+   either case at job-step launch — after the job has already been allocated,
+   not at submission time — and only takes effect if the plugin is declared
+   `required` (not `optional`) in `plugstack.conf`. The hard requirement fails
+   closed when `SLURM_JOB_LICENSES` is unavailable and therefore requires Slurm
+   23.02 or newer.
 5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf`
    to track its usage in Slurm accounting.
 
