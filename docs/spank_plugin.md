@@ -156,13 +156,11 @@ overridden by users at submission time.
 
 **`/etc/slurm/plugstack.conf.d/iqm-qdmi.conf`**
 
+The whole directive must be a single line; plugstack.conf does not support line
+continuation.
+
 ```text
-required /usr/lib/slurm/iqm-spank-plugin.so \
-    iqm_base_url=https://resonance.iqm.tech \
-    iqm_tokens_file=/etc/iqm/tokens.json \
-    partitions=quantum,debug \
-    iqm_license_prefix=iqm_qc_ \
-    iqm_require_license=1
+required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech iqm_tokens_file=/etc/iqm/tokens.json partitions=quantum,debug iqm_license_prefix=iqm_qc_ iqm_require_license=1
 ```
 
 - `iqm_base_url`: Default API endpoint.
