@@ -52,8 +52,9 @@
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
  *   - iqm_license_prefix=iqm_qc_ (prefix used to derive the expected Slurm
  *     license name from IQM_QC_ALIAS; default: "iqm_qc_")
- *   - iqm_require_license=1 (reject jobs whose Slurm license request does
- *     not match the derived name; default: off, warn only)
+ *   - iqm_require_license=1 (reject jobs whose Slurm license request is
+ *     missing or does not match the derived name; by default, mismatches
+ *     warn and an absent request is ignored)
  *
  * Partition detection uses the `SLURM_JOB_PARTITION` environment variable
  * (set by Slurm in every job), which is portable across all Slurm versions.
@@ -799,9 +800,9 @@ private:
   /// argument (default: "iqm_qc_").
   std::optional<std::string> license_prefix_;
 
-  /// When true, jobs that resolve an IQM_QC_ALIAS but do not request the
-  /// corresponding Slurm license via --licenses are rejected outright
-  /// instead of only receiving a warning. Configurable via
+  /// When true, jobs that resolve an IQM_QC_ALIAS but have no Slurm license
+  /// request or request a different license are rejected. By default,
+  /// mismatches warn and an absent request is ignored. Configurable via
   /// `iqm_require_license` (default: false/off).
   bool require_license_ = false;
 };

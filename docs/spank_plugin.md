@@ -172,9 +172,10 @@ required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.t
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses).
 - `iqm_require_license`: When set to a truthy value
   (`1`/`true`/`yes`/`on`/`enabled`, case-insensitive), fails at launch jobs
-  whose Slurm license request does not match the derived name, instead of only
-  logging a warning (default: off). This fails closed when `SLURM_JOB_LICENSES`
-  is unavailable, so only enable it on Slurm 23.02 or newer. See
+  whose Slurm license request is missing or does not match the derived name. By
+  default, mismatches log a warning and an absent request is ignored. This fails
+  closed when `SLURM_JOB_LICENSES` is unavailable, so only enable it on Slurm
+  23.02 or newer. See
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
   for the exact semantics. An unrecognized value logs a warning and is treated
   as off.
