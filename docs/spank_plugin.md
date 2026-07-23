@@ -91,10 +91,10 @@ This matters most for **on-premise QCs**: like Resonance, an on-premise setup
 still runs its own internal queue, but it typically fronts single-tenant
 hardware, so uncontrolled Slurm-side concurrency puts unnecessary pressure on
 that queue. Requesting the license lets Slurm regulate that pressure itself,
-ahead of the QC's own queue. If you omit `--licenses` on a cluster where it's
-expected, the plugin logs a warning (or, if the administrator has set
-`iqm_require_license=1`, fails your job step at launch instead — after it has
-already been allocated, not at submission time).
+ahead of the QC's own queue. If you omit `--licenses`, the default policy is a
+silent no-op. If the administrator has set `iqm_require_license=1`, the plugin
+instead fails your job step at launch — after it has already been allocated, not
+at submission time.
 
 ### Executing via CLI Scripts
 
@@ -125,8 +125,8 @@ policy or handle backend-side queue management.
   check (see
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses))
   additionally requires Slurm 23.02 or newer, since it relies on the
-  `SLURM_JOB_LICENSES` job environment variable; on older Slurm versions it is a
-  silent no-op.
+  `SLURM_JOB_LICENSES` job environment variable; on older Slurm versions the
+  default policy is a silent no-op, while `iqm_require_license=1` fails closed.
 - **C++ Compiler**: C++20 standard library support (GCC 13+ or Clang 16+).
 - **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI.
   You must compile the plugin against the target cluster's Slurm header files

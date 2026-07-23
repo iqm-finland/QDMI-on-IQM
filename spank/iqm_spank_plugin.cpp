@@ -76,7 +76,8 @@
  * already been allocated — it is not a submission-time rejection — and only
  * takes effect if the plugin is declared `required`, not `optional`, in
  * plugstack.conf). This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`);
- * on older Slurm, or when the job has no alias, it is a silent no-op.
+ * on older Slurm it is a silent no-op unless `iqm_require_license=1`, which
+ * fails closed. Jobs without an alias are always skipped.
  */
 // clang-format on
 
