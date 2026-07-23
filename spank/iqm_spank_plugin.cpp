@@ -18,6 +18,7 @@
  * with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// clang-format off
 /** @file
  * @brief Slurm SPANK plugin for IQM QDMI integration.
  *
@@ -35,13 +36,10 @@
  *   2. User-set environment variables
  *   3. plugstack.conf defaults
  *
- * Example plugstack.conf entry:
+ * Example plugstack.conf entry (the whole directive must be a single line;
+ * plugstack.conf does not support line continuation):
  * @code
- * required /usr/lib/slurm/iqm-spank-plugin.so \
- *     partitions=quantum                           \
- *     iqm_base_url=https://resonance.iqm.tech      \
- *     iqm_tokens_file=/etc/iqm/tokens.json         \
- *     iqm_qc_alias=emerald
+ * required /usr/lib/slurm/iqm-spank-plugin.so partitions=quantum iqm_base_url=https://resonance.iqm.tech iqm_tokens_file=/etc/iqm/tokens.json iqm_qc_alias=emerald
  * @endcode
  *
  * Supported plugstack arguments, srun options, and mapped env variables:
@@ -80,6 +78,7 @@
  * plugstack.conf). This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`);
  * on older Slurm, or when the job has no alias, it is a silent no-op.
  */
+// clang-format on
 
 #include <algorithm>
 #include <array>
