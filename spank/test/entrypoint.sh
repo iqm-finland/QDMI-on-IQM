@@ -32,8 +32,26 @@ if [[ ! -f /workspace/.built-in-image ]]; then
 
   # The CMake installation writes a commented-out template of iqm-qdmi.conf.
   # We must activate it by writing the uncommented, active required line.
-  echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" \
+  echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=http://127.0.0.1:18080 iqm_validation_timeout=1" \
     | sudo tee /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+fi
+
+# Start the credential-free IQM API fixture used by mandatory backend checks.
+echo "=== Starting local IQM API fixture ==="
+uv run --script /workspace/spank/test/mock_iqm_backend.py \
+  >/tmp/mock-iqm-backend.log 2>&1 &
+mock_iqm_pid=$!
+trap 'kill "$mock_iqm_pid" 2>/dev/null || true' EXIT
+for _ in {1..30}; do
+  if curl --fail --silent http://127.0.0.1:18080/request-count >/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if ! curl --fail --silent http://127.0.0.1:18080/request-count >/dev/null; then
+  echo "ERROR: Local IQM API fixture did not start"
+  cat /tmp/mock-iqm-backend.log
+  exit 1
 fi
 
 # Start Munge service
@@ -46,7 +64,15 @@ sudo /usr/sbin/slurmctld || { echo "ERROR: slurmctld failed to start"; exit 1; }
 
 # Start Slurmd
 echo "=== Starting Slurmd ==="
-sudo /usr/sbin/slurmd -N localhost || { echo "ERROR: slurmd failed to start"; exit 1; }
+# Poison the daemon-only IQM environment. The plugin must validate the SPANK
+# job environment instead of inheriting any of these service-process values.
+sudo env \
+  IQM_BASE_URL="http://127.0.0.1:1" \
+  IQM_TOKEN="daemon-only-token" \
+  IQM_TOKENS_FILE="/daemon-only/missing-tokens.json" \
+  IQM_QC_ID="daemon-only-qc-id" \
+  IQM_QC_ALIAS="daemon-only-qc-alias" \
+  /usr/sbin/slurmd -N localhost || { echo "ERROR: slurmd failed to start"; exit 1; }
 
 # Wait for node to be ready
 echo "=== Waiting for Slurm node to become ready ==="
@@ -64,4 +90,4 @@ if ! sinfo -h -n "localhost" -o "%t" | grep -qE "idle|alloc"; then
   exit 1
 fi
 
-exec "$@"
+"$@"

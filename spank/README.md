@@ -22,6 +22,6 @@ for the plugin license text.
 
 Unlike the core QDMI-on-IQM library, this plugin is tied directly to the Slurm
 ABI of the target system. It must be compiled against the target cluster's Slurm
-header files (`slurm/spank.h`) and rebuilt whenever the cluster's Slurm version
-is upgraded. For detailed version compatibility and compiler requirements, see
-the [SPANK Plugin Guide](../docs/spank_plugin.md).
+20.02-or-newer header files (`slurm/spank.h`) and rebuilt whenever the cluster's
+Slurm version is upgraded. For detailed version compatibility and compiler
+requirements, see the [SPANK Plugin Guide](../docs/spank_plugin.md).

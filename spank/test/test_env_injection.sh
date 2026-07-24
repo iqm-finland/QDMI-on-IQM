@@ -28,9 +28,14 @@
 #   1. Plugstack-configured variables are visible in the job environment.
 #   2. User-set variables override plugstack defaults (precedence).
 #   3. Unconfigured variables are absent from the job environment.
-#   4. Conflicting auth is rejected.
-#   5. srun options have highest precedence.
-#   6. Missing IQM_BASE_URL is rejected.
+#   4. Configured token files are visible in the job environment.
+#   5. Conflicting auth is rejected.
+#   6. srun options have highest precedence.
+#   7. Missing IQM_BASE_URL is rejected.
+#   8. An unavailable IQM backend is rejected.
+#   9. Daemon-only IQM variables do not affect backend validation.
+#  10. Backend validation and task diagnostics run once per node and job step.
+#  11. Backend validation fails within its configured HTTP timeout.
 
 set -euo pipefail
 
@@ -38,6 +43,8 @@ partition=""
 srun_cmd="srun"
 test_base_url="https://test.example.com"
 test_tokens_file=""
+request_count_url=""
+hang_base_url=""
 
 passed=0
 failed=0
@@ -105,6 +112,10 @@ Options:
                            (default: https://test.example.com).
   --test-tokens-file <f>   Expected IQM_TOKENS_FILE from plugstack config
                            (if set).
+  --request-count-url <u>  Optional mock-backend counter endpoint used to
+                           verify once-per-node, per-step validation.
+  --hang-base-url <u>      Optional mock-backend URL that accepts requests but
+                           delays responses beyond the configured timeout.
   -h, --help               Show this help.
 
 Examples:
@@ -137,6 +148,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --test-tokens-file)
       test_tokens_file="$2"
+      shift 2
+      ;;
+    --request-count-url)
+      request_count_url="$2"
+      shift 2
+      ;;
+    --hang-base-url)
+      hang_base_url="$2"
       shift 2
       ;;
     -h | --help)
@@ -198,7 +217,11 @@ fi
 
 echo "--- Test 2: User override takes precedence ---" >&2
 
-override_base_url="https://user-override.example.com"
+if [[ "$test_base_url" == */ ]]; then
+  override_base_url="${test_base_url%/}"
+else
+  override_base_url="${test_base_url}/"
+fi
 job_base_url_override=$(IQM_BASE_URL="$override_base_url" get_job_env "IQM_BASE_URL") || true
 
 if [[ "$job_base_url_override" == "$override_base_url" ]]; then
@@ -274,7 +297,7 @@ fi
 
 echo "--- Test 6: srun --iqm-base-url overrides plugstack and user env ---" >&2
 
-srun_override_base_url="https://srun-override.example.com"
+srun_override_base_url="$test_base_url"
 
 # Run srun with --iqm-base-url, plus IQM_BASE_URL in env to test full precedence.
 override_args=(--immediate=3 -N1 -n1)
@@ -327,6 +350,139 @@ elif [[ $missing_url_rc -ne 0 ]]; then
   pass "srun failed (rc=$missing_url_rc) when IQM_BASE_URL is empty"
 else
   fail "Missing IQM_BASE_URL was not rejected"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 8: Unavailable IQM backend is rejected
+# ---------------------------------------------------------------------------
+
+echo "--- Test 8: Unavailable IQM backend is rejected ---" >&2
+
+unavailable_args=(--immediate=3 --overcommit -N1 -n2)
+if [[ -n "$partition" ]]; then
+  unavailable_args+=(--partition "$partition")
+fi
+unavailable_args+=(--iqm-base-url=http://127.0.0.1:1)
+
+set +e
+unavailable_output=$("$srun_cmd" "${unavailable_args[@]}" /bin/true 2>&1)
+unavailable_rc=$?
+set -e
+rejection_log_count=$(grep -Fc \
+  "[iqm_spank_plugin] error: job rejected because IQM validation failed" \
+  <<<"$unavailable_output" || true)
+
+if [[ $unavailable_rc -eq 0 ]]; then
+  fail "srun succeeded despite an unavailable IQM backend"
+elif echo "$unavailable_output" | grep -Fq "IQM backend validation failed"; then
+  pass "Unavailable IQM backend rejected before task launch"
+else
+  fail "srun failed (rc=$unavailable_rc) without the backend-validation message"
+fi
+
+if [[ $rejection_log_count -eq 1 ]]; then
+  pass "Multi-task validation failure emitted one rejection diagnostic"
+else
+  fail "Expected one cached-failure diagnostic, observed $rejection_log_count"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 9: Daemon-only IQM variables do not affect validation
+# ---------------------------------------------------------------------------
+
+echo "--- Test 9: Daemon IQM environment is isolated from jobs ---" >&2
+
+if run_srun /bin/sh -c \
+  'test -z "${IQM_TOKEN:-}" && test -z "${IQM_TOKENS_FILE:-}" && test -z "${IQM_QC_ID:-}" && test -z "${IQM_QC_ALIAS:-}"' \
+  >/dev/null; then
+  pass "Backend validation ignored daemon-only IQM variables"
+else
+  fail "Daemon-only IQM variables affected validation or reached the job"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 10: Backend validation and diagnostics run once per node and job step
+# ---------------------------------------------------------------------------
+
+echo "--- Test 10: Backend validation and diagnostics run once per node and job step ---" >&2
+
+if [[ -z "$request_count_url" ]]; then
+  skip "No --request-count-url provided; skipping once-per-node assertions"
+else
+  reference_before=$(curl --fail --silent "$request_count_url")
+  if run_srun /bin/true >/dev/null; then
+    reference_after=$(curl --fail --silent "$request_count_url")
+    reference_delta=$((reference_after - reference_before))
+  else
+    reference_delta=0
+  fi
+
+  before_count=$(curl --fail --silent "$request_count_url")
+  once_args=(--immediate=3 --overcommit -N1 -n2)
+  if [[ -n "$partition" ]]; then
+    once_args+=(--partition "$partition")
+  fi
+
+  set +e
+  once_output=$("$srun_cmd" "${once_args[@]}" /bin/true 2>&1)
+  once_rc=$?
+  set -e
+  after_count=$(curl --fail --silent "$request_count_url")
+  request_delta=$((after_count - before_count))
+  task_init_log_count=$(grep -Ec \
+    '\[iqm_spank_plugin\] hook=slurm_spank_task_init$' <<<"$once_output" || true)
+  privileged_log_count=$(grep -Ec \
+    '\[iqm_spank_plugin\] hook=slurm_spank_task_init_privileged$' \
+    <<<"$once_output" || true)
+  diagnostic_log_count=$(grep -Ec \
+    '\[iqm_spank_plugin\] job=.* partition=' <<<"$once_output" || true)
+
+  if [[ $once_rc -ne 0 ]]; then
+    fail "Two-task srun failed (rc=$once_rc)"
+  elif [[ $reference_delta -gt 0 && $request_delta -eq $reference_delta ]]; then
+    pass "Two-task single-node step performed one backend validation"
+  else
+    fail "Expected the two-task step to match one validation's $reference_delta requests, observed $request_delta"
+  fi
+
+  if [[ $task_init_log_count -eq 1 && $privileged_log_count -eq 1 && $diagnostic_log_count -eq 1 ]]; then
+    pass "Two-task job step emitted task hooks and summary diagnostics once"
+  else
+    fail "Expected one task-init, privileged-task-init, and summary diagnostic; observed $task_init_log_count, $privileged_log_count, and $diagnostic_log_count"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Test 11: A backend that accepts but never responds is bounded by HTTP timeout
+# ---------------------------------------------------------------------------
+
+echo "--- Test 11: Backend validation request timeout ---" >&2
+
+if [[ -z "$hang_base_url" ]]; then
+  skip "No --hang-base-url provided; skipping request-timeout assertion"
+else
+  timeout_args=(--immediate=3 -N1 -n1)
+  if [[ -n "$partition" ]]; then
+    timeout_args+=(--partition "$partition")
+  fi
+
+  start_seconds=$SECONDS
+  set +e
+  IQM_BASE_URL="$hang_base_url" timeout 8s "$srun_cmd" \
+    "${timeout_args[@]}" /bin/true >/dev/null 2>&1
+  timeout_rc=$?
+  set -e
+  elapsed_seconds=$((SECONDS - start_seconds))
+
+  if [[ $timeout_rc -eq 124 ]]; then
+    fail "Backend validation exceeded the 8-second outer test bound"
+  elif [[ $timeout_rc -eq 0 ]]; then
+    fail "Backend validation unexpectedly accepted a timed-out request"
+  elif [[ $elapsed_seconds -le 5 ]]; then
+    pass "Backend validation rejected a non-responsive endpoint in ${elapsed_seconds}s"
+  else
+    fail "Backend validation took ${elapsed_seconds}s despite the configured one-second request timeout"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

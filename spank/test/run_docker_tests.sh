@@ -31,6 +31,17 @@ show_logs() {
 # If any command fails, dump logs before exiting
 trap show_logs ERR
 
+echo "=== Verifying self-contained SPANK plugin installation ==="
+plugin_path=$(find /usr/lib -name iqm-spank-plugin.so -print -quit)
+if [[ -z "${plugin_path}" ]]; then
+  echo "IQM SPANK plugin was not installed" >&2
+  exit 1
+fi
+if ldd "${plugin_path}" | grep -Fq libiqm-qdmi-device; then
+  echo "IQM SPANK plugin unexpectedly depends on the shared IQM QDMI device" >&2
+  exit 1
+fi
+
 echo "=== Verifying basic Slurm srun connectivity ==="
 srun --partition=debug --immediate=5 /bin/true
 
@@ -43,7 +54,9 @@ uvx nox -s smoke_tests -- \
   --partition debug \
   --hook-mode full \
   --require-all-hooks \
-  --test-base-url "https://resonance.iqm.tech"
+  --test-base-url "http://127.0.0.1:18080" \
+  --request-count-url "http://127.0.0.1:18080/request-count" \
+  --hang-base-url "http://127.0.0.1:18080/hang"
 
 # Running resonance tests if authentication is configured
 if [[ -n "${IQM_TOKEN:-}" || -n "${IQM_TOKENS_FILE:-}" ]]; then

@@ -77,7 +77,7 @@ RUN SLURM_LIB_DIR=$(dpkg-architecture -qDEB_HOST_MULTIARCH | xargs -I{} echo /us
     cmake --build /workspace/build-spank-docker --target iqm-spank-plugin && \
     cmake --install /workspace/build-spank-docker --component iqm-spank-plugin && \
     rm -rf /workspace/build-spank-docker && \
-    echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
+    echo "required $SLURM_LIB_DIR/iqm-spank-plugin.so iqm_base_url=http://127.0.0.1:18080 iqm_validation_timeout=1" > /etc/slurm/plugstack.conf.d/iqm-qdmi.conf
 
 # Create a sentinel file to detect bind-mount shadowing
 RUN touch /workspace/.built-in-image

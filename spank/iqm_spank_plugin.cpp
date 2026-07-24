@@ -50,6 +50,8 @@
  *
  * Additional plugstack-only arguments:
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
+ *   - iqm_validation_timeout=30 (per-request backend-validation timeout in
+ *     seconds; default: 30, allowed range: 1-3600)
  *   - iqm_license_prefix=iqm_qc_ (prefix used to derive the expected Slurm
  *     license name from IQM_QC_ALIAS; default: "iqm_qc_")
  *   - iqm_require_license=1 (reject jobs whose Slurm license request is
@@ -58,6 +60,10 @@
  *
  * Partition detection uses the `SLURM_JOB_PARTITION` environment variable
  * (set by Slurm in every job), which is portable across all Slurm versions.
+ *
+ * Before any task starts, the plugin initializes an IQM QDMI session once per
+ * node for each job step to verify that the configured backend and target QC
+ * are available.
  *
  * When `IQM_QC_ALIAS` is resolved, the plugin can optionally check that the
  * job's Slurm license request (the native `--licenses`/`-L` submission
@@ -85,10 +91,16 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
+#include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <optional>
+// POSIX setenv and unsetenv are declared by stdlib.h, not cstdlib.
+// NOLINTNEXTLINE(modernize-deprecated-headers)
+#include <stdlib.h>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -99,10 +111,14 @@
 // functions. This is unavoidable when interfacing with the Slurm C API.
 
 extern "C" {
+#include <iqm_qdmi/device.h>
 #include <slurm/slurm_errno.h>
 #include <slurm/slurm_version.h>
 #include <slurm/spank.h>
 }
+
+static_assert(SLURM_VERSION_NUMBER >= SLURM_VERSION_NUM(20, 2, 0),
+              "The IQM SPANK plugin requires Slurm 20.02 or newer");
 
 namespace {
 
@@ -117,6 +133,24 @@ struct Config_mapping {
   const char *option_name;
   /// srun option usage description.
   const char *option_usage;
+};
+
+/// A SPANK environment variable and its corresponding QDMI session parameter.
+struct Session_parameter_mapping {
+  /// Environment variable in the effective job environment.
+  const char *env_var;
+  /// QDMI session parameter receiving the value.
+  QDMI_Device_Session_Parameter parameter;
+};
+
+/// Cached result of the once-per-node, per-job-step validation.
+struct Validation_state {
+  /// Whether the plugin applies to this job step.
+  bool active = true;
+  /// Whether validation has finished.
+  bool complete = false;
+  /// Whether all validation checks succeeded.
+  bool successful = false;
 };
 
 /// All recognized configuration entries and their mappings.
@@ -139,6 +173,80 @@ constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
      .option_usage = "Quantum computer alias"},
 }};
 
+/// Effective job values passed explicitly to the validation session.
+constexpr std::array<Session_parameter_mapping, 5> K_SESSION_PARAMETERS = {{
+    {.env_var = "IQM_BASE_URL",
+     .parameter = QDMI_DEVICE_SESSION_PARAMETER_BASEURL},
+    {.env_var = "IQM_TOKEN", .parameter = QDMI_DEVICE_SESSION_PARAMETER_TOKEN},
+    {.env_var = "IQM_TOKENS_FILE",
+     .parameter = QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE},
+    {.env_var = "IQM_QC_ID",
+     .parameter = QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1},
+    {.env_var = "IQM_QC_ALIAS",
+     .parameter = QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2},
+}};
+
+/// Default per-request timeout for launch-time backend validation.
+constexpr uint64_t K_DEFAULT_VALIDATION_TIMEOUT_MILLISECONDS = 30'000;
+/// Longest accepted validation request timeout.
+constexpr uint64_t K_MAX_VALIDATION_TIMEOUT_SECONDS = 3'600;
+
+/**
+ * @brief Hide daemon environment defaults while IQM validates explicit values.
+ *
+ * The effective SPANK job values are passed as QDMI session parameters. Hiding
+ * the corresponding process variables prevents slurmstepd service defaults
+ * from supplying values that are absent from the job.
+ */
+class ScopedSessionEnvironment final {
+public:
+  ScopedSessionEnvironment() {
+    for (std::size_t i = 0; i < K_SESSION_PARAMETERS.size(); ++i) {
+      const auto *env_var = K_SESSION_PARAMETERS[i].env_var;
+      if (const auto *value = std::getenv(env_var); value != nullptr) {
+        original_values_[i] = value;
+      }
+      if (unsetenv(env_var) != 0) {
+        valid_ = false;
+        break;
+      }
+      ++hidden_values_;
+    }
+  }
+
+  ScopedSessionEnvironment(const ScopedSessionEnvironment &) = delete;
+  ScopedSessionEnvironment &
+  operator=(const ScopedSessionEnvironment &) = delete;
+  ScopedSessionEnvironment(ScopedSessionEnvironment &&) = delete;
+  ScopedSessionEnvironment &operator=(ScopedSessionEnvironment &&) = delete;
+
+  ~ScopedSessionEnvironment() {
+    for (std::size_t i = 0; i < hidden_values_; ++i) {
+      if (set_value(K_SESSION_PARAMETERS[i].env_var, original_values_[i]) !=
+          0) {
+        slurm_spank_log(
+            "[iqm_spank_plugin] error: failed to restore process environment");
+      }
+    }
+  }
+
+  [[nodiscard]] bool valid() const { return valid_; }
+
+private:
+  static int set_value(const char *name,
+                       const std::optional<std::string> &value) {
+    if (value.has_value()) {
+      return setenv(name, value->c_str(), 1);
+    }
+    return unsetenv(name);
+  }
+
+  std::array<std::optional<std::string>, K_SESSION_PARAMETERS.size()>
+      original_values_{};
+  std::size_t hidden_values_ = 0;
+  bool valid_ = true;
+};
+
 /**
  * @brief Parses plugstack.conf arguments, processes srun options, and injects
  * IQM environment variables into Slurm jobs.
@@ -148,14 +256,14 @@ constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
  *      `key=value` pairs from the plugstack.conf line.
  *   2. `register_options()` is called from `slurm_spank_init` to register
  *      `--iqm-*` srun command-line options.
- *   3. `inject_environment()` is called from `slurm_spank_task_init` (remote
+ *   3. `inject_environment()` is called from `slurm_spank_user_init` (remote
  *      context) to set environment variables in the job via `spank_setenv()`.
  *   4. `validate_environment()` is called after injection to perform
- *      superficial configuration validation. Deeper validation is deferred to
- *      the IQM QDMI device implementation.
- *   5. `validate_license_alignment()` is called after `validate_environment()`
- *      to check that the job's Slurm license request matches the targeted
- *      QC alias.
+ *      superficial configuration validation.
+ *   5. `validate_backend()` initializes an IQM QDMI session to verify the
+ *      configured backend and target QC before tasks are allowed to start.
+ *   6. `validate_license_alignment()` is called from task init for local task
+ *      zero, after Slurm makes `SLURM_JOB_LICENSES` available.
  */
 class IQMSpankConfigManager final {
 public:
@@ -205,6 +313,11 @@ public:
 
       if (!matched && key == "iqm_require_license") {
         require_license_ = parse_bool_arg(value, "iqm_require_license");
+        matched = true;
+      }
+
+      if (!matched && key == "iqm_validation_timeout") {
+        validation_timeout_milliseconds_ = parse_timeout_arg(value);
         matched = true;
       }
 
@@ -305,12 +418,9 @@ public:
   /**
    * @brief Validate that the effective configuration is non-contradictory.
    *
-   * Performs only superficial SPANK-side checks:
+   * Performs superficial SPANK-side checks before backend validation:
    *   1. `IQM_BASE_URL` must be set.
    *   2. `IQM_TOKEN` and `IQM_TOKENS_FILE` must not both be set.
-   *
-   * Deeper semantic/runtime validation is intentionally deferred to the
-   * IQM QDMI device implementation.
    *
    * @param spank SPANK handle for the current hook invocation.
    * @return `ESPANK_SUCCESS` if valid, `ESPANK_ERROR` on conflict.
@@ -345,6 +455,112 @@ public:
                 "auth_source=%s",
                 has_base_url ? "set" : "unset", auth_source);
 
+    return ESPANK_SUCCESS;
+  }
+
+  /**
+   * @brief Initialize a QDMI session to verify backend and target availability.
+   *
+   * Effective values are read from the SPANK job environment after injection
+   * and passed directly to the QDMI session, avoiding any dependency on the
+   * slurmstepd process environment.
+   *
+   * @param spank SPANK handle for the current remote job step.
+   * @return `ESPANK_SUCCESS` when the backend session is available,
+   *   `ESPANK_ERROR` otherwise.
+   */
+  [[nodiscard]] int validate_backend(spank_t spank) const {
+    const ScopedSessionEnvironment environment_scope;
+    if (!environment_scope.valid()) {
+      slurm_spank_log("[iqm_spank_plugin] error: failed to isolate backend "
+                      "validation from the daemon environment");
+      return ESPANK_ERROR;
+    }
+
+    if (IQM_QDMI_device_initialize() != QDMI_SUCCESS) {
+      slurm_spank_log(
+          "[iqm_spank_plugin] error: failed to initialize the IQM QDMI device");
+      return ESPANK_ERROR;
+    }
+
+    struct Qdmi_guard {
+      IQM_QDMI_Device_Session session = nullptr;
+
+      Qdmi_guard() = default;
+      Qdmi_guard(const Qdmi_guard &) = delete;
+      Qdmi_guard &operator=(const Qdmi_guard &) = delete;
+      Qdmi_guard(Qdmi_guard &&) = delete;
+      Qdmi_guard &operator=(Qdmi_guard &&) = delete;
+
+      ~Qdmi_guard() {
+        if (session != nullptr) {
+          IQM_QDMI_device_session_free(session);
+        }
+        IQM_QDMI_device_finalize();
+      }
+    } guard;
+
+    try {
+      if (IQM_QDMI_device_session_alloc(&guard.session) != QDMI_SUCCESS) {
+        slurm_spank_log(
+            "[iqm_spank_plugin] error: failed to allocate an IQM QDMI session");
+        return ESPANK_ERROR;
+      }
+
+      for (const auto &[env_var, parameter] : K_SESSION_PARAMETERS) {
+        const auto value = get_spank_env(spank, env_var);
+        if (!value.has_value()) {
+          continue;
+        }
+        if (IQM_QDMI_device_session_set_parameter(
+                guard.session, parameter, value->size() + 1, value->c_str()) !=
+            QDMI_SUCCESS) {
+          slurm_spank_log("[iqm_spank_plugin] error: invalid value for %s",
+                          env_var);
+          return ESPANK_ERROR;
+        }
+      }
+
+      if (IQM_QDMI_device_session_set_parameter(
+              guard.session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+              sizeof(validation_timeout_milliseconds_),
+              &validation_timeout_milliseconds_) != QDMI_SUCCESS) {
+        slurm_spank_log(
+            "[iqm_spank_plugin] error: invalid IQM validation timeout");
+        return ESPANK_ERROR;
+      }
+
+      if (IQM_QDMI_device_session_init(guard.session) != QDMI_SUCCESS) {
+        slurm_spank_log(
+            "[iqm_spank_plugin] error: IQM backend validation failed");
+        return ESPANK_ERROR;
+      }
+
+      QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+      if (IQM_QDMI_device_session_query_device_property(
+              guard.session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status),
+              &status, nullptr) != QDMI_SUCCESS ||
+          (status != QDMI_DEVICE_STATUS_IDLE &&
+           status != QDMI_DEVICE_STATUS_BUSY)) {
+        slurm_spank_log(
+            "[iqm_spank_plugin] error: targeted IQM quantum computer is not "
+            "available");
+        return ESPANK_ERROR;
+      }
+    } catch (const std::exception &error) {
+      slurm_spank_log(
+          "[iqm_spank_plugin] error: IQM backend validation raised an "
+          "exception: %s",
+          error.what());
+      return ESPANK_ERROR;
+    } catch (...) {
+      slurm_spank_log(
+          "[iqm_spank_plugin] error: IQM backend validation raised an unknown "
+          "exception");
+      return ESPANK_ERROR;
+    }
+
+    slurm_debug("[iqm_spank_plugin] IQM backend validation status=ok");
     return ESPANK_SUCCESS;
   }
 
@@ -583,10 +799,35 @@ public:
     const auto configured_count = static_cast<int>(
         std::count_if(plugstack_values_.cbegin(), plugstack_values_.cend(),
                       [](const auto &v) { return v.has_value(); }));
-    slurm_debug("[iqm_spank_plugin] parsed %d plugstack argument(s), "
-                "%zu active partition(s), require_license=%s",
-                configured_count, active_partitions_.size(),
-                require_license_ ? "true" : "false");
+    slurm_debug(
+        "[iqm_spank_plugin] parsed %d plugstack argument(s), "
+        "%zu active partition(s), require_license=%s, "
+        "validation_timeout_ms=%llu",
+        configured_count, active_partitions_.size(),
+        require_license_ ? "true" : "false",
+        static_cast<unsigned long long>(validation_timeout_milliseconds_));
+  }
+
+  /// Reset validation before a remote job step is processed.
+  void reset_validation() { validation_state_ = {}; }
+
+  /// Record that the partition filter disabled this plugin for the job step.
+  void skip_validation() {
+    validation_state_ = {.active = false, .complete = true, .successful = true};
+  }
+
+  /**
+   * @brief Store the final validation result for task-init enforcement.
+   * @param successful Whether every validation check succeeded.
+   */
+  void finish_validation(const bool successful) {
+    validation_state_ = {
+        .active = true, .complete = true, .successful = successful};
+  }
+
+  /// Return the cached validation result.
+  [[nodiscard]] Validation_state validation_state() const {
+    return validation_state_;
   }
 
 private:
@@ -660,6 +901,33 @@ private:
         "false, no, off, disabled)",
         static_cast<int>(value.size()), value.data(), arg_name);
     return false;
+  }
+
+  /**
+   * @brief Parse a launch-validation request timeout in whole seconds.
+   *
+   * Invalid values log a warning and retain the non-optional 30-second
+   * default. The upper bound prevents accidentally restoring the one-hour
+   * general-purpose HTTP timeout on Slurm's task-launch path.
+   *
+   * @param value The raw plugstack argument value.
+   * @return The timeout in milliseconds.
+   */
+  [[nodiscard]] static uint64_t parse_timeout_arg(std::string_view value) {
+    uint64_t timeout_seconds = 0;
+    const auto *first = value.data();
+    const auto *last = first + value.size();
+    const auto result = std::from_chars(first, last, timeout_seconds);
+    if (result.ec == std::errc{} && result.ptr == last &&
+        timeout_seconds >= 1 &&
+        timeout_seconds <= K_MAX_VALIDATION_TIMEOUT_SECONDS) {
+      return timeout_seconds * 1'000;
+    }
+    slurm_spank_log(
+        "[iqm_spank_plugin] warning: invalid iqm_validation_timeout '%.*s'; "
+        "using 30 seconds (expected an integer from 1 to 3600)",
+        static_cast<int>(value.size()), value.data());
+    return K_DEFAULT_VALIDATION_TIMEOUT_MILLISECONDS;
   }
 
   /**
@@ -805,6 +1073,13 @@ private:
   /// mismatches warn and an absent request is ignored. Configurable via
   /// `iqm_require_license` (default: false/off).
   bool require_license_ = false;
+
+  /// Once-per-node, per-job-step validation result consumed by task-init hooks.
+  Validation_state validation_state_{};
+
+  /// Per-request timeout used by mandatory backend validation.
+  uint64_t validation_timeout_milliseconds_ =
+      K_DEFAULT_VALIDATION_TIMEOUT_MILLISECONDS;
 };
 
 /// Global plugin configuration instance. Populated once during SPANK init,
@@ -838,6 +1113,22 @@ void Emit_hook_log(const char *hook_name) {
   slurm_spank_log("[iqm_spank_plugin] hook=%s", hook_name);
 }
 
+/**
+ * @brief Determine whether this hook invocation belongs to local task zero.
+ *
+ * Hooks without a remote task context are treated as primary. If Slurm cannot
+ * provide a task ID, retaining the historical task-zero behavior preserves
+ * diagnostics and license enforcement.
+ */
+bool Is_primary_task(spank_t spank) {
+  if (spank_remote(spank) != 1) {
+    return true;
+  }
+  int local_task_id = 0;
+  return spank_get_item(spank, S_TASK_ID, &local_task_id) != ESPANK_SUCCESS ||
+         local_task_id == 0;
+}
+
 } // namespace
 
 // NOLINTBEGIN(readability-identifier-naming)
@@ -864,6 +1155,9 @@ int slurm_spank_init(spank_t spank, const int ac, char **av) {
   Emit_hook_log("slurm_spank_init");
   g_config.parse_plugstack_args(ac, av);
   g_config.log_parsed_config();
+  if (spank_remote(spank) == 1) {
+    g_config.reset_validation();
+  }
   return g_config.register_options(spank);
 }
 
@@ -878,10 +1172,58 @@ int slurm_spank_init_post_opt(spank_t /* spank */, const int /* ac */,
 }
 
 /**
+ * @brief SPANK job-step user init hook (unprivileged context).
+ *
+ * Injects IQM environment variables and validates the resulting
+ * configuration and IQM backend exactly once per node for each remote job
+ * step.
+ *
+ * The hook intentionally returns success after caching a failure. Returning
+ * an error from `slurm_spank_user_init` can drain the node; the cached result
+ * is enforced safely from `slurm_spank_task_init` instead.
+ *
+ * @return `ESPANK_SUCCESS`.
+ */
+int slurm_spank_user_init(spank_t spank, const int /* ac */, char ** /* av */) {
+  Emit_hook_log("slurm_spank_user_init");
+
+  if (spank_remote(spank) != 1) {
+    return ESPANK_SUCCESS;
+  }
+
+  if (g_config.validation_state().complete) {
+    return ESPANK_SUCCESS;
+  }
+
+  if (!g_config.is_active_for_job(spank)) {
+    g_config.skip_validation();
+    return ESPANK_SUCCESS;
+  }
+
+  if (g_config.inject_environment(spank) != ESPANK_SUCCESS) {
+    g_config.finish_validation(false);
+    return ESPANK_SUCCESS;
+  }
+
+  const auto environment_rc =
+      IQMSpankConfigManager::validate_environment(spank);
+
+  IQMSpankConfigManager::check_tokens_file_access(spank);
+
+  bool successful = environment_rc == ESPANK_SUCCESS;
+  if (successful) {
+    successful = g_config.validate_backend(spank) == ESPANK_SUCCESS;
+  }
+  g_config.finish_validation(successful);
+  return ESPANK_SUCCESS;
+}
+
+/**
  * @brief SPANK task init hook (unprivileged context).
  *
- * Injects IQM environment variables into the job environment and performs
- * validation of the resulting configuration.
+ * Enforces the validation result cached once per node for the remote job step.
+ * Slurm only exposes `SLURM_JOB_LICENSES` at task-init time, so local task zero
+ * also performs the inexpensive license-alignment check and emits diagnostics.
  *
  * Slurm-ABI note: slurmstepd (`task.c`, `spank_user_task(...) < 0`) only
  * treats a *negative* return from this specific hook as fatal — it does
@@ -894,29 +1236,35 @@ int slurm_spank_init_post_opt(spank_t /* spank */, const int /* ac */,
  * @return `ESPANK_SUCCESS` on success, `-1` if validation failed.
  */
 int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
-  Emit_hook_log("slurm_spank_task_init");
-
-  // Partition filter: skip if job is not on an active partition.
-  if (!g_config.is_active_for_job(spank)) {
+  if (spank_remote(spank) != 1) {
+    Emit_hook_log("slurm_spank_task_init");
     return ESPANK_SUCCESS;
   }
 
-  if (const auto rc = g_config.inject_environment(spank);
-      rc != ESPANK_SUCCESS) {
+  const bool is_primary_task = Is_primary_task(spank);
+  if (is_primary_task) {
+    Emit_hook_log("slurm_spank_task_init");
+  }
+
+  const auto validation = g_config.validation_state();
+  if (!validation.active) {
+    return ESPANK_SUCCESS;
+  }
+  if (!validation.complete || !validation.successful) {
+    if (is_primary_task) {
+      slurm_spank_log("[iqm_spank_plugin] error: job rejected because IQM "
+                      "validation failed");
+    }
     return -1;
   }
 
-  const auto validation_rc = IQMSpankConfigManager::validate_environment(spank);
-  const auto license_validation_rc = g_config.validate_license_alignment(spank);
+  if (!is_primary_task) {
+    return ESPANK_SUCCESS;
+  }
 
-  // Auth file accessibility check (warning only).
-  IQMSpankConfigManager::check_tokens_file_access(spank);
-
-  // Structured diagnostic summary.
+  const auto license_rc = g_config.validate_license_alignment(spank);
   g_config.emit_diagnostics(spank);
-
-  if (validation_rc != ESPANK_SUCCESS ||
-      license_validation_rc != ESPANK_SUCCESS) {
+  if (license_rc != ESPANK_SUCCESS) {
     return -1;
   }
   return ESPANK_SUCCESS;
@@ -926,9 +1274,11 @@ int slurm_spank_task_init(spank_t spank, const int /* ac */, char ** /* av */) {
  * @brief SPANK task init hook (privileged context).
  * @return `ESPANK_SUCCESS`.
  */
-int slurm_spank_task_init_privileged(spank_t /* spank */, const int /* ac */,
+int slurm_spank_task_init_privileged(spank_t spank, const int /* ac */,
                                      char ** /* av */) {
-  Emit_hook_log("slurm_spank_task_init_privileged");
+  if (Is_primary_task(spank)) {
+    Emit_hook_log("slurm_spank_task_init_privileged");
+  }
   return ESPANK_SUCCESS;
 }
 

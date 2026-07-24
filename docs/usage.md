@@ -81,6 +81,13 @@ FoMaC::get_iqm_session(const std::string &base_url,
         tokens_file->size() + 1, tokens_file->c_str());
   }
 
+  // Optionally override the one-hour default timeout for every HTTP request
+  // made by this session.
+  const uint64_t request_timeout_milliseconds = 30'000;
+  ret = IQM_QDMI_device_session_set_parameter(
+      session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+      sizeof(request_timeout_milliseconds), &request_timeout_milliseconds);
+
   // Initialize the session
   IQM_QDMI_device_session_init(session);
 
@@ -103,6 +110,11 @@ used to set various parameters for the session:
   ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`):
   Optional alias of the specific quantum computer to use. If not set, falls back
   to `IQM_QC_ALIAS`.
+- **HTTP Request Timeout**
+  ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3`):
+  Optional positive `uint64_t` duration in milliseconds applied to every HTTP
+  request made by the session. If not set, each request uses the default
+  one-hour timeout.
 - **Authentication Token**
   ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_TOKEN`):
   Bearer token for authentication. If not set, falls back to the `IQM_TOKEN`

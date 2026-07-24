@@ -21,8 +21,11 @@
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
 
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -614,6 +617,17 @@ TEST_F(DeviceTest, SessionParameterValidation) {
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2, 6, "value"),
             QDMI_SUCCESS);
+  const uint64_t timeout_milliseconds = 1'234;
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                sizeof(timeout_milliseconds), &timeout_milliseconds),
+            QDMI_SUCCESS);
+  const uint64_t maximum_timeout =
+      static_cast<uint64_t>(std::chrono::milliseconds::max().count());
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                sizeof(maximum_timeout), &maximum_timeout),
+            QDMI_SUCCESS);
 }
 
 TEST_F(DeviceTest, SessionParameterInvalidArguments) {
@@ -630,9 +644,6 @@ TEST_F(DeviceTest, SessionParameterInvalidArguments) {
 
 TEST_F(DeviceTest, SessionParameterUnsupportedParameters) {
   // Test unsupported custom parameters
-  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3, 6, "value"),
-            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4, 6, "value"),
             QDMI_ERROR_NOTSUPPORTED);
@@ -661,6 +672,22 @@ TEST_F(DeviceTest, SessionParameterNullValueSupport) {
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE, 0, nullptr),
             QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3, 0, nullptr),
+            QDMI_SUCCESS);
+}
+
+TEST_F(DeviceTest, SessionRequestTimeoutRejectsInvalidValues) {
+  const uint64_t zero_timeout = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                sizeof(zero_timeout), &zero_timeout),
+            QDMI_ERROR_INVALIDARGUMENT);
+  const uint32_t wrong_size = 10;
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                sizeof(wrong_size), &wrong_size),
+            QDMI_ERROR_INVALIDARGUMENT);
 }
 
 TEST_F(DeviceTest, SessionInitializationWithoutParameters) {
@@ -1026,6 +1053,23 @@ TEST_F(DeviceIntegrationMockTest, HTTPTimeoutHandling) {
   http_stub.queue_get(408);
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_TIMEOUT);
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionRequestTimeoutAppliesToInitialization) {
+  const uint64_t timeout_milliseconds = 1'234;
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                sizeof(timeout_milliseconds), &timeout_milliseconds),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.get_timeouts().size(), 5U);
+  EXPECT_TRUE(
+      std::ranges::all_of(http_stub.get_timeouts(), [](const auto timeout) {
+        return timeout == std::chrono::milliseconds{1'234};
+      }));
 }
 
 TEST_F(DeviceIntegrationMockTest, HTTPAuthenticationFailure) {

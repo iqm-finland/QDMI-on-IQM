@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Validate IQM backend and target-QC availability once per node for each
+  Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])
@@ -22,6 +24,10 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⚡️ Cache SPANK validation per node and job step, isolate it from daemon-only
+  environment variables, bound each launch-time request to 30 seconds by
+  default, emit task diagnostics once per node and step, and require Slurm 20.02
+  or newer ([#136]) ([**@burgholzer**])
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
   ([#122]) ([**@burgholzer**])
 
@@ -114,6 +120,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
 [#130]: https://github.com/iqm-finland/QDMI-on-IQM/pull/130

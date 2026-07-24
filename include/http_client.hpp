@@ -25,13 +25,16 @@
 
 #include "iqm_qdmi/constants.h"
 
+#include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <optional>
+#include <type_traits>
 
 namespace iqm::http {
 
@@ -54,10 +57,12 @@ enum class ERROR_LOG_POLICY : uint8_t {
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param timeout Overall timeout for the request and any rate-limit retries.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
-                  const std::optional<cpr::Bearer> &bearer_token);
+                  const std::optional<cpr::Bearer> &bearer_token,
+                  std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
  * @brief Perform an optional HTTP GET request.
@@ -67,10 +72,13 @@ cpr::Response Get(const cpr::Url &url,
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param timeout Overall timeout for the request and any rate-limit retries.
  * @return CPR response object.
  */
-cpr::Response Get_optional(const cpr::Url &url,
-                           const std::optional<cpr::Bearer> &bearer_token);
+cpr::Response
+Get_optional(const cpr::Url &url,
+             const std::optional<cpr::Bearer> &bearer_token,
+             std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
  * @brief Perform an HTTP POST request.
@@ -84,12 +92,14 @@ cpr::Response Get_optional(const cpr::Url &url,
  * @param bearer_token Bearer token used for authentication, if configured.
  * @param data The request body data.
  * @param additional_headers Additional HTTP headers to include.
+ * @param timeout Overall timeout for the request and any rate-limit retries.
  * @return CPR response object.
  */
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::Body &data,
-                   const cpr::Header &additional_headers = {});
+                   const cpr::Header &additional_headers = {},
+                   std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -102,6 +112,33 @@ QDMI_STATUS Handle_response(
 
 namespace internal {
 /**
+ * @brief Clamp a logical timeout to the integer range used by a transport.
+ *
+ * CPR passes timeouts to libcurl as a `long`, which is only 32 bits on
+ * Windows. The logical request budget remains unchanged; only an individual
+ * transport attempt is clamped.
+ *
+ * @tparam TransportRep Integral representation accepted by the transport.
+ * @param timeout Logical request timeout.
+ * @return Timeout representable by the transport.
+ */
+template <typename TransportRep>
+[[nodiscard]] constexpr auto
+Clamp_timeout_for_transport(const std::chrono::milliseconds timeout)
+    -> std::chrono::milliseconds {
+  static_assert(std::is_integral_v<TransportRep>);
+  using TimeoutRep = std::chrono::milliseconds::rep;
+  if constexpr (std::numeric_limits<TransportRep>::digits >=
+                std::numeric_limits<TimeoutRep>::digits) {
+    return timeout;
+  } else {
+    constexpr auto transport_maximum = std::chrono::milliseconds{
+        static_cast<TimeoutRep>(std::numeric_limits<TransportRep>::max())};
+    return timeout > transport_maximum ? transport_maximum : timeout;
+  }
+}
+
+/**
  * @brief Function hooks used to intercept HTTP calls and retry delays.
  *
  * Tests override these to exercise get()/post()/retry logic without a live
@@ -110,14 +147,15 @@ namespace internal {
  */
 struct Hooks {
   /// Hook for GET requests.
-  std::function<cpr::Response(const cpr::Url &url,
-                              const std::optional<cpr::Bearer> &bearer_token,
-                              const cpr::Header &headers)>
-      get;
-  /// Hook for POST requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
-      const cpr::Header &headers, const cpr::Body &body)>
+      const cpr::Header &headers, std::chrono::milliseconds timeout)>
+      get;
+  /// Hook for POST requests.
+  std::function<cpr::Response(const cpr::Url &url,
+                              const std::optional<cpr::Bearer> &bearer_token,
+                              const cpr::Header &headers, const cpr::Body &body,
+                              std::chrono::milliseconds timeout)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;

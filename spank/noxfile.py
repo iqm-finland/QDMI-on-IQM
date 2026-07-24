@@ -64,6 +64,14 @@ def smoke_tests(session: nox.Session) -> None:
         default=os.environ.get("IQM_TOKENS_FILE"),
         help="Optional tokens file path to validate with test_env_injection.sh.",
     )
+    parser.add_argument(
+        "--request-count-url",
+        help="Optional mock-backend counter URL for once-per-node validation.",
+    )
+    parser.add_argument(
+        "--hang-base-url",
+        help="Optional mock-backend URL for request-timeout validation.",
+    )
     args, posargs = parser.parse_known_args(session.posargs)
     if posargs:
         joined_args = " ".join(posargs)
@@ -95,6 +103,10 @@ def smoke_tests(session: nox.Session) -> None:
     ]
     if args.test_tokens_file:
         env_args.extend(["--test-tokens-file", args.test_tokens_file])
+    if args.request_count_url:
+        env_args.extend(["--request-count-url", args.request_count_url])
+    if args.hang_base_url:
+        env_args.extend(["--hang-base-url", args.hang_base_url])
 
     session.run(*env_args, external=True)
 

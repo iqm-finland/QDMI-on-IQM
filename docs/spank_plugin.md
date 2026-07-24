@@ -119,9 +119,18 @@ The SPANK plugin is a lightweight C++ module that intercepts job launches to
 parse options and inject environment variables. It does not implement scheduler
 policy or handle backend-side queue management.
 
+For every active job step, the plugin initializes one IQM QDMI session on each
+allocated node after Slurm drops privileges. This verifies the endpoint,
+credentials, selected quantum computer, and architecture before any task starts
+on that node. The result is cached per node for the step, so multi-task launches
+on one node do not repeat the backend requests or routine task diagnostics. An
+N-node job therefore performs N validation sessions. Validation uses the exact
+SPANK job environment; daemon-only `slurmd` or `slurmstepd` IQM variables are
+ignored. Every validation request has a non-optional 30-second default timeout.
+
 ### Compatibility and Requirements
 
-- **Slurm Version**: Slurm 17.11 or newer. The optional Slurm license alignment
+- **Slurm Version**: Slurm 20.02 or newer. The optional Slurm license alignment
   check (see
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses))
   additionally requires Slurm 23.02 or newer, since it relies on the
@@ -143,7 +152,8 @@ sudo cmake --install build-spank --component iqm-spank-plugin
 ```
 
 This installs the compiled `.so` file to the Slurm plugin directory and places
-the template configuration in `plugstack.conf.d/`.
+the template configuration in `plugstack.conf.d/`. The IQM QDMI implementation
+used for launch-time validation is linked directly into the plugin.
 
 Deploy the plugin on login/submit nodes (for `srun`/`sbatch` command line
 parsing) and on compute nodes running `slurmd`/`slurmstepd`. Controller-only
@@ -160,13 +170,16 @@ The whole directive must be a single line; plugstack.conf does not support line
 continuation.
 
 ```text
-required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech iqm_tokens_file=/etc/iqm/tokens.json partitions=quantum,debug iqm_license_prefix=iqm_qc_ iqm_require_license=1
+required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.tech iqm_tokens_file=/etc/iqm/tokens.json partitions=quantum,debug iqm_validation_timeout=30 iqm_license_prefix=iqm_qc_ iqm_require_license=1
 ```
 
 - `iqm_base_url`: Default API endpoint.
 - `iqm_tokens_file`: Path to the shared token file.
 - `partitions`: Comma-separated list of partitions where this plugin will run.
   If omitted, the plugin evaluates all partitions.
+- `iqm_validation_timeout`: Positive whole-second timeout applied to each HTTP
+  request during mandatory backend validation (default: `30`, allowed range: `1`
+  to `3600`). Invalid values log a warning and use the 30-second default.
 - `iqm_license_prefix`: Prefix used to derive the expected Slurm license name
   from `IQM_QC_ALIAS` (default: `iqm_qc_`). See
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses).
@@ -260,6 +273,9 @@ activation prints a log entry when a job starts on an active partition:
   directory and that the drop-in file is read-permitted.
 - **Permission Denied**: The `slurmd` process user must have read access to the
   compiled `.so` library and the specified `iqm_tokens_file`.
+- **"IQM backend validation failed"**: Check that the compute node can reach
+  `IQM_BASE_URL`, that its credentials are valid, and that the selected QC
+  exists. Validation is mandatory and rejects the step before any task starts.
 
 ---
 
