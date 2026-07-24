@@ -13,12 +13,11 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
-  `estimate` functions for Slurm job submissions ([#104]) ([**@marcelwa**])
+  `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
+  parameters) for Slurm job submissions ([#104], [#133]) ([**@marcelwa**])
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
   on-premise QCs ([#114]) ([**@marcelwa**])
-- ✨ Add `qc_id`/`qc_alias` SPANK device-selection parameters to
-  `iqm.qdmi.offloader.sample`/`estimate` ([#133]) ([**@marcelwa**])
 
 ### Changed
 
