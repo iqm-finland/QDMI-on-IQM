@@ -21,6 +21,9 @@ add_library(${BUILD_IQM_SPANK_TARGET} MODULE iqm_spank_plugin.cpp)
 target_compile_features(${BUILD_IQM_SPANK_TARGET} PRIVATE cxx_std_20)
 target_include_directories(${BUILD_IQM_SPANK_TARGET}
                            PRIVATE ${SLURM_SPANK_INCLUDE_DIR})
+target_link_libraries(
+  ${BUILD_IQM_SPANK_TARGET} PRIVATE iqm::qdmi_device_internals
+                                    qdmi::qdmi_project_warnings)
 set_target_properties(${BUILD_IQM_SPANK_TARGET} PROPERTIES PREFIX "")
 
 # Detect the Slurm plugin directory for the SPANK plugin.

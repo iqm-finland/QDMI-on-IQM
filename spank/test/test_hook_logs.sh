@@ -189,6 +189,7 @@ local_hooks=(
 full_hooks=(
   "slurm_spank_init"
   "slurm_spank_init_post_opt"
+  "slurm_spank_user_init"
   "slurm_spank_task_init"
   "slurm_spank_task_init_privileged"
   "slurm_spank_exit"

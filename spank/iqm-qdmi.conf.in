@@ -23,4 +23,4 @@
 # values. The whole directive must stay on a single line; plugstack.conf does
 # not support line continuation. See the plugin README for details.
 
-# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so partitions= iqm_base_url= iqm_tokens_file= iqm_qc_id= iqm_qc_alias= iqm_license_prefix= iqm_require_license=
+# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so partitions= iqm_base_url= iqm_tokens_file= iqm_qc_id= iqm_qc_alias= iqm_validation_timeout=30 iqm_license_prefix= iqm_require_license=
