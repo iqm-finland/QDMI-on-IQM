@@ -50,7 +50,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("circuit", type=str, help="Path to the QPY circuit file.")
     parser.add_argument("observable", type=str, help="Path to the serialized observable file.")
     parser.add_argument("--maxiter", type=int, required=True, help="Maximum number of iterations.")
-    parser.add_argument("--timeout", type=int, help="Timeout passed to the IQM Backend in seconds.", default=300)
     parser.add_argument("--simulator", action="store_true", help="Use the simulator instead of the actual backend.")
     parser.add_argument("--base-url", type=str, dest="base_url", help="IQM server base URL.", default=None)
     parser.add_argument("--tokens-file", type=str, help="IQM tokens file for authentication.", default=None)
