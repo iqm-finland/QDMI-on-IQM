@@ -91,10 +91,10 @@ This matters most for **on-premise QCs**: like Resonance, an on-premise setup
 still runs its own internal queue, but it typically fronts single-tenant
 hardware, so uncontrolled Slurm-side concurrency puts unnecessary pressure on
 that queue. Requesting the license lets Slurm regulate that pressure itself,
-ahead of the QC's own queue. If you omit `--licenses` on a cluster where it's
-expected, the plugin logs a warning (or, if the administrator has set
-`iqm_require_license=1`, fails your job step at launch instead — after it has
-already been allocated, not at submission time).
+ahead of the QC's own queue. If you omit `--licenses`, the default policy is a
+silent no-op. If the administrator has set `iqm_require_license=1`, the plugin
+instead fails your job step at launch — after it has already been allocated, not
+at submission time.
 
 ### Executing via CLI Scripts
 
@@ -125,8 +125,8 @@ policy or handle backend-side queue management.
   check (see
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses))
   additionally requires Slurm 23.02 or newer, since it relies on the
-  `SLURM_JOB_LICENSES` job environment variable; on older Slurm versions it is a
-  silent no-op.
+  `SLURM_JOB_LICENSES` job environment variable; on older Slurm versions the
+  default policy is a silent no-op, while `iqm_require_license=1` fails closed.
 - **C++ Compiler**: C++20 standard library support (GCC 13+ or Clang 16+).
 - **Compilation Constraint**: SPANK plugins are tied to the Slurm daemon ABI.
   You must compile the plugin against the target cluster's Slurm header files
@@ -172,8 +172,10 @@ required /usr/lib/slurm/iqm-spank-plugin.so iqm_base_url=https://resonance.iqm.t
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses).
 - `iqm_require_license`: When set to a truthy value
   (`1`/`true`/`yes`/`on`/`enabled`, case-insensitive), fails at launch jobs
-  whose Slurm license request does not match the derived name, instead of only
-  logging a warning (default: off). See
+  whose Slurm license request is missing or does not match the derived name. By
+  default, mismatches log a warning and an absent request is ignored. This fails
+  closed when `SLURM_JOB_LICENSES` is unavailable, so only enable it on Slurm
+  23.02 or newer. See
   [Limiting Concurrent Access with Slurm Licenses](#limiting-concurrent-access-with-slurm-licenses)
   for the exact semantics. An unrecognized value logs a warning and is treated
   as off.
@@ -229,11 +231,13 @@ that pressure itself, ahead of the QC's own queue.
    separator, the plugin replaces `:` and `,` in the alias with `_` when
    deriving the name (e.g. alias `emerald:mock` → license
    `iqm_qc_emerald_mock`).
-4. By default, a mismatch (or a missing `--licenses` request) only logs a
-   warning. Setting `iqm_require_license=1` instead fails the job step at launch
-   — after the job has already been allocated, not at submission time — and only
-   takes effect if the plugin is declared `required` (not `optional`) in
-   `plugstack.conf`.
+4. By default, a mismatched request logs a warning, while a missing `--licenses`
+   request is a silent no-op. Setting `iqm_require_license=1` instead fails
+   either case at job-step launch — after the job has already been allocated,
+   not at submission time — and only takes effect if the plugin is declared
+   `required` (not `optional`) in `plugstack.conf`. The hard requirement fails
+   closed when `SLURM_JOB_LICENSES` is unavailable and therefore requires Slurm
+   23.02 or newer.
 5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf`
    to track its usage in Slurm accounting.
 

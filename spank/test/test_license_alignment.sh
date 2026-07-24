@@ -33,7 +33,7 @@
 #   3. Aliases containing ':' (e.g. "emerald:mock") are sanitized to '_' when
 #      deriving the expected license name.
 #   4. No --licenses request at all is a silent no-op.
-#   5. With iqm_require_license=1, a mismatched request is rejected outright.
+#   5. With iqm_require_license=1, mismatched and absent requests are rejected.
 
 set -euo pipefail
 
@@ -270,6 +270,15 @@ else
     pass "Mismatched Slurm license rejected with iqm_require_license=1 (rc=$rc)"
   else
     fail "srun failed (rc=$rc) but not with the expected 'missing required Slurm license' message"
+  fi
+
+  run_srun_capture --iqm-qc-alias="$test_qc_alias" env
+  if [[ $rc -eq 0 ]]; then
+    fail "srun succeeded (rc=0) despite iqm_require_license=1 and no license request"
+  elif echo "$output" | grep -Fq "missing required Slurm license"; then
+    pass "Absent Slurm license rejected with iqm_require_license=1 (rc=$rc)"
+  else
+    fail "srun without --licenses failed (rc=$rc) but not with the expected 'missing required Slurm license' message"
   fi
 
   restore_conf
