@@ -184,6 +184,31 @@ def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyP
     assert captured["session"]["base_url"] is None
 
 
+@pytest.mark.parametrize(
+    ("base_url", "environment_base_url"),
+    [
+        pytest.param(None, "", id="empty-environment"),
+        pytest.param("", None, id="empty-explicit"),
+    ],
+)
+def test_iqm_backend_treats_empty_base_url_as_unset(
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str | None,
+    environment_base_url: str | None,
+) -> None:
+    """An empty endpoint should not override the registered device default."""
+    captured = _stub_backend_construction(monkeypatch)
+    if environment_base_url is None:
+        monkeypatch.delenv("IQM_BASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("IQM_BASE_URL", environment_base_url)
+
+    IQMBackend(base_url=base_url)
+
+    assert captured["definition_kwargs"] == _expected_definition()
+    assert captured["session"]["base_url"] is None
+
+
 def test_iqm_backend_propagates_disabled_device(monkeypatch: pytest.MonkeyPatch) -> None:
     """A disabled stable ID should not be re-enabled by the packaged fallback."""
     _stub_backend_construction(monkeypatch)

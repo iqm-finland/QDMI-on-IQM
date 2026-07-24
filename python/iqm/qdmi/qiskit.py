@@ -71,7 +71,7 @@ class IQMBackend(QDMIBackend):
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
-        resolved_base_url = base_url or os.getenv("IQM_BASE_URL")
+        resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
         resolved_tokens_file = tokens_file or os.getenv("IQM_TOKENS_FILE")
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
