@@ -16,7 +16,7 @@ releases may include breaking changes.
   `estimate` functions for Slurm job submissions ([#104]) ([**@marcelwa**])
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
-  on-premise QCs ([#114]) ([**@marcelwa**])
+  on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**])
 
 ### Changed
 
@@ -25,8 +25,6 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🐛 Reject missing Slurm license requests when the SPANK plugin has
-  `iqm_require_license=1` enabled ([#134]) ([**@burgholzer**])
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 
