@@ -181,9 +181,12 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
         stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
         stderr = b""
 
-    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
         assert capture_output is True
         assert check is False
+        assert timeout is None
         captured_command[:] = command
         return FakeCompletedProcess()
 
@@ -223,9 +226,12 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
         stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
         stderr = b""
 
-    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
         assert capture_output is True
         assert check is False
+        assert timeout is None
         captured_command[:] = command
         return FakeCompletedProcess()
 
