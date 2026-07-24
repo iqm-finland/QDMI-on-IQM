@@ -52,8 +52,9 @@
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
  *   - iqm_license_prefix=iqm_qc_ (prefix used to derive the expected Slurm
  *     license name from IQM_QC_ALIAS; default: "iqm_qc_")
- *   - iqm_require_license=1 (reject jobs whose Slurm license request does
- *     not match the derived name; default: off, warn only)
+ *   - iqm_require_license=1 (reject jobs whose Slurm license request is
+ *     missing or does not match the derived name; by default, mismatches
+ *     warn and an absent request is ignored)
  *
  * Partition detection uses the `SLURM_JOB_PARTITION` environment variable
  * (set by Slurm in every job), which is portable across all Slurm versions.
@@ -76,7 +77,8 @@
  * already been allocated — it is not a submission-time rejection — and only
  * takes effect if the plugin is declared `required`, not `optional`, in
  * plugstack.conf). This check requires Slurm >= 23.02 (`SLURM_JOB_LICENSES`);
- * on older Slurm, or when the job has no alias, it is a silent no-op.
+ * on older Slurm it is a silent no-op unless `iqm_require_license=1`, which
+ * fails closed. Jobs without an alias are always skipped.
  */
 // clang-format on
 
@@ -361,12 +363,12 @@ public:
    * check is skipped (returns `ESPANK_SUCCESS`, debug log only) when:
    *   - No `IQM_QC_ALIAS` is resolved (`IQM_QC_ID`-only jobs are not
    *     checked; raw IDs are not reliably convertible into license names).
-   *   - `SLURM_JOB_LICENSES` is absent — true both on Slurm < 23.02 (the
-   *     variable does not exist there) and when the user requested no
-   *     `--licenses` at all. These two cases cannot be distinguished from
-   *     inside the plugin, so absence is always treated as a no-op. A
-   *     value too long to fit the lookup buffer is treated as a mismatch
-   *     instead (fail closed, not skipped).
+   *   - `SLURM_JOB_LICENSES` is absent and `iqm_require_license` is disabled.
+   *     Absence means either Slurm < 23.02 (where the variable does not exist)
+   *     or that the user requested no `--licenses`; these cases cannot be
+   *     distinguished. With `iqm_require_license` enabled, either case is
+   *     rejected. A value too long to fit the lookup buffer is treated as a
+   *     mismatch instead (fail closed, not skipped).
    *
    * Note on enforcement: returning `ESPANK_ERROR` here fails the task at
    * launch in `slurm_spank_task_init` (remote context) — i.e. *after* the
@@ -400,11 +402,20 @@ public:
                      static_cast<int>(licenses_buf.size()));
 
     if (licenses_rc != ESPANK_SUCCESS && licenses_rc != ESPANK_NOSPACE) {
-      slurm_debug(
-          "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
-          "environment (requires Slurm >=23.02, or no --licenses requested); "
-          "skipping Slurm license alignment check");
-      return ESPANK_SUCCESS;
+      if (!require_license_) {
+        slurm_debug(
+            "[iqm_spank_plugin] SLURM_JOB_LICENSES not present in job "
+            "environment (requires Slurm >=23.02, or no --licenses requested); "
+            "skipping Slurm license alignment check");
+        return ESPANK_SUCCESS;
+      }
+
+      slurm_spank_log(
+          "[iqm_spank_plugin] error: missing required Slurm license '%s' for "
+          "QC alias '%s' — resubmit with --licenses=%s:<n> "
+          "(iqm_require_license is enabled)",
+          expected_license.c_str(), alias->c_str(), expected_license.c_str());
+      return ESPANK_ERROR;
     }
 
     bool aligned = false;
@@ -789,9 +800,9 @@ private:
   /// argument (default: "iqm_qc_").
   std::optional<std::string> license_prefix_;
 
-  /// When true, jobs that resolve an IQM_QC_ALIAS but do not request the
-  /// corresponding Slurm license via --licenses are rejected outright
-  /// instead of only receiving a warning. Configurable via
+  /// When true, jobs that resolve an IQM_QC_ALIAS but have no Slurm license
+  /// request or request a different license are rejected. By default,
+  /// mismatches warn and an absent request is ignored. Configurable via
   /// `iqm_require_license` (default: false/off).
   bool require_license_ = false;
 };
