@@ -103,9 +103,12 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
         stderr = b""
 
-    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
         assert capture_output is True
         assert check is False
+        assert timeout is None
         captured_command[:] = command
         return FakeCompletedProcess()
 
@@ -136,9 +139,12 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
         stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
         stderr = b""
 
-    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
         assert capture_output is True
         assert check is False
+        assert timeout is None
         captured_command[:] = command
         return FakeCompletedProcess()
 
@@ -168,9 +174,12 @@ def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.Mo
         stdout = b""
         stderr = b"srun: error: something went wrong"
 
-    def fake_run(command: list[str], *, capture_output: bool, check: bool) -> FakeCompletedProcess:
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
         assert capture_output is True
         assert check is False
+        assert timeout is None
         assert command
         return FakeCompletedProcess()
 
@@ -187,3 +196,30 @@ def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.Mo
     job_dirs = list(tmp_path.iterdir())
     assert len(job_dirs) == 1
     assert (job_dirs[0] / "qc.qpy").exists()
+
+
+def test_sample_slurm_timeout_raises_runtime_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A Slurm job that exceeds the given timeout raises a clear RuntimeError, not a bare subprocess error."""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> subprocess.CompletedProcess[bytes]:
+        assert capture_output is True
+        assert check is False
+        assert timeout == 5
+        raise subprocess.TimeoutExpired(cmd=command, timeout=timeout)
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        offloader.sample(circuit, shots=7, local=False, simulator=True, timeout=5)
+
+
+def test_first_pub_raises_on_empty_result() -> None:
+    """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
+    with pytest.raises(RuntimeError, match="no pubs"):
+        offloader._first_pub([])  # noqa: SLF001
