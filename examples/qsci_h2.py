@@ -25,6 +25,8 @@
 #
 # [tool.uv.sources]
 # iqm-qdmi = { path = ".." }
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["qiskit_nature.**", "pyscf.**"]
 # ///
 
 """Run QSCI on the H2 molecule using the QDMI-on-IQM stack."""

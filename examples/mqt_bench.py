@@ -24,6 +24,8 @@
 # ]
 # [tool.uv.sources]
 # iqm-qdmi = { path = ".." }
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["mqt.bench.**"]
 # ///
 
 """Run an MQT Bench workload using the QDMI-on-IQM stack."""
