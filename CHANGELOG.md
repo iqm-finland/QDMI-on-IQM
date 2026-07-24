@@ -26,7 +26,7 @@ releases may include breaking changes.
 ### Fixed
 
 - 🐛 Reject missing Slurm license requests when the SPANK plugin has
-  `iqm_require_license=1` enabled
+  `iqm_require_license=1` enabled ([#134]) ([**@burgholzer**])
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 
@@ -114,6 +114,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#122]: https://github.com/iqm-finland/QDMI-on-IQM/pull/122
 [#120]: https://github.com/iqm-finland/QDMI-on-IQM/pull/120
 [#117]: https://github.com/iqm-finland/QDMI-on-IQM/pull/117
