@@ -19,14 +19,8 @@
 # IQM QDMI SPANK Plugin — plugstack.conf.d drop-in configuration.
 #
 # This file is installed by CMake into the plugstack.conf.d directory.
-# To activate, uncomment the plugin line below and fill in site-specific values.
-# See the plugin README for details.
+# To activate, uncomment the plugin line below and fill in site-specific
+# values. The whole directive must stay on a single line; plugstack.conf does
+# not support line continuation. See the plugin README for details.
 
-# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so \
-#     partitions= \
-#     iqm_base_url= \
-#     iqm_tokens_file= \
-#     iqm_qc_id= \
-#     iqm_qc_alias= \
-#     iqm_license_prefix= \
-#     iqm_require_license=
+# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so partitions= iqm_base_url= iqm_tokens_file= iqm_qc_id= iqm_qc_alias= iqm_license_prefix= iqm_require_license=
