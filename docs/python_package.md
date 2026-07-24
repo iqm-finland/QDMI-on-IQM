@@ -138,6 +138,15 @@ directory path is resolved as follows:
 Ensure that the jobs directory is located on a shared cluster filesystem
 accessible by both the login node and all Slurm compute nodes.
 
+### Selecting a Quantum Computer per Job
+
+Both functions accept optional `qc_id` and `qc_alias` keyword arguments to pin a
+specific quantum computer for a single job, without changing the process's
+default backend configuration. When set, they are passed as `--iqm-qc-id` and
+`--iqm-qc-alias` options on the `srun` command itself, which the QDMI-on-IQM
+[SPANK plugin](spank_plugin.md) resolves into the job's `IQM_QC_ID` and
+`IQM_QC_ALIAS` environment variables. Only used when `local=False`.
+
 ### Programmatic Sampling Example
 
 ```python

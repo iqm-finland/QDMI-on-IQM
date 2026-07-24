@@ -24,7 +24,7 @@ import math
 import pickle  # noqa: S403
 import re
 import subprocess
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 from qiskit import QuantumCircuit
@@ -32,9 +32,6 @@ from qiskit.circuit import Parameter
 from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import offloader
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class FakeBitArray:
@@ -164,6 +161,105 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
     # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
     assert "--base-url" not in captured_command
+
+
+def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The Slurm path must never put credentials on the `srun` command line.
+
+    Backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`) reach the job
+    purely through the environment -- either plain Slurm propagation or the
+    QDMI-on-IQM SPANK plugin's own injection -- never as CLI arguments. Only
+    the explicit `qc_alias` selection is forwarded, as a SPANK `--iqm-*`
+    option on `srun` itself (not a worker CLI flag).
+    """
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
+    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    counts = offloader.sample(circuit, shots=7, local=False, simulator=True, qc_alias="emerald:mock")
+
+    worker_index = captured_command.index("iqm-sampler")
+    worker_command = captured_command[worker_index : worker_index + 4]
+    assert counts == {"0": 1}
+    assert "https://resonance.example" not in captured_command
+    assert "tokens_path" not in captured_command
+    for flag in ("--base-url", "--tokens-file", "--token", "--qc-alias"):
+        assert flag not in captured_command
+    assert "--iqm-qc-alias=emerald:mock" in captured_command
+    assert captured_command.index("--iqm-qc-alias=emerald:mock") < worker_index
+    assert worker_command[0] == "iqm-sampler"
+    assert Path(worker_command[1]).name == "qc.qpy"
+    assert worker_command[2] == "--shots"
+    assert worker_command[3] == "7"
+
+
+def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Mirrors `test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials` for `estimate()`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
+    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    qc_id = "12345678-1234-1234-1234-123456789abc"
+    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
+
+    worker_index = captured_command.index("iqm-estimator")
+    worker_command = captured_command[worker_index : worker_index + 5]
+    assert result.optimal_parameters == {"theta": 0.125}
+    assert "https://resonance.example" not in captured_command
+    assert "tokens_path" not in captured_command
+    for flag in ("--base-url", "--tokens-file", "--token", "--qc-id", "--qc-alias"):
+        assert flag not in captured_command
+    assert f"--iqm-qc-id={qc_id}" in captured_command
+    assert captured_command.index(f"--iqm-qc-id={qc_id}") < worker_index
+    assert worker_command[0] == "iqm-estimator"
+    assert Path(worker_command[1]).name == "ansatz.qpy"
+    assert Path(worker_command[2]).name == "operator.pkl"
+    assert worker_command[3] == "--maxiter"
+    assert worker_command[4] == "3"
 
 
 def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

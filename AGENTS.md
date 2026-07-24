@@ -93,6 +93,10 @@ explicit intent, valid credentials, and an appropriate target.
 - MUST follow existing patterns in neighboring source and test files.
 - MUST document new user-facing behavior and update `CHANGELOG.md` for
   noteworthy user-facing changes.
+- MUST fold additions, enhancements, or bug fixes for features that are still in
+  `[Unreleased]` into the existing `[Unreleased]` `CHANGELOG.md` entry for that
+  feature (appending the PR number) rather than creating separate bullet points
+  for every minor addition to an unreleased feature.
 - MUST update `docs/examples.md` when changing an example.
 - MUST preserve the existing license header and SPDX identifier appropriate to
   the file's component.
