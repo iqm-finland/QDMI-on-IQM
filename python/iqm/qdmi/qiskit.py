@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 try:
@@ -66,14 +67,15 @@ class IQMBackend(QDMIBackend):
         *,
         base_url: str | None = None,
         token: str | None = None,
-        tokens_file: str | None = None,
+        tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
         resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
-        resolved_tokens_file = tokens_file or os.getenv("IQM_TOKENS_FILE")
+        tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
+        resolved_tokens_file = Path(tokens_file_value) if tokens_file_value else None
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
         resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
 

@@ -49,11 +49,10 @@ Explicit arguments to `IQMBackend(...)` take precedence over `IQM_BASE_URL`,
 environment. For the endpoint, an explicit argument takes precedence over
 `IQM_BASE_URL`, which takes precedence over the registered device default.
 
-The wrapper registers the packaged provider as a fallback under the stable ID
-`iqm.default` with the standard Resonance endpoint as its default. An existing
-configured definition with that ID is preserved, including its endpoint. Every
-backend opens a fresh session with its own configuration. The returned FoMaC
-device owns that session for the backend's lifetime.
+The wrapper registers the packaged IQM QDMI device as a fallback under the
+stable ID `iqm.default` with the standard Resonance endpoint as its default. An
+existing configured definition with that ID is preserved, including its
+endpoint. Every backend opens a fresh device session with its own configuration.
 
 ## Sampler and Estimator Primitives
 

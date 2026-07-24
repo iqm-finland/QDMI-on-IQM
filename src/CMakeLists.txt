@@ -49,7 +49,7 @@ target_link_libraries(
           iqm::qdmi_device_internals)
 
 # Publish the metadata MQT Core needs to synthesize a relocatable manifest when
-# this independently built provider is attached to an application.
+# this separately built device implementation is attached to an application.
 set_target_properties(
   ${QDMI_TARGET_NAME} PROPERTIES MQT_QDMI_DEVICE_ID "iqm.default"
                                  MQT_QDMI_DEVICE_PREFIX "${QDMI_PREFIX}")

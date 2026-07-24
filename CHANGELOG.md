@@ -30,8 +30,8 @@ releases may include breaking changes.
   environment variables, bound each launch-time request to 30 seconds by
   default, emit task diagnostics once per node and step, and require Slurm 20.02
   or newer ([#136]) ([**@burgholzer**])
-- ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry while
-  opening a fresh owning session for every `IQMBackend`
+- ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry with
+  per-backend device sessions
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
   ([#122]) ([**@burgholzer**])
 

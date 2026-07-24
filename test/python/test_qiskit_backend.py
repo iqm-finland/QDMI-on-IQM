@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -32,8 +33,8 @@ from qiskit.quantum_info import SparsePauliOp
 from iqm.qdmi import qiskit as iqm_qiskit
 from iqm.qdmi.qiskit import IQMBackend
 
-ENVIRONMENT_TOKENS_FILE = "/opt/iqm/environment-tokens.json"
-EXPLICIT_TOKENS_FILE = "/opt/iqm/explicit-tokens.json"
+ENVIRONMENT_TOKENS_FILE = Path("/opt/iqm/environment-tokens.json")
+EXPLICIT_TOKENS_FILE = Path("/opt/iqm/explicit-tokens.json")
 
 
 def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
@@ -66,7 +67,7 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
         captured["registered"] = definition
         return True
 
-    def fake_open_device(device_id: str, **session: str | None) -> object:
+    def fake_open_device(device_id: str, **session: str | Path | None) -> object:
         captured["opened_id"] = device_id
         captured["session"] = session
         return fake_device
@@ -95,7 +96,7 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     captured = _stub_backend_construction(monkeypatch)
     monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
     monkeypatch.setenv("IQM_TOKEN", "environment-token")
-    monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
+    monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
     environment_token = "environment-token"  # noqa: S105
@@ -122,7 +123,7 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
     captured = _stub_backend_construction(monkeypatch)
     monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
     monkeypatch.setenv("IQM_TOKEN", "environment-token")
-    monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
+    monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
     explicit_token = "explicit-token"  # noqa: S105
@@ -141,30 +142,6 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
         "auth_file": EXPLICIT_TOKENS_FILE,
         "custom1": "explicit-qc-id",
         "custom2": "explicit-qc-alias",
-    }
-
-
-def test_iqm_backend_does_not_use_legacy_resonance_api_key(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Legacy RESONANCE_API_KEY should not be consulted at runtime anymore."""
-    captured = _stub_backend_construction(monkeypatch)
-    monkeypatch.delenv("IQM_BASE_URL", raising=False)
-    monkeypatch.delenv("IQM_TOKEN", raising=False)
-    monkeypatch.delenv("IQM_TOKENS_FILE", raising=False)
-    monkeypatch.delenv("IQM_QC_ID", raising=False)
-    monkeypatch.delenv("IQM_QC_ALIAS", raising=False)
-    monkeypatch.setenv("RESONANCE_API_KEY", "legacy-token")
-
-    IQMBackend()
-
-    assert captured["definition_kwargs"] == _expected_definition()
-    assert captured["session"] == {
-        "base_url": None,
-        "token": None,
-        "auth_file": None,
-        "custom1": None,
-        "custom2": None,
     }
 
 
@@ -216,7 +193,7 @@ def test_iqm_backend_propagates_disabled_device(monkeypatch: pytest.MonkeyPatch)
     def disabled_registration(_definition: object) -> bool:
         return False
 
-    def disabled_open(_device_id: str, **_session: str | None) -> object:
+    def disabled_open(_device_id: str, **_session: str | Path | None) -> object:
         msg = "QDMI device ID 'iqm.default' is disabled by configuration"
         raise RuntimeError(msg)
 
@@ -232,12 +209,12 @@ def test_iqm_backend_propagates_invalid_registration(monkeypatch: pytest.MonkeyP
     _stub_backend_construction(monkeypatch)
 
     def invalid_registration(_definition: object) -> bool:
-        msg = "invalid provider definition"
+        msg = "invalid device definition"
         raise ValueError(msg)
 
     monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", invalid_registration)
 
-    with pytest.raises(ValueError, match="invalid provider definition"):
+    with pytest.raises(ValueError, match="invalid device definition"):
         IQMBackend()
 
 

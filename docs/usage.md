@@ -199,7 +199,7 @@ in the Contributing guide.
 The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
 symbol prefix. Applications that link the MQT Core driver statically can use its
 runtime-copy helper to synthesize a relocatable manifest and colocate it with
-the provider library beside the executable:
+the device library beside the executable:
 
 ```cmake
 find_package(mqt-core 3.8 CONFIG REQUIRED)
@@ -214,7 +214,7 @@ For dynamically linked consumers, automatic discovery searches beside the driver
 library rather than the executable. Such consumers must place the generated
 manifest in a discovered location or select a complete configuration with
 `MQT_CORE_QDMI_CONFIG_FILE`. Python integrations instead register the same
-stable ID directly from the packaged library path and open a fresh owning
+stable ID directly from the packaged library path and open a fresh device
 session for each backend.
 
 ## Running Jobs via Slurm
