@@ -22,11 +22,13 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <chrono>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -210,6 +212,34 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
             "test-token");
 }
 
+TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get(200).queue_post(200);
+  constexpr auto timeout = std::chrono::milliseconds{1'234};
+
+  const auto get_response =
+      iqm::http::Get("https://example.test/jobs", std::nullopt, timeout);
+  const auto post_response = iqm::http::Post("https://example.test/jobs",
+                                             std::nullopt, "{}", {}, timeout);
+
+  EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
+  EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_timeouts(),
+            std::vector<std::chrono::milliseconds>{timeout});
+  EXPECT_EQ(http_stub.post_timeouts(),
+            std::vector<std::chrono::milliseconds>{timeout});
+}
+
+TEST(HttpClientTest, TimeoutIsClampedToTransportRepresentation) {
+  constexpr auto timeout = std::chrono::milliseconds::max();
+  constexpr auto clamped =
+      iqm::http::internal::Clamp_timeout_for_transport<std::int32_t>(timeout);
+  EXPECT_EQ(clamped.count(), std::numeric_limits<std::int32_t>::max());
+  EXPECT_EQ(
+      iqm::http::internal::Clamp_timeout_for_transport<std::int64_t>(timeout),
+      timeout);
+}
+
 TEST(HttpClientTest, RetriesHttp429UsingRetryAfterUntilSuccess) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
@@ -241,6 +271,43 @@ TEST(HttpClientTest, RetriesHttp429UsingCaseInsensitiveRetryAfterHeader) {
 
   EXPECT_EQ(status, QDMI_SUCCESS);
   EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{7});
+}
+
+TEST(HttpClientTest, RateLimitRetryDoesNotOutliveRequestTimeout) {
+  const LoggerCapture logger_capture;
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get(429, "", {{"Retry-After", "30"}}).queue_get(200);
+
+  const auto response =
+      iqm::http::Get("https://example.test/jobs", std::nullopt,
+                     std::chrono::milliseconds{1'000});
+  const auto status = iqm::http::Handle_response(response);
+
+  EXPECT_EQ(status, QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(response.status_code, 429);
+  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+  EXPECT_EQ(http_stub.get_timeouts(), std::vector<std::chrono::milliseconds>{
+                                          std::chrono::milliseconds{1'000}});
+  EXPECT_NE(logger_capture.str().find(
+                "Retry-After exceeds the remaining request timeout"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, MaximumRequestTimeoutDoesNotOverflowRetryBudget) {
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_get(429, "", {{"Retry-After", "30"}}).queue_get(200);
+  constexpr auto timeout = std::chrono::milliseconds::max();
+
+  const auto response =
+      iqm::http::Get("https://example.test/jobs", std::nullopt, timeout);
+  const auto status = iqm::http::Handle_response(response);
+
+  EXPECT_EQ(status, QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.get_timeouts().size(), 2U);
+  EXPECT_EQ(http_stub.get_timeouts().front(), timeout);
+  EXPECT_GT(http_stub.get_timeouts().back(), std::chrono::milliseconds::zero());
+  EXPECT_LE(http_stub.get_timeouts().back(), timeout);
+  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{30});
 }
 
 TEST(HttpClientTest,

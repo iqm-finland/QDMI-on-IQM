@@ -67,11 +67,14 @@ cpr::Header Make_json_headers(const cpr::Header &additional_headers) {
 
 void Apply_common_options(cpr::Session &session, const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
-                          const cpr::Header &headers) {
+                          const cpr::Header &headers,
+                          const std::chrono::milliseconds timeout) {
   session.SetUrl(url);
   session.SetHeader(headers);
   session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
-  session.SetTimeout(cpr::Timeout{std::chrono::seconds{3600}});
+  using CprTimeoutRep = decltype(cpr::Timeout{timeout}.Milliseconds());
+  session.SetTimeout(
+      cpr::Timeout{Clamp_timeout_for_transport<CprTimeoutRep>(timeout)});
   session.SetRedirect(cpr::Redirect{true});
   session.SetVerifySsl(cpr::VerifySsl{true});
   if (bearer_token.has_value()) {
@@ -81,17 +84,19 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
 
 cpr::Response Default_get(const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
-                          const cpr::Header &headers) {
+                          const cpr::Header &headers,
+                          const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers);
+  Apply_common_options(session, url, bearer_token, headers, timeout);
   return session.Get();
 }
 
 cpr::Response Default_post(const cpr::Url &url,
                            const std::optional<cpr::Bearer> &bearer_token,
-                           const cpr::Header &headers, const cpr::Body &body) {
+                           const cpr::Header &headers, const cpr::Body &body,
+                           const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers);
+  Apply_common_options(session, url, bearer_token, headers, timeout);
   session.SetBody(body);
   return session.Post();
 }
@@ -135,10 +140,29 @@ void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
 /// HTTP 429 rate limiting.
 template <typename Perform_attempt>
 cpr::Response Perform_with_retries(const cpr::Url &url,
+                                   const std::chrono::milliseconds timeout,
                                    Perform_attempt perform_attempt) {
   const auto &hooks = Get_hooks();
+  const auto start = std::chrono::steady_clock::now();
+  const auto remaining_timeout = [&]() {
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start);
+    return elapsed >= timeout ? std::chrono::milliseconds::zero()
+                              : timeout - elapsed;
+  };
   for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
-    const auto http_response = perform_attempt();
+    const auto remaining = remaining_timeout();
+    if (remaining <= std::chrono::milliseconds::zero()) {
+      cpr::Response response;
+      response.url = url;
+      response.error =
+          cpr::Error{static_cast<int>(cpr::ErrorCode::OPERATION_TIMEDOUT),
+                     "Request and rate-limit retry deadline exceeded"};
+      return response;
+    }
+
+    const auto http_response =
+        perform_attempt(attempt == 0 ? timeout : remaining);
 
     if (http_response.error) {
       return http_response;
@@ -149,6 +173,15 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
     }
 
     const int delay_seconds = Retry_after_seconds(http_response);
+    const auto retry_delay = std::chrono::seconds{delay_seconds};
+    const auto retry_budget = remaining_timeout();
+    if (retry_delay >= retry_budget) {
+      LOG_DEBUG("Request to URL '" + url.str() +
+                "' hit HTTP 429 rate limiting, but Retry-After exceeds the "
+                "remaining request timeout; not retrying");
+      return http_response;
+    }
+
     LOG_DEBUG("Request to URL '" + url.str() +
               "' hit HTTP 429 rate limiting; retrying after " +
               std::to_string(delay_seconds) +
@@ -336,27 +369,33 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
 }
 
 cpr::Response Get(const cpr::Url &url,
-                  const std::optional<cpr::Bearer> &bearer_token) {
+                  const std::optional<cpr::Bearer> &bearer_token,
+                  const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, [&]() { return hooks.get(url, bearer_token, headers); });
+      url, timeout, [&](const auto remaining) {
+        return hooks.get(url, bearer_token, headers, remaining);
+      });
 }
 
 cpr::Response Get_optional(const cpr::Url &url,
-                           const std::optional<cpr::Bearer> &bearer_token) {
+                           const std::optional<cpr::Bearer> &bearer_token,
+                           const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, [&]() { return hooks.get(url, bearer_token, headers); });
+      url, timeout, [&](const auto remaining) {
+        return hooks.get(url, bearer_token, headers, remaining);
+      });
 }
 
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
-                   const cpr::Body &data,
-                   const cpr::Header &additional_headers) {
+                   const cpr::Body &data, const cpr::Header &additional_headers,
+                   const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing POST request to " + url.str());
   if (const auto &data_str = data.str(); !data_str.empty()) {
     LOG_DEBUG("POST data: " + data_str);
@@ -364,7 +403,9 @@ cpr::Response Post(const cpr::Url &url,
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_json_headers(additional_headers);
   return internal::Perform_with_retries(
-      url, [&]() { return hooks.post(url, bearer_token, headers, data); });
+      url, timeout, [&](const auto remaining) {
+        return hooks.post(url, bearer_token, headers, data, remaining);
+      });
 }
 
 } // namespace iqm::http

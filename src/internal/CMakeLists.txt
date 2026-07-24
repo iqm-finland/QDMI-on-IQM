@@ -58,6 +58,7 @@ target_sources(
          ${PUBLIC_HEADER_FILES})
 target_compile_definitions(
   ${QDMI_INTERNAL_TARGET_NAME}
+  PUBLIC $<$<PLATFORM_ID:Windows>:NOMINMAX>
   PRIVATE QDMI_VERSION="${QDMI_VERSION}"
           IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
           IQM_QDMI_device_EXPORTS)

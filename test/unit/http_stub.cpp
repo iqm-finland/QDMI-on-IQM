@@ -21,6 +21,7 @@
 
 #include "http_client.hpp"
 
+#include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
 #include <cpr/cprtypes.h>
@@ -60,9 +61,11 @@ HttpStub::HttpStub() {
 
   hooks.get = [this](const cpr::Url &url,
                      const std::optional<cpr::Bearer> &bearer_token,
-                     const cpr::Header & /*headers*/) {
+                     const cpr::Header & /*headers*/,
+                     const std::chrono::milliseconds timeout) {
     get_urls_.push_back(url.str());
     get_bearer_tokens_.push_back(bearer_token);
+    get_timeouts_.push_back(timeout);
     if (get_responses_.empty()) {
       ADD_FAILURE() << "Unexpected GET request to '" << url
                     << "': no scripted response was queued";
@@ -81,9 +84,11 @@ HttpStub::HttpStub() {
   hooks.post = [this](const cpr::Url &url,
                       const std::optional<cpr::Bearer> &bearer_token,
                       const cpr::Header & /*headers*/,
-                      const cpr::Body & /*body*/) {
+                      const cpr::Body & /*body*/,
+                      const std::chrono::milliseconds timeout) {
     post_urls_.push_back(url.str());
     post_bearer_tokens_.push_back(bearer_token);
+    post_timeouts_.push_back(timeout);
     if (post_responses_.empty()) {
       ADD_FAILURE() << "Unexpected POST request to '" << url
                     << "': no scripted response was queued";
@@ -143,6 +148,10 @@ HttpStub::get_bearer_tokens() const {
   return get_bearer_tokens_;
 }
 
+const std::vector<std::chrono::milliseconds> &HttpStub::get_timeouts() const {
+  return get_timeouts_;
+}
+
 const std::vector<std::string> &HttpStub::post_urls() const {
   return post_urls_;
 }
@@ -150,6 +159,10 @@ const std::vector<std::string> &HttpStub::post_urls() const {
 const std::vector<std::optional<cpr::Bearer>> &
 HttpStub::post_bearer_tokens() const {
   return post_bearer_tokens_;
+}
+
+const std::vector<std::chrono::milliseconds> &HttpStub::post_timeouts() const {
+  return post_timeouts_;
 }
 
 size_t HttpStub::sleep_call_count() const { return sleep_durations_.size(); }

@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/cprtypes.h>
 #include <cstddef>
@@ -96,11 +97,17 @@ public:
   /// Bearer tokens passed to GET requests, in call order.
   [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
   get_bearer_tokens() const;
+  /// Timeouts passed to GET requests, in call order.
+  [[nodiscard]] const std::vector<std::chrono::milliseconds> &
+  get_timeouts() const;
   /// URLs requested via POST, in call order.
   [[nodiscard]] const std::vector<std::string> &post_urls() const;
   /// Bearer tokens passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
   post_bearer_tokens() const;
+  /// Timeouts passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<std::chrono::milliseconds> &
+  post_timeouts() const;
   /// Number of retry-delay ("sleep") calls triggered by HTTP 429 retries.
   [[nodiscard]] size_t sleep_call_count() const;
   /// Retry-delay durations requested by HTTP 429 handling, in call order.
@@ -111,8 +118,10 @@ private:
   std::deque<Scripted_response> post_responses_;
   std::vector<std::string> get_urls_;
   std::vector<std::optional<cpr::Bearer>> get_bearer_tokens_;
+  std::vector<std::chrono::milliseconds> get_timeouts_;
   std::vector<std::string> post_urls_;
   std::vector<std::optional<cpr::Bearer>> post_bearer_tokens_;
+  std::vector<std::chrono::milliseconds> post_timeouts_;
   std::vector<int> sleep_durations_;
 };
 
