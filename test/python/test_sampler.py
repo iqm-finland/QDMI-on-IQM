@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import base64
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qpy
@@ -46,7 +46,7 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     assert result.success
 
     decoded = base64.b64decode(result.stdout.strip().encode())
-    res = pickle.loads(decoded)  # noqa: S301
+    res = pickle.loads(decoded)  # ruff:ignore[suspicious-pickle-usage]
     first_pub = next(iter(res))
     counts = first_pub.data.meas.get_counts()
     assert sum(counts.values()) == 256

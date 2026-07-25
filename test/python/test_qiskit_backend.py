@@ -107,7 +107,7 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
     monkeypatch.setenv("IQM_TOKENS_FILE", ENVIRONMENT_TOKENS_FILE)
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
-    explicit_token = "explicit-token"  # noqa: S105
+    explicit_token = "explicit-token"  # ruff:ignore[hardcoded-password-string]
 
     IQMBackend(
         base_url="https://explicit.example",

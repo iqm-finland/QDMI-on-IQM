@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# ruff: noqa: S603
+# ruff:file-ignore[subprocess-without-shell-equals-true]
 """Offload Qiskit workloads (sampling and estimation) using Slurm."""
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import os
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
 import uuid
 from collections.abc import Iterable, Mapping
@@ -226,7 +226,7 @@ def _load_pickled_result(payload: bytes) -> object:
         RuntimeError: If the payload cannot be unpickled.
     """
     try:
-        return pickle.loads(payload)  # noqa: S301
+        return pickle.loads(payload)  # ruff:ignore[suspicious-pickle-usage]
     except Exception as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
@@ -272,7 +272,7 @@ def sample(
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """  # noqa: DOC502
+    """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "
@@ -372,7 +372,7 @@ def estimate(
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """  # noqa: DOC502
+    """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "

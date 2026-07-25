@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -68,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         ansatz = qpy.load(file_obj)[0]
 
     with Path(args.observable).open("rb") as file_obj:
-        observable: SparsePauliOp = pickle.load(file_obj)  # noqa: S301
+        observable: SparsePauliOp = pickle.load(file_obj)  # ruff:ignore[suspicious-pickle-usage]
 
     _, estimator = build_estimator(
         simulator=args.simulator,

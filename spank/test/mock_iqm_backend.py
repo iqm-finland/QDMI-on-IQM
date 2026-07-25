@@ -83,7 +83,7 @@ class IQMRequestHandler(BaseHTTPRequestHandler):
 
         self.send_error(404)
 
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: object) -> None:  # ruff:ignore[builtin-argument-shadowing]
         """Suppress routine request logs in the test container."""
 
     def _send_json(self, payload: object) -> None:
