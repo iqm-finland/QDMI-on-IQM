@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import base64
 import math
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qpy
@@ -60,7 +60,7 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     assert result.success
 
     decoded = base64.b64decode(result.stdout.strip().encode())
-    res = pickle.loads(decoded)  # noqa: S301
+    res = pickle.loads(decoded)  # ruff:ignore[suspicious-pickle-usage]
     assert hasattr(res, "optimal_parameters")
     assert hasattr(res, "eigenvalue")
     params = list(res.optimal_parameters.values())

@@ -99,7 +99,7 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
-    environment_token = "environment-token"  # noqa: S105
+    environment_token = "environment-token"  # ruff:ignore[hardcoded-password-string]
 
     IQMBackend()
 
@@ -126,7 +126,7 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
     monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
     monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
-    explicit_token = "explicit-token"  # noqa: S105
+    explicit_token = "explicit-token"  # ruff:ignore[hardcoded-password-string]
 
     IQMBackend(
         base_url="https://explicit.example",
