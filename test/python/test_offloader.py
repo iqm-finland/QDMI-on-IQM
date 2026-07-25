@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import base64
 import math
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 import re
 import subprocess
 from pathlib import Path
@@ -318,4 +318,4 @@ def test_sample_slurm_timeout_raises_runtime_error(monkeypatch: pytest.MonkeyPat
 def test_first_pub_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
-        offloader._first_pub([])  # noqa: SLF001
+        offloader._first_pub([])  # ruff:ignore[private-member-access]

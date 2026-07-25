@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-import pickle  # noqa: S403
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
 

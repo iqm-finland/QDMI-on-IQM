@@ -298,7 +298,7 @@ def _postprocess_counts(atom: str, basis: str, counts: dict[str, int], *, cutoff
     mean_field.kernel()
     molecular_orbitals = mean_field.mo_coeff
     orthogonalized_core = reduce(np.dot, (molecular_orbitals.conj().T, core_hamiltonian, molecular_orbitals))
-    orthogonalized_eri = ao2mo.kernel(mean_field._eri, molecular_orbitals)  # noqa: SLF001
+    orthogonalized_eri = ao2mo.kernel(mean_field._eri, molecular_orbitals)  # ruff:ignore[private-member-access]
     diagonal_terms = np.kron(np.array([1, 1]), np.diag(orthogonalized_core))
     off_diagonal_terms = orthogonalized_core - np.diag(np.diag(orthogonalized_core))
     restored_eri = ao2mo.restore(1, orthogonalized_eri, molecule.nao)
