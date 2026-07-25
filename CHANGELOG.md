@@ -15,7 +15,8 @@ releases may include breaking changes.
 - ✨ Validate IQM backend and target-QC availability once per node for each
   Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
 - ✨ Export the stable IQM device ID and symbol prefix on the installed CMake
-  target so MQT Core can synthesize relocatable manifests
+  target so MQT Core can synthesize relocatable manifests ([#140])
+  ([**@burgholzer**])
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])
@@ -31,14 +32,14 @@ releases may include breaking changes.
   default, emit task diagnostics once per node and step, and require Slurm 20.02
   or newer ([#136]) ([**@burgholzer**])
 - ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry with
-  per-backend device sessions
+  per-backend device sessions ([#140]) ([**@burgholzer**])
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
   ([#122]) ([**@burgholzer**])
 
 ### Fixed
 
 - 🩹 Preserve a configured `iqm.default` endpoint unless `IQMBackend` receives
-  an explicit or environment-provided base URL
+  an explicit or environment-provided base URL ([#140]) ([**@burgholzer**])
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 
@@ -126,6 +127,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
