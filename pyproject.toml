@@ -95,7 +95,7 @@ dev = [
 [tool.uv.sources]
 # Remove this source override and the build variables below once MQT Core 3.8.0
 # is published on PyPI.
-mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "5ca29c72c0bc42592521a15c69113aa50f130c68" }
+mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "3fba2888880689d80aa07f1c799c920ea5ef92d6" }
 
 [tool.uv.extra-build-variables]
 mqt-core = { SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MQT_CORE = "3.8.0", SKBUILD_CMAKE_DEFINE = "BUILD_MQT_CORE_MLIR=OFF" }
