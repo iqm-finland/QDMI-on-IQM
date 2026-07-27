@@ -48,15 +48,15 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json
           iqm::qdmi_device_internals)
 
-# Publish the metadata MQT Core needs to synthesize a relocatable manifest when
-# this separately built device implementation is attached to an application.
+# Publish the metadata consumers need to identify this separately built QDMI
+# device target and synthesize a relocatable manifest.
 set_target_properties(
-  ${QDMI_TARGET_NAME} PROPERTIES MQT_QDMI_DEVICE_ID "iqm.default"
-                                 MQT_QDMI_DEVICE_PREFIX "${QDMI_PREFIX}")
+  ${QDMI_TARGET_NAME} PROPERTIES QDMI_DEVICE_ID "iqm.default" QDMI_DEVICE_PREFIX
+                                                              "${QDMI_PREFIX}")
 set_property(
   TARGET ${QDMI_TARGET_NAME}
   APPEND
-  PROPERTY EXPORT_PROPERTIES MQT_QDMI_DEVICE_ID MQT_QDMI_DEVICE_PREFIX)
+  PROPERTY EXPORT_PROPERTIES QDMI_DEVICE_ID QDMI_DEVICE_PREFIX)
 
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"
