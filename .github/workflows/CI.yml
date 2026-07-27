@@ -142,6 +142,8 @@ jobs:
       check-stubs: false
       enable-ty: true
       enable-mypy: false
+      setup-mlir: true
+      llvm-version: "22.1.7"
 
   examples:
     name: 🐍 End-to-End Examples
