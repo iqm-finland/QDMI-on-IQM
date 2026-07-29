@@ -29,23 +29,52 @@
 """Discover IQM quantum computers on a server and select one matching a constraint.
 
 QDMI-on-IQM does not currently expose a Python or C++ binding for listing every
-quantum computer known to an IQM Server (each QDMI device session is scoped to a
-single quantum computer, selected by ID, alias, or "first available" during
-session initialization; see docs/usage.md). This example fills that gap for
-discovery *scripts* rather than the library: it issues the same
-`api/v1/quantum-computers` request the device session already performs
-internally, then queries each candidate's public properties (qubit count and,
-where exposed, two-qubit gate fidelity) through the regular `IQMBackend`/QDMI
-`Target` API to pick one that satisfies a `--min-qubits` constraint.
+quantum computer known to an IQM Server: each opened QDMI device session
+resolves to exactly *one* quantum computer, selected by ID, alias, or "first
+available" during session initialization (`IQM_QDMI_device_session_init` /
+`Process_static_quantum_architecture` in `src/iqm_device.cpp`; see
+docs/usage.md). This example fills that gap for discovery *scripts* rather
+than the library: it issues the same `api/v1/quantum-computers` request the
+device session already performs internally to learn the available aliases,
+then opens each candidate's device and queries its public properties (qubit
+count, status, per-site T1/T2, and per-operation fidelity) through the public
+`mqt.core.fomac.Device`/`Site`/`Operation` API to pick one that satisfies a
+`--min-qubits` constraint.
 
-Future direction: the IQM Server API is known to expose a queue-length /
-execution-availability-window signal, described for the "pay-as-you-go queue"
-and therefore apparently cloud/Resonance-oriented (its availability and
-semantics for on-premise quantum computers are unconfirmed). That signal is
-not currently surfaced through QDMI-on-IQM's Python or C++ bindings, so it is
-not used here. Once it is exposed through the library, a natural enhancement
-to this example would be ranking candidate backends by queue depth in
-addition to qubit count and fidelity.
+Future direction:
+
+- True multi-QC enumeration without the `api/v1/quantum-computers` REST call
+  above is not something any current or planned `mqt-core` release can fix on
+  its own, because the root cause lives in *this repo's* C++ device
+  implementation, not in `mqt-core`: `mqt.core.fomac.Session.get_devices()`
+  only ever returns one `Device` per registered `DeviceDefinition`, and (per
+  the session-initialization behavior above) each `DeviceDefinition` this
+  library can hand `mqt-core` still resolves to exactly one IQM quantum
+  computer. Registering one `DeviceDefinition` per alias would still require
+  knowing every alias up front - the same requirement the REST call exists to
+  satisfy. An open (unmerged) `mqt-core` pull request,
+  https://github.com/munich-quantum-toolkit/core/pull/1912 ("Add configurable
+  QDMI device discovery"), adds exactly that `DeviceRegistry`/`DeviceDefinition`
+  mechanism (`qdmi.json` / `[tool.qdmi]` / env-var configuration), which would
+  be the right way to *register* multiple already-known aliases as separate
+  `Device`s - but it is relevant only as context here, not as a fix for the
+  enumeration problem itself, which needs a change to this repo's own C++
+  session initialization to resolve. (A related, larger, also-open PR,
+  https://github.com/munich-quantum-toolkit/core/pull/1901, redesigns FoMaC
+  and `qdmi::Driver` around that same registry and was reportedly exercised
+  against IQM's own QDMI implementation branches during development.) Neither
+  PR has merged, and this note describes context, not a plan this repo
+  currently depends on.
+- The IQM Server API is known to expose a queue-length /
+  execution-availability-window signal, described for the "pay-as-you-go
+  queue" and therefore apparently cloud/Resonance-oriented (its availability
+  and semantics for on-premise quantum computers are unconfirmed). That
+  signal is not currently surfaced through QDMI-on-IQM's Python or C++
+  bindings, so it is not used here. Once it is exposed through the library, a
+  natural enhancement to this example would be ranking candidate backends by
+  queue depth in addition to qubit count and fidelity. This is an open
+  question independent of the `mqt-core` discussion above - it concerns IQM
+  Server API queue depth, not `mqt-core`'s device object model.
 """
 
 from __future__ import annotations
@@ -59,9 +88,10 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from mqt.core.fomac import Device, add_dynamic_device_library
 from mqt.core.plugins.qiskit.provider import QDMIProvider
 
-from iqm.qdmi.qiskit import IQMBackend
+from iqm.qdmi import IQM_QDMI_LIBRARY_PATH
 
 log = logging.getLogger(__name__)
 
@@ -108,23 +138,62 @@ def _list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dic
     return quantum_computers
 
 
-def _calibration_summary(backend: IQMBackend) -> str:
-    """Summarize two-qubit gate fidelity from the backend's public `Target`, if available.
+def _open_device(base_url: str, token: str | None, tokens_file: str | None, qc_alias: str) -> Device:
+    """Open a public FoMaC `Device` for one IQM quantum computer.
+
+    This calls the same `mqt.core.fomac.add_dynamic_device_library` entry point
+    `IQMBackend` uses internally, so the returned `Device` exposes qubit count,
+    status, per-site T1/T2, and per-operation fidelity through the public API,
+    without reaching into any private `QDMIBackend` attribute.
+
+    Returns:
+        The opened FoMaC `Device` for `qc_alias`.
+    """
+    return add_dynamic_device_library(
+        library_path=str(IQM_QDMI_LIBRARY_PATH),
+        prefix="IQM",
+        base_url=base_url,
+        token=token,
+        auth_file=tokens_file,
+        custom2=qc_alias,
+    )
+
+
+def _calibration_summary(device: Device) -> str:
+    """Summarize two-qubit gate fidelity from the device's public `Operation` API, if available.
 
     Returns:
         A short human-readable calibration-quality summary.
     """
-    target = backend.target
-    for name in target.operation_names:
-        errors = [
-            props.error
-            for qargs, props in target[name].items()
-            if qargs is not None and len(qargs) == 2 and props is not None and props.error is not None
-        ]
-        if errors:
-            mean_fidelity = 1.0 - (sum(errors) / len(errors))
-            return f"'{name}' mean 2-qubit fidelity {mean_fidelity:.4f} over {len(errors)} pair(s)"
-    return "no two-qubit gate error data exposed by Target"
+    for op in device.operations():
+        site_pairs = op.site_pairs()
+        if not site_pairs:
+            continue
+        fidelities = [fidelity for pair in site_pairs if (fidelity := op.fidelity(sites=pair)) is not None]
+        if fidelities:
+            mean_fidelity = sum(fidelities) / len(fidelities)
+            return f"'{op.name()}' mean 2-qubit fidelity {mean_fidelity:.4f} over {len(fidelities)} pair(s)"
+    return "no two-qubit gate fidelity exposed by the device"
+
+
+def _coherence_summary(device: Device) -> str:
+    """Summarize per-site T1/T2 coherence times from the device's public `Site` API, if available.
+
+    Returns:
+        A short human-readable coherence-time summary.
+    """
+    sites = [site for site in device.sites() if not site.is_zone()]
+    t1_values = [t1 for site in sites if (t1 := site.t1()) is not None]
+    t2_values = [t2 for site in sites if (t2 := site.t2()) is not None]
+    if not t1_values and not t2_values:
+        return "no T1/T2 data exposed by the device"
+    unit = device.duration_unit() or "device time units"
+    parts = []
+    if t1_values:
+        parts.append(f"mean T1 {sum(t1_values) / len(t1_values):.1f} {unit}")
+    if t2_values:
+        parts.append(f"mean T2 {sum(t2_values) / len(t2_values):.1f} {unit}")
+    return ", ".join(parts)
 
 
 def _run_simulator(min_qubits: int) -> None:
@@ -157,7 +226,7 @@ def _run_discovery(*, base_url: str | None, token: str | None, tokens_file: str 
             qc.get("display_name"),
         )
 
-    candidates: list[tuple[str, IQMBackend, str]] = []
+    candidates: list[tuple[str, Device, str]] = []
     for qc in quantum_computers:
         alias = qc.get("alias")
         if not alias:
@@ -165,24 +234,33 @@ def _run_discovery(*, base_url: str | None, token: str | None, tokens_file: str 
             continue
         log.info("Querying properties of '%s'...", alias)
         try:
-            backend = IQMBackend(base_url=resolved_base_url, token=token, tokens_file=tokens_file, qc_alias=alias)
+            device = _open_device(resolved_base_url, token, tokens_file, alias)
         except Exception as exc:  # ruff:ignore[blind-except] - keep discovering the remaining candidates
             log.warning("Skipping '%s': failed to query device properties (%s)", alias, exc)
             continue
-        quality = _calibration_summary(backend)
-        log.info("  '%s': %d qubits, %s", alias, backend.num_qubits, quality)
-        candidates.append((alias, backend, quality))
+        status = device.status().name
+        quality = _calibration_summary(device)
+        coherence = _coherence_summary(device)
+        log.info(
+            "  '%s': status=%s, %d qubits, %s, %s",
+            alias,
+            status,
+            device.qubits_num(),
+            quality,
+            coherence,
+        )
+        candidates.append((alias, device, quality))
 
-    matching = [candidate for candidate in candidates if candidate[1].num_qubits >= min_qubits]
+    matching = [candidate for candidate in candidates if candidate[1].qubits_num() >= min_qubits]
     if not matching:
-        largest = max((candidate[1].num_qubits for candidate in candidates), default=0)
+        largest = max((candidate[1].qubits_num() for candidate in candidates), default=0)
         sys.exit(f"No discovered quantum computer meets --min-qubits={min_qubits} (largest available: {largest}).")
 
-    selected_alias, selected_backend, selected_quality = max(matching, key=lambda candidate: candidate[1].num_qubits)
+    selected_alias, selected_device, selected_quality = max(matching, key=lambda candidate: candidate[1].qubits_num())
     log.info(
         "Selected '%s': %d qubits (>= --min-qubits=%d), %s",
         selected_alias,
-        selected_backend.num_qubits,
+        selected_device.qubits_num(),
         min_qubits,
         selected_quality,
     )

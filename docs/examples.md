@@ -163,9 +163,10 @@ Before running a workload, it can be useful to discover which quantum computers
 are actually available on an IQM Server and pick one programmatically, rather
 than hardcoding a single alias. The `examples/discover_backends.py` script
 demonstrates this: it lists the quantum computers exposed by the configured IQM
-Server endpoint, queries each one's qubit count and (where exposed) two-qubit
-gate fidelity through the standard `IQMBackend`/QDMI `Target` API, and selects
-the largest one that satisfies a `--min-qubits` constraint.
+Server endpoint, opens each one and queries its status, qubit count, per-site
+T1/T2, and (where exposed) two-qubit gate fidelity through the public
+`mqt.core.fomac` `Device`/`Site`/`Operation` API, and selects the largest one
+that satisfies a `--min-qubits` constraint.
 
 ```{literalinclude} ../examples/discover_backends.py
 :language: python
@@ -189,21 +190,49 @@ count without contacting an IQM Server:
 
 :::{note}
 QDMI-on-IQM does not currently expose a Python or C++ binding for listing every
-quantum computer on a server; each QDMI device session is scoped to a single
-quantum computer. This example works around that by issuing the same
-`api/v1/quantum-computers` request the session already performs internally
-during initialization, then falls back to the regular public API for every other
-query.
+quantum computer on a server: each opened QDMI device session resolves to
+exactly one quantum computer, selected by ID, alias, or "first available" during
+session initialization (`IQM_QDMI_device_session_init` /
+`Process_static_quantum_architecture` in `src/iqm_device.cpp`). This example
+works around that by issuing the same `api/v1/quantum-computers` request the
+session already performs internally to learn the available aliases, then opens
+each candidate's device and queries it through the public
+`mqt.core.fomac.Device`/`Site`/`Operation` API for every other query.
 :::
 
 :::{note}
-The IQM Server API is also known to expose a queue-length /
-execution-availability-window signal, described for the "pay-as-you-go queue"
-and therefore apparently cloud/Resonance-oriented (unconfirmed for on-premise
-quantum computers). QDMI-on-IQM does not currently surface that signal through
-its Python or C++ bindings, so this example does not use it. Once it is exposed
-through the library, ranking candidates by queue depth in addition to qubit
-count and fidelity would be a natural enhancement here.
+True multi-QC enumeration without the `api/v1/quantum-computers` REST call above
+is not something any current or planned `mqt-core` release can fix on its own,
+because the root cause lives in this repo's own C++ device implementation, not
+in `mqt-core`: `mqt.core.fomac.Session.get_devices()` only ever returns one
+`Device` per registered `DeviceDefinition`, and each `DeviceDefinition` this
+library can hand `mqt-core` still resolves to exactly one IQM quantum computer,
+per the session-initialization behavior above. Registering one
+`DeviceDefinition` per alias would still require knowing every alias up front -
+the same requirement the REST call exists to satisfy. An open (unmerged)
+`mqt-core` pull request,
+[core#1912](https://github.com/munich-quantum-toolkit/core/pull/1912) ("Add
+configurable QDMI device discovery"), adds exactly that
+`DeviceRegistry`/`DeviceDefinition` mechanism (`qdmi.json` / `[tool.qdmi]` /
+env-var configuration), which would be the right way to *register* multiple
+already-known aliases as separate `Device`s - but it is relevant only as context
+here, not as a fix for the enumeration problem itself, which needs a change to
+this repo's own C++ session initialization to resolve. A related, larger,
+also-open PR,
+[core#1901](https://github.com/munich-quantum-toolkit/core/pull/1901),
+redesigns FoMaC and `qdmi::Driver` around that same registry and was reportedly
+exercised against IQM's own QDMI implementation branches during development.
+Neither PR has merged, and this note describes context, not a plan this repo
+currently depends on.
+
+Separately, and independent of that `mqt-core` discussion: the IQM Server API is
+also known to expose a queue-length / execution-availability-window signal,
+described for the "pay-as-you-go queue" and therefore apparently
+cloud/Resonance-oriented (unconfirmed for on-premise quantum computers).
+QDMI-on-IQM does not currently surface that signal through its Python or C++
+bindings, so this example does not use it. Once it is exposed through the
+library, ranking candidates by queue depth in addition to qubit count and
+fidelity would be a natural enhancement here.
 :::
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
