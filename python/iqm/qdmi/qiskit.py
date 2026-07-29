@@ -35,11 +35,10 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from ._paths import IQM_QDMI_LIBRARY_PATH
+from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 
 __all__ = ["IQMBackend"]
 
-IQM_DEVICE_ID = "iqm.default"
 IQM_DEFAULT_BASE_URL = "https://resonance.iqm.tech"
 
 
@@ -81,14 +80,14 @@ class IQMBackend(QDMIBackend):
 
         register_device_if_absent(
             DeviceDefinition(
-                IQM_DEVICE_ID,
-                str(IQM_QDMI_LIBRARY_PATH),
-                "IQM",
+                IQM_QDMI_DEVICE_ID,
+                IQM_QDMI_LIBRARY_PATH,
+                IQM_QDMI_PREFIX,
                 base_url=IQM_DEFAULT_BASE_URL,
             )
         )
         device = open_device(
-            IQM_DEVICE_ID,
+            IQM_QDMI_DEVICE_ID,
             base_url=resolved_base_url,
             token=resolved_token,
             auth_file=resolved_tokens_file,

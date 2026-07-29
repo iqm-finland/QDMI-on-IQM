@@ -50,7 +50,7 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
         def __init__(
             self,
             device_id: str,
-            library_path: str,
+            library_path: str | os.PathLike[str],
             prefix: str,
             *,
             base_url: str | None = None,
@@ -82,11 +82,11 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
     return captured
 
 
-def _expected_definition() -> dict[str, str]:
+def _expected_definition() -> dict[str, str | os.PathLike[str]]:
     return {
-        "device_id": "iqm.default",
-        "library_path": str(iqm_qiskit.IQM_QDMI_LIBRARY_PATH),
-        "prefix": "IQM",
+        "device_id": iqm_qiskit.IQM_QDMI_DEVICE_ID,
+        "library_path": iqm_qiskit.IQM_QDMI_LIBRARY_PATH,
+        "prefix": iqm_qiskit.IQM_QDMI_PREFIX,
         "base_url": "https://resonance.iqm.tech",
     }
 
@@ -106,7 +106,7 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     assert captured["device"] is not None
     assert captured["registered"] is captured["definition"]
     assert captured["definition_kwargs"] == _expected_definition()
-    assert captured["opened_id"] == "iqm.default"
+    assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"] == {
         "base_url": "https://environment.example",
         "token": environment_token,
@@ -157,7 +157,7 @@ def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyP
 
     IQMBackend()
 
-    assert captured["opened_id"] == "iqm.default"
+    assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"]["base_url"] is None
 
 
