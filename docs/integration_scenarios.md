@@ -126,11 +126,23 @@ another scheduler unchanged:
   external scheduler plugin; LSF has no direct SPANK equivalent, so environment
   injection and any launch-time validation would need to be reimplemented
   against LSF's job-control hooks.
-- **Kubernetes**: would look structurally different from all of the above —
-  likely a mutating admission webhook or device-plugin-style resource
-  advertisement, since Kubernetes has no per-job-step CLI flag-parsing hook
-  comparable to SPANK; partition gating's closest analogue would be namespace-
-  or `ResourceQuota`-scoped access.
+- **Grid Engine**: would need a prolog/epilog script pair (or a JSV — Job
+  Submission Verifier — script) configured cluster-wide to inject `IQM_*`
+  variables before the job starts, since Grid Engine has no SPANK-equivalent
+  plugin API; partition gating's closest analogue is queue-based access control
+  via `qconf`.
+- **Kubernetes (CRD-based)**: would look structurally different from all of the
+  above — a Custom Resource Definition (e.g. an `IQMJob` CRD) reconciled by a
+  custom controller/operator, which injects `IQM_*` variables into the pod spec
+  it creates, rather than a mutating admission webhook intercepting arbitrary
+  pods; Kubernetes has no per-job-step CLI flag-parsing hook comparable to
+  SPANK, and partition gating's closest analogue would be namespace- or
+  `ResourceQuota`-scoped access.
+- **Flux**: would need a Flux plugin against its job execution API (e.g. a
+  `flux-shell` plugin or jobtap plugin) to inject `IQM_*` variables at job shell
+  launch — architecturally closer to SPANK's shell-launch hook than the others
+  here, but a distinct plugin API and ABI that would need its own
+  implementation.
 
 None of these are implemented in this repository. Treat this section as scoping
 input for a site evaluating IQM integration outside Slurm, not as supported
@@ -145,4 +157,4 @@ functionality.
 | Dedicated production cluster, single tenant, still scheduler-managed | 3 (Slurm + SPANK), partition gating optional, licenses optional |
 | Site already standardized on Spack for software management | 4, layered on top of 1-3 |
 | Plugin development or CI, no access to real Slurm | 5's Docker topology only — not a deployment target |
-| Site running PBS, LSF, or Kubernetes instead of Slurm | 7 — no supported path today; would require new integration work |
+| Site running PBS, LSF, Grid Engine, Kubernetes (CRD-based), or Flux instead of Slurm | 7 — no supported path today; would require new integration work |
