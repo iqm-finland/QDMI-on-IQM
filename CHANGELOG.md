@@ -21,6 +21,12 @@ releases may include breaking changes.
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
   on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**])
+- ✨ Add an RFC-quality prototype daemon (`spank/dynamic_license_daemon.py`)
+  mirroring a Slurm-mediated job's claim on an IQM QC (via a file-based lease
+  lock, `spank/license_lock.py`, with QDMI status and an experimental IQM Server
+  API queue-depth probe as optional supplementary signals) into a Slurm Dynamic
+  License via `sacctmgr`, plus documentation of its design and open questions
+  ([#145]) ([**@marcelwa**])
 
 ### Changed
 
@@ -120,6 +126,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#145]: https://github.com/iqm-finland/QDMI-on-IQM/pull/145
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
