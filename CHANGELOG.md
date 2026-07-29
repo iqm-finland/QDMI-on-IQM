@@ -14,7 +14,7 @@ releases may include breaking changes.
 
 - ✨ Add `examples/discover_backends.py`, listing the quantum computers
   available on an IQM Server and selecting one that satisfies a `--min-qubits`
-  constraint ([#145]) ([**@marcelwa**])
+  constraint ([#146]) ([**@marcelwa**])
 - ✨ Validate IQM backend and target-QC availability once per node for each
   Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
@@ -123,7 +123,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#145]: https://github.com/iqm-finland/QDMI-on-IQM/pull/145
+[#146]: https://github.com/iqm-finland/QDMI-on-IQM/pull/146
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
