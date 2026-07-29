@@ -16,15 +16,17 @@ alongside a Python wrapper for straightforward installation via `pip` or `uv`.
 
 ## Where to Start
 
-| I want to…                                                       | Start here                            |
-| :--------------------------------------------------------------- | :------------------------------------ |
-| Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)       |
-| Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)               |
-| Integrate the C++ library directly                               | [Usage Guide](usage.md)               |
-| Integrate with **Slurm** on an HPC cluster                       | [SPANK Plugin Guide](spank_plugin.md) |
-| Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)         |
-| Understand the Python package and its entry points               | [Python Package](python_package.md)   |
-| Contribute to the project                                        | [Contributing](contributing.md)       |
+| I want to…                                                       | Start here                                                 |
+| :--------------------------------------------------------------- | :--------------------------------------------------------- |
+| Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)                            |
+| Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)                                    |
+| Integrate the C++ library directly                               | [Usage Guide](usage.md)                                    |
+| Integrate with **Slurm** on an HPC cluster                       | [SPANK Plugin Guide](spank_plugin.md)                      |
+| Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)                              |
+| Understand the Python package and its entry points               | [Python Package](python_package.md)                        |
+| Compare integration options for my HPC site                      | [Integration Scenarios Analysis](integration_scenarios.md) |
+| Stand up IQM access on a Slurm cluster as an administrator       | [Administrator Guide](admin_guide.md)                      |
+| Contribute to the project                                        | [Contributing](contributing.md)                            |
 
 ## API Reference
 
@@ -47,6 +49,14 @@ spank_plugin
 spack_guide
 
 CHANGELOG
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Administrator Guide
+
+integration_scenarios
+admin_guide
 ```
 
 ```{toctree}
