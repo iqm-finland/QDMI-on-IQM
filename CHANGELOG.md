@@ -24,8 +24,8 @@ releases may include breaking changes.
 - 📝 Add an integration scenarios analysis comparing IQM integration paths
   (direct C++/Python usage, Slurm + SPANK offloading, Spack install, and
   non-Slurm schedulers as forward-looking guidance) and an administrator guide
-  walking through standing up IQM access on a Slurm cluster ([#145] —
-  unverified) ([**@marcelwa**])
+  walking through standing up IQM access on a Slurm cluster ([#147])
+  ([**@marcelwa**])
 
 ### Changed
 
@@ -125,7 +125,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#145]: https://github.com/iqm-finland/QDMI-on-IQM/pull/145
+[#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
