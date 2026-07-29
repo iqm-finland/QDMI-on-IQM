@@ -196,6 +196,16 @@ during initialization, then falls back to the regular public API for every other
 query.
 :::
 
+:::{note}
+The IQM Server API is also known to expose a queue-length /
+execution-availability-window signal, described for the "pay-as-you-go queue"
+and therefore apparently cloud/Resonance-oriented (unconfirmed for on-premise
+quantum computers). QDMI-on-IQM does not currently surface that signal through
+its Python or C++ bindings, so this example does not use it. Once it is exposed
+through the library, ranking candidates by queue depth in addition to qubit
+count and fidelity would be a natural enhancement here.
+:::
+
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
 [ghz-state]: https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state
 [graph-state]: https://en.wikipedia.org/wiki/Graph_state

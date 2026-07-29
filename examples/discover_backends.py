@@ -37,6 +37,15 @@ discovery *scripts* rather than the library: it issues the same
 internally, then queries each candidate's public properties (qubit count and,
 where exposed, two-qubit gate fidelity) through the regular `IQMBackend`/QDMI
 `Target` API to pick one that satisfies a `--min-qubits` constraint.
+
+Future direction: the IQM Server API is known to expose a queue-length /
+execution-availability-window signal, described for the "pay-as-you-go queue"
+and therefore apparently cloud/Resonance-oriented (its availability and
+semantics for on-premise quantum computers are unconfirmed). That signal is
+not currently surfaced through QDMI-on-IQM's Python or C++ bindings, so it is
+not used here. Once it is exposed through the library, a natural enhancement
+to this example would be ranking candidate backends by queue depth in
+addition to qubit count and fidelity.
 """
 
 from __future__ import annotations
