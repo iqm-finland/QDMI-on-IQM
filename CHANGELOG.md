@@ -22,8 +22,11 @@ releases may include breaking changes.
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
   on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**])
 - ✨ Add an RFC-quality prototype daemon (`spank/dynamic_license_daemon.py`)
-  polling QDMI device status into a Slurm Dynamic License via `sacctmgr`, plus
-  documentation of its open questions ([#145]) ([**@marcelwa**])
+  mirroring a Slurm-mediated job's claim on an IQM QC (via a file-based lease
+  lock, `spank/license_lock.py`, with QDMI status and an experimental IQM Server
+  API queue-depth probe as optional supplementary signals) into a Slurm Dynamic
+  License via `sacctmgr`, plus documentation of its design and open questions
+  ([#145]) ([**@marcelwa**])
 
 ### Changed
 
