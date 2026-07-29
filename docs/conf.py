@@ -143,13 +143,16 @@ napoleon_numpy_docstring = False
 breathe_projects = {"QDMI on IQM": "_build/doxygen/xml"}
 breathe_default_project = "QDMI on IQM"
 
-# get SKBUILD_BUILD_DIR from the environment as the stem for the documentation
+# Get the IQM QDMI build directory as the stem for the generated headers.
 try:
-    skbuild_build_dir = os.environ["SKBUILD_BUILD_DIR"]
+    iqm_qdmi_build_dir = os.environ["IQM_QDMI_BUILD_DIR"]
 except KeyError:
-    msg = "No build dir set in environment. Consider setting SKBUILD_BUILD_DIR."
+    msg = "No build dir set in environment. Consider setting IQM_QDMI_BUILD_DIR."
     raise RuntimeError(msg) from None
 
 breathe_projects_source = {
-    "QDMI on IQM": (f"../{skbuild_build_dir}/src/include/iqm_qdmi", ["constants.h", "types.h", "export.h", "device.h"])
+    "QDMI on IQM": (
+        f"../{iqm_qdmi_build_dir}/src/include/iqm_qdmi",
+        ["constants.h", "types.h", "export.h", "device.h"],
+    )
 }

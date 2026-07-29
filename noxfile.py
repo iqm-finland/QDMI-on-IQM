@@ -193,8 +193,8 @@ def docs(session: nox.Session) -> None:
         f"docs/_build/{args.builder}",
         *posargs,
         env={
+            "IQM_QDMI_BUILD_DIR": "build/docs",
             "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
-            "SKBUILD_BUILD_DIR": "build/docs",
         },
     )
 
