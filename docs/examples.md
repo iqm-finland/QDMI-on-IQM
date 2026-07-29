@@ -12,10 +12,11 @@ Welcome to the end-to-end tutorial. This guide walks you step by step through
 driving real quantum workloads on IQM systems using QDMI-on-IQM and the packaged
 {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
 
-Whether you want to estimate molecular ground-state energies with [QSCI][qsci]
-or benchmark hardware with [MQT Bench][mqt-bench], the example scripts in this
-repository provide a practical starting point. This tutorial focuses on two
-application areas:
+Whether you want to estimate molecular ground-state energies with [QSCI][qsci],
+benchmark hardware with [MQT Bench][mqt-bench], or discover which IQM quantum
+computer to target in the first place, the example scripts in this repository
+provide a practical starting point. This tutorial focuses on three application
+areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature]
   to estimate the ground-state energy of an H2 molecule.
@@ -23,6 +24,8 @@ application areas:
   [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
   [QFT][quantum-fourier-transform], [graph states][graph-state],
   [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
+- **Backend discovery:** enumerating the quantum computers available on an IQM
+  Server and selecting one that satisfies a qubit-count constraint.
 
 :::{important}
 The example scripts live in the QDMI-on-IQM repository and are not shipped with
@@ -61,6 +64,7 @@ uvx nox -s examples
 # Run specific examples
 ./examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
 ./examples/mqt_bench.py --benchmark ghz --shots 128
+./examples/discover_backends.py --min-qubits 5
 ```
 
 ## Quantum Chemistry
@@ -152,6 +156,55 @@ expected bitstrings (all 0s and all 1s for the GHZ state):
 Now try running the same script with `--backend iqm` to see how the distribution
 looks on real hardware. Remember to set the required environment variables for
 authentication before running the script.
+
+## Discovering and Selecting Backends
+
+Before running a workload, it can be useful to discover which quantum computers
+are actually available on an IQM Server and pick one programmatically, rather
+than hardcoding a single alias. The `examples/discover_backends.py` script
+demonstrates this: it lists the quantum computers exposed by the configured IQM
+Server endpoint, queries each one's qubit count and (where exposed) two-qubit
+gate fidelity through the standard `IQMBackend`/QDMI `Target` API, and selects
+the largest one that satisfies a `--min-qubits` constraint.
+
+```{literalinclude} ../examples/discover_backends.py
+:language: python
+:caption: examples/discover_backends.py
+:start-after: "# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception"
+```
+
+Run it directly against an IQM Server (remember to set the required
+authentication environment variables first):
+
+```console
+./examples/discover_backends.py --min-qubits 5
+```
+
+Or exercise the simulator path, which reports the local DDSIM simulator's qubit
+count without contacting an IQM Server:
+
+```{code-cell} ipython3
+!../examples/discover_backends.py --backend sim --min-qubits 5
+```
+
+:::{note}
+QDMI-on-IQM does not currently expose a Python or C++ binding for listing every
+quantum computer on a server; each QDMI device session is scoped to a single
+quantum computer. This example works around that by issuing the same
+`api/v1/quantum-computers` request the session already performs internally
+during initialization, then falls back to the regular public API for every other
+query.
+:::
+
+:::{note}
+The IQM Server API is also known to expose a queue-length /
+execution-availability-window signal, described for the "pay-as-you-go queue"
+and therefore apparently cloud/Resonance-oriented (unconfirmed for on-premise
+quantum computers). QDMI-on-IQM does not currently surface that signal through
+its Python or C++ bindings, so this example does not use it. Once it is exposed
+through the library, ranking candidates by queue depth in addition to qubit
+count and fidelity would be a natural enhancement here.
+:::
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
 [ghz-state]: https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state
