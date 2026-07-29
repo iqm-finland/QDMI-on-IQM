@@ -254,6 +254,104 @@ that pressure itself, ahead of the QC's own queue.
 5. Optionally, add the license name to `AccountingStorageTRES` in `slurm.conf`
    to track its usage in Slurm accounting.
 
+### Reflecting Live QC Availability with Dynamic Licenses
+
+:::{warning}
+**This section describes an RFC-quality prototype, not a supported feature.** It
+is exploratory groundwork intended to prompt a design discussion, not something
+to deploy as-is on a production cluster. The polling daemon it describes lives
+at `spank/dynamic_license_daemon.py`; it is a standalone script, not an
+installed package entry point, and the SPANK plugin itself is unaware of it.
+:::
+
+The static license pool above (a fixed `Licenses=iqm_qc_emerald:4` count) caps
+how many jobs Slurm lets through concurrently, but that cap is not tied to
+whether the QC is actually free right now. A job can pass Slurm's static count
+and then still sit queued behind the QC's own internal queue. Slurm's
+**Dynamic License** mechanism (Slurm 23.02+) addresses this: instead of a fixed
+count, a Dynamic License's available count (`lastconsumed`) can be updated live
+by an external process via
+
+```bash
+sacctmgr -i modify resource iqm_qc_emerald set lastconsumed=<0|1>
+```
+
+so the scheduler only lets a job proceed once the license shows as available.
+This is the approach taken by IBM/Pasqal's QRMI (Quantum Resource Management
+Interface) papers for their own Slurm integration, which flag the same static-
+license gap this section addresses and propose Dynamic Licenses as the fix —
+while explicitly accepting the poll-interval-vs-staleness race condition
+described below as a known limitation rather than something to fully solve.
+
+**Setup** (requires Slurm 23.02 or newer):
+
+```bash
+sacctmgr add resource name=iqm_qc_emerald count=1 cluster=<cluster> \
+  allowed=100 type=license
+```
+
+**Running the daemon:**
+
+```bash
+python3 spank/dynamic_license_daemon.py --qc-alias emerald
+```
+
+Every option has an environment variable equivalent
+(`IQM_DYNAMIC_LICENSE_RESOURCE_NAME`,
+`IQM_DYNAMIC_LICENSE_POLL_INTERVAL_SECONDS`, `IQM_DYNAMIC_LICENSE_CLUSTER`,
+`IQM_DYNAMIC_LICENSE_DRY_RUN`, plus the existing
+`IQM_BASE_URL`/`IQM_TOKEN`/`IQM_TOKENS_FILE`/`IQM_QC_ID`/`IQM_QC_ALIAS` for QC
+selection and credentials); see `--help` for the full list. Running it requires
+`mqt-core`, i.e. `iqm-qdmi[qiskit]` installed in the daemon's environment.
+
+**What "availability" actually means here.** Be skeptical of this signal before
+relying on it. The daemon polls
+{cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS` (exposed
+at the Python level via `mqt.core.fomac.Device.status()`), which is the only
+QC-status property QDMI-on-IQM exposes today. As implemented, this property is
+**local to the querying session**: it is set to `IDLE` when a session
+initializes and to `BUSY` only when *that same session* submits a job — it does
+not reflect whether other users' sessions currently have work running on the QC.
+A polling daemon that never submits jobs itself will, in practice, observe
+`IDLE` continuously, except when the QC is genuinely unreachable (session
+initialization failing, which the daemon treats as unavailable, fail-closed).
+Neither the C++ core nor the IQM Server API endpoints used elsewhere in this
+codebase (`GET /api/v1/quantum-computers`, `GET /cocos/health`) currently expose
+real queue depth or cross-tenant occupancy. This prototype therefore does not
+yet solve the problem it targets — it wires up the polling-and-`sacctmgr`
+mechanics against the only status signal QDMI currently exposes, so that
+mechanism is ready to plug into a real occupancy signal if/when one becomes
+available (e.g. a future IQM Server API queue-depth endpoint, or a
+`QDMI_DEVICE_PROPERTY_STATUS` implementation that reflects global rather than
+session-local state).
+
+**Open questions for reviewers:**
+
+- **The core gap above**: is extending the IQM Server API (or QDMI's status
+  implementation) to expose real, cross-tenant queue depth in scope, and if so,
+  is polling still the right model, or should the QC push state changes?
+- **Poll-interval-vs-staleness race**: even with a real occupancy signal, there
+  is an inherent window between a state change on the QC and the daemon's next
+  poll (and `sacctmgr` update) during which Slurm's view is stale. The QRMI
+  papers accept this as a known limitation rather than solving it; do we accept
+  the same tradeoff, and if so, what poll interval is an acceptable staleness
+  bound for this cluster's job mix?
+- **Where does the daemon run, and as whom?** A single system-level daemon per
+  QC (e.g. under systemd, on a login or admin node) needs `sacctmgr` write
+  access, which is a privileged operation. What identity/credentials should it
+  run as, and how is that access scoped down from a general admin account?
+- **One daemon instance per QC**: the current design polls one QC per process
+  invocation. A cluster with several QCs needs one instance per QC (per alias);
+  is that the right granularity, or should a single daemon poll multiple QCs?
+- **Interaction with `iqm_require_license`**: the SPANK plugin's fail-closed
+  `iqm_require_license=1` option only checks that a matching `--licenses`
+  request was made — it does not know whether that license is a static or
+  Dynamic License, nor whether the daemon updating it is alive. If the daemon
+  dies or falls behind, Slurm will hold jobs on a Dynamic License that never
+  updates again; is a staleness/liveness check needed (e.g. a systemd watchdog,
+  or Slurm-side alerting on an unchanged `lastconsumed` value) before this is
+  trusted in place of the static pool?
+
 ### Troubleshooting
 
 The plugin logs to the standard `slurmd.log` on compute nodes. Successful
