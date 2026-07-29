@@ -259,9 +259,10 @@ that pressure itself, ahead of the QC's own queue.
 :::{warning}
 **This section describes an RFC-quality prototype, not a supported feature.** It
 is exploratory groundwork intended to prompt a design discussion, not something
-to deploy as-is on a production cluster. The polling daemon it describes lives
-at `spank/dynamic_license_daemon.py`; it is a standalone script, not an
-installed package entry point, and the SPANK plugin itself is unaware of it.
+to deploy as-is on a production cluster. The tooling it describes lives at
+`spank/dynamic_license_daemon.py` and `spank/license_lock.py`; these are
+standalone scripts, not installed package entry points, and the SPANK plugin
+itself (`iqm_spank_plugin.cpp`) is unaware of and unmodified by any of this.
 :::
 
 The static license pool above (a fixed `Licenses=iqm_qc_emerald:4` count) caps
@@ -290,6 +291,89 @@ sacctmgr add resource name=iqm_qc_emerald count=1 cluster=<cluster> \
   allowed=100 type=license
 ```
 
+#### What "availability" can actually mean here
+
+The open question in an earlier revision of this section was whether any signal
+exists for real, cross-tenant QC occupancy. A closer read of the IQM Server API
+reference answers part of that, with an important caveat:
+**the answer differs by deployment type**, and this prototype is designed around
+that split rather than around a single assumed-universal signal.
+
+- **No reservation/exclusive-lock endpoint exists anywhere in the API.**
+  Confirmed both from this codebase (QDMI exposes no such call) and from the
+  full API surface. There is no IQM-server-side primitive to "reserve" a QC for
+  exclusive use.
+- **Cloud/pay-as-you-go QCs do expose a real, cross-tenant queue-depth signal**:
+  a "get quantum computer queue status" endpoint returning
+  `{"available": [...], "queue_length": <int>}` — a genuine improvement over
+  anything session-local. Its exact path is **not confirmed** (the reference
+  text available while writing this section shows the schema and description but
+  not the raw path), so it is deliberately not hardcoded anywhere in this PR;
+  see `QueueLengthSignal` below.
+- There is also a credit-priced **timeslot booking API** (list/book/cancel
+  timeslots, atomic, explicitly unavailable for mock QCs) that is closer to a
+  genuine reservation primitive — but it is account/credit-based and its
+  applicability to **on-premise** devices is unconfirmed. Resonance is known to
+  manage its own pay-as-you-go queue this way; that does not necessarily hold
+  for on-prem Station Control deployments, which is exactly the deployment type
+  this document's static-license section already flags as needing Slurm-side
+  concurrency control the most. Treat this API as cloud/Resonance-oriented until
+  someone with on-prem API access confirms otherwise.
+- QDMI's own `QDMI_DEVICE_PROPERTY_STATUS` (exposed at the Python level via
+  `mqt.core.fomac.Device.status()`) remains **session-local**: `IDLE` at session
+  init, `BUSY` only when *that same session* submits a job. It says nothing
+  about other tenants and works identically (i.e., uselessly for this purpose)
+  regardless of deployment type.
+
+**Design response: don't build the enforcement mechanism on a signal that might
+not exist (on-prem) or that we can't yet confirm the shape of (cloud).**
+Instead, `dynamic_license_daemon.py` treats
+**the SPANK plugin's own acquire/release of a QC as the authoritative signal**,
+and any QC-side status API as, at best, an optional supplementary check.
+Concretely, the daemon polls one or more independent, combinable
+**signal sources** (`--signal-source`, repeatable; a QC is reported unavailable
+if *any* enabled source says so):
+
+- **`lock` (default)**: reads a small file-based lease lock
+  (`spank/license_lock.py`) that directly models "does a Slurm-mediated job
+  currently hold this QC" — the thing we actually want to gate on, and the one
+  fact that is guaranteed to be knowable uniformly across cloud and on-prem,
+  because it comes from Slurm's own job lifecycle rather than from the QC. The
+  lock is driven by Slurm's native `Prolog`/`Epilog` (or
+  `TaskProlog`/`TaskEpilog`) script hooks — configured in `slurm.conf`, so
+  **no SPANK plugin C++ changes are required**:
+
+  ```bash
+  # TaskProlog, run as the job before the task starts:
+  python3 /path/to/spank/license_lock.py acquire \
+    --resource-name "iqm_qc_${IQM_QC_ALIAS}" --ttl-seconds 21600
+
+  # TaskEpilog, run after the task ends (including on failure/cancellation):
+  python3 /path/to/spank/license_lock.py release \
+    --resource-name "iqm_qc_${IQM_QC_ALIAS}"
+  ```
+
+  Leases carry a TTL so a crashed job (whose epilog never runs) cannot leak the
+  lock forever. **This wiring is not implemented by this PR** — only the lock
+  primitive and the daemon-side read of it are. Until a cluster wires up the
+  Prolog/Epilog calls above, the lock is simply never held and this source
+  always reports "available"; that is an explicit, logged no-op-by-default
+  rather than a silent lie.
+- **`qdmi-status` (legacy, off by default)**: the original session-local QDMI
+  probe from an earlier revision of this prototype. Kept for backwards
+  compatibility and as an optional supplementary check; not recommended as the
+  sole source, for the reasons above.
+- **`queue-length` (experimental, off by default, cloud/pay-as-you-go QCs only)**:
+  best-effort polling of the queue-status endpoint described above. Because the
+  exact path is unconfirmed, this source requires an explicit
+  `--queue-status-url-template` (a URL template with a `{qc_id}` placeholder)
+  rather than shipping a guessed, hardcoded path. Any request failure (wrong
+  path, 404, network error, unexpected schema) degrades to "inconclusive" rather
+  than "busy", so a wrong or unavailable endpoint fails open on this one source
+  (the overall verdict still falls back to `lock`/other enabled sources).
+  **Do not enable this on-premise** until someone with real API/dashboard access
+  confirms it applies there.
+
 **Running the daemon:**
 
 ```bash
@@ -297,52 +381,50 @@ python3 spank/dynamic_license_daemon.py --qc-alias emerald
 ```
 
 Every option has an environment variable equivalent
-(`IQM_DYNAMIC_LICENSE_RESOURCE_NAME`,
+(`IQM_DYNAMIC_LICENSE_RESOURCE_NAME`, `IQM_DYNAMIC_LICENSE_SIGNAL_SOURCES`,
+`IQM_DYNAMIC_LICENSE_LOCK_DIR`, `IQM_DYNAMIC_LICENSE_QUEUE_STATUS_URL_TEMPLATE`,
 `IQM_DYNAMIC_LICENSE_POLL_INTERVAL_SECONDS`, `IQM_DYNAMIC_LICENSE_CLUSTER`,
 `IQM_DYNAMIC_LICENSE_DRY_RUN`, plus the existing
 `IQM_BASE_URL`/`IQM_TOKEN`/`IQM_TOKENS_FILE`/`IQM_QC_ID`/`IQM_QC_ALIAS` for QC
-selection and credentials); see `--help` for the full list. Running it requires
-`mqt-core`, i.e. `iqm-qdmi[qiskit]` installed in the daemon's environment.
-
-**What "availability" actually means here.** Be skeptical of this signal before
-relying on it. The daemon polls
-{cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS` (exposed
-at the Python level via `mqt.core.fomac.Device.status()`), which is the only
-QC-status property QDMI-on-IQM exposes today. As implemented, this property is
-**local to the querying session**: it is set to `IDLE` when a session
-initializes and to `BUSY` only when *that same session* submits a job — it does
-not reflect whether other users' sessions currently have work running on the QC.
-A polling daemon that never submits jobs itself will, in practice, observe
-`IDLE` continuously, except when the QC is genuinely unreachable (session
-initialization failing, which the daemon treats as unavailable, fail-closed).
-Neither the C++ core nor the IQM Server API endpoints used elsewhere in this
-codebase (`GET /api/v1/quantum-computers`, `GET /cocos/health`) currently expose
-real queue depth or cross-tenant occupancy. This prototype therefore does not
-yet solve the problem it targets — it wires up the polling-and-`sacctmgr`
-mechanics against the only status signal QDMI currently exposes, so that
-mechanism is ready to plug into a real occupancy signal if/when one becomes
-available (e.g. a future IQM Server API queue-depth endpoint, or a
-`QDMI_DEVICE_PROPERTY_STATUS` implementation that reflects global rather than
-session-local state).
+selection and credentials); see `--help` for the full list. The `lock` source
+has no extra dependencies; `qdmi-status` requires `mqt-core`, i.e.
+`iqm-qdmi[qiskit]` installed in the daemon's environment.
 
 **Open questions for reviewers:**
 
-- **The core gap above**: is extending the IQM Server API (or QDMI's status
-  implementation) to expose real, cross-tenant queue depth in scope, and if so,
-  is polling still the right model, or should the QC push state changes?
-- **Poll-interval-vs-staleness race**: even with a real occupancy signal, there
-  is an inherent window between a state change on the QC and the daemon's next
+- **Is the `lock`-as-authoritative-signal design the right call?** It sidesteps
+  the on-prem/cloud signal-availability gap above, at the cost of only tracking
+  "did a Slurm job claim this QC," not the QC's true internal state (e.g. a QC
+  could still be busy from non-Slurm-mediated access). Is that an acceptable
+  scope for this mechanism, or is closing that gap (e.g. by confirming and
+  wiring up the queue-status endpoint for cloud QCs, and finding an on-prem
+  equivalent) a prerequisite before this is trusted in place of the static pool?
+- **Who wires the Prolog/Epilog hooks, and how robustly?** This PR ships the
+  lock primitive and documents the intended `TaskProlog`/`TaskEpilog` calls
+  above, but does not wire them into any packaged Slurm configuration. Should
+  that wiring ship as part of this mechanism (e.g. a documented drop-in script
+  pair, or eventually a real SPANK-plugin-side acquire/release), or remain an
+  administrator's responsibility?
+- **Poll-interval-vs-staleness race**: even with the lock as the primary signal,
+  there is an inherent window between a lock state change and the daemon's next
   poll (and `sacctmgr` update) during which Slurm's view is stale. The QRMI
-  papers accept this as a known limitation rather than solving it; do we accept
-  the same tradeoff, and if so, what poll interval is an acceptable staleness
-  bound for this cluster's job mix?
+  papers accept the equivalent tradeoff as a known limitation rather than
+  solving it; do we accept the same here, and if so, what poll interval is an
+  acceptable staleness bound for this cluster's job mix?
 - **Where does the daemon run, and as whom?** A single system-level daemon per
   QC (e.g. under systemd, on a login or admin node) needs `sacctmgr` write
   access, which is a privileged operation. What identity/credentials should it
   run as, and how is that access scoped down from a general admin account?
-- **One daemon instance per QC**: the current design polls one QC per process
-  invocation. A cluster with several QCs needs one instance per QC (per alias);
-  is that the right granularity, or should a single daemon poll multiple QCs?
+  Separately, the lock directory needs to be writable by every node running the
+  Prolog/Epilog hooks and readable by the daemon — likely a shared filesystem
+  path, which has its own consistency caveats.
+- **One daemon instance (and one lock) per QC**: the current design polls one QC
+  per process invocation and the lock supports a single holder per resource,
+  matching a `Licenses=<resource>:1` grant. A cluster with several QCs needs one
+  daemon instance per QC (per alias); pool sizes greater than 1
+  (`Licenses=<resource>:4`) are not supported by the lock as implemented — is
+  single-holder-per-resource the right scope for this mechanism, or does it need
+  to model a counted pool?
 - **Interaction with `iqm_require_license`**: the SPANK plugin's fail-closed
   `iqm_require_license=1` option only checks that a matching `--licenses`
   request was made — it does not know whether that license is a static or
