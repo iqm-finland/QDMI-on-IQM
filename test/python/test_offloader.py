@@ -58,7 +58,7 @@ class FakePubResult:
 class FakeVQEResult:
     """Mock for VQEResult."""
 
-    def __init__(self, optimal_parameters: dict[str, float]) -> None:
+    def __init__(self, optimal_parameters: dict[str, float] | None) -> None:
         """Initialize optimal parameters."""
         self.optimal_parameters = optimal_parameters
 
@@ -89,6 +89,36 @@ def test_estimate_local_simulator() -> None:
     params = list(optimal_parameters.values())
     assert len(params) == 1
     assert math.isfinite(float(params[0]))
+
+
+def test_estimate_local_raises_without_optimal_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A local VQE result without optimal parameters should raise a clear error."""
+
+    class FakeVQE:
+        """Mock VQE that returns no optimal parameters."""
+
+        def __init__(self, *args: object) -> None:
+            """Accept the VQE constructor arguments."""
+            assert args
+
+        @staticmethod
+        def compute_minimum_eigenvalue(*, operator: SparsePauliOp) -> FakeVQEResult:
+            """Return an unsuccessful VQE result."""
+            assert operator
+            return FakeVQEResult(None)
+
+    def fake_build_estimator(*, simulator: bool) -> tuple[object, object]:
+        assert simulator
+        return object(), object()
+
+    monkeypatch.setattr(offloader, "VQE", FakeVQE)
+    monkeypatch.setattr(offloader, "build_estimator", fake_build_estimator)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    with pytest.raises(RuntimeError, match="VQE did not return optimal parameters"):
+        offloader.estimate(ansatz, operator, local=True, simulator=True)
 
 
 def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -161,6 +191,33 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
     # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
     assert "--base-url" not in captured_command
+
+
+def test_estimate_slurm_raises_without_optimal_parameters(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An offloaded VQE result without optimal parameters should raise a clear error."""
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult(None)))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        assert command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    with pytest.raises(RuntimeError, match="VQE did not return optimal parameters"):
+        offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
 
 def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(

@@ -117,6 +117,21 @@ def _first_pub(primitive_result: Iterable[PubResult]) -> PubResult:
     return first_pub
 
 
+def _validate_vqe_result(result: VQEResult) -> VQEResult:
+    """Ensure that a VQE result contains optimized parameters.
+
+    Returns:
+        The validated VQE result.
+
+    Raises:
+        RuntimeError: If VQE did not return optimal parameters.
+    """
+    if result.optimal_parameters is None:
+        msg = "VQE did not return optimal parameters."
+        raise RuntimeError(msg)
+    return result
+
+
 def _get_jobs_dir() -> Path:
     """Get the jobs directory path.
 
@@ -344,9 +359,10 @@ def estimate(
     When `local=True`, runs the VQE algorithm locally using either the MQT Core
     DDSIM simulator backend or the packaged IQM backend.
 
-    The returned result has the same semantics as calling
-    `VQE(...).compute_minimum_eigenvalue(...)` directly against the regular
-    (non-offloaded) estimator.
+    A successful call returns the same result as
+    `VQE(...).compute_minimum_eigenvalue(...)` against the regular
+    (non-offloaded) estimator. If VQE does not produce optimal parameters, this
+    function raises a `RuntimeError`.
 
     Args:
         ansatz: The ansatz circuit to run.
@@ -371,7 +387,8 @@ def estimate(
 
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
-        RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
+        RuntimeError: If VQE does not return optimal parameters or there is an
+            error while submitting the job to Slurm or parsing the output.
     """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
@@ -382,7 +399,8 @@ def estimate(
     if local:
         _, estimator = build_estimator(simulator=simulator)
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
-        return vqe.compute_minimum_eigenvalue(operator=operator)
+        result = vqe.compute_minimum_eigenvalue(operator=operator)
+        return _validate_vqe_result(result)
 
     # Make sure the `jobs` directory exists on the shared filesystem
     job_dir = _new_job_dir()
@@ -423,4 +441,5 @@ def estimate(
         job_dir.rmdir()
 
     payload = _decode_payload(process)
-    return cast("VQEResult", _load_pickled_result(payload))
+    result = cast("VQEResult", _load_pickled_result(payload))
+    return _validate_vqe_result(result)
