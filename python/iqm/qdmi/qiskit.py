@@ -20,10 +20,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 try:
-    from mqt.core.fomac import add_dynamic_device_library
+    from mqt.core.fomac import DeviceDefinition, open_device, register_device_if_absent
     from mqt.core.plugins.qiskit.backend import QDMIBackend
     from mqt.core.plugins.qiskit.estimator import QDMIEstimator
     from mqt.core.plugins.qiskit.sampler import QDMISampler
@@ -34,9 +35,11 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from ._paths import IQM_QDMI_LIBRARY_PATH
+from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 
 __all__ = ["IQMBackend"]
+
+IQM_DEFAULT_BASE_URL = "https://resonance.iqm.tech"
 
 
 def __dir__() -> list[str]:
@@ -50,8 +53,8 @@ class IQMBackend(QDMIBackend):
     exposes it through MQT Core's Qiskit-compatible QDMI backend.
 
     Args:
-        base_url: Base URL of the IQM service. Defaults to `IQM_BASE_URL` or
-            the standard Resonance endpoint.
+        base_url: Base URL of the IQM service. Overrides `IQM_BASE_URL` and
+            the registered device default when provided.
         token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
@@ -63,20 +66,28 @@ class IQMBackend(QDMIBackend):
         *,
         base_url: str | None = None,
         token: str | None = None,
-        tokens_file: str | None = None,
+        tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
-        resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or "https://resonance.iqm.tech"
+        resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
-        resolved_tokens_file = tokens_file or os.getenv("IQM_TOKENS_FILE")
+        tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
+        resolved_tokens_file = Path(tokens_file_value) if tokens_file_value else None
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
         resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
 
-        device = add_dynamic_device_library(
-            library_path=str(IQM_QDMI_LIBRARY_PATH),
-            prefix="IQM",
+        register_device_if_absent(
+            DeviceDefinition(
+                IQM_QDMI_DEVICE_ID,
+                IQM_QDMI_LIBRARY_PATH,
+                IQM_QDMI_PREFIX,
+                base_url=IQM_DEFAULT_BASE_URL,
+            )
+        )
+        device = open_device(
+            IQM_QDMI_DEVICE_ID,
             base_url=resolved_base_url,
             token=resolved_token,
             auth_file=resolved_tokens_file,

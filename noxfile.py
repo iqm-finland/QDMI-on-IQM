@@ -176,6 +176,12 @@ def docs(session: nox.Session) -> None:
         "run",
         "--no-build-isolation-package",
         "iqm-qdmi",
+        "--config-settings-package",
+        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
+        "--config-settings-package",
+        "iqm-qdmi:build.targets=iqm-qdmi-device;iqm-qdmi-device-docs",
+        "--config-settings-package",
+        "iqm-qdmi:build-dir=build/docs",
         "--group",
         "docs",
         "--verbose",
@@ -187,10 +193,8 @@ def docs(session: nox.Session) -> None:
         f"docs/_build/{args.builder}",
         *posargs,
         env={
+            "IQM_QDMI_BUILD_DIR": "build/docs",
             "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
-            "SKBUILD_CMAKE_DEFINE": "BUILD_IQM_QDMI_DOCS=ON",
-            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs",
-            "SKBUILD_BUILD_DIR": "build/docs",
         },
     )
 

@@ -22,10 +22,15 @@ from ._version import version as __version__
 
 __all__ = [
     "IQM_QDMI_CMAKE_DIR",
+    "IQM_QDMI_DEVICE_ID",
     "IQM_QDMI_INCLUDE_DIR",
     "IQM_QDMI_LIBRARY_PATH",
+    "IQM_QDMI_PREFIX",
     "__version__",
 ]
+
+IQM_QDMI_DEVICE_ID = "iqm.default"
+IQM_QDMI_PREFIX = "IQM"
 
 
 def __dir__() -> list[str]:

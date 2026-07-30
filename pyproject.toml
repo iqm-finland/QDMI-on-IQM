@@ -45,7 +45,7 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.7.0",
+  "mqt-core~=3.8.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -64,7 +64,7 @@ iqm-estimator = "iqm.qdmi.estimator:main"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core~=3.7.0",
+  "mqt-core~=3.8.0",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -91,7 +91,6 @@ dev = [
   {include-group = "test"},
   "nox>=2026.4.10",
 ]
-
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
