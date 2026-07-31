@@ -17,10 +17,11 @@ categories:
     when:
       labels:
         - "documentation"
-  - title: "🤖 CI"
+  - title: "🤖 CI & Tooling"
     when:
       labels:
         - "continuous integration"
+        - "tooling"
   - title: "📦 Packaging"
     when:
       labels:
