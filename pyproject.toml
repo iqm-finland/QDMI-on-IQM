@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.2.0"
+version = "1.3.0"
 requires-python = ">=3.10"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
@@ -107,7 +107,6 @@ install.components = ["iqm-qdmi-device_Runtime", "iqm-qdmi-device_Development"]
 sdist.include = ["python/iqm/qdmi/_version.py"]
 sdist.exclude = [
   "**/docs",
-  "**/test",
   "sitecustomize.py",
   ".*",
 ]
