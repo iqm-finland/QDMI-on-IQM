@@ -150,11 +150,11 @@ functionality.
 
 ## Recommendation Matrix
 
-| Site profile | Recommended scenario |
-| :--- | :--- |
-| Single researcher, workstation or notebook, direct network access to the IQM service | 1 (C++) or 2 (Python/Qiskit) |
-| Shared academic HPC center, multiple users/groups, on-premise or capacity-limited QC | 3 (Slurm + SPANK), with Slurm licenses enabled |
-| Dedicated production cluster, single tenant, still scheduler-managed | 3 (Slurm + SPANK), partition gating optional, licenses optional |
-| Site already standardized on Spack for software management | 4, layered on top of 1-3 |
-| Plugin development or CI, no access to real Slurm | 5's Docker topology only — not a deployment target |
+| Site profile                                                                         | Recommended scenario                                            |
+| :----------------------------------------------------------------------------------- | :-------------------------------------------------------------- |
+| Single researcher, workstation or notebook, direct network access to the IQM service | 1 (C++) or 2 (Python/Qiskit)                                    |
+| Shared academic HPC center, multiple users/groups, on-premise or capacity-limited QC | 3 (Slurm + SPANK), with Slurm licenses enabled                  |
+| Dedicated production cluster, single tenant, still scheduler-managed                 | 3 (Slurm + SPANK), partition gating optional, licenses optional |
+| Site already standardized on Spack for software management                           | 4, layered on top of 1-3                                        |
+| Plugin development or CI, no access to real Slurm                                    | 5's Docker topology only — not a deployment target              |
 | Site running PBS, LSF, Grid Engine, Kubernetes (CRD-based), or Flux instead of Slurm | 7 — no supported path today; would require new integration work |

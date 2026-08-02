@@ -133,15 +133,15 @@ container without touching real Slurm — see
 
 Read the diagnostic line's fields to localize a failure:
 
-| Symptom | Likely cause | Fix |
-| :--- | :--- | :--- |
-| `base_url=unset` | `iqm_base_url` missing from `plugstack.conf` and not set by the user | Set `iqm_base_url` in the drop-in config, or have the user pass `--iqm-base-url` |
-| `auth=unset` | Neither `IQM_TOKEN` nor `IQM_TOKENS_FILE` reached the job | Set `iqm_tokens_file` in `plugstack.conf`, or have the user pass `--iqm-tokens-file` |
-| Job rejected for setting both token forms | `IQM_TOKEN` and `IQM_TOKENS_FILE` both present | Pick one; the plugin treats using both as a configuration conflict |
-| `tokens_file_ok=no` | Token file missing or unreadable by `slurmd` on that compute node | Fix file permissions/path; the file must be readable on every compute node, not just the login node |
-| Options/flags not recognized (`--iqm-*` rejected) | `plugstack.conf` drop-in directory not included, or not read-permitted | Verify `scontrol show config \| grep PlugStackConfig`, and check file permissions on the drop-in file |
-| "Plugin metadata symbol missing" at `slurmd` startup | Plugin built against incompatible Slurm headers | Rebuild the plugin from source against this cluster's exact `slurm/spank.h` |
-| "IQM backend validation failed" | Compute node can't reach `IQM_BASE_URL`, credentials invalid, or the QC doesn't exist | Check network egress from compute nodes, credential validity, and the QC id/alias spelling |
+| Symptom                                              | Likely cause                                                                          | Fix                                                                                                   |
+| :--------------------------------------------------- | :------------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------- |
+| `base_url=unset`                                     | `iqm_base_url` missing from `plugstack.conf` and not set by the user                  | Set `iqm_base_url` in the drop-in config, or have the user pass `--iqm-base-url`                      |
+| `auth=unset`                                         | Neither `IQM_TOKEN` nor `IQM_TOKENS_FILE` reached the job                             | Set `iqm_tokens_file` in `plugstack.conf`, or have the user pass `--iqm-tokens-file`                  |
+| Job rejected for setting both token forms            | `IQM_TOKEN` and `IQM_TOKENS_FILE` both present                                        | Pick one; the plugin treats using both as a configuration conflict                                    |
+| `tokens_file_ok=no`                                  | Token file missing or unreadable by `slurmd` on that compute node                     | Fix file permissions/path; the file must be readable on every compute node, not just the login node   |
+| Options/flags not recognized (`--iqm-*` rejected)    | `plugstack.conf` drop-in directory not included, or not read-permitted                | Verify `scontrol show config \| grep PlugStackConfig`, and check file permissions on the drop-in file |
+| "Plugin metadata symbol missing" at `slurmd` startup | Plugin built against incompatible Slurm headers                                       | Rebuild the plugin from source against this cluster's exact `slurm/spank.h`                           |
+| "IQM backend validation failed"                      | Compute node can't reach `IQM_BASE_URL`, credentials invalid, or the QC doesn't exist | Check network egress from compute nodes, credential validity, and the QC id/alias spelling            |
 
 For the full list of `plugstack.conf` options (including optional Slurm
 license-based concurrency limits) and additional troubleshooting detail, see
