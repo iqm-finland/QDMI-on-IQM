@@ -886,21 +886,28 @@ int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
     return status;
   }
 
-  const auto job_status_json = nlohmann::json::parse(job_status_response.text);
-  auto opened_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
-  opened_job->session_ = session;
-  opened_job->job_id_ = job_id;
-  opened_job->opened_ = true;
-  const auto job_type = job_status_json.value("type", "circuit");
-  if (job_type != "circuit") {
-    return QDMI_ERROR_NOTSUPPORTED;
+  try {
+    const auto job_status_json =
+        nlohmann::json::parse(job_status_response.text);
+    if (job_status_json.value("type", "circuit") != "circuit") {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+
+    auto opened_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
+    opened_job->session_ = session;
+    opened_job->job_id_ = job_id;
+    opened_job->opened_ = true;
+    if (const auto status = Set_job_status(
+            opened_job.get(), job_status_json.at("status").get<std::string>());
+        status != QDMI_SUCCESS) {
+      return status;
+    }
+    *job = opened_job.release();
+  } catch (const nlohmann::json::exception &error) {
+    LOG_ERROR("Failed to parse opened job response: " +
+              std::string{error.what()});
+    return QDMI_ERROR_FATAL;
   }
-  if (const auto status = Set_job_status(
-          opened_job.get(), job_status_json.at("status").get<std::string>());
-      status != QDMI_SUCCESS) {
-    return status;
-  }
-  *job = opened_job.release();
   LOG_INFO("Opened device job with ID: " + std::string{job_id});
   return QDMI_SUCCESS;
 }

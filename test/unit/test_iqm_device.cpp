@@ -799,6 +799,21 @@ TEST_F(DeviceJobMockTest, OpenExistingJobPropagatesAccessErrors) {
       QDMI_ERROR_PERMISSIONDENIED);
 }
 
+TEST_F(DeviceJobMockTest, OpenExistingJobRejectsMalformedResponses) {
+  IQM_QDMI_Device_Job opened_job = nullptr;
+  http_stub.queue_get(200, "invalid json");
+  EXPECT_EQ(
+      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
+      QDMI_ERROR_FATAL);
+  EXPECT_EQ(opened_job, nullptr);
+
+  http_stub.queue_get(200, R"({"id": "job-123", "type": "circuit"})");
+  EXPECT_EQ(
+      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
+      QDMI_ERROR_FATAL);
+  EXPECT_EQ(opened_job, nullptr);
+}
+
 TEST_F(DeviceJobMockTest, OpenExistingJobRejectsUnsupportedJobTypes) {
   http_stub.queue_get(
       200,
