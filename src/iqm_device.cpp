@@ -37,11 +37,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
+#include <new>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
@@ -876,17 +878,17 @@ int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
     return QDMI_ERROR_BADSTATE;
   }
 
-  const auto job_status_url =
-      session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS, job_id);
-  const auto job_status_response = iqm::http::Get(
-      job_status_url, session->token_manager_->get_bearer_token(),
-      session->request_timeout_);
-  if (const auto status = iqm::http::Handle_response(job_status_response);
-      status != QDMI_SUCCESS) {
-    return status;
-  }
-
   try {
+    const auto job_status_url =
+        session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS, job_id);
+    const auto job_status_response = iqm::http::Get(
+        job_status_url, session->token_manager_->get_bearer_token(),
+        session->request_timeout_);
+    if (const auto status = iqm::http::Handle_response(job_status_response);
+        status != QDMI_SUCCESS) {
+      return status;
+    }
+
     const auto job_status_json =
         nlohmann::json::parse(job_status_response.text);
     if (job_status_json.value("type", "circuit") != "circuit") {
@@ -903,9 +905,21 @@ int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
       return status;
     }
     *job = opened_job.release();
+  } catch (const iqm::ClientAuthenticationError &error) {
+    LOG_ERROR("Authentication failed while opening job: " +
+              std::string{error.what()});
+    return QDMI_ERROR_PERMISSIONDENIED;
+  } catch (const std::bad_alloc &) {
+    return QDMI_ERROR_OUTOFMEM;
   } catch (const nlohmann::json::exception &error) {
     LOG_ERROR("Failed to parse opened job response: " +
               std::string{error.what()});
+    return QDMI_ERROR_FATAL;
+  } catch (const std::exception &error) {
+    LOG_ERROR("Failed to open job: " + std::string{error.what()});
+    return QDMI_ERROR_FATAL;
+  } catch (...) {
+    LOG_ERROR("Failed to open job with an unknown error");
     return QDMI_ERROR_FATAL;
   }
   LOG_INFO("Opened device job with ID: " + std::string{job_id});
@@ -1616,7 +1630,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         }
 
         // Validate that the number of shots matches what was requested
-        if (num_shots != job->num_shots_) {
+        if (!job->opened_ && num_shots != job->num_shots_) {
           LOG_ERROR(
               "Number of shots in measurement response (" +
               std::to_string(num_shots) + ") does not match requested shots (" +

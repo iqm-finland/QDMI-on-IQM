@@ -802,6 +802,19 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
                         return total + entry.second;
                       });
   EXPECT_EQ(reopened_sum, shots_num);
+
+  size_t reopened_shots_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
+                                            0, nullptr, &reopened_shots_size),
+            QDMI_SUCCESS);
+  ASSERT_GT(reopened_shots_size, 1U);
+  std::vector<char> reopened_shots(reopened_shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
+                                            reopened_shots.size(),
+                                            reopened_shots.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(static_cast<size_t>(std::ranges::count(reopened_shots, ',')) + 1,
+            shots_num);
   IQM_QDMI_device_job_free(opened_job);
 }
 
