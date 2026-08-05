@@ -842,6 +842,47 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   EXPECT_EQ(total_count, 4); // 4 shots total
 }
 
+TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
+  const std::string job_submission_response = R"({"id": "job-ordered"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["z_result", "a_result"], "counts": {"01": 1, "10": 1}}])";
+  const std::string job_measurements_response =
+      R"([{"a_result": [[1], [0]], "z_result": [[0], [1]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 2;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  size_t hist_keys_size{};
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                            nullptr, &hist_keys_size),
+            QDMI_SUCCESS);
+
+  size_t shots_size{};
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &shots_size),
+            QDMI_SUCCESS);
+  std::vector<char> shots_buffer(shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+                                            shots_size, shots_buffer.data(),
+                                            nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(shots_buffer.data(), "01,10");
+}
+
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
   const std::string job_submission_response = R"({"id": "job-789"})";
 
