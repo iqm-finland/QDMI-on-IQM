@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- 🩹 Preserve exact program bytes across QDMI job parameter updates and property
+  queries ([**@burgholzer**])
+
 ## [1.3.0] - 2026-07-31
 
 ### Added

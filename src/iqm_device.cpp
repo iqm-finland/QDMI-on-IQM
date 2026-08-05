@@ -151,6 +151,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
   /// The program to be executed.
   std::string program_;
+  /// Whether a program has been set.
+  bool program_set_ = false;
   /// The number of shots to execute for a quantum circuit job.
   size_t num_shots_ = 0;
   /// @brief Heralding mode for the job.
@@ -861,6 +863,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
   case QDMI_DEVICE_JOB_PARAMETER_PROGRAM:
     if (value != nullptr) {
       job->program_.assign(static_cast<const char *>(value), size);
+      job->program_set_ = true;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM:
@@ -979,6 +982,9 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM && !job->program_set_) {
+    return QDMI_ERROR_BADSTATE;
+  }
   ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
                     size, value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
@@ -1117,7 +1123,7 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
   if (job->session_ == nullptr) {
     return QDMI_ERROR_BADSTATE;
   }
-  if (job->program_.empty()) {
+  if (!job->program_set_) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   job->session_->device_status_ = QDMI_DEVICE_STATUS_BUSY;

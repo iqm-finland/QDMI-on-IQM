@@ -1191,12 +1191,29 @@ TEST_F(DeviceJobMockTest, JobParameterValidation) {
 }
 
 TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
-  auto first_program = std::to_array("first");
+  size_t size = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
+            QDMI_ERROR_BADSTATE);
+
+  constexpr auto first_program_expected = std::to_array("first");
+  auto first_program = first_program_expected;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, first_program.size(),
                 first_program.data()),
             QDMI_SUCCESS);
   first_program.front() = 'X';
+
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
+            QDMI_SUCCESS);
+  ASSERT_EQ(size, first_program_expected.size());
+  std::vector<char> retrieved_program(size);
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, retrieved_program.size(),
+                retrieved_program.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_TRUE(std::ranges::equal(retrieved_program, first_program_expected));
 
   constexpr auto latest_program = std::to_array("latest program");
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1204,7 +1221,6 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
                 latest_program.data()),
             QDMI_SUCCESS);
 
-  size_t size = 0;
   ASSERT_EQ(IQM_QDMI_device_job_query_property(
                 job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
             QDMI_SUCCESS);
@@ -1216,7 +1232,7 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
                 too_small.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  std::vector<char> retrieved_program(size);
+  retrieved_program.resize(size);
   ASSERT_EQ(IQM_QDMI_device_job_query_property(
                 job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, retrieved_program.size(),
                 retrieved_program.data(), nullptr),
