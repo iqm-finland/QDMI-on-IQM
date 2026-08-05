@@ -191,6 +191,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::optional<std::string> dd_strategy_ = std::nullopt;
   /// The dictionary of results (histogram counts).
   std::map<std::string, size_t> counts_;
+  /// Measurement keys in the order used by IQM's histogram bitstrings.
+  std::optional<std::vector<std::string>> measurement_keys_;
   /// Individual shot measurement results as bitstrings. std::nullopt means not
   /// yet fetched, empty vector means fetched but no shots.
   std::optional<std::vector<std::string>> shots_;
@@ -1314,7 +1316,9 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
           nlohmann::json::parse(job_results_response.text);
       LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
 
-      // Response is an array with a single object containing counts
+      // Response is an array with one result for the submitted circuit.
+      job->measurement_keys_ = job_results_json_response[0]["measurement_keys"]
+                                   .get<std::vector<std::string>>();
       for (const auto &counts = job_results_json_response[0]["counts"];
            const auto &[bitstring, count] : counts.items()) {
         job->counts_[bitstring] = count.get<size_t>();
@@ -1443,6 +1447,16 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
                                           size_t *size_ret) {
   // Fetch the remote results, if not already fetched
   if (!job->shots_.has_value()) {
+    // IQM defines this metadata as the concatenation order of measurement
+    // results in histogram bitstrings. Use the same order for individual shots.
+    if (!job->measurement_keys_.has_value()) {
+      if (const auto status = IQM_QDMI_device_job_get_results_hist(
+              job, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, nullptr);
+          status != QDMI_SUCCESS) {
+        return status;
+      }
+    }
+
     LOG_INFO("Fetching shot measurements for job " + job->job_id_);
     const auto job_measurements_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
@@ -1496,14 +1510,17 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
           return QDMI_ERROR_FATAL;
         }
 
-        // Collect and sort measurement keys for consistent bitstring ordering
-        std::vector<std::string> keys;
-        keys.reserve(measurement_obj.size());
-        for (auto it = measurement_obj.begin(); it != measurement_obj.end();
-             ++it) {
-          keys.emplace_back(it.key());
+        const auto &keys = *job->measurement_keys_;
+        if (measurement_obj.size() != keys.size() ||
+            !std::ranges::all_of(keys, [&](const auto &key) {
+              return measurement_obj.contains(key);
+            })) {
+          LOG_ERROR(
+              "Measurement keys do not match histogram metadata for job " +
+              job->job_id_);
+          job->status_ = QDMI_JOB_STATUS_FAILED;
+          return QDMI_ERROR_FATAL;
         }
-        std::ranges::sort(keys);
 
         // Determine the number of shots from the first key
         size_t num_shots = 0;

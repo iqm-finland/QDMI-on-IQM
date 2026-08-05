@@ -710,7 +710,7 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_submission_response = R"({"id": "job-123"})";
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_results_response =
-      R"([{"counts": {"0": 100, "1": 0}}])";
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"0": 100, "1": 0}}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -755,11 +755,14 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
 TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   const std::string job_submission_response = R"({"id": "job-456"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0", "meas_2_0_1"], "counts": {"00": 1, "01": 1, "10": 1, "11": 1}}])";
   const std::string job_measurements_response =
       R"([{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[0], [0], [1], [1]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   // Job submission
@@ -800,7 +803,7 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
                                             small_buffer.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  // This should NOT trigger another API call (only 2 GET responses were
+  // This should NOT trigger another API call (only 3 GET responses were
   // queued above; an unscripted call would fail the test).
   size_t hist_keys_size{};
   ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
@@ -909,10 +912,13 @@ TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
 TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   const std::string job_submission_response = R"({"id": "job-789"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["m"], "counts": {"0": 1}}])";
   const std::string job_measurements_response = R"([{"m": [[0], [0]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -954,11 +960,14 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
 TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   const std::string job_submission_response = R"({"id": "job-999"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"0": 1}}])";
   // Invalid: qubit result value is a string instead of an integer
   const std::string job_measurements_response = R"([{"meas_2_0_0": [["0"]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -982,11 +991,14 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
 TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   const std::string job_submission_response = R"({"id": "job-empty"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": [], "counts": {}}])";
   // Empty measurements array - no shots
   const std::string job_measurements_response = R"([])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(

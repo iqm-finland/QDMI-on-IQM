@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- 🩹 Keep IQM shot and histogram bitstrings in the result order specified by
+  IQM's measurement-count metadata ([#158]) ([**@burgholzer**])
+
 ## [1.3.0] - 2026-07-31
 
 ### Added
@@ -135,6 +140,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
