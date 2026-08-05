@@ -38,6 +38,7 @@
 #include <cstring>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -1569,6 +1570,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
             return QDMI_ERROR_FATAL;
           }
 
+          std::optional<size_t> key_result_width;
+
           // Process each shot for this measurement key
           for (size_t shot_idx = 0; shot_idx < num_shots; ++shot_idx) {
             const auto &qubit_result = key_results[shot_idx];
@@ -1576,6 +1579,19 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
               LOG_ERROR("Invalid qubit result format for measurement key '" +
                         key + "', shot " + std::to_string(shot_idx) +
                         " in job " + job->job_id_);
+              job->status_ = QDMI_JOB_STATUS_FAILED;
+              return QDMI_ERROR_FATAL;
+            }
+
+            if (!key_result_width.has_value()) {
+              key_result_width = qubit_result.size();
+            } else if (qubit_result.size() != *key_result_width) {
+              LOG_ERROR(
+                  "Inconsistent qubit-result width for measurement key '" +
+                  key + "': expected " + std::to_string(*key_result_width) +
+                  ", got " + std::to_string(qubit_result.size()) +
+                  " for shot " + std::to_string(shot_idx) + " in job " +
+                  job->job_id_);
               job->status_ = QDMI_JOB_STATUS_FAILED;
               return QDMI_ERROR_FATAL;
             }
@@ -1624,13 +1640,21 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     return QDMI_SUCCESS;
   }
 
-  // Calculate required size: bitstring lengths + commas + null terminator
-  // All shots have the same bitstring length (number of qubits measured)
-  const size_t bitstring_length = (*job->shots_)[0].length();
-  const size_t total_bitstring_length = bitstring_length * job->shots_->size();
-  // For N shots, we need (N - 1) commas and 1 null terminator => N extra
-  // characters.
-  const size_t req_size = total_bitstring_length + job->shots_->size();
+  // Calculate the exact serialized size, including separators and terminator.
+  size_t req_size = 1;
+  for (size_t shot_idx = 0; shot_idx < job->shots_->size(); ++shot_idx) {
+    const auto &shot = (*job->shots_)[shot_idx];
+    const size_t separator_size = shot_idx == 0 ? 0 : 1;
+    if (separator_size > std::numeric_limits<size_t>::max() - req_size ||
+        shot.size() >
+            std::numeric_limits<size_t>::max() - req_size - separator_size) {
+      LOG_ERROR("Serialized shot results exceed the supported size for job " +
+                job->job_id_);
+      job->status_ = QDMI_JOB_STATUS_FAILED;
+      return QDMI_ERROR_FATAL;
+    }
+    req_size += separator_size + shot.size();
+  }
 
   if (size_ret != nullptr) {
     *size_ret = req_size;

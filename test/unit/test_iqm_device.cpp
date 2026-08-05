@@ -1018,6 +1018,41 @@ TEST_F(DeviceJobMockTest, RejectNonBitMeasurementValues) {
             QDMI_ERROR_FATAL);
 }
 
+TEST_F(DeviceJobMockTest, RejectInconsistentMeasurementWidths) {
+  const std::string job_submission_response = R"({"id": "job-width"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["m"], "counts": {"0": 1, "01": 1}}])";
+  const std::string job_measurements_response = R"([{"m": [[0], [0, 1]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 2;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  std::array<char, 8> buffer{};
+  buffer.fill('x');
+  const auto original_buffer = buffer;
+  size_t shots_size = 123;
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+                                            buffer.size(), buffer.data(),
+                                            &shots_size),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(shots_size, 123);
+  EXPECT_EQ(buffer, original_buffer);
+}
+
 TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   const std::string job_submission_response = R"({"id": "job-empty"})";
   const std::string job_status_response = R"({"status": "ready"})";
