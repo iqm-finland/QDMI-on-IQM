@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
