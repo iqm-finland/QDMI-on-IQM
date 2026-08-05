@@ -892,12 +892,7 @@ int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
   opened_job->job_id_ = job_id;
   opened_job->opened_ = true;
   const auto job_type = job_status_json.value("type", "circuit");
-  if (job_type == "calibration") {
-    if (!session->supports_calibration_jobs_) {
-      return QDMI_ERROR_NOTSUPPORTED;
-    }
-    opened_job->program_format_ = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  } else if (job_type != "circuit") {
+  if (job_type != "circuit") {
     return QDMI_ERROR_NOTSUPPORTED;
   }
   if (const auto status = Set_job_status(
@@ -1248,6 +1243,9 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
       job->session_->connection_pool_, "", {}, job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
+    if (status == QDMI_ERROR_PERMISSIONDENIED) {
+      return status;
+    }
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
@@ -1279,6 +1277,9 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
       job->session_->connection_pool_, job->session_->request_timeout_);
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
+    if (status_code == QDMI_ERROR_PERMISSIONDENIED) {
+      return status_code;
+    }
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }

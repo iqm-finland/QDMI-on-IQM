@@ -471,9 +471,9 @@ parameter.
 ## Reopening jobs
 
 Use {cpp:func}`IQM_QDMI_device_session_open_device_job` with the opaque job ID
-returned by
+returned for an IQM circuit job by
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_ID` to
-obtain a new local handle for an existing IQM job:
+obtain a new local handle for an existing IQM circuit job:
 
 ```cpp
 IQM_QDMI_Device_Job opened_job = nullptr;

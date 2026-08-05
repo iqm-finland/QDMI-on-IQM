@@ -799,14 +799,38 @@ TEST_F(DeviceJobMockTest, OpenExistingJobPropagatesAccessErrors) {
       QDMI_ERROR_PERMISSIONDENIED);
 }
 
-TEST_F(DeviceJobMockTest, OpenExistingCalibrationJob) {
+TEST_F(DeviceJobMockTest, OpenExistingJobRejectsUnsupportedJobTypes) {
   http_stub.queue_get(
       200,
       R"({"id": "calibration-123", "status": "ready", "type": "calibration"})");
   IQM_QDMI_Device_Job opened_job = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_open_device_job(session, "calibration-123",
+  EXPECT_EQ(IQM_QDMI_device_session_open_device_job(session, "calibration-123",
                                                     &opened_job),
-            QDMI_SUCCESS);
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(opened_job, nullptr);
+}
+
+TEST_F(DeviceJobMockTest, OpenedJobPreservesPermissionFailures) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job opened_job = nullptr;
+  ASSERT_EQ(
+      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
+      QDMI_SUCCESS);
+
+  http_stub.queue_get(403, R"({"message": "Access denied"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(opened_job, &status),
+            QDMI_ERROR_PERMISSIONDENIED);
+
+  http_stub.queue_post(403, R"({"message": "Access denied"})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(opened_job),
+            QDMI_ERROR_PERMISSIONDENIED);
+
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(opened_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
   IQM_QDMI_device_job_free(opened_job);
 }
 
