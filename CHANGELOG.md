@@ -13,7 +13,7 @@ releases may include breaking changes.
 ### Fixed
 
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
-  queries ([**@burgholzer**])
+  queries ([#159]) ([**@burgholzer**])
 
 ## [1.3.0] - 2026-07-31
 
@@ -140,6 +140,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
