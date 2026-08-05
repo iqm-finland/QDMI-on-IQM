@@ -849,9 +849,9 @@ TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
   const std::string job_submission_response = R"({"id": "job-ordered"})";
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_counts_response =
-      R"([{"measurement_keys": ["z_result", "a_result"], "counts": {"01": 1, "10": 1}}])";
+      R"([{"measurement_keys": ["z_result", "a_result"], "counts": {"010": 1, "101": 1}}])";
   const std::string job_measurements_response =
-      R"([{"a_result": [[1], [0]], "z_result": [[0], [1]]}])";
+      R"([{"a_result": [[0], [1]], "z_result": [[0, 1], [1, 0]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -883,7 +883,7 @@ TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
                                             shots_size, shots_buffer.data(),
                                             nullptr),
             QDMI_SUCCESS);
-  EXPECT_STREQ(shots_buffer.data(), "01,10");
+  EXPECT_STREQ(shots_buffer.data(), "010,101");
 }
 
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
@@ -914,7 +914,7 @@ TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_counts_response =
       R"([{"measurement_keys": ["m"], "counts": {"0": 1}}])";
-  const std::string job_measurements_response = R"([{"m": [[0], [0]]}])";
+  const std::string job_measurements_response = R"([{"m": [[]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -961,9 +961,10 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   const std::string job_submission_response = R"({"id": "job-999"})";
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_counts_response =
-      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"0": 1}}])";
-  // Invalid: qubit result value is a string instead of an integer
-  const std::string job_measurements_response = R"([{"meas_2_0_0": [["0"]]}])";
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"00": 1}}])";
+  // Invalid: the second value is a string instead of an integer.
+  const std::string job_measurements_response =
+      R"([{"meas_2_0_0": [[0, "1"]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -982,6 +983,35 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   // Should fail when trying to retrieve results due to non-integer value
+  size_t shots_size{};
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &shots_size),
+            QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceJobMockTest, RejectNonBitMeasurementValues) {
+  const std::string job_submission_response = R"({"id": "job-999"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"00": 1}}])";
+  const std::string job_measurements_response = R"([{"meas_2_0_0": [[0, 2]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 1;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
   size_t shots_size{};
   EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),

@@ -1481,7 +1481,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     // API returns array format: [{"meas_key": [[0], [1], ...], ...}, ...]
     // The outer array typically contains a single object.
     // Each measurement key maps to an array of shot results.
-    // Each shot result is itself an array containing a single integer (0 or 1).
+    // Each shot result contains one bit per measured qubit.
     if (!job_measurements_json_response.is_array()) {
       LOG_ERROR("Expected array of measurement objects for job " +
                 job->job_id_);
@@ -1580,28 +1580,28 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
               return QDMI_ERROR_FATAL;
             }
 
-            // Each qubit result array must contain exactly one integer outcome
-            if (qubit_result.size() != 1 ||
-                !qubit_result[0].is_number_integer()) {
-              LOG_ERROR("Invalid qubit result value format for measurement "
-                        "key '" +
-                        key + "', shot " + std::to_string(shot_idx) +
-                        " in job " + job->job_id_);
-              job->status_ = QDMI_JOB_STATUS_FAILED;
-              return QDMI_ERROR_FATAL;
-            }
+            for (const auto &bit : qubit_result) {
+              if (!bit.is_number_integer()) {
+                LOG_ERROR("Invalid qubit result value format for measurement "
+                          "key '" +
+                          key + "', shot " + std::to_string(shot_idx) +
+                          " in job " + job->job_id_);
+                job->status_ = QDMI_JOB_STATUS_FAILED;
+                return QDMI_ERROR_FATAL;
+              }
 
-            const auto value = qubit_result[0].get<int>();
-            if (value < 0 || value > 1) {
-              LOG_ERROR("Invalid qubit value " + std::to_string(value) +
-                        " for measurement key '" + key + "', shot " +
-                        std::to_string(shot_idx) + " in job " + job->job_id_);
-              job->status_ = QDMI_JOB_STATUS_FAILED;
-              return QDMI_ERROR_FATAL;
-            }
+              const auto value = bit.get<int>();
+              if (value < 0 || value > 1) {
+                LOG_ERROR("Invalid qubit value " + std::to_string(value) +
+                          " for measurement key '" + key + "', shot " +
+                          std::to_string(shot_idx) + " in job " + job->job_id_);
+                job->status_ = QDMI_JOB_STATUS_FAILED;
+                return QDMI_ERROR_FATAL;
+              }
 
-            // Append to the bitstring for this shot
-            (*job->shots_)[shot_idx] += std::to_string(value);
+              // Preserve the qubit order within each measurement key.
+              (*job->shots_)[shot_idx] += std::to_string(value);
+            }
           }
         }
       }

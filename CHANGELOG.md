@@ -12,8 +12,8 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🩹 Keep IQM shot and histogram bitstrings in the result order specified by
-  IQM's measurement-count metadata ([#158]) ([**@burgholzer**])
+- 🩹 Keep IQM shot and histogram bitstrings in the measurement-key and qubit
+  order specified by IQM's result metadata ([#158]) ([**@burgholzer**])
 
 ## [1.3.0] - 2026-07-31
 
