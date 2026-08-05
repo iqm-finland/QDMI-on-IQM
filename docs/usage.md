@@ -468,6 +468,28 @@ For QIR and JSON formats, the program should be provided as a string via the
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
 parameter.
 
+## Reopening jobs
+
+Use {cpp:func}`IQM_QDMI_device_session_open_device_job` with the opaque job ID
+returned by
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_ID` to
+obtain a new local handle for an existing IQM job:
+
+```cpp
+IQM_QDMI_Device_Job opened_job = nullptr;
+const int ret = IQM_QDMI_device_session_open_device_job(
+    session, job_id.c_str(), &opened_job);
+```
+
+The device validates the ID with the IQM Server using the current session
+credentials and initializes the handle with the remote job's current status.
+Opening does not clone or submit the job. Parameters cannot be changed and the
+opened handle cannot be submitted again. Freeing it only releases the local
+handle; it does not cancel or delete the remote job. Check or wait for
+completion before retrieving results. Since the original submission payload is
+not reconstructed, only the job ID is exposed as a job property on an opened
+handle.
+
 ## Retrieving Job Results
 
 After a job completes execution, you can retrieve the measurement results in

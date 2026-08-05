@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <ranges>
@@ -690,6 +691,7 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
   auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  const auto job_id = FoMaC::get_job_id(job);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     IQM_QDMI_device_job_free(job);
@@ -785,6 +787,22 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
             QDMI_ERROR_NOTSUPPORTED);
 
   IQM_QDMI_device_job_free(job);
+
+  IQM_QDMI_Device_Job opened_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_open_device_job(session, job_id.c_str(),
+                                                    &opened_job),
+            QDMI_SUCCESS);
+  EXPECT_EQ(FoMaC::get_job_id(opened_job), job_id);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(opened_job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(wait_for_done(opened_job), QDMI_JOB_STATUS_DONE);
+  const auto reopened_counts = FoMaC::get_histogram(opened_job);
+  const auto reopened_sum =
+      std::accumulate(reopened_counts.begin(), reopened_counts.end(), size_t{0},
+                      [](const size_t total, const auto &entry) {
+                        return total + entry.second;
+                      });
+  EXPECT_EQ(reopened_sum, shots_num);
+  IQM_QDMI_device_job_free(opened_job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCancellation) {

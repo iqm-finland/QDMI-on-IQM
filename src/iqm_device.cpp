@@ -151,6 +151,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   IQM_QDMI_Device_Session session_ = nullptr;
   /// The job ID as returned by the API.
   std::string job_id_;
+  /// Whether this handle was opened for an existing remote job.
+  bool opened_ = false;
   /// The program format used for this job.
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
   /// The program to be executed.
@@ -822,6 +824,92 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
   return QDMI_SUCCESS;
 }
 
+namespace {
+int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
+  if (native_status == "received") {
+    job->status_ = QDMI_JOB_STATUS_SUBMITTED;
+  } else if (native_status == "queued" || native_status == "waiting") {
+    job->status_ = QDMI_JOB_STATUS_QUEUED;
+  } else if (native_status == "validation_started" ||
+             native_status == "validation_ended" ||
+             native_status == "fetch_calibration_started" ||
+             native_status == "fetch_calibration_ended" ||
+             native_status == "compilation_started" ||
+             native_status == "compilation_ended" ||
+             native_status == "save_sweep_metadata_started" ||
+             native_status == "save_sweep_metadata_ended" ||
+             native_status == "pending execution" ||
+             native_status == "pending_execution" ||
+             native_status == "execution_started" ||
+             native_status == "execution_ended" ||
+             native_status == "post_processing_pending" ||
+             native_status == "post_processing_started" ||
+             native_status == "post_processing_ended" ||
+             // Legacy job statuses
+             native_status == "running" || native_status == "processing" ||
+             native_status == "accepted" ||
+             native_status == "pending compilation" ||
+             native_status == "compiled") {
+    job->status_ = QDMI_JOB_STATUS_RUNNING;
+  } else if (native_status == "ready" || native_status == "completed") {
+    job->status_ = QDMI_JOB_STATUS_DONE;
+  } else if (native_status == "aborted" || native_status == "cancelled") {
+    job->status_ = QDMI_JOB_STATUS_CANCELED;
+  } else if (native_status == "failed") {
+    job->status_ = QDMI_JOB_STATUS_FAILED;
+  } else {
+    LOG_ERROR("Unknown job status: " + native_status);
+    return QDMI_ERROR_FATAL;
+  }
+  return QDMI_SUCCESS;
+}
+} // namespace
+
+int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
+                                            const char *job_id,
+                                            IQM_QDMI_Device_Job *job) {
+  if (session == nullptr || job_id == nullptr || job_id[0] == '\0' ||
+      job == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
+    return QDMI_ERROR_BADSTATE;
+  }
+
+  const auto job_status_url =
+      session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS, job_id);
+  const auto job_status_response = iqm::http::Get(
+      job_status_url, session->token_manager_->get_bearer_token(),
+      session->request_timeout_);
+  if (const auto status = iqm::http::Handle_response(job_status_response);
+      status != QDMI_SUCCESS) {
+    return status;
+  }
+
+  const auto job_status_json = nlohmann::json::parse(job_status_response.text);
+  auto opened_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
+  opened_job->session_ = session;
+  opened_job->job_id_ = job_id;
+  opened_job->opened_ = true;
+  const auto job_type = job_status_json.value("type", "circuit");
+  if (job_type == "calibration") {
+    if (!session->supports_calibration_jobs_) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    opened_job->program_format_ = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  } else if (job_type != "circuit") {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (const auto status = Set_job_status(
+          opened_job.get(), job_status_json.at("status").get<std::string>());
+      status != QDMI_SUCCESS) {
+    return status;
+  }
+  *job = opened_job.release();
+  LOG_INFO("Opened device job with ID: " + std::string{job_id});
+  return QDMI_SUCCESS;
+}
+
 void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   LOG_INFO("Freeing device job");
   delete[] static_cast<char *>(job->program_);
@@ -988,6 +1076,9 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
                       size, value, size_ret)
+  if (job->opened_) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
@@ -1114,8 +1205,11 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
 } // namespace
 
 int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
-  if (job == nullptr || job->status_ != QDMI_JOB_STATUS_CREATED) {
+  if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->status_ != QDMI_JOB_STATUS_CREATED) {
+    return QDMI_ERROR_BADSTATE;
   }
   if (job->session_ == nullptr) {
     return QDMI_ERROR_BADSTATE;
@@ -1193,39 +1287,9 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
   const auto job_status = job_status_json_response["status"].get<std::string>();
-  if (job_status == "received") {
-    job->status_ = QDMI_JOB_STATUS_SUBMITTED;
-  } else if (job_status == "queued" || job_status == "waiting") {
-    job->status_ = QDMI_JOB_STATUS_QUEUED;
-  } else if (job_status == "validation_started" ||
-             job_status == "validation_ended" ||
-             job_status == "fetch_calibration_started" ||
-             job_status == "fetch_calibration_ended" ||
-             job_status == "compilation_started" ||
-             job_status == "compilation_ended" ||
-             job_status == "save_sweep_metadata_started" ||
-             job_status == "save_sweep_metadata_ended" ||
-             job_status == "pending execution" ||
-             job_status == "pending_execution" ||
-             job_status == "execution_started" ||
-             job_status == "execution_ended" ||
-             job_status == "post_processing_pending" ||
-             job_status == "post_processing_started" ||
-             job_status == "post_processing_ended" ||
-             // Legacy job statuses
-             job_status == "running" || job_status == "processing" ||
-             job_status == "accepted" || job_status == "pending compilation" ||
-             job_status == "compiled") {
-    job->status_ = QDMI_JOB_STATUS_RUNNING;
-  } else if (job_status == "ready" || job_status == "completed") {
-    job->status_ = QDMI_JOB_STATUS_DONE;
-  } else if (job_status == "aborted" || job_status == "cancelled") {
-    job->status_ = QDMI_JOB_STATUS_CANCELED;
-  } else if (job_status == "failed") {
-    job->status_ = QDMI_JOB_STATUS_FAILED;
-  } else {
-    LOG_ERROR("Unknown job status: " + job_status);
-    return QDMI_ERROR_FATAL;
+  if (const auto update_status = Set_job_status(job, job_status);
+      update_status != QDMI_SUCCESS) {
+    return update_status;
   }
   *status = job->status_;
   LOG_DEBUG("Job status: " + std::to_string(job->status_) +
