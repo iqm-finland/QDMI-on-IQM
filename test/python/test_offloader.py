@@ -262,6 +262,109 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     assert worker_command[4] == "3"
 
 
+def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The `licenses` kwarg is forwarded verbatim as `--licenses` on `srun`, ahead of the worker command."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    counts = offloader.sample(
+        circuit, shots=7, local=False, simulator=True, qc_alias="emerald:mock", licenses="iqm_qc_emerald_mock:1"
+    )
+
+    worker_index = captured_command.index("iqm-sampler")
+    assert counts == {"0": 1}
+    assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
+    assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
+
+
+def test_sample_slurm_omits_licenses_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Without a `licenses` kwarg, `--licenses` is not added to the `srun` command."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True)
+
+    assert not any(arg.startswith("--licenses") for arg in captured_command)
+
+
+def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Mirrors `test_sample_slurm_forwards_licenses` for `estimate()`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    result = offloader.estimate(
+        ansatz,
+        operator,
+        maxiter=3,
+        local=False,
+        simulator=True,
+        qc_alias="emerald:mock",
+        licenses="iqm_qc_emerald_mock:1",
+    )
+
+    worker_index = captured_command.index("iqm-estimator")
+    assert result.optimal_parameters == {"theta": 0.125}
+    assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
+    assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
+
+
 def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A failed Slurm job leaves its input files in place and reports where to find them."""
 
