@@ -159,7 +159,7 @@ docs -- and `licenses` is how a caller requests it. Only used when
 `local=False`.
 
 ```python
-counts = sample(qc, shots=512, simulator=True, qc_alias="emerald:mock", licenses="iqm_qc_emerald_mock:1")
+counts = sample(qc, shots=512, simulator=True, qc_alias="emerald", licenses="iqm_qc_emerald:1")
 ```
 
 ### Programmatic Sampling Example
