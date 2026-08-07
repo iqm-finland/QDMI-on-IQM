@@ -147,6 +147,21 @@ default backend configuration. When set, they are passed as `--iqm-qc-id` and
 [SPANK plugin](spank_plugin.md) resolves into the job's `IQM_QC_ID` and
 `IQM_QC_ALIAS` environment variables. Only used when `local=False`.
 
+### Requesting a Slurm License
+
+Both functions accept an optional `licenses` keyword argument, forwarded
+verbatim as a `--licenses` option on the `srun` command (Slurm's own
+`name[:count][,name[:count]...]` syntax). This is unrelated to QC selection: a
+site administrator can configure a Slurm license per QC to cap concurrent jobs
+against it -- see the SPANK plugin's
+[Limiting Concurrent Access with Slurm Licenses](spank_plugin.md#limiting-concurrent-access-with-slurm-licenses)
+docs -- and `licenses` is how a caller requests it. Only used when
+`local=False`.
+
+```python
+counts = sample(qc, shots=512, simulator=True, qc_alias="emerald", licenses="iqm_qc_emerald:1")
+```
+
 ### Programmatic Sampling Example
 
 ```python
