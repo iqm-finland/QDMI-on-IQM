@@ -23,6 +23,7 @@
 #include "logging.hpp"
 
 #include <chrono>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
@@ -166,9 +167,10 @@ TEST(HttpClientTest, StructuredErrorsSuppressRawFallback) {
 TEST(HttpClientTest, GetReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get_connection_error();
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
 
   EXPECT_EQ(iqm::http::Handle_response(response), QDMI_ERROR_FATAL);
   EXPECT_NE(
@@ -179,9 +181,10 @@ TEST(HttpClientTest, GetReturnsFatalWhenRequestFails) {
 TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_post_connection_error();
-  const auto response =
-      iqm::http::Post("https://example.test/jobs", std::nullopt, "{}");
+  const auto response = iqm::http::Post("https://example.test/jobs",
+                                        std::nullopt, connection_pool, "{}");
 
   EXPECT_EQ(iqm::http::Handle_response(response), QDMI_ERROR_FATAL);
   EXPECT_NE(
@@ -191,18 +194,22 @@ TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
 
 TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
   iqm::test_support::HttpStub http_stub;
-  http_stub.queue_get(200).queue_post(200);
+  const cpr::ConnectionPool connection_pool;
+  http_stub.queue_get(200).queue_get(200).queue_post(200);
   const auto bearer_token = cpr::Bearer{"test-token"};
 
-  const auto get_response =
-      iqm::http::Get("https://example.test/jobs", bearer_token);
-  const auto post_response =
-      iqm::http::Post("https://example.test/jobs", bearer_token, "{}");
+  const auto get_response = iqm::http::Get("https://example.test/jobs",
+                                           bearer_token, connection_pool);
+  const auto optional_get_response = iqm::http::Get_optional(
+      "https://example.test/capability", bearer_token, connection_pool);
+  const auto post_response = iqm::http::Post(
+      "https://example.test/jobs", bearer_token, connection_pool, "{}");
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
+  EXPECT_EQ(iqm::http::Handle_response(optional_get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
 
-  ASSERT_EQ(http_stub.get_bearer_tokens().size(), 1U);
+  ASSERT_EQ(http_stub.get_bearer_tokens().size(), 2U);
   ASSERT_TRUE(http_stub.get_bearer_tokens()[0].has_value());
   EXPECT_EQ(std::string{http_stub.get_bearer_tokens()[0]->GetToken()},
             "test-token");
@@ -210,17 +217,24 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
   ASSERT_TRUE(http_stub.post_bearer_tokens()[0].has_value());
   EXPECT_EQ(std::string{http_stub.post_bearer_tokens()[0]->GetToken()},
             "test-token");
+  EXPECT_EQ(http_stub.get_connection_pools(),
+            (std::vector<const cpr::ConnectionPool *>{&connection_pool,
+                                                      &connection_pool}));
+  EXPECT_EQ(http_stub.post_connection_pools(),
+            (std::vector<const cpr::ConnectionPool *>{&connection_pool}));
 }
 
 TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(200).queue_post(200);
   constexpr auto timeout = std::chrono::milliseconds{1'234};
 
-  const auto get_response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt, timeout);
-  const auto post_response = iqm::http::Post("https://example.test/jobs",
-                                             std::nullopt, "{}", {}, timeout);
+  const auto get_response = iqm::http::Get(
+      "https://example.test/jobs", std::nullopt, connection_pool, timeout);
+  const auto post_response =
+      iqm::http::Post("https://example.test/jobs", std::nullopt,
+                      connection_pool, "{}", {}, timeout);
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
@@ -243,16 +257,20 @@ TEST(HttpClientTest, TimeoutIsClampedToTransportRepresentation) {
 TEST(HttpClientTest, RetriesHttp429UsingRetryAfterUntilSuccess) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429, "", {{"Retry-After", "30"}}).queue_get(200);
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
   EXPECT_EQ(response.status_code, 200);
   EXPECT_EQ(http_stub.sleep_call_count(), 1U);
   EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{30});
+  EXPECT_EQ(http_stub.get_connection_pools(),
+            (std::vector<const cpr::ConnectionPool *>{&connection_pool,
+                                                      &connection_pool}));
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("hit HTTP 429 rate limiting; retrying after 30 second(s) "
@@ -263,10 +281,11 @@ TEST(HttpClientTest, RetriesHttp429UsingRetryAfterUntilSuccess) {
 
 TEST(HttpClientTest, RetriesHttp429UsingCaseInsensitiveRetryAfterHeader) {
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429, "", {{"retry-after", "7"}}).queue_get(200);
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
@@ -276,10 +295,11 @@ TEST(HttpClientTest, RetriesHttp429UsingCaseInsensitiveRetryAfterHeader) {
 TEST(HttpClientTest, RateLimitRetryDoesNotOutliveRequestTimeout) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429, "", {{"Retry-After", "30"}}).queue_get(200);
 
   const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt,
+      iqm::http::Get("https://example.test/jobs", std::nullopt, connection_pool,
                      std::chrono::milliseconds{1'000});
   const auto status = iqm::http::Handle_response(response);
 
@@ -295,11 +315,12 @@ TEST(HttpClientTest, RateLimitRetryDoesNotOutliveRequestTimeout) {
 
 TEST(HttpClientTest, MaximumRequestTimeoutDoesNotOverflowRetryBudget) {
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429, "", {{"Retry-After", "30"}}).queue_get(200);
   constexpr auto timeout = std::chrono::milliseconds::max();
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt, timeout);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool, timeout);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
@@ -313,10 +334,11 @@ TEST(HttpClientTest, MaximumRequestTimeoutDoesNotOverflowRetryBudget) {
 TEST(HttpClientTest,
      RetriesHttp429WithConservativeFallbackForMissingRetryAfter) {
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429).queue_get(200);
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
@@ -326,10 +348,11 @@ TEST(HttpClientTest,
 TEST(HttpClientTest,
      RetriesHttp429WithConservativeFallbackForMalformedRetryAfter) {
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   http_stub.queue_get(429, "", {{"Retry-After", "soon"}}).queue_get(200);
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_SUCCESS);
@@ -339,12 +362,13 @@ TEST(HttpClientTest,
 TEST(HttpClientTest, RetriesExhaustedForHttp429ReturnsInvalidArgument) {
   const LoggerCapture logger_capture;
   iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
   for (int i = 0; i < 11; ++i) {
     http_stub.queue_get(429, "", {{"Retry-After", "1"}});
   }
 
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt);
+  const auto response = iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool);
   const auto status = iqm::http::Handle_response(response);
 
   EXPECT_EQ(status, QDMI_ERROR_INVALIDARGUMENT);

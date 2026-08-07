@@ -583,6 +583,35 @@ TEST_F(DeviceIntegrationMockTest,
             "https://localhost/api/v1/quantum-computers");
 }
 
+TEST_F(DeviceIntegrationMockTest,
+       DeviceSessionsReuseDistinctConnectionPoolsDuringInitialization) {
+  IQM_QDMI_Device_Session second_session = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_alloc(&second_session), QDMI_SUCCESS);
+  const std::string base_url = "https://localhost";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                second_session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+
+  queue_successful_initialization();
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_session_init(second_session), QDMI_SUCCESS);
+
+  const auto &connection_pools = http_stub.get_connection_pools();
+  ASSERT_EQ(connection_pools.size(), 10U);
+  EXPECT_TRUE(std::ranges::all_of(
+      connection_pools.begin(), connection_pools.begin() + 5,
+      [&](const auto *pool) { return pool == connection_pools.front(); }));
+  EXPECT_TRUE(std::ranges::all_of(
+      connection_pools.begin() + 5, connection_pools.end(),
+      [&](const auto *pool) { return pool == connection_pools.back(); }));
+  EXPECT_NE(connection_pools.front(), connection_pools.back());
+
+  IQM_QDMI_device_session_free(second_session);
+}
+
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
   EXPECT_NE(session, nullptr);
