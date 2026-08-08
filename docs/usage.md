@@ -468,17 +468,17 @@ For QIR and JSON formats, the program should be provided as a string via the
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
 parameter.
 
-## Reopening jobs
+## Retrieving jobs by ID
 
-Use {cpp:func}`IQM_QDMI_device_session_open_device_job` with the opaque job ID
-returned for an IQM circuit job by
+Use {cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` with the job
+ID returned for an IQM circuit job by
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_ID` to
 obtain a new local handle for an existing IQM circuit job:
 
 ```cpp
-IQM_QDMI_Device_Job opened_job = nullptr;
-const int ret = IQM_QDMI_device_session_open_device_job(
-    session, job_id.c_str(), &opened_job);
+IQM_QDMI_Device_Job retrieved_job = nullptr;
+const int ret = IQM_QDMI_device_session_retrieve_device_job_by_id(
+    session, job_id.c_str(), &retrieved_job);
 ```
 
 The device validates the ID with the IQM Server using the current session

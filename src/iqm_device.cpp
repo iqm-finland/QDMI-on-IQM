@@ -154,7 +154,7 @@ struct IQM_QDMI_Device_Job_impl_d {
   /// The job ID as returned by the API.
   std::string job_id_;
   /// Whether this handle was opened for an existing remote job.
-  bool opened_ = false;
+  bool retrieved_ = false;
   /// The program format used for this job.
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
   /// The program to be executed.
@@ -867,9 +867,9 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
 }
 } // namespace
 
-int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
-                                            const char *job_id,
-                                            IQM_QDMI_Device_Job *job) {
+int IQM_QDMI_device_session_retrieve_device_job_by_id(
+    IQM_QDMI_Device_Session session, const char *job_id,
+    IQM_QDMI_Device_Job *job) {
   if (session == nullptr || job_id == nullptr || job_id[0] == '\0' ||
       job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -895,34 +895,35 @@ int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
       return QDMI_ERROR_NOTSUPPORTED;
     }
 
-    auto opened_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
-    opened_job->session_ = session;
-    opened_job->job_id_ = job_id;
-    opened_job->opened_ = true;
-    if (const auto status = Set_job_status(
-            opened_job.get(), job_status_json.at("status").get<std::string>());
+    auto retrieved_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
+    retrieved_job->session_ = session;
+    retrieved_job->job_id_ = job_id;
+    retrieved_job->retrieved_ = true;
+    if (const auto status =
+            Set_job_status(retrieved_job.get(),
+                           job_status_json.at("status").get<std::string>());
         status != QDMI_SUCCESS) {
       return status;
     }
-    *job = opened_job.release();
+    *job = retrieved_job.release();
   } catch (const iqm::ClientAuthenticationError &error) {
-    LOG_ERROR("Authentication failed while opening job: " +
+    LOG_ERROR("Authentication failed while retrieving job: " +
               std::string{error.what()});
     return QDMI_ERROR_PERMISSIONDENIED;
   } catch (const std::bad_alloc &) {
     return QDMI_ERROR_OUTOFMEM;
   } catch (const nlohmann::json::exception &error) {
-    LOG_ERROR("Failed to parse opened job response: " +
+    LOG_ERROR("Failed to parse retrieved job response: " +
               std::string{error.what()});
     return QDMI_ERROR_FATAL;
   } catch (const std::exception &error) {
-    LOG_ERROR("Failed to open job: " + std::string{error.what()});
+    LOG_ERROR("Failed to retrieve job: " + std::string{error.what()});
     return QDMI_ERROR_FATAL;
   } catch (...) {
-    LOG_ERROR("Failed to open job with an unknown error");
+    LOG_ERROR("Failed to retrieve job with an unknown error");
     return QDMI_ERROR_FATAL;
   }
-  LOG_INFO("Opened device job with ID: " + std::string{job_id});
+  LOG_INFO("Retrieved device job with ID: " + std::string{job_id});
   return QDMI_SUCCESS;
 }
 
@@ -1092,7 +1093,7 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
                       size, value, size_ret)
-  if (job->opened_) {
+  if (job->retrieved_) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
@@ -1630,7 +1631,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         }
 
         // Validate that the number of shots matches what was requested
-        if (!job->opened_ && num_shots != job->num_shots_) {
+        if (!job->retrieved_ && num_shots != job->num_shots_) {
           LOG_ERROR(
               "Number of shots in measurement response (" +
               std::to_string(num_shots) + ") does not match requested shots (" +

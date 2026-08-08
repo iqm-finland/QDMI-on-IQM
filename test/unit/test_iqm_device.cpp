@@ -737,175 +737,177 @@ TEST_F(DeviceTest, JobCreationWithoutInitialization) {
             QDMI_ERROR_BADSTATE);
 }
 
-TEST_F(DeviceTest, JobOpeningValidatesArgumentsAndSessionState) {
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(nullptr, "job-123", &opened_job),
-      QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, nullptr, &opened_job),
-      QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(IQM_QDMI_device_session_open_device_job(session, "", &opened_job),
+TEST_F(DeviceTest, JobRetrievalValidatesArgumentsAndSessionState) {
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                nullptr, "job-123", &retrieved_job),
             QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", nullptr),
-      QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, nullptr,
+                                                              &retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, "",
+                                                              &retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_BADSTATE);
 }
 
 // ============================================================================
 // INTEGRATION MOCK TESTS - Full lifecycle with mocked dependencies
 // ============================================================================
 
-TEST_F(DeviceJobMockTest, OpenExistingJob) {
+TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
   const std::string job_status_response =
       R"({"id": "job-123", "status": "ready", "type": "circuit"})";
   http_stub.queue_get(200, job_status_response);
 
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  ASSERT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_SUCCESS);
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
 
   size_t id_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                opened_job, QDMI_DEVICE_JOB_PROPERTY_ID, 0, nullptr, &id_size),
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
+                                               QDMI_DEVICE_JOB_PROPERTY_ID, 0,
+                                               nullptr, &id_size),
             QDMI_SUCCESS);
   std::string id(id_size, '\0');
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(opened_job,
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
                                                QDMI_DEVICE_JOB_PROPERTY_ID,
                                                id.size(), id.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_STREQ(id.c_str(), "job-123");
 
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                opened_job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
+                retrieved_job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
             QDMI_ERROR_BADSTATE);
-  EXPECT_EQ(IQM_QDMI_device_job_submit(opened_job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);
 
   QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
-  EXPECT_EQ(IQM_QDMI_device_job_check(opened_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
   EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
-  IQM_QDMI_device_job_free(opened_job);
+  IQM_QDMI_device_job_free(retrieved_job);
 }
 
-TEST_F(DeviceJobMockTest, OpenExistingJobPropagatesAccessErrors) {
-  IQM_QDMI_Device_Job opened_job = nullptr;
+TEST_F(DeviceJobMockTest, RetrieveExistingJobPropagatesAccessErrors) {
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
   http_stub.queue_get(404, R"({"message": "Job not found"})");
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "unknown", &opened_job),
-      QDMI_ERROR_NOTFOUND);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "unknown", &retrieved_job),
+            QDMI_ERROR_NOTFOUND);
 
   http_stub.queue_get(403, R"({"message": "Access denied"})");
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "private", &opened_job),
-      QDMI_ERROR_PERMISSIONDENIED);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "private", &retrieved_job),
+            QDMI_ERROR_PERMISSIONDENIED);
 }
 
-TEST_F(DeviceJobMockTest, OpenExistingJobRejectsMalformedResponses) {
-  IQM_QDMI_Device_Job opened_job = nullptr;
+TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsMalformedResponses) {
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
   http_stub.queue_get(200, "invalid json");
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_FATAL);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(retrieved_job, nullptr);
 
   http_stub.queue_get(200, R"({"id": "job-123", "type": "circuit"})");
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_FATAL);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(retrieved_job, nullptr);
 }
 
-TEST_F(DeviceJobMockTest, OpenExistingJobContainsBoundaryExceptions) {
-  IQM_QDMI_Device_Job opened_job = nullptr;
+TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
   get_hook = [](const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response {
     throw iqm::ClientAuthenticationError{"expired token"};
   };
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_PERMISSIONDENIED);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_PERMISSIONDENIED);
+  EXPECT_EQ(retrieved_job, nullptr);
 
   get_hook = [](const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response { throw std::bad_alloc{}; };
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_OUTOFMEM);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_OUTOFMEM);
+  EXPECT_EQ(retrieved_job, nullptr);
 
   get_hook = [](const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response {
     throw std::runtime_error{"transport hook failed"};
   };
-  EXPECT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_ERROR_FATAL);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(retrieved_job, nullptr);
 }
 
-TEST_F(DeviceJobMockTest, OpenExistingJobRejectsUnsupportedJobTypes) {
+TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsUnsupportedJobTypes) {
   http_stub.queue_get(
       200,
       R"({"id": "calibration-123", "status": "ready", "type": "calibration"})");
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  EXPECT_EQ(IQM_QDMI_device_session_open_device_job(session, "calibration-123",
-                                                    &opened_job),
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "calibration-123", &retrieved_job),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(opened_job, nullptr);
+  EXPECT_EQ(retrieved_job, nullptr);
 }
 
-TEST_F(DeviceJobMockTest, OpenedJobRetrievesShotsWithoutSubmissionMetadata) {
+TEST_F(DeviceJobMockTest, RetrievedJobReturnsShotsWithoutSubmissionMetadata) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "ready", "type": "circuit"})");
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  ASSERT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_SUCCESS);
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
 
   http_stub.queue_get(
       200,
       R"([{"meas_2_0_0": [[0], [1], [0]], "meas_2_0_1": [[1], [0], [1]]}])");
   size_t shots_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
-                                            0, nullptr, &shots_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, QDMI_JOB_RESULT_SHOTS, 0, nullptr, &shots_size),
             QDMI_SUCCESS);
   std::vector<char> shots(shots_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
-                                            shots.size(), shots.data(),
-                                            nullptr),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+                                            QDMI_JOB_RESULT_SHOTS, shots.size(),
+                                            shots.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_STREQ(shots.data(), "01,10,01");
-  IQM_QDMI_device_job_free(opened_job);
+  IQM_QDMI_device_job_free(retrieved_job);
 }
 
-TEST_F(DeviceJobMockTest, OpenedJobPreservesPermissionFailures) {
+TEST_F(DeviceJobMockTest, RetrievedJobPreservesPermissionFailures) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  ASSERT_EQ(
-      IQM_QDMI_device_session_open_device_job(session, "job-123", &opened_job),
-      QDMI_SUCCESS);
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
 
   http_stub.queue_get(403, R"({"message": "Access denied"})");
   QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
-  EXPECT_EQ(IQM_QDMI_device_job_check(opened_job, &status),
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
             QDMI_ERROR_PERMISSIONDENIED);
 
   http_stub.queue_post(403, R"({"message": "Access denied"})");
-  EXPECT_EQ(IQM_QDMI_device_job_cancel(opened_job),
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
             QDMI_ERROR_PERMISSIONDENIED);
 
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
-  EXPECT_EQ(IQM_QDMI_device_job_check(opened_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
   EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
-  IQM_QDMI_device_job_free(opened_job);
+  IQM_QDMI_device_job_free(retrieved_job);
 }
 
 TEST_F(DeviceJobMockTest, FullLifecycle) {

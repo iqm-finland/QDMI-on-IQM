@@ -788,34 +788,35 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
 
   IQM_QDMI_device_job_free(job);
 
-  IQM_QDMI_Device_Job opened_job = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_open_device_job(session, job_id.c_str(),
-                                                    &opened_job),
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, job_id.c_str(), &retrieved_job),
             QDMI_SUCCESS);
-  EXPECT_EQ(FoMaC::get_job_id(opened_job), job_id);
-  EXPECT_EQ(IQM_QDMI_device_job_submit(opened_job), QDMI_ERROR_BADSTATE);
-  EXPECT_EQ(wait_for_done(opened_job), QDMI_JOB_STATUS_DONE);
-  const auto reopened_counts = FoMaC::get_histogram(opened_job);
-  const auto reopened_sum =
-      std::accumulate(reopened_counts.begin(), reopened_counts.end(), size_t{0},
-                      [](const size_t total, const auto &entry) {
+  EXPECT_EQ(FoMaC::get_job_id(retrieved_job), job_id);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(wait_for_done(retrieved_job), QDMI_JOB_STATUS_DONE);
+  const auto retrieved_counts = FoMaC::get_histogram(retrieved_job);
+  const auto retrieved_sum =
+      std::accumulate(retrieved_counts.begin(), retrieved_counts.end(),
+                      size_t{0}, [](const size_t total, const auto &entry) {
                         return total + entry.second;
                       });
-  EXPECT_EQ(reopened_sum, shots_num);
+  EXPECT_EQ(retrieved_sum, shots_num);
 
-  size_t reopened_shots_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
-                                            0, nullptr, &reopened_shots_size),
+  size_t retrieved_shots_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+                                            QDMI_JOB_RESULT_SHOTS, 0, nullptr,
+                                            &retrieved_shots_size),
             QDMI_SUCCESS);
-  ASSERT_GT(reopened_shots_size, 1U);
-  std::vector<char> reopened_shots(reopened_shots_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(opened_job, QDMI_JOB_RESULT_SHOTS,
-                                            reopened_shots.size(),
-                                            reopened_shots.data(), nullptr),
+  ASSERT_GT(retrieved_shots_size, 1U);
+  std::vector<char> retrieved_shots(retrieved_shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
+                retrieved_shots.data(), nullptr),
             QDMI_SUCCESS);
-  EXPECT_EQ(static_cast<size_t>(std::ranges::count(reopened_shots, ',')) + 1,
+  EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
             shots_num);
-  IQM_QDMI_device_job_free(opened_job);
+  IQM_QDMI_device_job_free(retrieved_job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCancellation) {
