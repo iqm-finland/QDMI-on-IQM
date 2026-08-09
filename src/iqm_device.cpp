@@ -1091,8 +1091,8 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job->session_->connection_pool_, program,
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_);
+      job->session_->connection_pool_, program, {{"Expect", "100-continue"}},
+      job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
