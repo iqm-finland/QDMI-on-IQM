@@ -33,6 +33,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cpr/connection_pool.h>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -83,6 +84,9 @@ struct IQM_QDMI_Device_Session_impl_d {
 
   /// Timeout applied to each HTTP request made by this session.
   std::chrono::milliseconds request_timeout_ = std::chrono::hours{1};
+
+  /// HTTP connection cache shared by requests belonging to this session.
+  cpr::ConnectionPool connection_pool_;
 
   /// Session status
   IQM_QDMI_DEVICE_SESSION_STATUS session_status_ =
@@ -159,15 +163,15 @@ struct IQM_QDMI_Device_Job_impl_d {
   /// @details Valid values include "none" and "zeros".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 parameter.
   std::string heralding_mode_ = "none";
-  /// @brief Move validation mode for the job.
+  /// @brief Move gate validation mode for the job.
   /// @details Valid values include "strict", "allow_prx", and "none"
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM2 parameter.
-  std::string move_validation_mode_ = "strict";
+  std::string move_gate_validation_ = "strict";
   /// @brief Move gate frame tracking mode for the job.
   /// @details Valid values include "full", "no_detuning_correction", and
   ///          "none".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM3 parameter.
-  std::string move_gate_frame_tracking_mode_ = "full";
+  std::string move_gate_frame_tracking_ = "full";
   /// @brief Dynamical decoupling mode for the job.
   /// @details Valid values include "disabled" and "enabled".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 parameter.
@@ -185,7 +189,7 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::optional<double> max_circuit_duration_over_t2_ = std::nullopt;
   /// @brief The number of active reset cycles.
   /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+2 parameter.
-  std::optional<size_t> num_active_reset_cycles_ = std::nullopt;
+  std::optional<size_t> active_reset_cycles_ = std::nullopt;
   /// @brief The dynamical decoupling strategy to use for the job.
   /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+3 parameter.
   ///          This is transferred as a JSON string according to the data model
@@ -330,7 +334,8 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       session->api_config_->url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS);
   const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto qc_list_response =
-      iqm::http::Get(qc_list_url, bearer_token, session->request_timeout_);
+      iqm::http::Get(qc_list_url, bearer_token, session->connection_pool_,
+                     session->request_timeout_);
   if (const auto status = iqm::http::Handle_response(qc_list_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -395,7 +400,8 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       iqm::API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_);
   const auto arch_response =
-      iqm::http::Get(arch_url, bearer_token, session->request_timeout_);
+      iqm::http::Get(arch_url, bearer_token, session->connection_pool_,
+                     session->request_timeout_);
   if (const auto status = iqm::http::Handle_response(arch_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -479,7 +485,8 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       iqm::API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
       *session->quantum_computer_alias_, session->calibration_set_id_);
   const auto dyn_arch_response =
-      iqm::http::Get(dyn_arch_url, bearer_token, session->request_timeout_);
+      iqm::http::Get(dyn_arch_url, bearer_token, session->connection_pool_,
+                     session->request_timeout_);
   if (const auto status = iqm::http::Handle_response(dyn_arch_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -547,7 +554,8 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       *session->quantum_computer_alias_, session->calibration_set_id_);
   const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto calibration_response =
-      iqm::http::Get(calibration_url, bearer_token, session->request_timeout_);
+      iqm::http::Get(calibration_url, bearer_token, session->connection_pool_,
+                     session->request_timeout_);
   if (const auto status = iqm::http::Handle_response(calibration_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -712,7 +720,7 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
   const auto cocos_health_response = iqm::http::Get_optional(
       cocos_health_url, session->token_manager_->get_bearer_token(),
-      session->request_timeout_);
+      session->connection_pool_, session->request_timeout_);
   const auto status = iqm::http::Handle_response(
       cocos_health_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG);
   session->supports_calibration_jobs_ = (status == QDMI_SUCCESS);
@@ -888,7 +896,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
           move_validation_mode != "none") {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->move_validation_mode_ = move_validation_mode;
+      job->move_gate_validation_ = move_validation_mode;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM3:
@@ -900,7 +908,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
           move_gate_frame_tracking_mode != "none") {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->move_gate_frame_tracking_mode_ = move_gate_frame_tracking_mode;
+      job->move_gate_frame_tracking_ = move_gate_frame_tracking_mode;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM4:
@@ -950,7 +958,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     }
     if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2) {
       if (value != nullptr) {
-        job->num_active_reset_cycles_ = *static_cast<const size_t *>(value);
+        job->active_reset_cycles_ = *static_cast<const size_t *>(value);
       }
       return QDMI_SUCCESS;
     }
@@ -1015,9 +1023,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
   json_program["heralding_mode"] = job->heralding_mode_;
-  json_program["move_validation_mode"] = job->move_validation_mode_;
-  json_program["move_gate_frame_tracking_mode"] =
-      job->move_gate_frame_tracking_mode_;
+  json_program["move_gate_validation"] = job->move_gate_validation_;
+  json_program["move_gate_frame_tracking"] = job->move_gate_frame_tracking_;
   json_program["dd_mode"] = job->dd_mode_;
   if (job->qubit_mapping_) {
     nlohmann::json qubit_mapping_json = nlohmann::json::array();
@@ -1031,8 +1038,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     json_program["max_circuit_duration_over_t2"] =
         *job->max_circuit_duration_over_t2_;
   }
-  if (job->num_active_reset_cycles_) {
-    json_program["num_active_reset_cycles"] = *job->num_active_reset_cycles_;
+  if (job->active_reset_cycles_) {
+    json_program["active_reset_cycles"] = *job->active_reset_cycles_;
   }
   if (job->dd_strategy_) {
     json_program["dd_strategy"] = nlohmann::json::parse(*job->dd_strategy_);
@@ -1043,8 +1050,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
                                       *job->session_->quantum_computer_alias_);
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      json_program.dump(), {{"Expect", "100-continue"}},
-      job->session_->request_timeout_);
+      job->session_->connection_pool_, json_program.dump(),
+      {{"Expect", "100-continue"}}, job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1084,7 +1091,8 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      program, {{"Expect", "100-continue"}}, job->session_->request_timeout_);
+      job->session_->connection_pool_, program,
+      {{"Expect", "100-continue"}}, job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1153,8 +1161,8 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
                                             job->job_id_);
   const auto job_abortion_response = iqm::http::Post(
-      job_abortion_url, job->session_->token_manager_->get_bearer_token(), "",
-      {}, job->session_->request_timeout_);
+      job_abortion_url, job->session_->token_manager_->get_bearer_token(),
+      job->session_->connection_pool_, "", {}, job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1185,7 +1193,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
                                             job->job_id_);
   const auto job_status_response = iqm::http::Get(
       job_status_url, job->session_->token_manager_->get_bearer_token(),
-      job->session_->request_timeout_);
+      job->session_->connection_pool_, job->session_->request_timeout_);
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1313,7 +1321,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
           iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS, job->job_id_);
       const auto job_results_response = iqm::http::Get(
           job_results_url, job->session_->token_manager_->get_bearer_token(),
-          job->session_->request_timeout_);
+          job->session_->connection_pool_, job->session_->request_timeout_);
       const auto status = iqm::http::Handle_response(job_results_response);
       if (status != QDMI_SUCCESS) {
         // Only mark the job as failed for truly fatal errors, but always
@@ -1396,7 +1404,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
         iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_);
     const auto job_calibration_response = iqm::http::Get(
         job_calibration_url, job->session_->token_manager_->get_bearer_token(),
-        job->session_->request_timeout_);
+        job->session_->connection_pool_, job->session_->request_timeout_);
     const auto status = iqm::http::Handle_response(job_calibration_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
@@ -1461,7 +1469,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
     const auto job_measurements_response = iqm::http::Get(
         job_measurements_url, job->session_->token_manager_->get_bearer_token(),
-        job->session_->request_timeout_);
+        job->session_->connection_pool_, job->session_->request_timeout_);
     const auto status = iqm::http::Handle_response(job_measurements_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always

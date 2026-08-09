@@ -941,7 +941,10 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   ASSERT_LE(sum, shots_num);
 }
 
-TEST_F(QDMIIntegrationTest, JobCycleQIR) {
+// Resonance currently rejects valid QIR programs with an internal server error.
+// Track re-enabling this test in
+// https://github.com/iqm-finland/QDMI-on-IQM/issues/170.
+TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   constexpr size_t shots_num = 64;
   const auto qir_program = build_qir_test_circuit();
   auto *job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
