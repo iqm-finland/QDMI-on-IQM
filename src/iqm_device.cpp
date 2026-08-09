@@ -883,7 +883,7 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
         session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS, job_id);
     const auto job_status_response = iqm::http::Get(
         job_status_url, session->token_manager_->get_bearer_token(),
-        session->request_timeout_);
+        session->connection_pool_, session->request_timeout_);
     if (const auto status = iqm::http::Handle_response(job_status_response);
         status != QDMI_SUCCESS) {
       return status;

@@ -825,7 +825,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
   IQM_QDMI_Device_Job retrieved_job = nullptr;
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
-  get_hook = [](const auto &, const auto &, const auto &,
+  get_hook = [](const auto &, const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response {
     throw iqm::ClientAuthenticationError{"expired token"};
   };
@@ -834,14 +834,14 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
             QDMI_ERROR_PERMISSIONDENIED);
   EXPECT_EQ(retrieved_job, nullptr);
 
-  get_hook = [](const auto &, const auto &, const auto &,
+  get_hook = [](const auto &, const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response { throw std::bad_alloc{}; };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_ERROR_OUTOFMEM);
   EXPECT_EQ(retrieved_job, nullptr);
 
-  get_hook = [](const auto &, const auto &, const auto &,
+  get_hook = [](const auto &, const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response {
     throw std::runtime_error{"transport hook failed"};
   };
