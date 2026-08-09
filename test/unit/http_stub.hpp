@@ -106,6 +106,8 @@ public:
   get_connection_pools() const;
   /// URLs requested via POST, in call order.
   [[nodiscard]] const std::vector<std::string> &post_urls() const;
+  /// Request bodies passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<std::string> &post_bodies() const;
   /// Bearer tokens passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
   post_bearer_tokens() const;
@@ -128,6 +130,7 @@ private:
   std::vector<std::chrono::milliseconds> get_timeouts_;
   std::vector<const cpr::ConnectionPool *> get_connection_pools_;
   std::vector<std::string> post_urls_;
+  std::vector<std::string> post_bodies_;
   std::vector<std::optional<cpr::Bearer>> post_bearer_tokens_;
   std::vector<std::chrono::milliseconds> post_timeouts_;
   std::vector<const cpr::ConnectionPool *> post_connection_pools_;

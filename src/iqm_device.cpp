@@ -160,15 +160,15 @@ struct IQM_QDMI_Device_Job_impl_d {
   /// @details Valid values include "none" and "zeros".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 parameter.
   std::string heralding_mode_ = "none";
-  /// @brief Move validation mode for the job.
+  /// @brief Move gate validation mode for the job.
   /// @details Valid values include "strict", "allow_prx", and "none"
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM2 parameter.
-  std::string move_validation_mode_ = "strict";
+  std::string move_gate_validation_ = "strict";
   /// @brief Move gate frame tracking mode for the job.
   /// @details Valid values include "full", "no_detuning_correction", and
   ///          "none".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM3 parameter.
-  std::string move_gate_frame_tracking_mode_ = "full";
+  std::string move_gate_frame_tracking_ = "full";
   /// @brief Dynamical decoupling mode for the job.
   /// @details Valid values include "disabled" and "enabled".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 parameter.
@@ -186,7 +186,7 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::optional<double> max_circuit_duration_over_t2_ = std::nullopt;
   /// @brief The number of active reset cycles.
   /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+2 parameter.
-  std::optional<size_t> num_active_reset_cycles_ = std::nullopt;
+  std::optional<size_t> active_reset_cycles_ = std::nullopt;
   /// @brief The dynamical decoupling strategy to use for the job.
   /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+3 parameter.
   ///          This is transferred as a JSON string according to the data model
@@ -894,7 +894,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
           move_validation_mode != "none") {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->move_validation_mode_ = move_validation_mode;
+      job->move_gate_validation_ = move_validation_mode;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM3:
@@ -906,7 +906,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
           move_gate_frame_tracking_mode != "none") {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->move_gate_frame_tracking_mode_ = move_gate_frame_tracking_mode;
+      job->move_gate_frame_tracking_ = move_gate_frame_tracking_mode;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM4:
@@ -956,7 +956,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     }
     if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2) {
       if (value != nullptr) {
-        job->num_active_reset_cycles_ = *static_cast<const size_t *>(value);
+        job->active_reset_cycles_ = *static_cast<const size_t *>(value);
       }
       return QDMI_SUCCESS;
     }
@@ -1010,9 +1010,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
   json_program["heralding_mode"] = job->heralding_mode_;
-  json_program["move_validation_mode"] = job->move_validation_mode_;
-  json_program["move_gate_frame_tracking_mode"] =
-      job->move_gate_frame_tracking_mode_;
+  json_program["move_gate_validation"] = job->move_gate_validation_;
+  json_program["move_gate_frame_tracking"] = job->move_gate_frame_tracking_;
   json_program["dd_mode"] = job->dd_mode_;
   if (job->qubit_mapping_) {
     nlohmann::json qubit_mapping_json = nlohmann::json::array();
@@ -1026,8 +1025,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     json_program["max_circuit_duration_over_t2"] =
         *job->max_circuit_duration_over_t2_;
   }
-  if (job->num_active_reset_cycles_) {
-    json_program["num_active_reset_cycles"] = *job->num_active_reset_cycles_;
+  if (job->active_reset_cycles_) {
+    json_program["active_reset_cycles"] = *job->active_reset_cycles_;
   }
   if (job->dd_strategy_) {
     json_program["dd_strategy"] = nlohmann::json::parse(*job->dd_strategy_);
