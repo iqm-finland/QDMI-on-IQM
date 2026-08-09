@@ -51,6 +51,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -72,6 +73,17 @@ enum class IQM_QDMI_DEVICE_SESSION_STATUS : uint8_t { ALLOCATED, INITIALIZED };
  * @brief Implementation of the IQM_QDMI_Device_Session structure.
  */
 struct IQM_QDMI_Device_Session_impl_d {
+  IQM_QDMI_Device_Session_impl_d() = default;
+
+  explicit IQM_QDMI_Device_Session_impl_d(
+      const IQM_QDMI_Device_Session_impl_d &configuration)
+      : base_url_(configuration.base_url_), token_(configuration.token_),
+        tokens_file_(configuration.tokens_file_),
+        request_timeout_(configuration.request_timeout_),
+        connection_pool_(configuration.connection_pool_),
+        quantum_computer_id_(configuration.quantum_computer_id_),
+        quantum_computer_alias_(configuration.quantum_computer_alias_) {}
+
   /// Base URL of the device.
   std::string base_url_;
 
@@ -685,19 +697,7 @@ int IQM_QDMI_device_update_dynamic_quantum_architecture(
 
   return QDMI_SUCCESS;
 }
-} // namespace
-
-int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
-  if (session == nullptr) {
-    return QDMI_ERROR_INVALIDARGUMENT;
-  }
-
-  // Check if session is already initialized
-  if (session->session_status_ == IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
-    LOG_ERROR("Session is already initialized");
-    return QDMI_ERROR_BADSTATE;
-  }
-
+int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Initializing device session");
   Apply_environment_session_defaults(session);
   if (session->base_url_.empty()) {
@@ -740,6 +740,48 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) {
 
   LOG_INFO("Device session initialized successfully");
   return QDMI_SUCCESS;
+}
+} // namespace
+
+int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
+  if (session == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (session->session_status_ == IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
+    LOG_ERROR("Session is already initialized");
+    return QDMI_ERROR_BADSTATE;
+  }
+
+  auto initialized = std::make_unique<IQM_QDMI_Device_Session_impl_d>(*session);
+  if (const auto status = Initialize_device_session(initialized.get());
+      status != QDMI_SUCCESS) {
+    return status;
+  }
+
+  const auto state = [](IQM_QDMI_Device_Session value) {
+    return std::tie(value->base_url_, value->token_, value->tokens_file_,
+                    value->token_manager_, value->api_config_,
+                    value->request_timeout_, value->session_status_,
+                    value->device_status_, value->quantum_computer_id_,
+                    value->quantum_computer_alias_, value->calibration_set_id_,
+                    value->supports_calibration_jobs_, value->sites_,
+                    value->sites_ptr_, value->sites_map_, value->connectivity_,
+                    value->operations_, value->operations_ptr_,
+                    value->operations_map_, value->operations_sites_map_,
+                    value->operations_single_qubit_fidelity_map_,
+                    value->operations_two_qubit_fidelity_map_);
+  };
+  auto destination_state = state(session);
+  auto initialized_state = state(initialized.get());
+  static_assert(noexcept(std::swap(destination_state, initialized_state)));
+  std::swap(destination_state, initialized_state);
+  return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 void IQM_QDMI_device_session_free(IQM_QDMI_Device_Session session) {

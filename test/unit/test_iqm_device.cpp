@@ -1726,12 +1726,46 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest, MalformedJSONResponse) {
-
-  // Test malformed JSON responses
   http_stub.queue_get(200, "invalid json");
 
-  // Expect a JSON parsing exception to be thrown
-  EXPECT_THROW(IQM_QDMI_device_session_init(session), std::exception);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+
+  // Failed initialization leaves the session configurable and retryable.
+  const std::string base_url = "https://retry.example.com";
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceIntegrationMockTest, SessionInitializationContainsCxxExceptions) {
+  auto &get_hook = iqm::http::internal::Get_hooks().get;
+  auto original_get_hook = get_hook;
+  const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
+                                           const int expected_status) {
+    get_hook = [exception](const cpr::Url &, const std::optional<cpr::Bearer> &,
+                           const cpr::ConnectionPool &, const cpr::Header &,
+                           std::chrono::milliseconds) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), expected_status);
+  };
+
+  expect_mapped_exception(
+      std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+      QDMI_ERROR_PERMISSIONDENIED);
+  expect_mapped_exception(std::make_exception_ptr(std::bad_alloc{}),
+                          QDMI_ERROR_OUTOFMEM);
+  expect_mapped_exception(
+      std::make_exception_ptr(std::runtime_error{"transport failure"}),
+      QDMI_ERROR_FATAL);
+  expect_mapped_exception(std::make_exception_ptr(42), QDMI_ERROR_FATAL);
+
+  get_hook = std::move(original_get_hook);
+  queue_successful_initialization();
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 }
 
 TEST_F(DeviceJobMockTest, DoubleInitializationPrevention) {
