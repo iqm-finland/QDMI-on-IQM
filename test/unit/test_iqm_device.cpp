@@ -618,6 +618,47 @@ TEST_F(DeviceIntegrationMockTest,
   IQM_QDMI_device_session_free(second_session);
 }
 
+TEST_F(DeviceIntegrationMockTest, QueryQueueLength) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"queue_length": 7})");
+  size_t queue_length = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_length, 7U);
+  ASSERT_FALSE(http_stub.get_urls().empty());
+  EXPECT_EQ(http_stub.get_urls().back(),
+            "https://localhost/api/v1/quantum-computers/"
+            "01966208-f3ec-73b7-890d-100000000000/queue-availability");
+}
+
+TEST_F(DeviceIntegrationMockTest, QueueLengthIsOptional) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  size_t queue_length = 0;
+  http_stub.queue_get(404);
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+
+  http_stub.queue_get(200, R"({"queue_length": -1})");
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+
+  http_stub.queue_get(200, R"({"queue_length": "unknown"})");
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+}
+
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
   EXPECT_NE(session, nullptr);
@@ -1269,6 +1310,69 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
             QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
+  http_stub.queue_post(200, R"({"id": "job-queue"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 4})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 4U);
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 2})");
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 2U);
+
+  const auto &get_urls = http_stub.get_urls();
+  ASSERT_GE(get_urls.size(), 2U);
+  EXPECT_EQ(get_urls[get_urls.size() - 2],
+            "https://localhost/api/v1/jobs/job-queue");
+  EXPECT_EQ(get_urls.back(), "https://localhost/api/v1/jobs/job-queue");
+}
+
+TEST_F(DeviceJobMockTest, QueuePositionRequiresQueuedJobAndKnownPosition) {
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_ERROR_BADSTATE);
+
+  http_stub.queue_post(200, R"({"id": "job-queue"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"status": "waiting"})");
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": -1})");
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+
+  http_stub.queue_get(200, R"({"status": "running", "queue_position": 3})");
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_ERROR_BADSTATE);
 }
 
 TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {

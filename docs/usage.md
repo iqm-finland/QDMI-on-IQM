@@ -271,8 +271,9 @@ session to use them.
 
 The QDMI device allows you to query various information about the quantum
 computing hardware, such as the available qubits, operations, and their
-properties. All device information is fetched during session initialization and
-kept in memory for efficient querying.
+properties. Architecture and calibration information is fetched during session
+initialization and kept in memory for efficient querying. Dynamic properties,
+such as queue length, are fetched when queried.
 
 The following properties about the device can be queried via the
 {cpp:func}`IQM_QDMI_device_session_query_device_property` function:
@@ -285,6 +286,9 @@ The following properties about the device can be queried via the
   The version of the QDMI library.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`: The
   current status of the device (e.g., idle, busy).
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUEUELENGTH`:
+  The current number of jobs waiting in the selected quantum computer's queue,
+  if the IQM backend exposes queue availability.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM`: The
   number of qubits available on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_SITES`: The
@@ -362,6 +366,14 @@ including the
   according to the
   [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791),
   set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
+
+After submission,
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
+reports the number of jobs ahead of the job while it is queued. Every property
+query refreshes the job status and queue position from the IQM server. The query
+returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
+`QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
+position.
 
 ```cpp
 auto FoMaC::submit_job(

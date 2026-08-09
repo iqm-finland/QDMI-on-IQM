@@ -42,6 +42,8 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
 
     // Quantum computer endpoints
     {API_ENDPOINT::GET_QUANTUM_COMPUTERS, "api/v1/quantum-computers"},
+    {API_ENDPOINT::GET_QUEUE_AVAILABILITY,
+     "api/v1/quantum-computers/%s/queue-availability"},
     {API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
      "api/v1/quantum-computers/%s/artifacts/static-quantum-architectures"},
     {API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
