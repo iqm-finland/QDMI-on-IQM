@@ -17,18 +17,12 @@ permissions:
 
 jobs:
   cpp-sanitizers:
-    name: 🧪 AddressSanitizer + UndefinedBehaviorSanitizer
+    name: 🧪 ASan + UBSan
     runs-on: ubuntu-24.04
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       CTEST_PARALLEL_LEVEL: 4
       FORCE_COLOR: 3
-      # -fno-sanitize-recover promotes UndefinedBehaviorSanitizer diagnostics
-      # from a printed warning to a non-zero exit. Without it a UBSan finding
-      # leaves the test green and goes unnoticed.
-      SANITIZER_FLAGS: >-
-        -fsanitize=address,undefined -fno-sanitize-recover=all
-        -fno-omit-frame-pointer -g -O1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Dependencies
@@ -48,10 +42,7 @@ jobs:
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_FLAGS="$SANITIZER_FLAGS" \
-            -DCMAKE_CXX_FLAGS="$SANITIZER_FLAGS" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+            -DIQM_QDMI_SANITIZERS="address;undefined"
       - name: Build
         run: cmake --build build
       # No --repeat here, unlike the regular test workflows: a sanitizer
