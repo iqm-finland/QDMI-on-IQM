@@ -808,15 +808,11 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
 }
 
 TEST_F(DeviceJobMockTest, RetrieveExistingJobRestoresRemoteStatus) {
-  struct StatusCase {
-    const char *native_status;
-    QDMI_Job_Status qdmi_status;
-  };
   constexpr std::array status_cases{
-      StatusCase{"received", QDMI_JOB_STATUS_SUBMITTED},
-      StatusCase{"queued", QDMI_JOB_STATUS_QUEUED},
-      StatusCase{"aborted", QDMI_JOB_STATUS_CANCELED},
-      StatusCase{"failed", QDMI_JOB_STATUS_FAILED},
+      std::pair{"received", QDMI_JOB_STATUS_SUBMITTED},
+      std::pair{"queued", QDMI_JOB_STATUS_QUEUED},
+      std::pair{"aborted", QDMI_JOB_STATUS_CANCELED},
+      std::pair{"failed", QDMI_JOB_STATUS_FAILED},
   };
 
   for (const auto &[native_status, qdmi_status] : status_cases) {
