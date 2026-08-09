@@ -34,8 +34,8 @@
 #include <exception>
 #include <gtest/gtest.h>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <new>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -938,6 +938,9 @@ TEST_F(DeviceJobMockTest, RetrievedJobReturnsShotsWithoutSubmissionMetadata) {
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
 
+  http_stub.queue_get(
+      200,
+      R"([{"measurement_keys": ["meas_2_0_0", "meas_2_0_1"], "counts": {"01": 2, "10": 1}}])");
   http_stub.queue_get(
       200,
       R"([{"meas_2_0_0": [[0], [1], [0]], "meas_2_0_1": [[1], [0], [1]]}])");
