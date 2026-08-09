@@ -545,13 +545,16 @@ The implementation expects JSON responses in specific formats:
   `value`, and `invalid` fields.
 - **Job Status**: Object with job status, errors, and messages.
 - **Measurement Counts Artifact**: Array with a single object containing
-  `counts` (object mapping bitstrings to count integers).
+  `measurement_keys` (the concatenation order for result bitstrings) and
+  `counts` (an object mapping bitstrings to count integers).
 - **Measurements Artifact**: Array typically containing a single object where
-  each measurement key maps to an array of all shot results. Each shot result is
-  a single-element array containing an integer (0 or 1). For example:
-  `[{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[1], [0], [1], [0]]}]`
-  represents 4 shots measuring two qubits, where each measurement key contains
-  all results for that qubit across all shots.
+  results have the shape `results[measurement_key][shot][qubit_index]`. A
+  measurement key may cover one or more qubits; its result arrays have a
+  constant width across shots and contain integer bits (0 or 1). For example,
+  `[{"m_pair": [[0, 1], [1, 0]], "m_single": [[0], [1]]}]` represents two shots,
+  with `m_pair` measuring two qubits and `m_single` one qubit. The
+  `measurement_keys` metadata from the corresponding counts artifact determines
+  how these per-key arrays are concatenated into each result bitstring.
 
 For more details, see the implementation in `iqm_device.cpp` and the API
 configuration in `iqm_api_config.hpp`/`.cpp`.

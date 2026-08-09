@@ -740,7 +740,7 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_submission_response = R"({"id": "job-123"})";
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_results_response =
-      R"([{"counts": {"0": 100, "1": 0}}])";
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"0": 100, "1": 0}}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -824,11 +824,14 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
 TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   const std::string job_submission_response = R"({"id": "job-456"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0", "meas_2_0_1"], "counts": {"00": 1, "01": 1, "10": 1, "11": 1}}])";
   const std::string job_measurements_response =
       R"([{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[0], [0], [1], [1]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   // Job submission
@@ -869,7 +872,7 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
                                             small_buffer.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  // This should NOT trigger another API call (only 2 GET responses were
+  // This should NOT trigger another API call (only 3 GET responses were
   // queued above; an unscripted call would fail the test).
   size_t hist_keys_size{};
   ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
@@ -911,6 +914,47 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   EXPECT_EQ(total_count, 4); // 4 shots total
 }
 
+TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
+  const std::string job_submission_response = R"({"id": "job-ordered"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["z_result", "a_result"], "counts": {"010": 1, "101": 1}}])";
+  const std::string job_measurements_response =
+      R"([{"a_result": [[0], [1]], "z_result": [[0, 1], [1, 0]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 2;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  size_t hist_keys_size{};
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                            nullptr, &hist_keys_size),
+            QDMI_SUCCESS);
+
+  size_t shots_size{};
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &shots_size),
+            QDMI_SUCCESS);
+  std::vector<char> shots_buffer(shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+                                            shots_size, shots_buffer.data(),
+                                            nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(shots_buffer.data(), "010,101");
+}
+
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
   const std::string job_submission_response = R"({"id": "job-789"})";
 
@@ -937,10 +981,13 @@ TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
 TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   const std::string job_submission_response = R"({"id": "job-789"})";
   const std::string job_status_response = R"({"status": "ready"})";
-  const std::string job_measurements_response = R"([{"m": [[0], [0]]}])";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["m"], "counts": {"0": 1}}])";
+  const std::string job_measurements_response = R"([{"m": [[]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -982,11 +1029,15 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
 TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   const std::string job_submission_response = R"({"id": "job-999"})";
   const std::string job_status_response = R"({"status": "ready"})";
-  // Invalid: qubit result value is a string instead of an integer
-  const std::string job_measurements_response = R"([{"meas_2_0_0": [["0"]]}])";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"00": 1}}])";
+  // Invalid: the second value is a string instead of an integer.
+  const std::string job_measurements_response =
+      R"([{"meas_2_0_0": [[0, "1"]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1007,14 +1058,81 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
             QDMI_ERROR_FATAL);
 }
 
+TEST_F(DeviceJobMockTest, RejectNonBitMeasurementValues) {
+  const std::string job_submission_response = R"({"id": "job-999"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["meas_2_0_0"], "counts": {"00": 1}}])";
+  const std::string job_measurements_response = R"([{"meas_2_0_0": [[0, 2]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 1;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  size_t shots_size{};
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &shots_size),
+            QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceJobMockTest, RejectInconsistentMeasurementWidths) {
+  const std::string job_submission_response = R"({"id": "job-width"})";
+  const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": ["m"], "counts": {"0": 1, "01": 1}}])";
+  const std::string job_measurements_response = R"([{"m": [[0], [0, 1]]}])";
+
+  http_stub.queue_post(200, job_submission_response);
+  http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
+  http_stub.queue_get(200, job_measurements_response);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 2;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  std::array<char, 8> buffer{};
+  buffer.fill('x');
+  const auto original_buffer = buffer;
+  size_t shots_size = 123;
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+                                            buffer.size(), buffer.data(),
+                                            &shots_size),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(shots_size, 123);
+  EXPECT_EQ(buffer, original_buffer);
+}
+
 TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   const std::string job_submission_response = R"({"id": "job-empty"})";
   const std::string job_status_response = R"({"status": "ready"})";
+  const std::string job_counts_response =
+      R"([{"measurement_keys": [], "counts": {}}])";
   // Empty measurements array - no shots
   const std::string job_measurements_response = R"([])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
+  http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
