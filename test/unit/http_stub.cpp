@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
 #include <cpr/response.h>
@@ -61,11 +62,13 @@ HttpStub::HttpStub() {
 
   hooks.get = [this](const cpr::Url &url,
                      const std::optional<cpr::Bearer> &bearer_token,
+                     const cpr::ConnectionPool &connection_pool,
                      const cpr::Header & /*headers*/,
                      const std::chrono::milliseconds timeout) {
     get_urls_.push_back(url.str());
     get_bearer_tokens_.push_back(bearer_token);
     get_timeouts_.push_back(timeout);
+    get_connection_pools_.push_back(&connection_pool);
     if (get_responses_.empty()) {
       ADD_FAILURE() << "Unexpected GET request to '" << url
                     << "': no scripted response was queued";
@@ -83,12 +86,14 @@ HttpStub::HttpStub() {
 
   hooks.post = [this](const cpr::Url &url,
                       const std::optional<cpr::Bearer> &bearer_token,
-                      const cpr::Header & /*headers*/,
-                      const cpr::Body & /*body*/,
+                      const cpr::ConnectionPool &connection_pool,
+                      const cpr::Header & /*headers*/, const cpr::Body &body,
                       const std::chrono::milliseconds timeout) {
     post_urls_.push_back(url.str());
+    post_bodies_.push_back(body.str());
     post_bearer_tokens_.push_back(bearer_token);
     post_timeouts_.push_back(timeout);
+    post_connection_pools_.push_back(&connection_pool);
     if (post_responses_.empty()) {
       ADD_FAILURE() << "Unexpected POST request to '" << url
                     << "': no scripted response was queued";
@@ -152,8 +157,17 @@ const std::vector<std::chrono::milliseconds> &HttpStub::get_timeouts() const {
   return get_timeouts_;
 }
 
+const std::vector<const cpr::ConnectionPool *> &
+HttpStub::get_connection_pools() const {
+  return get_connection_pools_;
+}
+
 const std::vector<std::string> &HttpStub::post_urls() const {
   return post_urls_;
+}
+
+const std::vector<std::string> &HttpStub::post_bodies() const {
+  return post_bodies_;
 }
 
 const std::vector<std::optional<cpr::Bearer>> &
@@ -163,6 +177,11 @@ HttpStub::post_bearer_tokens() const {
 
 const std::vector<std::chrono::milliseconds> &HttpStub::post_timeouts() const {
   return post_timeouts_;
+}
+
+const std::vector<const cpr::ConnectionPool *> &
+HttpStub::post_connection_pools() const {
+  return post_connection_pools_;
 }
 
 size_t HttpStub::sleep_call_count() const { return sleep_durations_.size(); }

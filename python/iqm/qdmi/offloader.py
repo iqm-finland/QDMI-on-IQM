@@ -169,6 +169,22 @@ def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[st
     return args
 
 
+def _licenses_arg(licenses: str | None) -> list[str]:
+    """Build `srun` options for an optional Slurm license request.
+
+    Slurm licenses are a cluster admin's own capacity-limiting mechanism (see
+    the SPANK plugin's "Limiting Concurrent Access with Slurm Licenses" docs)
+    and are unrelated to QC selection: the caller passes whatever license
+    name(s)/count(s) their site has configured for the target QC, verbatim,
+    as Slurm's own `name[:count][,name[:count]...]` syntax.
+
+    Returns:
+        List of `srun` options requesting *licenses*, or an empty list if none
+        was given.
+    """
+    return [f"--licenses={licenses}"] if licenses else []
+
+
 def _run_srun(
     command: list[str],
     job_dir: Path,
@@ -241,6 +257,7 @@ def sample(
     timeout: float | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
+    licenses: str | None = None,
 ) -> dict[str, int]:
     """Sample from a quantum circuit.
 
@@ -265,6 +282,12 @@ def sample(
         qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
             QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
             environment variable. Only used when `local=False`.
+        licenses: If given, passed as `--licenses` to `srun`, requesting the
+            named Slurm license(s) (Slurm's own `name[:count][,name[:count]
+            ...]` syntax) that a site administrator may have configured to
+            cap concurrent jobs against a QC -- e.g. required by the SPANK
+            plugin's `iqm_require_license` option. Only used when
+            `local=False`.
 
     Returns:
         A dictionary of measurement counts.
@@ -303,6 +326,7 @@ def sample(
         "--nodes=1",
         "--partition=quantum",
         *_spank_qc_selection_args(qc_id, qc_alias),
+        *_licenses_arg(licenses),
         "iqm-sampler",
         str(qc_path.absolute()),
         "--shots",
@@ -334,6 +358,7 @@ def estimate(
     timeout: float | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
+    licenses: str | None = None,
 ) -> VQEResult:
     """Estimate the optimal parameters for a given ansatz circuit and operator.
 
@@ -365,6 +390,12 @@ def estimate(
         qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
             QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
             environment variable. Only used when `local=False`.
+        licenses: If given, passed as `--licenses` to `srun`, requesting the
+            named Slurm license(s) (Slurm's own `name[:count][,name[:count]
+            ...]` syntax) that a site administrator may have configured to
+            cap concurrent jobs against a QC -- e.g. required by the SPANK
+            plugin's `iqm_require_license` option. Only used when
+            `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -405,6 +436,7 @@ def estimate(
         "--nodes=1",
         "--partition=quantum",
         *_spank_qc_selection_args(qc_id, qc_alias),
+        *_licenses_arg(licenses),
         "iqm-estimator",
         str(qc_path.absolute()),
         str(operator_path.absolute()),

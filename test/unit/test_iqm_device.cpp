@@ -31,6 +31,7 @@
 #include <exception>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -583,6 +584,35 @@ TEST_F(DeviceIntegrationMockTest,
             "https://localhost/api/v1/quantum-computers");
 }
 
+TEST_F(DeviceIntegrationMockTest,
+       DeviceSessionsReuseDistinctConnectionPoolsDuringInitialization) {
+  IQM_QDMI_Device_Session second_session = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_alloc(&second_session), QDMI_SUCCESS);
+  const std::string base_url = "https://localhost";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                second_session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+
+  queue_successful_initialization();
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_session_init(second_session), QDMI_SUCCESS);
+
+  const auto &connection_pools = http_stub.get_connection_pools();
+  ASSERT_EQ(connection_pools.size(), 10U);
+  EXPECT_TRUE(std::ranges::all_of(
+      connection_pools.begin(), connection_pools.begin() + 5,
+      [&](const auto *pool) { return pool == connection_pools.front(); }));
+  EXPECT_TRUE(std::ranges::all_of(
+      connection_pools.begin() + 5, connection_pools.end(),
+      [&](const auto *pool) { return pool == connection_pools.back(); }));
+  EXPECT_NE(connection_pools.front(), connection_pools.back());
+
+  IQM_QDMI_device_session_free(second_session);
+}
+
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
   EXPECT_NE(session, nullptr);
@@ -750,6 +780,45 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
                                             hist_values_size,
                                             hist_values.data(), nullptr),
             QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
+  http_stub.queue_post(200, R"({"id": "job-canonical-fields"})");
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr auto move_validation = "allow_prx";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                strlen(move_validation) + 1, move_validation),
+            QDMI_SUCCESS);
+  constexpr auto frame_tracking = "no_detuning_correction";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
+                strlen(frame_tracking) + 1, frame_tracking),
+            QDMI_SUCCESS);
+  constexpr size_t active_reset_cycles = 3;
+  // The IQM extension parameters continue past QDMI's last named custom value.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job,
+                static_cast<QDMI_Device_Job_Parameter>(
+                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
+                sizeof(active_reset_cycles), &active_reset_cycles),
+            QDMI_SUCCESS);
+
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("move_gate_validation"), move_validation);
+  EXPECT_EQ(request.at("move_gate_frame_tracking"), frame_tracking);
+  EXPECT_EQ(request.at("active_reset_cycles"), active_reset_cycles);
+  EXPECT_FALSE(request.contains("move_validation_mode"));
+  EXPECT_FALSE(request.contains("move_gate_frame_tracking_mode"));
+  EXPECT_FALSE(request.contains("num_active_reset_cycles"));
 }
 
 TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {

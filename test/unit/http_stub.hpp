@@ -26,6 +26,7 @@
 
 #include <chrono>
 #include <cpr/bearer.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cstddef>
 #include <cstdint>
@@ -100,14 +101,22 @@ public:
   /// Timeouts passed to GET requests, in call order.
   [[nodiscard]] const std::vector<std::chrono::milliseconds> &
   get_timeouts() const;
+  /// Connection pools passed to GET requests, in call order.
+  [[nodiscard]] const std::vector<const cpr::ConnectionPool *> &
+  get_connection_pools() const;
   /// URLs requested via POST, in call order.
   [[nodiscard]] const std::vector<std::string> &post_urls() const;
+  /// Request bodies passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<std::string> &post_bodies() const;
   /// Bearer tokens passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
   post_bearer_tokens() const;
   /// Timeouts passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::chrono::milliseconds> &
   post_timeouts() const;
+  /// Connection pools passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<const cpr::ConnectionPool *> &
+  post_connection_pools() const;
   /// Number of retry-delay ("sleep") calls triggered by HTTP 429 retries.
   [[nodiscard]] size_t sleep_call_count() const;
   /// Retry-delay durations requested by HTTP 429 handling, in call order.
@@ -119,9 +128,12 @@ private:
   std::vector<std::string> get_urls_;
   std::vector<std::optional<cpr::Bearer>> get_bearer_tokens_;
   std::vector<std::chrono::milliseconds> get_timeouts_;
+  std::vector<const cpr::ConnectionPool *> get_connection_pools_;
   std::vector<std::string> post_urls_;
+  std::vector<std::string> post_bodies_;
   std::vector<std::optional<cpr::Bearer>> post_bearer_tokens_;
   std::vector<std::chrono::milliseconds> post_timeouts_;
+  std::vector<const cpr::ConnectionPool *> post_connection_pools_;
   std::vector<int> sleep_durations_;
 };
 
