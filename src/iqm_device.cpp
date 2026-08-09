@@ -1851,7 +1851,7 @@ constexpr std::array SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION = {
     QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
     QDMI_PROGRAM_FORMAT_CALIBRATION};
 
-std::optional<size_t> Get_queue_length(const IQM_QDMI_Device_Session session) {
+std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
   if (!session->quantum_computer_id_.has_value()) {
     return std::nullopt;
   }
