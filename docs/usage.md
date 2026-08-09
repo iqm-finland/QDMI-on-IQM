@@ -470,14 +470,14 @@ parameter.
 
 ## Retrieving jobs by ID
 
-Use {cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` with the job
-ID returned for an IQM circuit job by
+Use {cpp:func}`IQM_QDMI_device_session_open_device_job` with the job ID returned
+for an IQM circuit job by
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_ID` to
 obtain a new local handle for an existing IQM circuit job:
 
 ```cpp
 IQM_QDMI_Device_Job retrieved_job = nullptr;
-const int ret = IQM_QDMI_device_session_retrieve_device_job_by_id(
+const int ret = IQM_QDMI_device_session_open_device_job(
     session, job_id.c_str(), &retrieved_job);
 ```
 

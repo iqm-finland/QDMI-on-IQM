@@ -867,9 +867,9 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
 }
 } // namespace
 
-int IQM_QDMI_device_session_retrieve_device_job_by_id(
-    IQM_QDMI_Device_Session session, const char *job_id,
-    IQM_QDMI_Device_Job *job) {
+int IQM_QDMI_device_session_open_device_job(IQM_QDMI_Device_Session session,
+                                            const char *job_id,
+                                            IQM_QDMI_Device_Job *job) {
   if (session == nullptr || job_id == nullptr || job_id[0] == '\0' ||
       job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
