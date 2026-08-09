@@ -738,22 +738,27 @@ TEST_F(DeviceTest, JobCreationWithoutInitialization) {
 }
 
 TEST_F(DeviceTest, JobRetrievalValidatesArgumentsAndSessionState) {
-  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job retrieved_job = sentinel;
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 nullptr, "job-123", &retrieved_job),
             QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(retrieved_job, sentinel);
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, nullptr,
                                                               &retrieved_job),
             QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(retrieved_job, sentinel);
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, "",
                                                               &retrieved_job),
             QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(retrieved_job, sentinel);
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(retrieved_job, nullptr);
 }
 
 // ============================================================================
@@ -807,13 +812,15 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobPropagatesAccessErrors) {
 }
 
 TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsMalformedResponses) {
-  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job retrieved_job = sentinel;
   http_stub.queue_get(200, "invalid json");
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_ERROR_FATAL);
   EXPECT_EQ(retrieved_job, nullptr);
 
+  retrieved_job = sentinel;
   http_stub.queue_get(200, R"({"id": "job-123", "type": "circuit"})");
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
@@ -822,7 +829,8 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsMalformedResponses) {
 }
 
 TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
-  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job retrieved_job = sentinel;
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
@@ -834,6 +842,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
             QDMI_ERROR_PERMISSIONDENIED);
   EXPECT_EQ(retrieved_job, nullptr);
 
+  retrieved_job = sentinel;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response { throw std::bad_alloc{}; };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -841,10 +850,19 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
             QDMI_ERROR_OUTOFMEM);
   EXPECT_EQ(retrieved_job, nullptr);
 
+  retrieved_job = sentinel;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
                 const auto) -> cpr::Response {
     throw std::runtime_error{"transport hook failed"};
   };
+  EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_ERROR_FATAL);
+  EXPECT_EQ(retrieved_job, nullptr);
+
+  retrieved_job = sentinel;
+  get_hook = [](const auto &, const auto &, const auto &, const auto &,
+                const auto) -> cpr::Response { throw 42; };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_ERROR_FATAL);

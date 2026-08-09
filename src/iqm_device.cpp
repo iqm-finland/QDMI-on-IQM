@@ -874,6 +874,7 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
       job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
+  *job = nullptr;
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
     return QDMI_ERROR_BADSTATE;
   }
@@ -905,26 +906,18 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
         status != QDMI_SUCCESS) {
       return status;
     }
+    LOG_INFO("Retrieved device job with ID: " + std::string{job_id});
     *job = retrieved_job.release();
-  } catch (const iqm::ClientAuthenticationError &error) {
-    LOG_ERROR("Authentication failed while retrieving job: " +
-              std::string{error.what()});
+    return QDMI_SUCCESS;
+  } catch (const iqm::ClientAuthenticationError &) {
     return QDMI_ERROR_PERMISSIONDENIED;
   } catch (const std::bad_alloc &) {
     return QDMI_ERROR_OUTOFMEM;
-  } catch (const nlohmann::json::exception &error) {
-    LOG_ERROR("Failed to parse retrieved job response: " +
-              std::string{error.what()});
-    return QDMI_ERROR_FATAL;
-  } catch (const std::exception &error) {
-    LOG_ERROR("Failed to retrieve job: " + std::string{error.what()});
+  } catch (const std::exception &) {
     return QDMI_ERROR_FATAL;
   } catch (...) {
-    LOG_ERROR("Failed to retrieve job with an unknown error");
     return QDMI_ERROR_FATAL;
   }
-  LOG_INFO("Retrieved device job with ID: " + std::string{job_id});
-  return QDMI_SUCCESS;
 }
 
 void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
