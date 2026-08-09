@@ -1010,8 +1010,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
   json_program["heralding_mode"] = job->heralding_mode_;
-  json_program["move_validation_mode"] = job->move_validation_mode_;
-  json_program["move_gate_frame_tracking_mode"] =
+  json_program["move_gate_validation"] = job->move_validation_mode_;
+  json_program["move_gate_frame_tracking"] =
       job->move_gate_frame_tracking_mode_;
   json_program["dd_mode"] = job->dd_mode_;
   if (job->qubit_mapping_) {
@@ -1027,7 +1027,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
         *job->max_circuit_duration_over_t2_;
   }
   if (job->num_active_reset_cycles_) {
-    json_program["num_active_reset_cycles"] = *job->num_active_reset_cycles_;
+    json_program["active_reset_cycles"] = *job->num_active_reset_cycles_;
   }
   if (job->dd_strategy_) {
     json_program["dd_strategy"] = nlohmann::json::parse(*job->dd_strategy_);

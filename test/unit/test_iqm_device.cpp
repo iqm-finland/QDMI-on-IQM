@@ -31,6 +31,7 @@
 #include <exception>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -779,6 +780,42 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
                                             hist_values_size,
                                             hist_values.data(), nullptr),
             QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
+  http_stub.queue_post(200, R"({"id": "job-canonical-fields"})");
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr auto move_validation = "allow_prx";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                strlen(move_validation) + 1, move_validation),
+            QDMI_SUCCESS);
+  constexpr auto frame_tracking = "no_detuning_correction";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
+                strlen(frame_tracking) + 1, frame_tracking),
+            QDMI_SUCCESS);
+  constexpr size_t active_reset_cycles = 3;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job,
+                static_cast<QDMI_Device_Job_Parameter>(
+                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
+                sizeof(active_reset_cycles), &active_reset_cycles),
+            QDMI_SUCCESS);
+
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("move_gate_validation"), move_validation);
+  EXPECT_EQ(request.at("move_gate_frame_tracking"), frame_tracking);
+  EXPECT_EQ(request.at("active_reset_cycles"), active_reset_cycles);
+  EXPECT_FALSE(request.contains("move_validation_mode"));
+  EXPECT_FALSE(request.contains("move_gate_frame_tracking_mode"));
+  EXPECT_FALSE(request.contains("num_active_reset_cycles"));
 }
 
 TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {

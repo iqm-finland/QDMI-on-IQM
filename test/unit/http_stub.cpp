@@ -87,10 +87,10 @@ HttpStub::HttpStub() {
   hooks.post = [this](const cpr::Url &url,
                       const std::optional<cpr::Bearer> &bearer_token,
                       const cpr::ConnectionPool &connection_pool,
-                      const cpr::Header & /*headers*/,
-                      const cpr::Body & /*body*/,
+                      const cpr::Header & /*headers*/, const cpr::Body &body,
                       const std::chrono::milliseconds timeout) {
     post_urls_.push_back(url.str());
+    post_bodies_.push_back(body.str());
     post_bearer_tokens_.push_back(bearer_token);
     post_timeouts_.push_back(timeout);
     post_connection_pools_.push_back(&connection_pool);
@@ -164,6 +164,10 @@ HttpStub::get_connection_pools() const {
 
 const std::vector<std::string> &HttpStub::post_urls() const {
   return post_urls_;
+}
+
+const std::vector<std::string> &HttpStub::post_bodies() const {
+  return post_bodies_;
 }
 
 const std::vector<std::optional<cpr::Bearer>> &
