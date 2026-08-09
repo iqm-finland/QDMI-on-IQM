@@ -39,6 +39,7 @@
 #include <cstring>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -198,6 +199,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::optional<std::string> dd_strategy_ = std::nullopt;
   /// The dictionary of results (histogram counts).
   std::map<std::string, size_t> counts_;
+  /// Measurement keys in the order used by IQM's histogram bitstrings.
+  std::optional<std::vector<std::string>> measurement_keys_;
   /// Individual shot measurement results as bitstrings. std::nullopt means not
   /// yet fetched, empty vector means fetched but no shots.
   std::optional<std::vector<std::string>> shots_;
@@ -1335,7 +1338,9 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
           nlohmann::json::parse(job_results_response.text);
       LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
 
-      // Response is an array with a single object containing counts
+      // Response is an array with one result for the submitted circuit.
+      job->measurement_keys_ = job_results_json_response[0]["measurement_keys"]
+                                   .get<std::vector<std::string>>();
       for (const auto &counts = job_results_json_response[0]["counts"];
            const auto &[bitstring, count] : counts.items()) {
         job->counts_[bitstring] = count.get<size_t>();
@@ -1464,6 +1469,16 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
                                           size_t *size_ret) {
   // Fetch the remote results, if not already fetched
   if (!job->shots_.has_value()) {
+    // IQM defines this metadata as the concatenation order of measurement
+    // results in histogram bitstrings. Use the same order for individual shots.
+    if (!job->measurement_keys_.has_value()) {
+      if (const auto status = IQM_QDMI_device_job_get_results_hist(
+              job, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, nullptr);
+          status != QDMI_SUCCESS) {
+        return status;
+      }
+    }
+
     LOG_INFO("Fetching shot measurements for job " + job->job_id_);
     const auto job_measurements_url = job->session_->api_config_->url(
         iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
@@ -1488,7 +1503,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     // API returns array format: [{"meas_key": [[0], [1], ...], ...}, ...]
     // The outer array typically contains a single object.
     // Each measurement key maps to an array of shot results.
-    // Each shot result is itself an array containing a single integer (0 or 1).
+    // Each shot result contains one bit per measured qubit.
     if (!job_measurements_json_response.is_array()) {
       LOG_ERROR("Expected array of measurement objects for job " +
                 job->job_id_);
@@ -1517,14 +1532,17 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
           return QDMI_ERROR_FATAL;
         }
 
-        // Collect and sort measurement keys for consistent bitstring ordering
-        std::vector<std::string> keys;
-        keys.reserve(measurement_obj.size());
-        for (auto it = measurement_obj.begin(); it != measurement_obj.end();
-             ++it) {
-          keys.emplace_back(it.key());
+        const auto &keys = *job->measurement_keys_;
+        if (measurement_obj.size() != keys.size() ||
+            !std::ranges::all_of(keys, [&](const auto &key) {
+              return measurement_obj.contains(key);
+            })) {
+          LOG_ERROR(
+              "Measurement keys do not match histogram metadata for job " +
+              job->job_id_);
+          job->status_ = QDMI_JOB_STATUS_FAILED;
+          return QDMI_ERROR_FATAL;
         }
-        std::ranges::sort(keys);
 
         // Determine the number of shots from the first key
         size_t num_shots = 0;
@@ -1573,6 +1591,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
             return QDMI_ERROR_FATAL;
           }
 
+          std::optional<size_t> key_result_width;
+
           // Process each shot for this measurement key
           for (size_t shot_idx = 0; shot_idx < num_shots; ++shot_idx) {
             const auto &qubit_result = key_results[shot_idx];
@@ -1584,28 +1604,41 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
               return QDMI_ERROR_FATAL;
             }
 
-            // Each qubit result array must contain exactly one integer outcome
-            if (qubit_result.size() != 1 ||
-                !qubit_result[0].is_number_integer()) {
-              LOG_ERROR("Invalid qubit result value format for measurement "
-                        "key '" +
-                        key + "', shot " + std::to_string(shot_idx) +
-                        " in job " + job->job_id_);
+            if (!key_result_width.has_value()) {
+              key_result_width = qubit_result.size();
+            } else if (qubit_result.size() != *key_result_width) {
+              LOG_ERROR(
+                  "Inconsistent qubit-result width for measurement key '" +
+                  key + "': expected " + std::to_string(*key_result_width) +
+                  ", got " + std::to_string(qubit_result.size()) +
+                  " for shot " + std::to_string(shot_idx) + " in job " +
+                  job->job_id_);
               job->status_ = QDMI_JOB_STATUS_FAILED;
               return QDMI_ERROR_FATAL;
             }
 
-            const auto value = qubit_result[0].get<int>();
-            if (value < 0 || value > 1) {
-              LOG_ERROR("Invalid qubit value " + std::to_string(value) +
-                        " for measurement key '" + key + "', shot " +
-                        std::to_string(shot_idx) + " in job " + job->job_id_);
-              job->status_ = QDMI_JOB_STATUS_FAILED;
-              return QDMI_ERROR_FATAL;
-            }
+            for (const auto &bit : qubit_result) {
+              if (!bit.is_number_integer()) {
+                LOG_ERROR("Invalid qubit result value format for measurement "
+                          "key '" +
+                          key + "', shot " + std::to_string(shot_idx) +
+                          " in job " + job->job_id_);
+                job->status_ = QDMI_JOB_STATUS_FAILED;
+                return QDMI_ERROR_FATAL;
+              }
 
-            // Append to the bitstring for this shot
-            (*job->shots_)[shot_idx] += std::to_string(value);
+              const auto value = bit.get<int>();
+              if (value < 0 || value > 1) {
+                LOG_ERROR("Invalid qubit value " + std::to_string(value) +
+                          " for measurement key '" + key + "', shot " +
+                          std::to_string(shot_idx) + " in job " + job->job_id_);
+                job->status_ = QDMI_JOB_STATUS_FAILED;
+                return QDMI_ERROR_FATAL;
+              }
+
+              // Preserve the qubit order within each measurement key.
+              (*job->shots_)[shot_idx] += std::to_string(value);
+            }
           }
         }
       }
@@ -1628,13 +1661,21 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     return QDMI_SUCCESS;
   }
 
-  // Calculate required size: bitstring lengths + commas + null terminator
-  // All shots have the same bitstring length (number of qubits measured)
-  const size_t bitstring_length = (*job->shots_)[0].length();
-  const size_t total_bitstring_length = bitstring_length * job->shots_->size();
-  // For N shots, we need (N - 1) commas and 1 null terminator => N extra
-  // characters.
-  const size_t req_size = total_bitstring_length + job->shots_->size();
+  // Calculate the exact serialized size, including separators and terminator.
+  size_t req_size = 1;
+  for (size_t shot_idx = 0; shot_idx < job->shots_->size(); ++shot_idx) {
+    const auto &shot = (*job->shots_)[shot_idx];
+    const size_t separator_size = shot_idx == 0 ? 0 : 1;
+    if (separator_size > std::numeric_limits<size_t>::max() - req_size ||
+        shot.size() >
+            std::numeric_limits<size_t>::max() - req_size - separator_size) {
+      LOG_ERROR("Serialized shot results exceed the supported size for job " +
+                job->job_id_);
+      job->status_ = QDMI_JOB_STATUS_FAILED;
+      return QDMI_ERROR_FATAL;
+    }
+    req_size += separator_size + shot.size();
+  }
 
   if (size_ret != nullptr) {
     *size_ret = req_size;
