@@ -789,8 +789,8 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   IQM_QDMI_device_job_free(job);
 
   IQM_QDMI_Device_Job retrieved_job = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_open_device_job(session, job_id.c_str(),
-                                                    &retrieved_job),
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, job_id.c_str(), &retrieved_job),
             QDMI_SUCCESS);
   EXPECT_EQ(FoMaC::get_job_id(retrieved_job), job_id);
   EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);

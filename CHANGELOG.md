@@ -16,7 +16,7 @@ releases may include breaking changes.
   `estimate`, forwarded as `--licenses` on `srun`, so callers can request the
   Slurm license a site administrator may require via the SPANK plugin's
   `iqm_require_license` option ([#162]) ([**@marcelwa**])
-- ✨ Support opening existing IQM circuit jobs by ID ([#160])
+- ✨ Support retrieving existing IQM circuit jobs by ID ([#160])
   ([**@burgholzer**])
 
 ### Fixed
