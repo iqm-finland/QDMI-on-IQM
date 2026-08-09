@@ -407,6 +407,31 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
             QDMI_ERROR_NOTSUPPORTED);
 }
 
+TEST_F(QDMIIntegrationTest, QueuePropertiesOnResonanceMock) {
+  if (!requested_qc_alias.has_value() ||
+      *requested_qc_alias != "emerald:mock") {
+    GTEST_SKIP() << "Queue-property integration coverage targets emerald:mock";
+  }
+
+  size_t queue_length = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+
+  constexpr size_t shots_num = 64;
+  const auto circuit = build_iqm_json_test_circuit();
+  auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(wait_for_done(job), QDMI_JOB_STATUS_DONE);
+  IQM_QDMI_device_job_free(job);
+}
+
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
   // Check whether there are equally many sites as reported qubits
   const auto sites = fomac.get_sites();
