@@ -21,6 +21,8 @@ releases may include breaking changes.
 
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
   RunRequest field names ([#169]) ([**@burgholzer**])
+- 🩹 Preserve exact program bytes across QDMI job parameter updates and property
+  queries ([#159]) ([**@burgholzer**])
 - 🩹 Keep IQM shot and histogram bitstrings in the measurement-key and qubit
   order specified by IQM's result metadata ([#158]) ([**@burgholzer**])
 
@@ -158,6 +160,7 @@ Compatible with QDMI `v1.3.0`.
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
+[#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140

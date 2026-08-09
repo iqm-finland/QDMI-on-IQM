@@ -47,6 +47,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -154,7 +155,9 @@ struct IQM_QDMI_Device_Job_impl_d {
   /// The program format used for this job.
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
   /// The program to be executed.
-  void *program_ = nullptr;
+  std::string program_;
+  /// Whether a program has been set.
+  bool program_set_ = false;
   /// The number of shots to execute for a quantum circuit job.
   size_t num_shots_ = 0;
   /// @brief Heralding mode for the job.
@@ -824,7 +827,6 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
 
 void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   LOG_INFO("Freeing device job");
-  delete[] static_cast<char *>(job->program_);
   delete job;
 }
 
@@ -871,8 +873,8 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_PROGRAM:
     if (value != nullptr) {
-      job->program_ = new char[size];
-      memcpy(job->program_, value, size);
+      job->program_.assign(static_cast<const char *>(value), size);
+      job->program_set_ = true;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM:
@@ -991,24 +993,35 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, void *,
-                            job->program_, prop, size, value, size_ret)
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM && !job->program_set_) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
+                    size, value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
                             job->num_shots_, prop, size, value, size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
 }
 
 namespace {
+std::string_view Program_contents(const std::string &stored_program) {
+  auto program = std::string_view{stored_program};
+  if (program.ends_with('\0')) {
+    program.remove_suffix(1);
+  }
+  return program;
+}
+
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
   auto json_program = nlohmann::json();
   json_program["circuits"] = nlohmann::json::array();
+  const auto program = Program_contents(job->program_);
   if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON) {
     json_program["circuits"].emplace_back(
-        nlohmann::json::parse(static_cast<const char *>(job->program_)));
+        nlohmann::json::parse(program.begin(), program.end()));
   } else {
-    json_program["circuits"].emplace_back(
-        std::string{static_cast<const char *>(job->program_)});
+    json_program["circuits"].emplace_back(std::string{program});
   }
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
@@ -1076,12 +1089,13 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
   LOG_INFO("Submitting calibration job");
+  const auto program = std::string{Program_contents(job->program_)};
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      job->session_->connection_pool_, static_cast<const char *>(job->program_),
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_);
+      job->session_->connection_pool_, program, {{"Expect", "100-continue"}},
+      job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1120,7 +1134,7 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
   if (job->session_ == nullptr) {
     return QDMI_ERROR_BADSTATE;
   }
-  if (job->program_ == nullptr) {
+  if (!job->program_set_) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   job->session_->device_status_ = QDMI_DEVICE_STATUS_BUSY;
