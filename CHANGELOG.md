@@ -12,6 +12,7 @@ releases may include breaking changes.
 
 ### Added
 
+- 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**])
 - ✨ Add a `licenses` keyword argument to `iqm.qdmi.offloader`'s `sample`/
   `estimate`, forwarded as `--licenses` on `srun`, so callers can request the
   Slurm license a site administrator may require via the SPANK plugin's
@@ -159,6 +160,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
@@ -196,6 +198,7 @@ Compatible with QDMI `v1.3.0`.
 [**@burgholzer**]: https://github.com/burgholzer
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm
+[**@denialhaag**]: https://github.com/denialhaag
 
 <!-- General links -->
 

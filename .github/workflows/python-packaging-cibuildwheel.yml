@@ -36,7 +36,7 @@ jobs:
           save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       # run cibuildwheel to build wheels for the specified Python version
-      - uses: pypa/cibuildwheel@4726cd35bb13f7bde50cf2761f2499ac7b3aa32c # v4.1.1
+      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"
