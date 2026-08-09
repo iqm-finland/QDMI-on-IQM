@@ -800,6 +800,8 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
                 strlen(frame_tracking) + 1, frame_tracking),
             QDMI_SUCCESS);
   constexpr size_t active_reset_cycles = 3;
+  // The IQM extension parameters continue past QDMI's last named custom value.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job,
                 static_cast<QDMI_Device_Job_Parameter>(
@@ -809,6 +811,7 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
 
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  // NOLINTNEXTLINE(misc-include-cleaner)
   const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
   EXPECT_EQ(request.at("move_gate_validation"), move_validation);
   EXPECT_EQ(request.at("move_gate_frame_tracking"), frame_tracking);
