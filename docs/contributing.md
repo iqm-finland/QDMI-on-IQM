@@ -452,6 +452,8 @@ Server API:
 
 - `GET_QUANTUM_COMPUTERS`: Retrieves the list of available quantum computers
   with their IDs and aliases.
+- `GET_QUEUE_AVAILABILITY`: Retrieves the current queue length for the selected
+  quantum computer when the backend exposes it.
 - `GET_STATIC_QUANTUM_ARCHITECTURE`: Fetches the static quantum architecture
   (qubits and connectivity) for a specific quantum computer.
 - `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Obtains the set of calibrated gates and
@@ -508,6 +510,19 @@ These steps correspond to the initialization sequence described in the
   queried.
 - `CANCEL_JOB` or `ABORT_CALIBRATION_JOB`: Called when
   `IQM_QDMI_device_job_cancel` is invoked.
+
+**When Queue Length Is Queried:**
+
+- `GET_QUEUE_AVAILABILITY`: Called when `QDMI_DEVICE_PROPERTY_QUEUELENGTH` is
+  queried. Backends that do not expose this optional endpoint are reported as
+  not supporting the property.
+
+**When Job Queue Position Is Queried:**
+
+- `GET_JOB_STATUS` or `GET_CALIBRATION_JOB_STATUS`: Called for every
+  `QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION` query. The refreshed status and queue
+  position are cached together, and a value is returned only while the job is
+  queued.
 
 **After Calibration Job Completion:**
 

@@ -212,6 +212,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::string new_calibration_set_id_;
   /// The status of the job.
   QDMI_Job_Status status_ = QDMI_JOB_STATUS_CREATED;
+  /// The number of jobs ahead while this job is queued.
+  std::optional<size_t> queue_position_ = std::nullopt;
 };
 
 /**
@@ -1088,6 +1090,22 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
                       size, value, size_ret)
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION) {
+    QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+    const auto result = IQM_QDMI_device_job_check(job, &status);
+    if (result != QDMI_SUCCESS) {
+      return result;
+    }
+    if (status != QDMI_JOB_STATUS_QUEUED) {
+      return QDMI_ERROR_BADSTATE;
+    }
+    if (!job->queue_position_.has_value()) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION, size_t,
+                              *job->queue_position_, prop, size, value,
+                              size_ret)
+  }
   if (job->retrieved_) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
@@ -1321,6 +1339,14 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   if (const auto update_status = Set_job_status(job, job_status);
       update_status != QDMI_SUCCESS) {
     return update_status;
+  }
+  job->queue_position_ = std::nullopt;
+  if (job->status_ == QDMI_JOB_STATUS_QUEUED) {
+    if (const auto position = job_status_json_response.find("queue_position");
+        position != job_status_json_response.end() &&
+        position->is_number_unsigned()) {
+      job->queue_position_ = position->get<size_t>();
+    }
   }
   *status = job->status_;
   LOG_DEBUG("Job status: " + std::to_string(job->status_) +
@@ -1824,6 +1850,35 @@ constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION = {
     QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
     QDMI_PROGRAM_FORMAT_CALIBRATION};
+
+std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
+  if (!session->quantum_computer_id_.has_value()) {
+    return std::nullopt;
+  }
+
+  const auto queue_url =
+      session->api_config_->url(iqm::API_ENDPOINT::GET_QUEUE_AVAILABILITY,
+                                *session->quantum_computer_id_);
+  const auto queue_response = iqm::http::Get_optional(
+      queue_url, session->token_manager_->get_bearer_token(),
+      session->connection_pool_, session->request_timeout_);
+  if (iqm::http::Handle_response(queue_response,
+                                 iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG) !=
+      QDMI_SUCCESS) {
+    return std::nullopt;
+  }
+
+  const auto response =
+      nlohmann::json::parse(queue_response.text, nullptr, false);
+  if (response.is_discarded() || !response.is_object() ||
+      !response.contains("queue_length") ||
+      !response["queue_length"].is_number_unsigned()) {
+    LOG_DEBUG("Queue availability response does not contain a non-negative "
+              "integer queue_length");
+    return std::nullopt;
+  }
+  return response["queue_length"].get<size_t>();
+}
 } // namespace
 
 int IQM_QDMI_device_session_query_device_property(
@@ -1858,6 +1913,14 @@ int IQM_QDMI_device_session_query_device_property(
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_STATUS, QDMI_Device_Status,
                             session->device_status_, prop, size, value,
                             size_ret)
+  if (prop == QDMI_DEVICE_PROPERTY_QUEUELENGTH) {
+    const auto queue_length = Get_queue_length(session);
+    if (!queue_length.has_value()) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_QUEUELENGTH, size_t,
+                              *queue_length, prop, size, value, size_ret)
+  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_QUBITSNUM, size_t,
                             session->sites_.size(), prop, size, value, size_ret)
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SITES, IQM_QDMI_Site,

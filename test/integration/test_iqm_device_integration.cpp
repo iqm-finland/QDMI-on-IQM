@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -36,6 +37,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -405,6 +407,60 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM5, 0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
+}
+
+TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
+  if (!requested_qc_alias.has_value() || *requested_qc_alias != "garnet:mock") {
+    GTEST_SKIP() << "Queue-property integration coverage targets garnet:mock";
+  }
+
+  size_t queue_length = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+
+  constexpr size_t shots_num = 64;
+  constexpr size_t jobs_num = 4;
+  constexpr size_t max_queue_position_queries = 20;
+  constexpr auto query_interval = std::chrono::milliseconds{100};
+  const auto circuit = build_iqm_json_test_circuit();
+  std::vector<IQM_QDMI_Device_Job> jobs;
+  jobs.reserve(jobs_num);
+  for (size_t i = 0; i < jobs_num; ++i) {
+    jobs.emplace_back(
+        fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num));
+  }
+
+  // The final job should remain in Garnet's queue long enough for its fresh
+  // status response to expose a position. A transiently absent value is valid,
+  // so poll within a small bound rather than relying on submission-time data.
+  std::optional<size_t> observed_queue_position;
+  for (size_t i = 0; i < max_queue_position_queries; ++i) {
+    size_t queue_position = 0;
+    const auto result = IQM_QDMI_device_job_query_property(
+        jobs.back(), QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+        sizeof(queue_position), &queue_position, nullptr);
+    if (result == QDMI_SUCCESS) {
+      observed_queue_position = queue_position;
+      break;
+    }
+    if (result == QDMI_ERROR_BADSTATE) {
+      break;
+    }
+    EXPECT_EQ(result, QDMI_ERROR_NOTSUPPORTED);
+    if (result != QDMI_ERROR_NOTSUPPORTED) {
+      break;
+    }
+    std::this_thread::sleep_for(query_interval);
+  }
+
+  EXPECT_TRUE(observed_queue_position.has_value())
+      << "Garnet did not expose a queue position before the job left its queue";
+  for (auto *job : jobs) {
+    EXPECT_EQ(wait_for_done(job), QDMI_JOB_STATUS_DONE);
+    IQM_QDMI_device_job_free(job);
+  }
 }
 
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {

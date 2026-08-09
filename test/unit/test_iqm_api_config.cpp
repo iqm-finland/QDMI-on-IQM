@@ -37,6 +37,9 @@ TEST(APIConfigTest, UnifiedApiUrl) {
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS),
             "http://test.url/api/v1/quantum-computers");
   EXPECT_EQ(
+      config.url(iqm::API_ENDPOINT::GET_QUEUE_AVAILABILITY, "qc_id"),
+      "http://test.url/api/v1/quantum-computers/qc_id/queue-availability");
+  EXPECT_EQ(
       config.url(iqm::API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE, "qc_id"),
       "http://test.url/api/v1/quantum-computers/qc_id/artifacts/"
       "static-quantum-architectures");
