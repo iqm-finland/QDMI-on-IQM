@@ -28,6 +28,7 @@
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
@@ -57,11 +58,13 @@ enum class ERROR_LOG_POLICY : uint8_t {
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param connection_pool Connection pool shared by the owning device session.
  * @param timeout Overall timeout for the request and any rate-limit retries.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
+                  const cpr::ConnectionPool &connection_pool,
                   std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
@@ -72,12 +75,14 @@ cpr::Response Get(const cpr::Url &url,
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param connection_pool Connection pool shared by the owning device session.
  * @param timeout Overall timeout for the request and any rate-limit retries.
  * @return CPR response object.
  */
 cpr::Response
 Get_optional(const cpr::Url &url,
              const std::optional<cpr::Bearer> &bearer_token,
+             const cpr::ConnectionPool &connection_pool,
              std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
@@ -90,6 +95,7 @@ Get_optional(const cpr::Url &url,
  *
  * @param url The target URL for the POST request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param connection_pool Connection pool shared by the owning device session.
  * @param data The request body data.
  * @param additional_headers Additional HTTP headers to include.
  * @param timeout Overall timeout for the request and any rate-limit retries.
@@ -97,6 +103,7 @@ Get_optional(const cpr::Url &url,
  */
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data,
                    const cpr::Header &additional_headers = {},
                    std::chrono::milliseconds timeout = std::chrono::hours{1});
@@ -149,13 +156,14 @@ struct Hooks {
   /// Hook for GET requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
-      const cpr::Header &headers, std::chrono::milliseconds timeout)>
+      const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
+      std::chrono::milliseconds timeout)>
       get;
   /// Hook for POST requests.
-  std::function<cpr::Response(const cpr::Url &url,
-                              const std::optional<cpr::Bearer> &bearer_token,
-                              const cpr::Header &headers, const cpr::Body &body,
-                              std::chrono::milliseconds timeout)>
+  std::function<cpr::Response(
+      const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+      const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
+      const cpr::Body &body, std::chrono::milliseconds timeout)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;

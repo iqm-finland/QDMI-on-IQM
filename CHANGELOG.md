@@ -17,6 +17,12 @@ releases may include breaking changes.
   Slurm license a site administrator may require via the SPANK plugin's
   `iqm_require_license` option ([#162]) ([**@marcelwa**])
 
+### Changed
+
+- ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
+  setup during initialization and subsequent requests ([#163])
+  ([**@burgholzer**])
+
 ## [1.3.0] - 2026-07-31
 
 ### Added
@@ -142,6 +148,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140

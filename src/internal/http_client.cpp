@@ -30,6 +30,7 @@
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
 #include <cpr/redirect.h>
@@ -67,8 +68,10 @@ cpr::Header Make_json_headers(const cpr::Header &additional_headers) {
 
 void Apply_common_options(cpr::Session &session, const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::ConnectionPool &connection_pool,
                           const cpr::Header &headers,
                           const std::chrono::milliseconds timeout) {
+  session.SetConnectionPool(connection_pool);
   session.SetUrl(url);
   session.SetHeader(headers);
   session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
@@ -84,19 +87,23 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
 
 cpr::Response Default_get(const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::ConnectionPool &connection_pool,
                           const cpr::Header &headers,
                           const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers, timeout);
+  Apply_common_options(session, url, bearer_token, connection_pool, headers,
+                       timeout);
   return session.Get();
 }
 
 cpr::Response Default_post(const cpr::Url &url,
                            const std::optional<cpr::Bearer> &bearer_token,
+                           const cpr::ConnectionPool &connection_pool,
                            const cpr::Header &headers, const cpr::Body &body,
                            const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers, timeout);
+  Apply_common_options(session, url, bearer_token, connection_pool, headers,
+                       timeout);
   session.SetBody(body);
   return session.Post();
 }
@@ -370,30 +377,35 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
 
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
+                  const cpr::ConnectionPool &connection_pool,
                   const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
       url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, headers, remaining);
+        return hooks.get(url, bearer_token, connection_pool, headers,
+                         remaining);
       });
 }
 
 cpr::Response Get_optional(const cpr::Url &url,
                            const std::optional<cpr::Bearer> &bearer_token,
+                           const cpr::ConnectionPool &connection_pool,
                            const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
       url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, headers, remaining);
+        return hooks.get(url, bearer_token, connection_pool, headers,
+                         remaining);
       });
 }
 
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data, const cpr::Header &additional_headers,
                    const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing POST request to " + url.str());
@@ -404,7 +416,8 @@ cpr::Response Post(const cpr::Url &url,
   const auto headers = internal::Make_json_headers(additional_headers);
   return internal::Perform_with_retries(
       url, timeout, [&](const auto remaining) {
-        return hooks.post(url, bearer_token, headers, data, remaining);
+        return hooks.post(url, bearer_token, connection_pool, headers, data,
+                          remaining);
       });
 }
 
