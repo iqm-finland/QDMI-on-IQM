@@ -848,6 +848,34 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest, RetrievedQueuedJobReportsFreshQueuePosition) {
+  http_stub.queue_get(
+      200,
+      R"({"id":"job-123","status":"waiting","type":"circuit","queue_position":9})");
+
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_get(
+      200,
+      R"({"id":"job-123","status":"waiting","type":"circuit","queue_position":4})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                retrieved_job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 4U);
+
+  const auto &get_urls = http_stub.get_urls();
+  ASSERT_GE(get_urls.size(), 2U);
+  EXPECT_EQ(get_urls[get_urls.size() - 2],
+            "https://localhost/api/v1/jobs/job-123");
+  EXPECT_EQ(get_urls.back(), "https://localhost/api/v1/jobs/job-123");
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
 TEST_F(DeviceJobMockTest, RetrieveExistingJobRestoresRemoteStatus) {
   constexpr std::array status_cases{
       std::pair{"received", QDMI_JOB_STATUS_SUBMITTED},

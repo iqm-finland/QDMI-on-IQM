@@ -1090,19 +1090,6 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
                       size, value, size_ret)
-  if (job->retrieved_) {
-    return QDMI_ERROR_NOTSUPPORTED;
-  }
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
-                            QDMI_Program_Format, job->program_format_, prop,
-                            size, value, size_ret)
-  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM && !job->program_set_) {
-    return QDMI_ERROR_BADSTATE;
-  }
-  ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
-                    size, value, size_ret)
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
-                            job->num_shots_, prop, size, value, size_ret)
   if (prop == QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION) {
     QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
     const auto result = IQM_QDMI_device_job_check(job, &status);
@@ -1119,6 +1106,19 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                               *job->queue_position_, prop, size, value,
                               size_ret)
   }
+  if (job->retrieved_) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
+                            QDMI_Program_Format, job->program_format_, prop,
+                            size, value, size_ret)
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM && !job->program_set_) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
+                    size, value, size_ret)
+  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
+                            job->num_shots_, prop, size, value, size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
 }
 
