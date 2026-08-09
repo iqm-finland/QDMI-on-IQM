@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
+  AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
+  MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
+  ([#173]) ([**@marcelwa**])
 - 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**])
 - ✨ Expose current device queue length and queued job position through QDMI,
   refreshing IQM job status for every position query ([#172])
@@ -171,6 +175,7 @@ Compatible with QDMI `v1.3.0`.
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
+[#173]: https://github.com/iqm-finland/QDMI-on-IQM/pull/173
 [#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
