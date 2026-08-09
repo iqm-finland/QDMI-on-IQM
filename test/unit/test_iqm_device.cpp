@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cpr/response.h>
 #include <cstddef>
@@ -738,7 +739,8 @@ TEST_F(DeviceTest, JobCreationWithoutInitialization) {
 }
 
 TEST_F(DeviceTest, JobRetrievalValidatesArgumentsAndSessionState) {
-  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job const sentinel =
+      std::bit_cast<IQM_QDMI_Device_Job>(session);
   IQM_QDMI_Device_Job retrieved_job = sentinel;
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 nullptr, "job-123", &retrieved_job),
@@ -812,7 +814,8 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobPropagatesAccessErrors) {
 }
 
 TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsMalformedResponses) {
-  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job const sentinel =
+      std::bit_cast<IQM_QDMI_Device_Job>(session);
   IQM_QDMI_Device_Job retrieved_job = sentinel;
   http_stub.queue_get(200, "invalid json");
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -829,7 +832,8 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobRejectsMalformedResponses) {
 }
 
 TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
-  const auto sentinel = reinterpret_cast<IQM_QDMI_Device_Job>(session);
+  IQM_QDMI_Device_Job const sentinel =
+      std::bit_cast<IQM_QDMI_Device_Job>(session);
   IQM_QDMI_Device_Job retrieved_job = sentinel;
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
