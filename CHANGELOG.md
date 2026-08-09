@@ -16,6 +16,8 @@ releases may include breaking changes.
   `estimate`, forwarded as `--licenses` on `srun`, so callers can request the
   Slurm license a site administrator may require via the SPANK plugin's
   `iqm_require_license` option ([#162]) ([**@marcelwa**])
+- ✨ Support retrieving existing IQM circuit jobs by ID ([#160])
+  ([**@burgholzer**])
 
 ### Fixed
 
@@ -162,6 +164,7 @@ Compatible with QDMI `v1.3.0`.
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
 [#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
+[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136

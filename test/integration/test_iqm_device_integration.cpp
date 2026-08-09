@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <ranges>
@@ -690,6 +691,7 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
   auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  const auto job_id = FoMaC::get_job_id(job);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     IQM_QDMI_device_job_free(job);
@@ -785,6 +787,36 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
             QDMI_ERROR_NOTSUPPORTED);
 
   IQM_QDMI_device_job_free(job);
+
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, job_id.c_str(), &retrieved_job),
+            QDMI_SUCCESS);
+  EXPECT_EQ(FoMaC::get_job_id(retrieved_job), job_id);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(wait_for_done(retrieved_job), QDMI_JOB_STATUS_DONE);
+  const auto retrieved_counts = FoMaC::get_histogram(retrieved_job);
+  const auto retrieved_sum =
+      std::accumulate(retrieved_counts.begin(), retrieved_counts.end(),
+                      size_t{0}, [](const size_t total, const auto &entry) {
+                        return total + entry.second;
+                      });
+  EXPECT_EQ(retrieved_sum, shots_num);
+
+  size_t retrieved_shots_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+                                            QDMI_JOB_RESULT_SHOTS, 0, nullptr,
+                                            &retrieved_shots_size),
+            QDMI_SUCCESS);
+  ASSERT_GT(retrieved_shots_size, 1U);
+  std::vector<char> retrieved_shots(retrieved_shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
+                retrieved_shots.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
+            shots_num);
+  IQM_QDMI_device_job_free(retrieved_job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCancellation) {
