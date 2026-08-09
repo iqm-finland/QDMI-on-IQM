@@ -115,6 +115,14 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  cpp-sanitizers:
+    name: 🇨 Sanitizers
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: ./.github/workflows/cpp-sanitizers.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+
   cpp-coverage:
     name: 🇨 Coverage
     needs: change-detection
@@ -201,6 +209,7 @@ jobs:
       - cpp-tests-macos
       - cpp-tests-windows
       - cpp-install-tests
+      - cpp-sanitizers
       - cpp-coverage
       - cpp-linter
       - python-linter
@@ -216,7 +225,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
