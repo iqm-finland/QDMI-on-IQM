@@ -814,6 +814,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobRestoresRemoteStatus) {
   };
   constexpr std::array status_cases{
       StatusCase{"received", QDMI_JOB_STATUS_SUBMITTED},
+      StatusCase{"queued", QDMI_JOB_STATUS_QUEUED},
       StatusCase{"aborted", QDMI_JOB_STATUS_CANCELED},
       StatusCase{"failed", QDMI_JOB_STATUS_FAILED},
   };
@@ -827,12 +828,20 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobRestoresRemoteStatus) {
                   session, "job-123", &retrieved_job),
               QDMI_SUCCESS);
 
-    if (qdmi_status == QDMI_JOB_STATUS_SUBMITTED) {
+    if (qdmi_status == QDMI_JOB_STATUS_SUBMITTED ||
+        qdmi_status == QDMI_JOB_STATUS_QUEUED) {
       http_stub.queue_get(200, response);
     }
     QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
     ASSERT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
     EXPECT_EQ(status, qdmi_status);
+
+    if (qdmi_status == QDMI_JOB_STATUS_SUBMITTED) {
+      http_stub.queue_get(
+          200, R"({"id":"job-123","status":"unknown","type":"circuit"})");
+      EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
+                QDMI_ERROR_FATAL);
+    }
     IQM_QDMI_device_job_free(retrieved_job);
   }
 
@@ -1615,6 +1624,8 @@ TEST_F(DeviceJobMockTest, JobParameterValidation) {
 }
 
 TEST_F(DeviceJobMockTest, JobSubmissionWithoutRequiredParameters) {
+  EXPECT_EQ(IQM_QDMI_device_job_submit(nullptr), QDMI_ERROR_INVALIDARGUMENT);
+
   // Test submitting job without required parameters
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_INVALIDARGUMENT);
 }
