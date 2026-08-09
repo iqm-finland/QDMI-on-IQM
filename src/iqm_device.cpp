@@ -1861,7 +1861,7 @@ std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
                                 *session->quantum_computer_id_);
   const auto queue_response = iqm::http::Get_optional(
       queue_url, session->token_manager_->get_bearer_token(),
-      session->request_timeout_);
+      session->connection_pool_, session->request_timeout_);
   if (iqm::http::Handle_response(queue_response,
                                  iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG) !=
       QDMI_SUCCESS) {
