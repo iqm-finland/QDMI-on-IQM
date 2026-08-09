@@ -418,6 +418,38 @@ auto FoMaC::get_supported_program_formats() const
   return formats;
 }
 
+namespace {
+/**
+ * @brief Owns a device job until it is handed to the caller.
+ * @details Every parameter that submit_job() sets is followed by a
+ *          throw_if_error(), so without this the job allocated up front is
+ *          leaked whenever any of those checks throws.
+ */
+class Job_guard final {
+public:
+  explicit Job_guard(const IQM_QDMI_Device_Job job) : job_(job) {}
+
+  ~Job_guard() {
+    if (job_ != nullptr) {
+      IQM_QDMI_device_job_free(job_);
+    }
+  }
+
+  Job_guard(const Job_guard &) = delete;
+  Job_guard &operator=(const Job_guard &) = delete;
+  Job_guard(Job_guard &&) = delete;
+  Job_guard &operator=(Job_guard &&) = delete;
+
+  /// Hand ownership to the caller.
+  [[nodiscard]] auto release() -> IQM_QDMI_Device_Job {
+    return std::exchange(job_, nullptr);
+  }
+
+private:
+  IQM_QDMI_Device_Job job_;
+};
+} // namespace
+
 auto FoMaC::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots, const std::string &heralding_mode,
@@ -432,6 +464,7 @@ auto FoMaC::submit_job(
   IQM_QDMI_Device_Job job = nullptr;
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   throw_if_error(ret, "Failed to create a job");
+  Job_guard guard{job};
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
       &format);
@@ -502,7 +535,7 @@ auto FoMaC::submit_job(
   }
   ret = IQM_QDMI_device_job_submit(job);
   throw_if_error(ret, "Failed to submit the job");
-  return job;
+  return guard.release();
 }
 
 auto FoMaC::get_status(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {
