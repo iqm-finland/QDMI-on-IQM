@@ -1276,7 +1276,8 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->job_id_.empty() || job->status_ == QDMI_JOB_STATUS_DONE ||
-      job->status_ == QDMI_JOB_STATUS_CANCELED) {
+      job->status_ == QDMI_JOB_STATUS_CANCELED ||
+      job->status_ == QDMI_JOB_STATUS_FAILED) {
     *status = job->status_;
     return QDMI_SUCCESS;
   }
