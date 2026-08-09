@@ -1066,6 +1066,36 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
   EXPECT_FALSE(request.contains("num_active_reset_cycles"));
 }
 
+TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
+  constexpr auto replacement_program =
+      R"({"name":"replacement","instructions":[],"metadata":{}})";
+  http_stub.queue_post(200, R"({"id": "job-replaced-program"})");
+
+  constexpr auto format = QDMI_PROGRAM_FORMAT_QIRBASESTRING;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(replacement_program) + 1, replacement_program),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, 0, nullptr),
+            QDMI_SUCCESS);
+
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  const auto &request_body = http_stub.post_bodies().front();
+  EXPECT_NE(request_body.find("replacement"), std::string::npos);
+  EXPECT_EQ(request_body.find("test_circuit"), std::string::npos);
+}
+
 TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   const std::string job_submission_response = R"({"id": "job-456"})";
   const std::string job_status_response = R"({"status": "ready"})";
