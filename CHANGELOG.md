@@ -25,6 +25,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Report the device as idle again once its jobs reach a terminal state,
+  instead of leaving it busy for the rest of the session after the first
+  submission ([#180]) ([**@marcelwa**])
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
   RunRequest field names ([#169]) ([**@burgholzer**])
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
@@ -163,6 +166,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#180]: https://github.com/iqm-finland/QDMI-on-IQM/pull/180
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
