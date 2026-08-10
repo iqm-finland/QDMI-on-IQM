@@ -1152,6 +1152,75 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
             QDMI_SUCCESS);
 }
 
+TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  // The keys are stored in a std::map, which orders the shorter one first, so
+  // sizing the buffer from the first key under-counts what the writes need.
+  http_stub.queue_get(
+      200, R"([{"measurement_keys": ["m"], "counts": {"00": 5, "111": 3}}])");
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 8;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  size_t hist_keys_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                            nullptr, &hist_keys_size),
+            QDMI_SUCCESS);
+  // "00" + ',' + "111" + '\0'
+  EXPECT_EQ(hist_keys_size, 7U);
+
+  // Allocate exactly what the API asked for. Before the fix this reported 6 and
+  // the write below overran the buffer by one byte.
+  std::vector<char> hist_keys(hist_keys_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+                                            hist_keys_size, hist_keys.data(),
+                                            nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(hist_keys.data(), "00,111");
+}
+
+TEST_F(DeviceJobMockTest, HistogramKeysOfEqualLengthAreUnaffected) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  http_stub.queue_get(
+      200,
+      R"([{"measurement_keys": ["m"], "counts": {"00": 5, "01": 2, "11": 1}}])");
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 8;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  size_t hist_keys_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                            nullptr, &hist_keys_size),
+            QDMI_SUCCESS);
+  // Unchanged from the previous computation for uniform keys: 3 * (2 + 1).
+  EXPECT_EQ(hist_keys_size, 9U);
+
+  std::vector<char> hist_keys(hist_keys_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+                                            hist_keys_size, hist_keys.data(),
+                                            nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(hist_keys.data(), "00,01,11");
+}
+
 TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
   http_stub.queue_post(200, R"({"id": "job-canonical-fields"})");
 
