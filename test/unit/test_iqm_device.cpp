@@ -533,7 +533,7 @@ protected:
 
   /// @brief Set the program and shot count a job needs before it can be
   ///        submitted.
-  void prepare_iqm_json_job(IQM_QDMI_Device_Job target) {
+  static void prepare_iqm_json_job(IQM_QDMI_Device_Job target) {
     ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                   target, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                   strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
