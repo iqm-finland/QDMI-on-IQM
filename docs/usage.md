@@ -292,13 +292,19 @@ The following properties about the device can be queried via the
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM`: The
   number of qubits available on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_SITES`: The
-  list of available qubit sites on the device.
+  list of available sites on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_OPERATIONS`:
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
+
+**Note:** Sites and qubits are not the same quantity. On Star-topology devices
+the site list also contains the computational resonators, so it is longer than
+the qubit count. Allocate registers from
+{cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM` and
+address hardware through the site list.
 
 The following properties about every site (qubit) can be queried via the
 {cpp:func}`IQM_QDMI_device_session_query_site_property` function:
