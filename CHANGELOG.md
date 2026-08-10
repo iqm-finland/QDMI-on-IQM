@@ -25,6 +25,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Size the histogram key buffer from all measurement bitstrings instead of
+  the first one, which overran the caller's buffer when the keys differed in
+  width ([#181]) ([**@marcelwa**])
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
   ([**@marcelwa**])
@@ -169,6 +172,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
+[#181]: https://github.com/iqm-finland/QDMI-on-IQM/pull/181
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
 [#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
