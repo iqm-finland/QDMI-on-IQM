@@ -98,6 +98,12 @@ struct IQM_QDMI_Device_Session_impl_d {
   /// Device status
   QDMI_Device_Status device_status_ = QDMI_DEVICE_STATUS_OFFLINE;
 
+  /// @brief Number of jobs of this session that have not reached a terminal
+  ///        state yet.
+  /// @details The device is reported as busy while this is non-zero and idle
+  ///          once it drops back to zero.
+  size_t outstanding_jobs_ = 0;
+
   /// Quantum computer ID
   std::optional<std::string> quantum_computer_id_ = std::nullopt;
 
@@ -214,6 +220,12 @@ struct IQM_QDMI_Device_Job_impl_d {
   QDMI_Job_Status status_ = QDMI_JOB_STATUS_CREATED;
   /// The number of jobs ahead while this job is queued.
   std::optional<size_t> queue_position_ = std::nullopt;
+  /// @brief Whether this job is currently counted in its session's
+  ///        @c outstanding_jobs_.
+  /// @details Set once the job occupies the device and cleared once it reaches
+  ///          a terminal state or is freed, so that neither transition is
+  ///          counted twice.
+  bool occupies_device_ = false;
 };
 
 /**
@@ -870,6 +882,62 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
   }
   return QDMI_SUCCESS;
 }
+
+/**
+ * @brief Whether a job status means the job will not change state again.
+ * @param status The job status to classify.
+ * @return True if the job has finished, been canceled, or failed.
+ */
+constexpr bool Is_terminal_job_status(const QDMI_Job_Status status) {
+  return status == QDMI_JOB_STATUS_DONE || status == QDMI_JOB_STATUS_CANCELED ||
+         status == QDMI_JOB_STATUS_FAILED;
+}
+
+/**
+ * @brief Count @p job against its session and mark the device busy.
+ * @details Idempotent: a job that already occupies the device is not counted a
+ *          second time.
+ * @param job The job that started occupying the device.
+ */
+void Acquire_device(IQM_QDMI_Device_Job job) {
+  if (job->session_ == nullptr || job->occupies_device_) {
+    return;
+  }
+  job->occupies_device_ = true;
+  ++job->session_->outstanding_jobs_;
+  job->session_->device_status_ = QDMI_DEVICE_STATUS_BUSY;
+}
+
+/**
+ * @brief Stop counting @p job against its session.
+ * @details Returns the device to idle once the last outstanding job of the
+ *          session is released. Idempotent, so repeated terminal-state
+ *          transitions of the same job are harmless.
+ * @param job The job that stopped occupying the device.
+ */
+void Release_device(IQM_QDMI_Device_Job job) {
+  if (job->session_ == nullptr || !job->occupies_device_) {
+    return;
+  }
+  job->occupies_device_ = false;
+  --job->session_->outstanding_jobs_;
+  if (job->session_->outstanding_jobs_ == 0 &&
+      job->session_->device_status_ == QDMI_DEVICE_STATUS_BUSY) {
+    job->session_->device_status_ = QDMI_DEVICE_STATUS_IDLE;
+  }
+}
+
+/**
+ * @brief Synchronize the session's device status with the state of @p job.
+ * @param job The job whose status was just updated.
+ */
+void Track_job_status(IQM_QDMI_Device_Job job) {
+  if (Is_terminal_job_status(job->status_)) {
+    Release_device(job);
+  } else {
+    Acquire_device(job);
+  }
+}
 } // namespace
 
 int IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -911,6 +979,9 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
         status != QDMI_SUCCESS) {
       return status;
     }
+    // A reopened job that is still queued or running occupies the device just
+    // as a locally submitted one does.
+    Track_job_status(retrieved_job.get());
     LOG_INFO("Retrieved device job with ID: " + std::string{job_id});
     *job = retrieved_job.release();
     return QDMI_SUCCESS;
@@ -927,6 +998,11 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
 
 void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   LOG_INFO("Freeing device job");
+  if (job != nullptr) {
+    // A job handle that is dropped while still running can no longer be
+    // observed, so it must not keep the device busy forever.
+    Release_device(job);
+  }
   delete job;
 }
 
@@ -1259,16 +1335,22 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
   if (!job->program_set_) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
-  job->session_->device_status_ = QDMI_DEVICE_STATUS_BUSY;
-
-  if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON ||
-      job->program_format_ == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
-    return IQM_QDMI_device_job_submit_circuit(job);
+  const auto submission_status = [job]() -> int {
+    if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON ||
+        job->program_format_ == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
+      return IQM_QDMI_device_job_submit_circuit(job);
+    }
+    if (job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION) {
+      return IQM_QDMI_device_job_submit_calibration(job);
+    }
+    return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
+  }();
+  // Only a job that actually reached the backend occupies the device. A
+  // submission that failed leaves the device as idle as it was before.
+  if (submission_status == QDMI_SUCCESS) {
+    Acquire_device(job);
   }
-  if (job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION) {
-    return IQM_QDMI_device_job_submit_calibration(job);
-  }
-  return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
+  return submission_status;
 }
 
 int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
@@ -1294,9 +1376,11 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
       return status;
     }
     job->status_ = QDMI_JOB_STATUS_FAILED;
+    Release_device(job);
     return QDMI_ERROR_FATAL;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
+  Release_device(job);
   LOG_DEBUG("Job cancellation response:\n" + job_abortion_response.text);
   LOG_INFO("Job with ID: " + job->job_id_ + " canceled");
   return QDMI_SUCCESS;
@@ -1329,6 +1413,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
       return status_code;
     }
     job->status_ = QDMI_JOB_STATUS_FAILED;
+    Release_device(job);
     return QDMI_ERROR_FATAL;
   }
   const auto job_status_json_response =
@@ -1340,6 +1425,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
       update_status != QDMI_SUCCESS) {
     return update_status;
   }
+  Track_job_status(job);
   job->queue_position_ = std::nullopt;
   if (job->status_ == QDMI_JOB_STATUS_QUEUED) {
     if (const auto position = job_status_json_response.find("queue_position");
