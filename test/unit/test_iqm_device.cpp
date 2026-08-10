@@ -531,6 +531,30 @@ class DeviceJobMockTest : public DeviceIntegrationMockTest {
 protected:
   IQM_QDMI_Device_Job job = nullptr;
 
+  /// @brief Set the program and shot count a job needs before it can be
+  ///        submitted.
+  void prepare_iqm_json_job(IQM_QDMI_Device_Job target) {
+    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                  target, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                  strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
+    constexpr size_t shots = 100;
+    ASSERT_EQ(
+        IQM_QDMI_device_job_set_parameter(
+            target, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+        QDMI_SUCCESS);
+  }
+
+  /// @brief Read the device status the session currently reports.
+  QDMI_Device_Status device_status() {
+    QDMI_Device_Status status{};
+    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                  session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                  nullptr),
+              QDMI_SUCCESS);
+    return status;
+  }
+
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
 
@@ -1094,6 +1118,89 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
                                             hist_values_size,
                                             hist_values.data(), nullptr),
             QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, DeviceReturnsToIdleWhenJobFinishes) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
+
+  prepare_iqm_json_job(job);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_BUSY);
+
+  QDMI_Job_Status job_status{};
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &job_status), QDMI_SUCCESS);
+  ASSERT_EQ(job_status, QDMI_JOB_STATUS_DONE);
+
+  // Before the fix the device stayed busy for the rest of the session's life.
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
+}
+
+TEST_F(DeviceJobMockTest, DeviceStaysBusyUntilTheLastJobFinishes) {
+  IQM_QDMI_Device_Job second_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &second_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(200, R"({"id": "job-1"})");
+  http_stub.queue_post(200, R"({"id": "job-2"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+
+  prepare_iqm_json_job(job);
+  prepare_iqm_json_job(second_job);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(second_job), QDMI_SUCCESS);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_BUSY);
+
+  QDMI_Job_Status job_status{};
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &job_status), QDMI_SUCCESS);
+  ASSERT_EQ(job_status, QDMI_JOB_STATUS_DONE);
+  // One of two jobs finishing must not make the device look idle.
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_BUSY);
+
+  ASSERT_EQ(IQM_QDMI_device_job_check(second_job, &job_status), QDMI_SUCCESS);
+  ASSERT_EQ(job_status, QDMI_JOB_STATUS_DONE);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
+
+  IQM_QDMI_device_job_free(second_job);
+}
+
+TEST_F(DeviceJobMockTest, FailedSubmissionLeavesTheDeviceIdle) {
+  http_stub.queue_post(500);
+
+  prepare_iqm_json_job(job);
+  EXPECT_NE(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  // A job that never reached the backend does not occupy the device.
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
+}
+
+TEST_F(DeviceJobMockTest, FreeingAnUnfinishedJobReleasesTheDevice) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+
+  prepare_iqm_json_job(job);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_BUSY);
+
+  // Dropping the handle makes the job unobservable, so it must not pin the
+  // device to busy forever.
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
+}
+
+TEST_F(DeviceJobMockTest, CanceledJobReleasesTheDevice) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_post(200, "");
+
+  prepare_iqm_json_job(job);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_BUSY);
+
+  ASSERT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_SUCCESS);
+  EXPECT_EQ(device_status(), QDMI_DEVICE_STATUS_IDLE);
 }
 
 TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
