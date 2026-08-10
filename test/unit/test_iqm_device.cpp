@@ -650,6 +650,71 @@ TEST_F(DeviceIntegrationMockTest, QueueLengthIsOptional) {
             QDMI_ERROR_NOTSUPPORTED);
 }
 
+TEST_F(DeviceIntegrationMockTest, QubitCountExcludesComputationalResonators) {
+  // A Star-topology device: three qubits around one computational resonator.
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, R"([
+      {
+        "computational_resonators": ["CR1"],
+        "connectivity": [["QB1","CR1"],["QB2","CR1"],["QB3","CR1"]],
+        "dut_label":"M160_W0_H01_Z99",
+        "qubits":["QB1","QB2","QB3"]
+      }
+    ])");
+  http_stub.queue_get(200, R"({
+      "calibration_set_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+      "qubits": ["QB1", "QB2", "QB3"],
+      "computational_resonators": ["CR1"],
+      "gates": {
+        "measure": {
+          "implementations": {
+            "constant": {"loci": [["QB1"], ["QB2"], ["QB3"]]}
+          },
+          "default_implementation": "constant",
+          "override_default_implementation": {}
+        }
+      }
+    })");
+  http_stub.queue_get(200, R"({"observations": []})");
+  http_stub.queue_get(200, cocos_health_response);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  size_t num_qubits = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUBITSNUM, sizeof(num_qubits),
+                &num_qubits, nullptr),
+            QDMI_SUCCESS);
+  // Three qubits, not the four sites. Before the fix this reported 4.
+  EXPECT_EQ(num_qubits, 3U);
+
+  // The site list still covers qubits and resonators alike, which is what
+  // QDMI expects of it.
+  size_t sites_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_SITES, 0, nullptr, &sites_size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(sites_size / sizeof(IQM_QDMI_Site), 4U);
+}
+
+TEST_F(DeviceIntegrationMockTest, QubitCountMatchesSiteCountWithoutResonators) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  size_t num_qubits = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUBITSNUM, sizeof(num_qubits),
+                &num_qubits, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(num_qubits, 2U);
+
+  size_t sites_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_SITES, 0, nullptr, &sites_size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(sites_size / sizeof(IQM_QDMI_Site), 2U);
+}
+
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
   EXPECT_NE(session, nullptr);
