@@ -73,9 +73,12 @@ enum class IQM_QDMI_DEVICE_SESSION_STATUS : uint8_t { ALLOCATED, INITIALIZED };
  * @brief Implementation of the IQM_QDMI_Device_Session structure.
  */
 struct IQM_QDMI_Device_Session_impl_d {
+  struct Initialization_candidate_tag {};
+
   IQM_QDMI_Device_Session_impl_d() = default;
 
-  explicit IQM_QDMI_Device_Session_impl_d(
+  IQM_QDMI_Device_Session_impl_d(
+      [[maybe_unused]] Initialization_candidate_tag candidate_tag,
       const IQM_QDMI_Device_Session_impl_d &configuration)
       : base_url_(configuration.base_url_), token_(configuration.token_),
         tokens_file_(configuration.tokens_file_),
@@ -697,6 +700,13 @@ int IQM_QDMI_device_update_dynamic_quantum_architecture(
 
   return QDMI_SUCCESS;
 }
+
+[[nodiscard]] IQM_QDMI_Device_Session_impl_d Create_initialization_candidate(
+    const IQM_QDMI_Device_Session_impl_d &configuration) {
+  return {IQM_QDMI_Device_Session_impl_d::Initialization_candidate_tag{},
+          configuration};
+}
+
 int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Initializing device session");
   Apply_environment_session_defaults(session);
@@ -752,8 +762,8 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
     return QDMI_ERROR_BADSTATE;
   }
 
-  auto initialized = std::make_unique<IQM_QDMI_Device_Session_impl_d>(*session);
-  if (const auto status = Initialize_device_session(initialized.get());
+  auto initialized = Create_initialization_candidate(*session);
+  if (const auto status = Initialize_device_session(&initialized);
       status != QDMI_SUCCESS) {
     return status;
   }
@@ -772,7 +782,7 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
                     value->operations_two_qubit_fidelity_map_);
   };
   auto destination_state = state(session);
-  auto initialized_state = state(initialized.get());
+  auto initialized_state = state(&initialized);
   static_assert(noexcept(std::swap(destination_state, initialized_state)));
   std::swap(destination_state, initialized_state);
   return QDMI_SUCCESS;
