@@ -590,13 +590,20 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest,
-       DeviceSessionUsesOneConnectionPoolDuringInitialization) {
+       DeviceSessionReusesConnectionPoolAfterInitialization) {
   queue_successful_initialization();
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"queue_length": 0})");
+  size_t queue_length = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_length, 0U);
 
   const auto &connection_pools = http_stub.get_connection_pools();
-  ASSERT_EQ(connection_pools.size(), 5U);
+  ASSERT_EQ(connection_pools.size(), 6U);
   EXPECT_TRUE(std::ranges::all_of(connection_pools, [&](const auto *pool) {
     return pool == connection_pools.front();
   }));
