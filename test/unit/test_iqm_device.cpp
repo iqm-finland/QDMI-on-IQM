@@ -590,32 +590,23 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest,
-       DeviceSessionsReuseDistinctConnectionPoolsDuringInitialization) {
-  IQM_QDMI_Device_Session second_session = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_alloc(&second_session), QDMI_SUCCESS);
-  const std::string base_url = "https://localhost";
-  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
-                second_session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
-                base_url.size() + 1, base_url.c_str()),
-            QDMI_SUCCESS);
-
-  queue_successful_initialization();
+       DeviceSessionReusesConnectionPoolAfterInitialization) {
   queue_successful_initialization();
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  EXPECT_EQ(IQM_QDMI_device_session_init(second_session), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"queue_length": 0})");
+  size_t queue_length = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_length, 0U);
 
   const auto &connection_pools = http_stub.get_connection_pools();
-  ASSERT_EQ(connection_pools.size(), 10U);
-  EXPECT_TRUE(std::ranges::all_of(
-      connection_pools.begin(), connection_pools.begin() + 5,
-      [&](const auto *pool) { return pool == connection_pools.front(); }));
-  EXPECT_TRUE(std::ranges::all_of(
-      connection_pools.begin() + 5, connection_pools.end(),
-      [&](const auto *pool) { return pool == connection_pools.back(); }));
-  EXPECT_NE(connection_pools.front(), connection_pools.back());
-
-  IQM_QDMI_device_session_free(second_session);
+  ASSERT_EQ(connection_pools.size(), 6U);
+  EXPECT_TRUE(std::ranges::all_of(connection_pools, [&](const auto *pool) {
+    return pool == connection_pools.front();
+  }));
 }
 
 TEST_F(DeviceIntegrationMockTest, QueryQueueLength) {
@@ -1726,12 +1717,45 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest, MalformedJSONResponse) {
-
-  // Test malformed JSON responses
   http_stub.queue_get(200, "invalid json");
 
-  // Expect a JSON parsing exception to be thrown
-  EXPECT_THROW(IQM_QDMI_device_session_init(session), std::exception);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+
+  // Failed initialization leaves the session configurable and retryable.
+  const std::string base_url = "https://retry.example.com";
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceIntegrationMockTest, SessionInitializationContainsCxxExceptions) {
+  auto &get_hook = iqm::http::internal::Get_hooks().get;
+  auto original_get_hook = get_hook;
+  const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
+                                           const int expected_status) {
+    get_hook = [exception](const auto &, const auto &, const auto &,
+                           const auto &, const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), expected_status);
+  };
+
+  expect_mapped_exception(
+      std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+      QDMI_ERROR_PERMISSIONDENIED);
+  expect_mapped_exception(std::make_exception_ptr(std::bad_alloc{}),
+                          QDMI_ERROR_OUTOFMEM);
+  expect_mapped_exception(
+      std::make_exception_ptr(std::runtime_error{"transport failure"}),
+      QDMI_ERROR_FATAL);
+  expect_mapped_exception(std::make_exception_ptr(42), QDMI_ERROR_FATAL);
+
+  get_hook = std::move(original_get_hook);
+  queue_successful_initialization();
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
 }
 
 TEST_F(DeviceJobMockTest, DoubleInitializationPrevention) {

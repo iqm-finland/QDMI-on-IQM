@@ -25,6 +25,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Contain exceptions during device-session initialization and leave failed
+  sessions retryable ([#175]) ([**@burgholzer**])
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
   RunRequest field names ([#169]) ([**@burgholzer**])
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
