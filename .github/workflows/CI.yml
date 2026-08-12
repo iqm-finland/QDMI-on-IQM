@@ -19,6 +19,12 @@ jobs:
     name: 🔍 Change
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@579203ef22082fa5d5483412f442e50d0c5ff4a7 # v2.2.2
     with:
+      additional-cpp-files: |
+        .github/workflows/CI.yml
+        .github/workflows/cpp-tests-*.yml
+        .github/workflows/cpp-coverage.yml
+        .github/workflows/cpp-linter.yml
+        .github/workflows/cpp-install-tests.yml
       additional-cd-files: |
         spank/**
         .github/workflows/spank-tests.yml
