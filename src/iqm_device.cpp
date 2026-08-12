@@ -356,7 +356,11 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
     return status;
   }
   const auto json_response = nlohmann::json::parse(
-      qc_list_response.text); // NOLINT(misc-include-cleaner)
+      qc_list_response.text, nullptr, false); // NOLINT(misc-include-cleaner)
+  if (json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the quantum computers response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Received quantum computers response: " + json_response.dump());
 
   // Extract the quantum_computers array from the response
@@ -376,9 +380,9 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
     // Search for the specified quantum computer by ID
     bool found = false;
     for (const auto &qc : json_qc_list) {
-      if (qc["id"].get<std::string>() == qc_id) {
+      if (qc.at("id").get<std::string>() == qc_id) {
         found = true;
-        session->quantum_computer_alias_ = qc["alias"].get<std::string>();
+        session->quantum_computer_alias_ = qc.at("alias").get<std::string>();
         break;
       }
     }
@@ -391,8 +395,8 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
     // Search for the specified quantum computer by alias
     bool found = false;
     for (const auto &qc : json_qc_list) {
-      if (qc["alias"].get<std::string>() == qc_alias) {
-        session->quantum_computer_id_ = qc["id"].get<std::string>();
+      if (qc.at("alias").get<std::string>() == qc_alias) {
+        session->quantum_computer_id_ = qc.at("id").get<std::string>();
         found = true;
         break;
       }
@@ -404,8 +408,8 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   } else {
     // Use first available quantum computer
     const auto &qc = json_qc_list[0];
-    session->quantum_computer_id_ = qc["id"].get<std::string>();
-    session->quantum_computer_alias_ = qc["alias"].get<std::string>();
+    session->quantum_computer_id_ = qc.at("id").get<std::string>();
+    session->quantum_computer_alias_ = qc.at("alias").get<std::string>();
   }
   LOG_INFO("Using quantum computer ID: " + *session->quantum_computer_id_);
   LOG_INFO("Using quantum computer alias: " +
@@ -421,8 +425,12 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       status != QDMI_SUCCESS) {
     return status;
   }
-  const auto arch_array =
-      nlohmann::json::parse(arch_response.text); // NOLINT(misc-include-cleaner)
+  const auto arch_array = nlohmann::json::parse(
+      arch_response.text, nullptr, false); // NOLINT(misc-include-cleaner)
+  if (arch_array.is_discarded()) {
+    LOG_ERROR("Failed to parse the static quantum architecture response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Received quantum architecture response: " + arch_array.dump());
 
   // Extract first element from array (API returns array with single object)
@@ -432,7 +440,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   }
   const auto &architecture = arch_array[0];
 
-  const auto &qubits = architecture["qubits"];
+  const auto &qubits = architecture.at("qubits");
   const auto num_qubits = qubits.size();
   session->num_qubits_ = num_qubits;
   LOG_INFO("Found " + std::to_string(num_qubits) + " qubits");
@@ -464,20 +472,19 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   };
 
   for (size_t i = 0; i < num_qubits; ++i) {
-    add_site(qubits[i].get<std::string>(), i);
+    add_site(qubits.at(i).get<std::string>(), i);
   }
   for (size_t i = 0; i < computational_resonators.size(); ++i) {
     add_site(computational_resonators[i], num_qubits + i);
   }
 
-  const auto &connectivity = architecture["connectivity"];
+  const auto &connectivity = architecture.at("connectivity");
   const auto num_edges = connectivity.size();
   LOG_INFO("Found " + std::to_string(num_edges) + " connectivity edges");
   session->connectivity_.reserve(num_edges * 2);
-  for (size_t i = 0; i < num_edges; ++i) {
-    const auto &edge = connectivity[i];
-    const auto site_name1 = edge[0].get<std::string>();
-    const auto site_name2 = edge[1].get<std::string>();
+  for (const auto &edge : connectivity) {
+    const auto site_name1 = edge.at(0).get<std::string>();
+    const auto site_name2 = edge.at(1).get<std::string>();
     const auto site1_it = session->sites_map_.find(site_name1);
     const auto site2_it = session->sites_map_.find(site_name2);
     if (site1_it == session->sites_map_.end() ||
@@ -508,15 +515,19 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
     return status;
   }
   const auto dynamic_architecture =
-      nlohmann::json::parse(dyn_arch_response.text);
+      nlohmann::json::parse(dyn_arch_response.text, nullptr, false);
+  if (dynamic_architecture.is_discarded()) {
+    LOG_ERROR("Failed to parse the dynamic quantum architecture response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Received dynamic quantum architecture response: " +
             dynamic_architecture.dump());
 
   session->calibration_set_id_ =
-      dynamic_architecture["calibration_set_id"].get<std::string>();
+      dynamic_architecture.at("calibration_set_id").get<std::string>();
   LOG_INFO("Using calibration set ID: " + session->calibration_set_id_);
 
-  const auto &gates = dynamic_architecture["gates"];
+  const auto &gates = dynamic_architecture.at("gates");
   session->operations_.reserve(gates.size());
   session->operations_map_.reserve(gates.size());
   for (const auto &[gate_name, gate_details] : gates.items()) {
@@ -532,10 +543,12 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
     session->operations_ptr_.emplace_back(operation.get());
     session->operations_map_[gate_name] = operation.get();
 
-    const auto default_implementation = gate_details["default_implementation"];
-    operation->implementation_ = default_implementation.get<std::string>();
-    const auto &qubit_lists =
-        gate_details["implementations"][default_implementation]["loci"];
+    const auto default_implementation =
+        gate_details.at("default_implementation").get<std::string>();
+    operation->implementation_ = default_implementation;
+    const auto &qubit_lists = gate_details.at("implementations")
+                                  .at(default_implementation)
+                                  .at("loci");
     auto &operation_qubit_lists =
         session->operations_sites_map_[operation.get()];
     operation_qubit_lists.reserve(qubit_lists.size());
@@ -577,18 +590,23 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
     return status;
   }
   const auto calibration_json_response =
-      nlohmann::json::parse(calibration_response.text);
+      nlohmann::json::parse(calibration_response.text, nullptr, false);
+  if (calibration_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the calibration set quality metrics response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Received calibration set quality metrics response: " +
             calibration_json_response.dump());
 
-  const auto &observations = calibration_json_response["observations"];
+  const auto &observations = calibration_json_response.at("observations");
   auto metrics = std::unordered_map<std::string, double>{};
   for (const auto &observation : observations) {
-    if (observation["invalid"].get<bool>()) {
+    // Only observations that are explicitly marked invalid are skipped.
+    if (observation.value("invalid", false)) {
       continue;
     }
-    const auto &dut_field = observation["dut_field"].get<std::string>();
-    const auto value = observation["value"].get<double>();
+    const auto &dut_field = observation.at("dut_field").get<std::string>();
+    const auto value = observation.at("value").get<double>();
     metrics[dut_field] = value;
   }
 
@@ -1211,10 +1229,14 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response.text);
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the job submission response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
-  job->job_id_ = job_submission_json_response["id"];
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
@@ -1252,11 +1274,15 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
     return QDMI_ERROR_FATAL;
   }
   const auto job_submission_json_response =
-      nlohmann::json::parse(job_submission_response.text);
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the calibration job submission response");
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Calibration job submission response:\n" +
             job_submission_json_response.dump());
 
-  job->job_id_ = job_submission_json_response["id"];
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
@@ -1364,10 +1390,15 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_FATAL;
   }
   const auto job_status_json_response =
-      nlohmann::json::parse(job_status_response.text);
+      nlohmann::json::parse(job_status_response.text, nullptr, false);
+  if (job_status_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the status response for job " + job->job_id_);
+    return QDMI_ERROR_FATAL;
+  }
   LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
-  const auto job_status = job_status_json_response["status"].get<std::string>();
+  const auto job_status =
+      job_status_json_response.at("status").get<std::string>();
   if (const auto update_status = Set_job_status(job, job_status);
       update_status != QDMI_SUCCESS) {
     return update_status;
@@ -1474,13 +1505,25 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         return status;
       }
       const auto job_results_json_response =
-          nlohmann::json::parse(job_results_response.text);
+          nlohmann::json::parse(job_results_response.text, nullptr, false);
+      if (job_results_json_response.is_discarded()) {
+        LOG_ERROR("Failed to parse the results response for job " +
+                  job->job_id_);
+        return QDMI_ERROR_FATAL;
+      }
       LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
 
       // Response is an array with one result for the submitted circuit.
-      job->measurement_keys_ = job_results_json_response[0]["measurement_keys"]
-                                   .get<std::vector<std::string>>();
-      for (const auto &counts = job_results_json_response[0]["counts"];
+      if (!job_results_json_response.is_array() ||
+          job_results_json_response.empty()) {
+        LOG_ERROR("Expected a non-empty array of results for job " +
+                  job->job_id_);
+        return QDMI_ERROR_FATAL;
+      }
+      const auto &counts_result = job_results_json_response.at(0);
+      job->measurement_keys_ =
+          counts_result.at("measurement_keys").get<std::vector<std::string>>();
+      for (const auto &counts = counts_result.at("counts");
            const auto &[bitstring, count] : counts.items()) {
         job->counts_[bitstring] = count.get<size_t>();
       }
@@ -1559,19 +1602,23 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
       return status;
     }
     const auto job_calibration_json_response =
-        nlohmann::json::parse(job_calibration_response.text);
+        nlohmann::json::parse(job_calibration_response.text, nullptr, false);
+    if (job_calibration_json_response.is_discarded()) {
+      LOG_ERROR("Failed to parse the calibration status response for job " +
+                job->job_id_);
+      return QDMI_ERROR_FATAL;
+    }
     LOG_DEBUG("Calibration job status response:\n" +
               job_calibration_json_response.dump());
 
-    if (!job_calibration_json_response["result"].contains("success") ||
-        !job_calibration_json_response["result"]["success"].get<bool>()) {
+    const auto &calibration_result = job_calibration_json_response.at("result");
+    if (!calibration_result.value("success", false)) {
       LOG_ERROR("Calibration job failed");
       job->status_ = QDMI_JOB_STATUS_FAILED;
       return QDMI_ERROR_FATAL;
     }
     job->new_calibration_set_id_ =
-        job_calibration_json_response["result"]["calibration_set_id"]
-            .get<std::string>();
+        calibration_result.at("calibration_set_id").get<std::string>();
 
     // Update the dynamic quantum architecture with the new calibration set ID
     auto ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
@@ -1635,7 +1682,12 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     }
 
     const auto job_measurements_json_response =
-        nlohmann::json::parse(job_measurements_response.text);
+        nlohmann::json::parse(job_measurements_response.text, nullptr, false);
+    if (job_measurements_json_response.is_discarded()) {
+      LOG_ERROR("Failed to parse the measurements response for job " +
+                job->job_id_);
+      return QDMI_ERROR_FATAL;
+    }
     LOG_DEBUG("Job measurements response:\n" +
               job_measurements_json_response.dump());
 
