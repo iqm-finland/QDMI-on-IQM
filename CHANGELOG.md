@@ -25,6 +25,10 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Answer the first `QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION` query from the
+  submission response, which already reports the position, instead of losing it
+  to a status round trip that outlives the job's stay in the queue ([#184])
+  ([**@marcelwa**])
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
   ([**@marcelwa**])
@@ -168,6 +172,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#184]: https://github.com/iqm-finland/QDMI-on-IQM/pull/184
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
