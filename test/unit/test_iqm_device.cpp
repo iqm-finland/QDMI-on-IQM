@@ -1106,6 +1106,97 @@ TEST_F(DeviceJobMockTest, RetrievedJobPreservesPermissionFailures) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnTransportFailure) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_get_connection_error();
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
+            QDMI_ERROR_FATAL);
+
+  // An unreachable server says nothing about the job, so the next check has to
+  // query the server again instead of short-circuiting on a terminal status.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnServerError) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "queued", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_get(502, R"({"message": "Bad gateway"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
+            QDMI_ERROR_FATAL);
+
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "queued", "type": "circuit"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_QUEUED);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(503, R"({"message": "Service unavailable"})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job), QDMI_ERROR_FATAL);
+
+  // The cancellation request never reached the server, so the job is still
+  // whatever it was before and must remain observable.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobWaitRemainsRetryableAfterTransportFailure) {
+  http_stub.queue_post(200, R"({"id": "job-flaky"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  http_stub.queue_get_connection_error();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_ERROR_FATAL);
+
+  // Waiting again has to resume polling the still-running job.
+  const auto requests_before_second_wait = http_stub.get_urls().size();
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_second_wait + 1);
+
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+}
+
 TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_submission_response = R"({"id": "job-123"})";
   const std::string job_status_response = R"({"status": "ready"})";
