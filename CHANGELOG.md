@@ -166,6 +166,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
+[#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
 [#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
