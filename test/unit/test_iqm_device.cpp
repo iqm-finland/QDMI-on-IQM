@@ -1879,6 +1879,51 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationSelectsQuantumComputerByAliasOrId) {
+  const auto device_name = [](IQM_QDMI_Device_Session device_session) {
+    size_t name_size = 0;
+    EXPECT_EQ(
+        IQM_QDMI_device_session_query_device_property(
+            device_session, QDMI_DEVICE_PROPERTY_NAME, 0, nullptr, &name_size),
+        QDMI_SUCCESS);
+    std::string name(name_size, '\0');
+    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                  device_session, QDMI_DEVICE_PROPERTY_NAME, name_size,
+                  name.data(), nullptr),
+              QDMI_SUCCESS);
+    // The queried size includes the terminator that the property writes.
+    name.resize(name_size - 1);
+    return name;
+  };
+
+  const std::string qc_alias = "default";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+                qc_alias.size() + 1, qc_alias.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_EQ(device_name(session), qc_alias);
+
+  IQM_QDMI_Device_Session session_by_id = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_alloc(&session_by_id), QDMI_SUCCESS);
+  const std::string base_url = "https://localhost";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session_by_id, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+  const std::string qc_id = "01966208-f3ec-73b7-890d-100000000000";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session_by_id, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
+                qc_id.size() + 1, qc_id.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session_by_id), QDMI_SUCCESS);
+  EXPECT_EQ(device_name(session_by_id), qc_alias);
+  IQM_QDMI_device_session_free(session_by_id);
+}
+
+TEST_F(DeviceIntegrationMockTest,
        SessionInitializationRejectsIncompleteStaticArchitecture) {
   const auto expect_rejected = [this](const std::string &architecture) {
     http_stub.queue_get(200, list_quantum_computers_response);
@@ -1888,7 +1933,10 @@ TEST_F(DeviceIntegrationMockTest,
 
   expect_rejected(R"([{"connectivity":[["QB1","QB2"]]}])");
   expect_rejected(R"([{"qubits":["QB1","QB2"]}])");
+  // A short connectivity edge is an out-of-range array subscript rather than a
+  // missing key, and nlohmann does not assert on those at all.
   expect_rejected(R"([{"qubits":["QB1","QB2"],"connectivity":[["QB1"]]}])");
+  expect_rejected(R"([{"qubits":["QB1","QB2"],"connectivity":[[]]}])");
   // A truncated body must not escape as a parse error either.
   expect_rejected(R"([{"qubits":["QB1")");
 }
@@ -1995,6 +2043,10 @@ TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
   http_stub.queue_post(200, R"({"queue_position": 3})");
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
 
+  // A job ID of the wrong type must be reported, not retyped.
+  http_stub.queue_post(200, R"({"id": 5})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
   http_stub.queue_post(200, R"({"id": )");
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
 
@@ -2039,6 +2091,9 @@ TEST_F(DeviceJobMockTest, JobStatusRejectsResponsesWithoutStatus) {
   http_stub.queue_get(200, R"({"id": "job-123"})");
   EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
 
+  http_stub.queue_get(200, R"({"status": []})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
+
   http_stub.queue_get(200, R"({"status": )");
   EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
 
@@ -2068,6 +2123,10 @@ TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
 
   expect_rejected(R"([{"counts":{"0":1}}])");
   expect_rejected(R"([{"measurement_keys":["m"]}])");
+  // Values of the wrong type must be reported rather than retyped.
+  expect_rejected(R"([{"measurement_keys":[0],"counts":{"0":4}}])");
+  expect_rejected(R"([{"measurement_keys":["m"],"counts":{"0":"many"}}])");
+  // An empty array is an out-of-range subscript on the leading result object.
   expect_rejected(R"([])");
   expect_rejected(R"([{"measurement_keys":)");
 }
@@ -2094,6 +2153,68 @@ TEST_F(DeviceJobMockTest, ShotResultsRejectMalformedMeasurementResponses) {
             QDMI_ERROR_FATAL);
 }
 
+TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
+  auto &hooks = iqm::http::internal::Get_hooks();
+  auto stub_get = hooks.get;
+  auto stub_post = hooks.post;
+  const auto throw_from_transport = [&](const std::exception_ptr &exception) {
+    hooks.get = [exception](const auto &, const auto &, const auto &,
+                            const auto &, const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+    hooks.post = [exception](const auto &, const auto &, const auto &,
+                             const auto &, const auto &,
+                             const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+  };
+  const auto restore_transport = [&]() {
+    hooks.get = stub_get;
+    hooks.post = stub_post;
+  };
+  const std::array<std::pair<std::exception_ptr, int>, 4> mappings{
+      {{std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+        QDMI_ERROR_PERMISSIONDENIED},
+       {std::make_exception_ptr(std::bad_alloc{}), QDMI_ERROR_OUTOFMEM},
+       {std::make_exception_ptr(std::runtime_error{"transport failure"}),
+        QDMI_ERROR_FATAL},
+       {std::make_exception_ptr(42), QDMI_ERROR_FATAL}}};
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), expected_status);
+  }
+
+  restore_transport();
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), expected_status);
+    EXPECT_EQ(IQM_QDMI_device_job_cancel(job), expected_status);
+  }
+
+  restore_transport();
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
+
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    size_t size = 0;
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                              nullptr, &size),
+              expected_status);
+  }
+  restore_transport();
+}
+
 TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -2104,6 +2225,8 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
                 &format),
             QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id": )");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
   http_stub.queue_post(200, R"({"id": "job-123"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   http_stub.queue_get(200, R"({"status": "ready"})");
