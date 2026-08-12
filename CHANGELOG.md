@@ -26,7 +26,7 @@ releases may include breaking changes.
 ### Fixed
 
 - 🐛 Keep a job checkable when a status or cancellation request fails, instead
-  of permanently reporting a still-running job as failed ([#187] — unverified)
+  of permanently reporting a still-running job as failed ([#187])
   ([**@marcelwa**])
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
