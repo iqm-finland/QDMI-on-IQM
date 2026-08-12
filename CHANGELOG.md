@@ -28,8 +28,11 @@ releases may include breaking changes.
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
   ([**@marcelwa**])
-- 🐛 Contain exceptions during device-session initialization and leave failed
-  sessions retryable ([#175]) ([**@burgholzer**])
+- 🐛 Contain exceptions during device-session initialization and at every device
+  entry point that talks to the IQM server, check every field read from a server
+  response so that a schema change or an unreadable body is reported as an error
+  instead of corrupting memory, and leave failed sessions retryable ([#175],
+  [#188]) ([**@burgholzer**], [**@marcelwa**])
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
   RunRequest field names ([#169]) ([**@burgholzer**])
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
@@ -168,6 +171,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
