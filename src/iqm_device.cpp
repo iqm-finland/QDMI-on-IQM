@@ -1444,8 +1444,9 @@ bool IQM_QDMI_device_job_done(IQM_QDMI_Device_Job job) {
 }
 } // namespace
 
-int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
-                             const size_t timeout) try {
+// All network access happens inside IQM_QDMI_device_job_check, which contains
+// its own exceptions, so no additional guard is needed here.
+int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
   if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1492,12 +1493,6 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
     sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
   }
   return QDMI_SUCCESS;
-} catch (const iqm::ClientAuthenticationError &) {
-  return QDMI_ERROR_PERMISSIONDENIED;
-} catch (const std::bad_alloc &) {
-  return QDMI_ERROR_OUTOFMEM;
-} catch (...) {
-  return QDMI_ERROR_FATAL;
 }
 
 namespace {
