@@ -1303,7 +1303,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
 }
 } // namespace
 
-int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
+int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1326,9 +1326,15 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) {
     return IQM_QDMI_device_job_submit_calibration(job);
   }
   return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
-int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
+int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   if (job == nullptr || job->status_ == QDMI_JOB_STATUS_DONE) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1358,10 +1364,16 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
   LOG_DEBUG("Job cancellation response:\n" + job_abortion_response.text);
   LOG_INFO("Job with ID: " + job->job_id_ + " canceled");
   return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
-                              QDMI_Job_Status *status) {
+                              QDMI_Job_Status *status) try {
   if (job == nullptr || status == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1415,6 +1427,12 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   LOG_DEBUG("Job status: " + std::to_string(job->status_) +
             " (native status: " + job_status + ")");
   return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 namespace {
@@ -1426,7 +1444,8 @@ bool IQM_QDMI_device_job_done(IQM_QDMI_Device_Job job) {
 }
 } // namespace
 
-int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
+int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
+                             const size_t timeout) try {
   if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1473,6 +1492,12 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
     sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
   }
   return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 namespace {
@@ -1894,7 +1919,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
 
 int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
                                     QDMI_Job_Result result, const size_t size,
-                                    void *data, size_t *size_ret) {
+                                    void *data, size_t *size_ret) try {
   if (job == nullptr || (data != nullptr && size == 0) ||
       (result >= QDMI_JOB_RESULT_MAX && result != QDMI_JOB_RESULT_CUSTOM1 &&
        result != QDMI_JOB_RESULT_CUSTOM2 && result != QDMI_JOB_RESULT_CUSTOM3 &&
@@ -1926,6 +1951,12 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
   default:
     return QDMI_ERROR_NOTSUPPORTED;
   }
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 namespace {
@@ -1967,7 +1998,7 @@ std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
 
 int IQM_QDMI_device_session_query_device_property(
     IQM_QDMI_Device_Session session, const QDMI_Device_Property prop,
-    const size_t size, void *value, size_t *size_ret) {
+    const size_t size, void *value, size_t *size_ret) try {
   if (session == nullptr || (value != nullptr && size == 0) ||
       (prop >= QDMI_DEVICE_PROPERTY_MAX &&
        prop != QDMI_DEVICE_PROPERTY_CUSTOM1 &&
@@ -2039,6 +2070,12 @@ int IQM_QDMI_device_session_query_device_property(
                       session->calibration_set_id_.c_str(), prop, size, value,
                       size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 int IQM_QDMI_device_session_query_site_property(IQM_QDMI_Device_Session session,
