@@ -220,6 +220,14 @@ struct IQM_QDMI_Device_Job_impl_d {
   QDMI_Job_Status status_ = QDMI_JOB_STATUS_CREATED;
   /// The number of jobs ahead while this job is queued.
   std::optional<size_t> queue_position_ = std::nullopt;
+  /// @brief Whether @c queue_position_ still holds the value that the
+  ///        submission response reported.
+  /// @details A submission response is a status observation in its own right,
+  ///          so the first queue-position query can be answered from it rather
+  ///          than spending a status round trip re-deriving what the backend
+  ///          has just reported. Cleared once that value has been handed out,
+  ///          and whenever a status check supersedes it.
+  bool queue_position_from_submission_ = false;
 };
 
 /**
@@ -901,6 +909,42 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
   }
   return QDMI_SUCCESS;
 }
+
+/**
+ * @brief Adopt the queue information that a submission response already
+ *        carries.
+ * @details The response to a submission reports the job's native status and,
+ *          while the job is queued, its position in the queue. Recording both
+ *          lets the first queue-position query be answered without a status
+ *          round trip that would only re-derive what the backend has just
+ *          reported. Anything other than a queued observation is ignored, so
+ *          the job keeps the submitted status it had before.
+ * @param job The job that was just submitted.
+ * @param response The parsed submission response.
+ */
+void Adopt_submission_queue_position(IQM_QDMI_Device_Job job,
+                                     const nlohmann::json &response) {
+  const auto native_status = response.find("status");
+  if (native_status == response.end() || !native_status->is_string()) {
+    return;
+  }
+  // Run the observation through the regular mapping rather than repeating the
+  // native status names here, and keep it only if it says the job is queued.
+  const auto submitted_status = job->status_;
+  if (Set_job_status(job, native_status->get<std::string>()) != QDMI_SUCCESS ||
+      job->status_ != QDMI_JOB_STATUS_QUEUED) {
+    job->status_ = submitted_status;
+    return;
+  }
+  const auto position = response.find("queue_position");
+  if (position == response.end() || !position->is_number_unsigned()) {
+    // Queued, but without a position to report. Leave the queued status in
+    // place and let the next query fetch one.
+    return;
+  }
+  job->queue_position_ = position->get<size_t>();
+  job->queue_position_from_submission_ = true;
+}
 } // namespace
 
 int IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1122,6 +1166,17 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
                       size, value, size_ret)
   if (prop == QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION) {
+    if (job->queue_position_from_submission_) {
+      // The submission response already reported this position, so answer from
+      // it rather than spending a status round trip to re-derive it. It is
+      // handed out once; every later query observes the device again.
+      if (value != nullptr) {
+        job->queue_position_from_submission_ = false;
+      }
+      ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION, size_t,
+                                *job->queue_position_, prop, size, value,
+                                size_ret)
+    }
     QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
     const auto result = IQM_QDMI_device_job_check(job, &status);
     if (result != QDMI_SUCCESS) {
@@ -1217,16 +1272,13 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   job->job_id_ = job_submission_json_response["id"];
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
+  Adopt_submission_queue_position(job, job_submission_json_response);
+
   // Log queue position if available
   std::string log_message = "Submitted job with ID: " + job->job_id_;
-  if (job_submission_json_response.contains("queue_position")) {
-    const auto &queue_position_json =
-        job_submission_json_response["queue_position"];
-    if (queue_position_json.is_number_integer()) {
-      const auto queue_position = queue_position_json.get<int>();
-      log_message +=
-          " (queue position: " + std::to_string(queue_position) + ")";
-    }
+  if (job->queue_position_.has_value()) {
+    log_message +=
+        " (queue position: " + std::to_string(*job->queue_position_) + ")";
   }
   LOG_INFO(log_message);
 
@@ -1259,17 +1311,14 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   job->job_id_ = job_submission_json_response["id"];
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
+  Adopt_submission_queue_position(job, job_submission_json_response);
+
   // Log queue position if available
   std::string log_message =
       "Submitted calibration job with ID: " + job->job_id_;
-  if (job_submission_json_response.contains("queue_position")) {
-    const auto &queue_position_json =
-        job_submission_json_response["queue_position"];
-    if (queue_position_json.is_number_integer()) {
-      const auto queue_position = queue_position_json.get<int>();
-      log_message +=
-          " (queue position: " + std::to_string(queue_position) + ")";
-    }
+  if (job->queue_position_.has_value()) {
+    log_message +=
+        " (queue position: " + std::to_string(*job->queue_position_) + ")";
   }
   LOG_INFO(log_message);
 
@@ -1372,7 +1421,9 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
       update_status != QDMI_SUCCESS) {
     return update_status;
   }
+  // A fresh observation supersedes whatever the submission response reported.
   job->queue_position_ = std::nullopt;
+  job->queue_position_from_submission_ = false;
   if (job->status_ == QDMI_JOB_STATUS_QUEUED) {
     if (const auto position = job_status_json_response.find("queue_position");
         position != job_status_json_response.end() &&

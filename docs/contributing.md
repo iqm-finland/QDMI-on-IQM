@@ -520,9 +520,10 @@ These steps correspond to the initialization sequence described in the
 **When Job Queue Position Is Queried:**
 
 - `GET_JOB_STATUS` or `GET_CALIBRATION_JOB_STATUS`: Called for every
-  `QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION` query. The refreshed status and queue
-  position are cached together, and a value is returned only while the job is
-  queued.
+  `QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION` query except the first one after a
+  submission that already reported a queue position. The refreshed status and
+  queue position are cached together, and a value is returned only while the job
+  is queued.
 
 **After Calibration Job Completion:**
 

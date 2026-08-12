@@ -1456,6 +1456,87 @@ TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
   EXPECT_EQ(get_urls.back(), "https://localhost/api/v1/jobs/job-queue");
 }
 
+TEST_F(DeviceJobMockTest, QueuePositionFromSubmissionSkipsTheStatusRoundTrip) {
+  // The submission response reports the queue position itself, so the first
+  // query has nothing to learn from a status check.
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 3U);
+  // Before the fix this issued a status request and the position was lost
+  // whenever that request outlived the job's stay in the queue.
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission);
+
+  // The value is handed out once. The next query observes the device again.
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 1})");
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 1U);
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
+TEST_F(DeviceJobMockTest, StatusCheckSupersedesTheSubmissionQueuePosition) {
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  // An explicit check is a fresher observation than the submission response,
+  // so the position it reports is the one that must be returned afterwards.
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 7})");
+  QDMI_Job_Status status{};
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  ASSERT_EQ(status, QDMI_JOB_STATUS_QUEUED);
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 7})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 7U);
+}
+
+TEST_F(DeviceJobMockTest, SubmissionQueuePositionIgnoredWhenNotQueued) {
+  // A position alongside a status that is not "queued" or "waiting" says
+  // nothing about a queue, so the regular refresh has to happen.
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "received", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 5})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 5U);
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
 TEST_F(DeviceJobMockTest, QueuePositionRequiresQueuedJobAndKnownPosition) {
   size_t queue_position = 0;
   EXPECT_EQ(IQM_QDMI_device_job_query_property(

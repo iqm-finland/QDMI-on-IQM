@@ -375,9 +375,12 @@ including the
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
-reports the number of jobs ahead of the job while it is queued. Every property
-query refreshes the job status and queue position from the IQM server. The query
-returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
+reports the number of jobs ahead of the job while it is queued. Property queries
+refresh the job status and queue position from the IQM server, with one
+exception: when the submission response already reported the job as queued and
+gave its position, the first query answers from that instead of asking again.
+That value is returned once; every later query goes back to the server. The
+query returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
 `QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
 position.
 
