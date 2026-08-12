@@ -1322,11 +1322,10 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
       job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
-    if (status == QDMI_ERROR_PERMISSIONDENIED) {
-      return status;
-    }
-    job->status_ = QDMI_JOB_STATUS_FAILED;
-    return QDMI_ERROR_FATAL;
+    // A cancellation request that never reached the server says nothing about
+    // the job itself, which keeps running remotely. Leave the status untouched
+    // so that the job stays observable and the request can be retried.
+    return status;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
   LOG_DEBUG("Job cancellation response:\n" + job_abortion_response.text);
@@ -1357,11 +1356,10 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
       *job->session_->connection_pool_, job->session_->request_timeout_);
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
-    if (status_code == QDMI_ERROR_PERMISSIONDENIED) {
-      return status_code;
-    }
-    job->status_ = QDMI_JOB_STATUS_FAILED;
-    return QDMI_ERROR_FATAL;
+    // A failed status query says nothing about the job itself, which keeps
+    // running remotely. Leave the status untouched so that a transient server
+    // or transport failure does not permanently mark the job as failed.
+    return status_code;
   }
   const auto job_status_json_response =
       nlohmann::json::parse(job_status_response.text);
