@@ -464,18 +464,21 @@ TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
 }
 
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
-  // Check whether there are equally many sites as reported qubits
+  // The site list covers the qubits and, on Star-topology devices, the
+  // computational resonators as well, so it is at least as long as the qubit
+  // count and longer whenever the device has resonators.
   const auto sites = fomac.get_sites();
   const auto qubits_num = fomac.get_qubits_num();
-  EXPECT_EQ(sites.size(), qubits_num);
+  EXPECT_GE(sites.size(), qubits_num);
 
   const auto duration_scale_factor = fomac.get_duration_scale_factor();
   ASSERT_GT(duration_scale_factor, 0.0);
 
-  // For every site check that the site ID is less than the number of qubits.
+  // Site IDs index the site list, so they are bounded by its size rather than
+  // by the qubit count.
   for (const auto &site : sites) {
     const auto site_id = fomac.get_site_index(site);
-    EXPECT_LT(site_id, qubits_num);
+    EXPECT_LT(site_id, sites.size());
     const auto site_name = fomac.get_site_name(site);
     EXPECT_FALSE(site_name.empty());
 

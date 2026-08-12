@@ -99,6 +99,11 @@ struct IQM_QDMI_Device_Session_impl_d {
   /// Device status
   QDMI_Device_Status device_status_ = QDMI_DEVICE_STATUS_OFFLINE;
 
+  /// @brief Number of qubits on the device.
+  /// @details Distinct from @c sites_.size(), which also counts the
+  ///          computational resonators of Star-topology devices.
+  size_t num_qubits_ = 0;
+
   /// Quantum computer ID
   std::optional<std::string> quantum_computer_id_ = std::nullopt;
 
@@ -429,6 +434,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
 
   const auto &qubits = architecture["qubits"];
   const auto num_qubits = qubits.size();
+  session->num_qubits_ = num_qubits;
   LOG_INFO("Found " + std::to_string(num_qubits) + " qubits");
 
   std::vector<std::string> computational_resonators;
@@ -1947,8 +1953,10 @@ int IQM_QDMI_device_session_query_device_property(
     ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_QUEUELENGTH, size_t,
                               *queue_length, prop, size, value, size_ret)
   }
+  // Deliberately not sites_.size(): the site list also holds the computational
+  // resonators of Star-topology devices, which are not qubits.
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_QUBITSNUM, size_t,
-                            session->sites_.size(), prop, size, value, size_ret)
+                            session->num_qubits_, prop, size, value, size_ret)
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SITES, IQM_QDMI_Site,
                     session->sites_ptr_, prop, size, value, size_ret)
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_OPERATIONS, IQM_QDMI_Operation,
