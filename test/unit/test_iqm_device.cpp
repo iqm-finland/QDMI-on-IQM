@@ -1178,8 +1178,7 @@ TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
   // "00" + ',' + "111" + '\0'
   EXPECT_EQ(hist_keys_size, 7U);
 
-  // Allocate exactly what the API asked for. Before the fix this reported 6 and
-  // the write below overran the buffer by one byte.
+  // Allocate exactly what the API asked for.
   std::vector<char> hist_keys(hist_keys_size);
   ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
                                             hist_keys_size, hist_keys.data(),
