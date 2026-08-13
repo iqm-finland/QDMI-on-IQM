@@ -284,6 +284,38 @@ lcov --remove coverage.info '/usr/*' '*/test/*' '*/build/_deps/*' --output-file 
 lcov --list coverage.info
 ```
 
+**Running the tests under sanitizers:**
+
+The device does a fair amount of manual memory work — raw allocations for the
+job program and caller-supplied output buffers sized by hand — so it is worth
+running the suite under
+[AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) and
+[UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
+when touching those paths. Pass the sanitizers you want as a semicolon-separated
+list:
+
+```console
+cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DIQM_QDMI_SANITIZERS="address;undefined"
+cmake --build build-sanitizers
+ctest --test-dir build-sanitizers --output-on-failure
+```
+
+Use a build directory separate from your regular one: the flags apply to the
+external dependencies as well, so switching sanitizers on and off rebuilds
+everything.
+
+Supported values are `address`, `undefined`, `thread`, and `memory`. `thread`
+and `memory` each need their own build, as neither can be combined with
+`address`. On Windows only `address` is available, since MSVC ships no other
+sanitizer.
+
+Sanitizer findings abort the process by default, which is what makes them fail
+the test suite — an UndefinedBehaviorSanitizer diagnostic otherwise only prints
+and leaves the run green. Set `-DIQM_QDMI_SANITIZER_HALT_ON_ERROR=OFF` to
+collect every diagnostic in one run instead of stopping at the first.
+
+The same configuration runs in CI for every pull request that touches C++ code.
+
 ### C++ Code Formatting and Linting
 
 This project mostly follows the

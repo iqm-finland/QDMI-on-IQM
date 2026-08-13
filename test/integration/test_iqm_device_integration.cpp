@@ -886,6 +886,7 @@ TEST_F(QDMIIntegrationTest, JobCancellation) {
   QDMI_Job_Status status{};
   EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
   EXPECT_EQ(status, QDMI_JOB_STATUS_CANCELED);
+  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
@@ -1022,6 +1023,7 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
 
   const auto counts = FoMaC::get_histogram(job);
+  IQM_QDMI_device_job_free(job);
   size_t sum = 0;
   std::cout << "Counts: {\n";
   for (const auto &[key, count] : counts) {

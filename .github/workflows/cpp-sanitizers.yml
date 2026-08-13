@@ -1,0 +1,58 @@
+name: 🇨 • Sanitizers
+on:
+  workflow_call:
+    inputs:
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-sanitizers:
+    name: 🧪 ASan + UBSan
+    runs-on: ubuntu-24.04
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CTEST_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+      # Set up ccache for faster C++ builds
+      - name: Setup ccache
+        uses: Chocobo1/setup-ccache-action@802ec72ba1d54bbf75c52f45367253d6abec30f5 # v1.5.8
+        with:
+          prepend_symlinks_to_path: false
+          override_cache_key: c++-sanitizers
+      # Set up mold for faster C++ builds
+      - name: Setup mold
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DIQM_QDMI_SANITIZERS="address;undefined"
+      - name: Build
+        run: cmake --build build
+      # No --repeat here, unlike the regular test workflows: a sanitizer
+      # diagnostic is deterministic, and retrying until pass would hide it.
+      - name: Test
+        env:
+          IQM_BASE_URL: "https://resonance.iqm.tech"
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+          ASAN_OPTIONS: "detect_leaks=1:detect_stack_use_after_return=1:strict_string_checks=1"
+          UBSAN_OPTIONS: "print_stacktrace=1"
+        run: ctest --output-on-failure --test-dir build --timeout 900
