@@ -1325,6 +1325,9 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) {
     // A cancellation request that never reached the server says nothing about
     // the job itself, which keeps running remotely. Leave the status untouched
     // so that the job stays observable and the request can be retried.
+    LOG_DEBUG("Cancellation request for job with ID: " + job->job_id_ +
+              " failed with status " + std::to_string(status) +
+              "; keeping its status at " + std::to_string(job->status_));
     return status;
   }
   job->status_ = QDMI_JOB_STATUS_CANCELED;
@@ -1359,6 +1362,9 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
     // A failed status query says nothing about the job itself, which keeps
     // running remotely. Leave the status untouched so that a transient server
     // or transport failure does not permanently mark the job as failed.
+    LOG_DEBUG("Status query for job with ID: " + job->job_id_ +
+              " failed with status " + std::to_string(status_code) +
+              "; keeping its status at " + std::to_string(job->status_));
     return status_code;
   }
   const auto job_status_json_response =
