@@ -1502,7 +1502,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       }
     } else {
       // The keys are not guaranteed to share a length, so the buffer has to be
-      // measured from all of them. One extra byte per key covers its 
+      // measured from all of them. One extra byte per key covers its
       // separator, the last of which becomes the null terminator.
       const size_t req_size = std::transform_reduce(
           job->counts_.begin(), job->counts_.end(), job->counts_.size(),
