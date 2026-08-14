@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Take over the IQM JSON conversion and the `MoveGate` from MQT Core, which
+  removed both in v4, and advertise the converter through MQT Core's
+  `mqt.core.qiskit.program_codecs` entry point group so any QDMI backend over an
+  IQM device keeps submitting IQM JSON ([#PRNUM]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
