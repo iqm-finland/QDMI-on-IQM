@@ -46,6 +46,7 @@
 #include <new>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
+#include <numeric>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -1567,8 +1568,13 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         *data_ptr = '\0';
       }
     } else {
-      const size_t bitstring_size = job->counts_.begin()->first.length();
-      const size_t req_size = job->counts_.size() * (bitstring_size + 1);
+      // The keys are not guaranteed to share a length, so the buffer has to be
+      // measured from all of them. One extra byte per key covers its
+      // separator, the last of which becomes the null terminator.
+      const size_t req_size = std::transform_reduce(
+          job->counts_.begin(), job->counts_.end(), job->counts_.size(),
+          std::plus{},
+          [](const auto &entry) -> size_t { return entry.first.length(); });
       if (size_ret != nullptr) {
         *size_ret = req_size;
       }
