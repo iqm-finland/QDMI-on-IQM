@@ -29,6 +29,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Report the status the quantum computer is actually in, instead of pinning a
+  session to busy from its first job submission onwards ([#190])
+  ([**@marcelwa**])
 - 🐛 Keep a job checkable when a status or cancellation request fails, instead
   of permanently reporting a still-running job as failed ([#187])
   ([**@marcelwa**])
@@ -176,6 +179,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
