@@ -97,9 +97,6 @@ struct IQM_QDMI_Device_Session_impl_d {
   IQM_QDMI_DEVICE_SESSION_STATUS session_status_ =
       IQM_QDMI_DEVICE_SESSION_STATUS::ALLOCATED;
 
-  /// Device status
-  QDMI_Device_Status device_status_ = QDMI_DEVICE_STATUS_OFFLINE;
-
   /// @brief Number of qubits on the device.
   /// @details Distinct from @c sites_.size(), which also counts the
   ///          computational resonators of Star-topology devices.
@@ -724,7 +721,6 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
   session->token_manager_ = std::make_unique<iqm::TokenManager>(
       session->token_, session->tokens_file_);
   session->session_status_ = IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED;
-  session->device_status_ = QDMI_DEVICE_STATUS_IDLE;
 
   // Get the static quantum architecture via a GET request
   if (const auto ret = Process_static_quantum_architecture(session);
@@ -1317,8 +1313,6 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (!job->program_set_) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
-  job->session_->device_status_ = QDMI_DEVICE_STATUS_BUSY;
-
   if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON ||
       job->program_format_ == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
     return IQM_QDMI_device_job_submit_circuit(job);
@@ -1971,33 +1965,158 @@ constexpr std::array SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION = {
     QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
     QDMI_PROGRAM_FORMAT_CALIBRATION};
 
-std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
+/// A device with at least this many queued jobs is reported as busy. The IQM
+/// on-demand queue is FIFO and executes one job at a time, so a single queued
+/// job already occupies the device.
+constexpr size_t QUEUE_BUSY_THRESHOLD = 1;
+
+/**
+ * @brief Outcome of an optional probe against the IQM Server API.
+ */
+enum class PROBE_OUTCOME : uint8_t {
+  ANSWERED,    ///< The backend answered and the payload was understood.
+  UNSUPPORTED, ///< The backend does not expose the endpoint.
+  UNAVAILABLE, ///< The backend could not be reached, or failed the request.
+};
+
+/**
+ * @brief Payload of the queue availability endpoint.
+ */
+struct Queue_availability {
+  /// Number of queued jobs, if the payload reported one.
+  std::optional<size_t> queue_length = std::nullopt;
+  /// Whether an availability window covers the queue, if the payload listed
+  /// windows at all.
+  std::optional<bool> is_available = std::nullopt;
+};
+
+/**
+ * @brief Probe an optional per-quantum-computer endpoint.
+ * @param session Initialized device session
+ * @param endpoint Endpoint to request for this session's quantum computer
+ * @return The parsed JSON body, paired with the outcome of the probe. The body
+ *         is only meaningful for @c PROBE_OUTCOME::ANSWERED.
+ */
+std::pair<PROBE_OUTCOME, nlohmann::json>
+Probe_quantum_computer(IQM_QDMI_Device_Session session,
+                       const iqm::API_ENDPOINT endpoint) {
   if (!session->quantum_computer_id_.has_value()) {
-    return std::nullopt;
+    return {PROBE_OUTCOME::UNSUPPORTED, {}};
   }
 
-  const auto queue_url =
-      session->api_config_->url(iqm::API_ENDPOINT::GET_QUEUE_AVAILABILITY,
-                                *session->quantum_computer_id_);
-  const auto queue_response = iqm::http::Get_optional(
-      queue_url, session->token_manager_->get_bearer_token(),
+  const auto url =
+      session->api_config_->url(endpoint, *session->quantum_computer_id_);
+  const auto http_response = iqm::http::Get_optional(
+      url, session->token_manager_->get_bearer_token(),
       *session->connection_pool_, session->request_timeout_);
-  if (iqm::http::Handle_response(queue_response,
-                                 iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG) !=
-      QDMI_SUCCESS) {
-    return std::nullopt;
+  switch (iqm::http::Handle_response(
+      http_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG)) {
+  case QDMI_SUCCESS:
+    break;
+  case QDMI_ERROR_NOTFOUND:
+    // An IQM Server that predates this endpoint. Treat it as a missing signal
+    // rather than as a device that is unusable.
+    return {PROBE_OUTCOME::UNSUPPORTED, {}};
+  default:
+    return {PROBE_OUTCOME::UNAVAILABLE, {}};
   }
 
-  const auto response =
-      nlohmann::json::parse(queue_response.text, nullptr, false);
-  if (response.is_discarded() || !response.is_object() ||
-      !response.contains("queue_length") ||
-      !response["queue_length"].is_number_unsigned()) {
+  auto response = nlohmann::json::parse(http_response.text, nullptr, false);
+  if (response.is_discarded() || !response.is_object()) {
+    LOG_DEBUG("Response is not a JSON object");
+    return {PROBE_OUTCOME::UNAVAILABLE, {}};
+  }
+  return {PROBE_OUTCOME::ANSWERED, std::move(response)};
+}
+
+/**
+ * @brief Ask the IQM Server whether the quantum computer is healthy.
+ * @param session Initialized device session
+ * @return Whether the quantum computer reported itself healthy, paired with the
+ *         outcome of the probe.
+ */
+std::pair<PROBE_OUTCOME, bool>
+Get_device_health(IQM_QDMI_Device_Session session) {
+  const auto [outcome, response] = Probe_quantum_computer(
+      session, iqm::API_ENDPOINT::GET_QUANTUM_COMPUTER_HEALTH);
+  if (outcome != PROBE_OUTCOME::ANSWERED) {
+    return {outcome, false};
+  }
+  const auto healthy = response.find("healthy");
+  if (healthy == response.end() || !healthy->is_boolean()) {
+    LOG_DEBUG("Health response does not contain a boolean healthy");
+    return {PROBE_OUTCOME::UNAVAILABLE, false};
+  }
+  return {PROBE_OUTCOME::ANSWERED, healthy->get<bool>()};
+}
+
+/**
+ * @brief Ask the IQM Server about the queue of the quantum computer.
+ * @param session Initialized device session
+ * @return The queue availability, paired with the outcome of the probe.
+ */
+std::pair<PROBE_OUTCOME, Queue_availability>
+Get_queue_availability(IQM_QDMI_Device_Session session) {
+  const auto [outcome, response] = Probe_quantum_computer(
+      session, iqm::API_ENDPOINT::GET_QUEUE_AVAILABILITY);
+  if (outcome != PROBE_OUTCOME::ANSWERED) {
+    return {outcome, {}};
+  }
+
+  Queue_availability availability{};
+  const auto queue_length = response.find("queue_length");
+  if (queue_length != response.end() && queue_length->is_number_unsigned()) {
+    availability.queue_length = queue_length->get<size_t>();
+  } else {
     LOG_DEBUG("Queue availability response does not contain a non-negative "
               "integer queue_length");
-    return std::nullopt;
   }
-  return response["queue_length"].get<size_t>();
+  if (const auto available = response.find("available");
+      available != response.end() && available->is_array()) {
+    availability.is_available = !available->empty();
+  }
+  return {PROBE_OUTCOME::ANSWERED, availability};
+}
+
+std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
+  return Get_queue_availability(session).second.queue_length;
+}
+
+/**
+ * @brief Derive the device status from what the IQM Server reports right now.
+ * @details The status is deliberately not tracked locally: the quantum computer
+ *          is shared, so jobs submitted outside this session occupy it just as
+ *          much as jobs submitted through it.
+ * @param session Initialized device session
+ * @return The status to report through @c QDMI_DEVICE_PROPERTY_STATUS
+ */
+QDMI_Device_Status Get_device_status(IQM_QDMI_Device_Session session) {
+  const auto [health_outcome, healthy] = Get_device_health(session);
+  if (health_outcome == PROBE_OUTCOME::ANSWERED && !healthy) {
+    return QDMI_DEVICE_STATUS_MAINTENANCE;
+  }
+  if (health_outcome == PROBE_OUTCOME::UNAVAILABLE) {
+    // Something is wrong with the backend, so claiming an idle device would
+    // invite a submission that is bound to fail.
+    return QDMI_DEVICE_STATUS_BUSY;
+  }
+
+  const auto [queue_outcome, availability] = Get_queue_availability(session);
+  if (queue_outcome == PROBE_OUTCOME::UNAVAILABLE) {
+    return QDMI_DEVICE_STATUS_BUSY;
+  }
+  if (queue_outcome == PROBE_OUTCOME::UNSUPPORTED) {
+    // A healthy quantum computer that does not expose a queue.
+    return QDMI_DEVICE_STATUS_IDLE;
+  }
+  if (availability.is_available.has_value() && !*availability.is_available) {
+    return QDMI_DEVICE_STATUS_MAINTENANCE;
+  }
+  if (availability.queue_length.value_or(QUEUE_BUSY_THRESHOLD) >=
+      QUEUE_BUSY_THRESHOLD) {
+    return QDMI_DEVICE_STATUS_BUSY;
+  }
+  return QDMI_DEVICE_STATUS_IDLE;
 }
 } // namespace
 
@@ -2030,9 +2149,11 @@ int IQM_QDMI_device_session_query_device_property(
   // NOLINTNEXTLINE(misc-include-cleaner)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_LIBRARYVERSION, QDMI_VERSION, prop,
                       size, value, size_ret)
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_STATUS, QDMI_Device_Status,
-                            session->device_status_, prop, size, value,
-                            size_ret)
+  if (prop == QDMI_DEVICE_PROPERTY_STATUS) {
+    const auto device_status = Get_device_status(session);
+    ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_STATUS, QDMI_Device_Status,
+                              device_status, prop, size, value, size_ret)
+  }
   if (prop == QDMI_DEVICE_PROPERTY_QUEUELENGTH) {
     const auto queue_length = Get_queue_length(session);
     if (!queue_length.has_value()) {
