@@ -1106,6 +1106,97 @@ TEST_F(DeviceJobMockTest, RetrievedJobPreservesPermissionFailures) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnTransportFailure) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_get_connection_error();
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
+            QDMI_ERROR_FATAL);
+
+  // An unreachable server says nothing about the job, so the next check has to
+  // query the server again instead of short-circuiting on a terminal status.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnServerError) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "queued", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_get(502, R"({"message": "Bad gateway"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status),
+            QDMI_ERROR_FATAL);
+
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "queued", "type": "circuit"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_QUEUED);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(503, R"({"message": "Service unavailable"})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job), QDMI_ERROR_FATAL);
+
+  // The cancellation request never reached the server, so the job is still
+  // whatever it was before and must remain observable.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_RUNNING);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, JobWaitRemainsRetryableAfterTransportFailure) {
+  http_stub.queue_post(200, R"({"id": "job-flaky"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  http_stub.queue_get_connection_error();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_ERROR_FATAL);
+
+  // Waiting again has to resume polling the still-running job.
+  const auto requests_before_second_wait = http_stub.get_urls().size();
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_second_wait + 1);
+
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+}
+
 TEST_F(DeviceJobMockTest, FullLifecycle) {
   const std::string job_submission_response = R"({"id": "job-123"})";
   const std::string job_status_response = R"({"status": "ready"})";
@@ -1879,6 +1970,405 @@ TEST_F(DeviceJobMockTest, JobSubmissionFailure) {
 
   // Job submission should fail
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+}
+
+// ============================================================================
+// SCHEMA DRIFT TESTS - well-formed responses that omit expected fields
+// ============================================================================
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsQuantumComputersWithoutIdentifiers) {
+  const std::string qc_list_without_identifiers =
+      R"({"quantum_computers":[{"display_name":"x"}]})";
+
+  // No selection criteria: the first entry is used and must be identifiable.
+  http_stub.queue_get(200, qc_list_without_identifiers);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+
+  // Selection by alias.
+  const std::string alias = "default";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+                alias.size() + 1, alias.c_str()),
+            QDMI_SUCCESS);
+  http_stub.queue_get(200, qc_list_without_identifiers);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+
+  // Selection by ID takes precedence over the alias.
+  const std::string qc_id = "01966208-f3ec-73b7-890d-100000000000";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
+                qc_id.size() + 1, qc_id.c_str()),
+            QDMI_SUCCESS);
+  http_stub.queue_get(200, qc_list_without_identifiers);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationSelectsQuantumComputerByAliasOrId) {
+  const auto device_name = [](IQM_QDMI_Device_Session device_session) {
+    size_t name_size = 0;
+    EXPECT_EQ(
+        IQM_QDMI_device_session_query_device_property(
+            device_session, QDMI_DEVICE_PROPERTY_NAME, 0, nullptr, &name_size),
+        QDMI_SUCCESS);
+    std::string name(name_size, '\0');
+    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                  device_session, QDMI_DEVICE_PROPERTY_NAME, name_size,
+                  name.data(), nullptr),
+              QDMI_SUCCESS);
+    // The queried size includes the terminator that the property writes.
+    name.resize(name_size - 1);
+    return name;
+  };
+
+  const std::string qc_alias = "default";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+                qc_alias.size() + 1, qc_alias.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_EQ(device_name(session), qc_alias);
+
+  IQM_QDMI_Device_Session session_by_id = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_alloc(&session_by_id), QDMI_SUCCESS);
+  const std::string base_url = "https://localhost";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session_by_id, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                base_url.size() + 1, base_url.c_str()),
+            QDMI_SUCCESS);
+  const std::string qc_id = "01966208-f3ec-73b7-890d-100000000000";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session_by_id, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
+                qc_id.size() + 1, qc_id.c_str()),
+            QDMI_SUCCESS);
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session_by_id), QDMI_SUCCESS);
+  EXPECT_EQ(device_name(session_by_id), qc_alias);
+  IQM_QDMI_device_session_free(session_by_id);
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsIncompleteStaticArchitecture) {
+  const auto expect_rejected = [this](const std::string &architecture) {
+    http_stub.queue_get(200, list_quantum_computers_response);
+    http_stub.queue_get(200, architecture);
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  };
+
+  expect_rejected(R"([{"connectivity":[["QB1","QB2"]]}])");
+  expect_rejected(R"([{"qubits":["QB1","QB2"]}])");
+  // A short connectivity edge is an out-of-range array subscript rather than a
+  // missing key, and nlohmann does not assert on those at all.
+  expect_rejected(R"([{"qubits":["QB1","QB2"],"connectivity":[["QB1"]]}])");
+  expect_rejected(R"([{"qubits":["QB1","QB2"],"connectivity":[[]]}])");
+  // A truncated body must not escape as a parse error either.
+  expect_rejected(R"([{"qubits":["QB1")");
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsIncompleteDynamicArchitecture) {
+  const auto expect_rejected = [this](const std::string &architecture) {
+    http_stub.queue_get(200, list_quantum_computers_response);
+    http_stub.queue_get(200, get_static_quantum_architectures_response);
+    http_stub.queue_get(200, architecture);
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  };
+
+  expect_rejected(R"({"gates":{}})");
+  expect_rejected(R"({"calibration_set_id":"f0fb4be5"})");
+  expect_rejected(
+      R"({"calibration_set_id":"f0fb4be5","gates":{"cz":{"implementations":{}}}})");
+  expect_rejected(R"({"calibration_set_id":)");
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsIncompleteQualityMetrics) {
+  const auto expect_rejected = [this](const std::string &metrics) {
+    http_stub.queue_get(200, list_quantum_computers_response);
+    http_stub.queue_get(200, get_static_quantum_architectures_response);
+    http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
+    http_stub.queue_get(200, metrics);
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  };
+
+  expect_rejected(R"({"observation_set_type":"quality-metric-set"})");
+  expect_rejected(R"({"observations":[{"value":0.96,"invalid":false}]})");
+  expect_rejected(
+      R"({"observations":[{"dut_field":"characterization.model.QB1.t1_time","invalid":false}]})");
+  expect_rejected(R"({"observations":)");
+}
+
+TEST_F(DeviceIntegrationMockTest, QualityMetricObservationsMayOmitInvalidFlag) {
+  // Observations are only skipped when they are explicitly marked invalid, so
+  // a missing flag is tolerated instead of failing the initialization.
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
+  http_stub.queue_get(
+      200,
+      R"({"observations":[{"dut_field":"characterization.model.QB1.t1_time","value":0.00002}]})");
+  http_stub.queue_get(200, cocos_health_response);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  std::vector<IQM_QDMI_Site> sites(2);
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_SITES,
+                sites.size() * sizeof(IQM_QDMI_Site),
+                static_cast<void *>(sites.data()), nullptr),
+            QDMI_SUCCESS);
+  uint64_t t1 = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_query_site_property(
+                session, sites.front(), QDMI_SITE_PROPERTY_T1, sizeof(t1), &t1,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(t1, 20U);
+}
+
+TEST_F(DeviceIntegrationMockTest, QueueLengthQueryContainsCxxExceptions) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  auto &get_hook = iqm::http::internal::Get_hooks().get;
+  const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
+                                           const int expected_status) {
+    get_hook = [exception](const auto &, const auto &, const auto &,
+                           const auto &, const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+    size_t queue_length = 0;
+    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                  session, QDMI_DEVICE_PROPERTY_QUEUELENGTH,
+                  sizeof(queue_length), &queue_length, nullptr),
+              expected_status);
+  };
+
+  expect_mapped_exception(
+      std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+      QDMI_ERROR_PERMISSIONDENIED);
+  expect_mapped_exception(std::make_exception_ptr(std::bad_alloc{}),
+                          QDMI_ERROR_OUTOFMEM);
+  expect_mapped_exception(
+      std::make_exception_ptr(std::runtime_error{"transport failure"}),
+      QDMI_ERROR_FATAL);
+  expect_mapped_exception(std::make_exception_ptr(42), QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 100;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(200, R"({"queue_position": 3})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
+  // A job ID of the wrong type must be reported, not retyped.
+  http_stub.queue_post(200, R"({"id": 5})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
+  http_stub.queue_post(200, R"({"id": )");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
+  // An unreadable submission response says nothing about the remote job, so
+  // the handle stays usable and can be submitted again.
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, MalformedProgramSubmissionReturnsAnErrorCode) {
+  const auto *const invalid_circuit = R"({"invalid": json})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(invalid_circuit) + 1, invalid_circuit),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  const auto *const invalid_dd_strategy = R"({"strategy": )";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job,
+                // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+                static_cast<QDMI_Device_Job_Parameter>(
+                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3),
+                strlen(invalid_dd_strategy) + 1, invalid_dd_strategy),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceJobMockTest, JobStatusRejectsResponsesWithoutStatus) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  http_stub.queue_get(200, R"({"id": "job-123"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
+
+  http_stub.queue_get(200, R"({"status": []})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
+
+  http_stub.queue_get(200, R"({"status": )");
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_ERROR_FATAL);
+
+  // An unreadable status response does not decide the fate of the job.
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+}
+
+TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  const auto expect_rejected = [this](const std::string &counts) {
+    http_stub.queue_get(200, counts);
+    size_t size = 0;
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                              nullptr, &size),
+              QDMI_ERROR_FATAL);
+  };
+
+  expect_rejected(R"([{"counts":{"0":1}}])");
+  expect_rejected(R"([{"measurement_keys":["m"]}])");
+  // Values of the wrong type must be reported rather than retyped.
+  expect_rejected(R"([{"measurement_keys":[0],"counts":{"0":4}}])");
+  expect_rejected(R"([{"measurement_keys":["m"],"counts":{"0":"many"}}])");
+  // An empty array is an out-of-range subscript on the leading result object.
+  expect_rejected(R"([])");
+  expect_rejected(R"([{"measurement_keys":)");
+}
+
+TEST_F(DeviceJobMockTest, ShotResultsRejectMalformedMeasurementResponses) {
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  constexpr size_t shots = 1;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"([{"measurement_keys":["m"],"counts":{"0":1}}])");
+  http_stub.queue_get(200, R"([{"m": [[0)");
+  size_t size = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &size),
+            QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
+  auto &hooks = iqm::http::internal::Get_hooks();
+  auto stub_get = hooks.get;
+  auto stub_post = hooks.post;
+  const auto throw_from_transport = [&](const std::exception_ptr &exception) {
+    hooks.get = [exception](const auto &, const auto &, const auto &,
+                            const auto &, const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+    hooks.post = [exception](const auto &, const auto &, const auto &,
+                             const auto &, const auto &,
+                             const auto) -> cpr::Response {
+      std::rethrow_exception(exception);
+    };
+  };
+  const auto restore_transport = [&]() {
+    hooks.get = stub_get;
+    hooks.post = stub_post;
+  };
+  const std::array<std::pair<std::exception_ptr, int>, 4> mappings{
+      {{std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+        QDMI_ERROR_PERMISSIONDENIED},
+       {std::make_exception_ptr(std::bad_alloc{}), QDMI_ERROR_OUTOFMEM},
+       {std::make_exception_ptr(std::runtime_error{"transport failure"}),
+        QDMI_ERROR_FATAL},
+       {std::make_exception_ptr(42), QDMI_ERROR_FATAL}}};
+
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), expected_status);
+  }
+
+  restore_transport();
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), expected_status);
+    EXPECT_EQ(IQM_QDMI_device_job_cancel(job), expected_status);
+  }
+
+  restore_transport();
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
+
+  for (const auto &[exception, expected_status] : mappings) {
+    throw_from_transport(exception);
+    size_t size = 0;
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                              nullptr, &size),
+              expected_status);
+  }
+  restore_transport();
+}
+
+TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id": )");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"status": "ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+
+  const auto expect_rejected = [this](const std::string &calibration_status) {
+    http_stub.queue_get(200, calibration_status);
+    size_t size = 0;
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
+                                              nullptr, &size),
+              QDMI_ERROR_FATAL);
+  };
+
+  expect_rejected(R"({"status":"ready"})");
+  expect_rejected(R"({"result":{"success":true}})");
+  expect_rejected(R"({"result":)");
 }
 
 // ============================================================================

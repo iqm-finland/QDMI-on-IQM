@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
+  AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
+  MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
+  ([#173]) ([**@marcelwa**])
 - 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**])
 - ✨ Expose current device queue length and queued job position through QDMI,
   refreshing IQM job status for every position query ([#172])
@@ -25,12 +29,15 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Keep a job checkable when a status or cancellation request fails, instead
+  of permanently reporting a still-running job as failed ([#187])
+  ([**@marcelwa**])
 - 🐛 Fix a potential histogram buffer size mismatch ([#181]) ([**@marcelwa**])
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
   ([**@marcelwa**])
-- 🐛 Contain exceptions during device-session initialization and leave failed
-  sessions retryable ([#175]) ([**@burgholzer**])
+- 🐛 Contain exceptions so they do not escape the C interface ([#175], [#188])
+  ([**@burgholzer**], [**@marcelwa**])
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
   RunRequest field names ([#169]) ([**@burgholzer**])
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
@@ -169,10 +176,13 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
+[#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
 [#181]: https://github.com/iqm-finland/QDMI-on-IQM/pull/181
 [#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
 [#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
+[#173]: https://github.com/iqm-finland/QDMI-on-IQM/pull/173
 [#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
