@@ -37,6 +37,13 @@ jobs:
         with:
           version: "1.16.1"
 
+      # `mqt-core` is pinned to a git reference, so it is built from source and
+      # needs MLIR. Drop this once MQT Core v4 ships and the pin is a version.
+      - name: Set up MLIR
+        uses: munich-quantum-software/setup-mlir@fc08baf0a172e98008e6528d465de3b5dd99bc68 # v1.4.1
+        with:
+          llvm-version: 22.1.0
+
       - name: Build documentation with nox
         run: uvx nox -s docs
         env:
