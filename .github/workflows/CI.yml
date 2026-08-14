@@ -160,7 +160,7 @@ jobs:
       # `mqt-core` is pinned to a git reference, so it is built from source and
       # needs MLIR. Drop this once MQT Core v4 ships and the pin is a version.
       setup-mlir: true
-      llvm-version: 22.1.0
+      llvm-version: 22.1.7
 
   examples:
     name: 🐍 End-to-End Examples

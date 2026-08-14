@@ -42,7 +42,16 @@ jobs:
       - name: Set up MLIR
         uses: munich-quantum-software/setup-mlir@fc08baf0a172e98008e6528d465de3b5dd99bc68 # v1.4.1
         with:
-          llvm-version: 22.1.0
+          llvm-version: 22.1.7
+
+      # `docs/examples.md` shells out to the example scripts, which resolve
+      # their own environment through `uv run --script`. While `mqt-core` is
+      # pinned to a git reference, that resolution builds MQT Core from source
+      # and exceeds the notebook cell timeout. Building it once here puts the
+      # wheel in the uv cache, so the cell reuses it. Drop this once MQT Core v4
+      # ships and the pin is a released version.
+      - name: Warm the example script environments
+        run: uv run --script examples/mqt_bench.py --help
 
       - name: Build documentation with nox
         run: uvx nox -s docs

@@ -35,7 +35,7 @@ jobs:
       - name: Set up MLIR
         uses: munich-quantum-software/setup-mlir@fc08baf0a172e98008e6528d465de3b5dd99bc68 # v1.4.1
         with:
-          llvm-version: 22.1.0
+          llvm-version: 22.1.7
 
       - name: Run end-user examples on the simulator
         run: uvx nox -s examples -- --backend sim
