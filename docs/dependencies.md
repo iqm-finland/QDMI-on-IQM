@@ -98,7 +98,7 @@ any binary or wheel.
 
 ```{note}
 Doxygen is licensed under GNU GPL v2, but
-[documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/),
+[documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), <!-- rumdl-disable-line MD013 -->
 and are therefore not affected by the GPL. The generated documentation remains
 under the project's own license terms.
 ```
