@@ -285,7 +285,12 @@ The following properties about the device can be queried via the
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_LIBRARYVERSION`:
   The version of the QDMI library.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`: The
-  current status of the device (e.g., idle, busy).
+  current status of the device (e.g., idle, busy). It is derived from what the
+  IQM Server reports about the quantum computer at the time of the query — its
+  health, the availability of its queue, and the number of queued jobs — so it
+  accounts for jobs submitted outside of QDMI as well. A quantum computer that
+  reports itself unhealthy, or whose queue has no availability, is reported as
+  under maintenance.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUEUELENGTH`:
   The current number of jobs waiting in the selected quantum computer's queue,
   if the IQM backend exposes queue availability.

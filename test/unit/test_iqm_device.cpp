@@ -650,6 +650,160 @@ TEST_F(DeviceIntegrationMockTest, QueueLengthIsOptional) {
             QDMI_ERROR_NOTSUPPORTED);
 }
 
+TEST_F(DeviceIntegrationMockTest, IdleDeviceWithAnEmptyQueue) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  const auto requests_before = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"healthy": true})");
+  http_stub.queue_get(
+      200,
+      R"({"queue_length": 0, "available": [{"start": "2026-08-14T09:00:00Z", "end": "2026-08-14T17:00:00Z"}]})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_IDLE);
+
+  ASSERT_EQ(http_stub.get_urls().size(), requests_before + 2);
+  EXPECT_EQ(http_stub.get_urls().at(requests_before),
+            "https://localhost/api/v1/quantum-computers/"
+            "01966208-f3ec-73b7-890d-100000000000/health");
+  EXPECT_EQ(http_stub.get_urls().back(),
+            "https://localhost/api/v1/quantum-computers/"
+            "01966208-f3ec-73b7-890d-100000000000/queue-availability");
+}
+
+TEST_F(DeviceIntegrationMockTest, BusyDeviceWhileJobsAreQueued) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"healthy": true})");
+  http_stub.queue_get(200, R"({"queue_length": 1})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_BUSY);
+}
+
+TEST_F(DeviceIntegrationMockTest, StatusFollowsTheQueueRatherThanSubmissions) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  IQM_QDMI_Device_Job job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id": "job-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  // The job this session submitted has left the queue, so the device is idle
+  // again even though the job was never observed reaching a terminal status.
+  http_stub.queue_get(200, R"({"healthy": true})");
+  http_stub.queue_get(200, R"({"queue_length": 0})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_IDLE);
+
+  IQM_QDMI_device_job_free(job);
+}
+
+TEST_F(DeviceIntegrationMockTest, UnhealthyDeviceIsUnderMaintenance) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  const auto requests_before = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"healthy": false})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_MAINTENANCE);
+  // An unhealthy device is settled without asking about its queue.
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 1);
+}
+
+TEST_F(DeviceIntegrationMockTest, DeviceWithoutAvailabilityIsUnderMaintenance) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"healthy": true})");
+  http_stub.queue_get(200, R"({"queue_length": 0, "available": []})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_MAINTENANCE);
+}
+
+TEST_F(DeviceIntegrationMockTest, StatusSurvivesABackendWithoutThoseEndpoints) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get(404);
+  http_stub.queue_get(404);
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_IDLE);
+}
+
+TEST_F(DeviceIntegrationMockTest, UnreachableBackendIsNotReportedAsIdle) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get_connection_error();
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_BUSY);
+
+  // A malformed health payload is just as unusable as no response at all.
+  http_stub.queue_get(200, R"({"healthy": "yes"})");
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_BUSY);
+}
+
+TEST_F(DeviceIntegrationMockTest, QueueWithoutALengthIsNotReportedAsIdle) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  http_stub.queue_get(200, R"({"healthy": true})");
+  http_stub.queue_get(200, R"({"queue_length": "unknown"})");
+
+  QDMI_Device_Status status = QDMI_DEVICE_STATUS_OFFLINE;
+  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_STATUS, sizeof(status), &status,
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_DEVICE_STATUS_BUSY);
+}
+
 TEST_F(DeviceIntegrationMockTest, QubitCountExcludesComputationalResonators) {
   // A Star-topology device: three qubits around one computational resonator.
   http_stub.queue_get(200, list_quantum_computers_response);
