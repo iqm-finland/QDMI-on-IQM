@@ -141,7 +141,7 @@ def main() -> None:
     )
 
     log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", args.maxiter, args.shots)
-    estimator = QDMIEstimator(backend, options={"default_shots": args.shots})
+    estimator = QDMIEstimator(backend, default_shots=args.shots)
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     optimal_parameters = result.optimal_parameters
