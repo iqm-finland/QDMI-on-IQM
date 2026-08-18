@@ -71,8 +71,8 @@ iqm-sampler = "iqm.qdmi.sampler:main"
 iqm-estimator = "iqm.qdmi.estimator:main"
 
 # Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
-[project.entry-points."mqt.core.qiskit.program_codecs"]
-IQM_JSON = "iqm.qdmi.converters:qiskit_to_iqm_json"
+[project.entry-points."mqt.core.qiskit.program_serializers"]
+IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
 [dependency-groups]
 qiskit = [

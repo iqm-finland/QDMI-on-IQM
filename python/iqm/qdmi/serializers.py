@@ -15,11 +15,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Conversion of Qiskit circuits into the IQM JSON program format.
+"""Serialization of Qiskit circuits into the IQM JSON program format.
 
 MQT Core loads :func:`qiskit_to_iqm_json` through the
-``mqt.core.qiskit.program_codecs`` entry point, so any QDMI backend over an IQM
-device submits IQM JSON without naming this package.
+``mqt.core.qiskit.program_serializers`` entry point, so any QDMI backend over an
+IQM device submits IQM JSON without naming this package.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ except ImportError as e:
 from .gates import MoveGate
 
 if TYPE_CHECKING:
-    from mqt.core.qdmi import Device as QDMIDevice
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.circuit import QuantumCircuit
 
 __all__ = ["qiskit_to_iqm_json"]
@@ -51,20 +51,21 @@ def __dir__() -> list[str]:
     return __all__
 
 
-def qiskit_to_iqm_json(circuit: QuantumCircuit, device: QDMIDevice) -> str:
-    """Convert a Qiskit :class:`~qiskit.circuit.QuantumCircuit` to IQM JSON format.
+def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
+    """Serialize a Qiskit :class:`~qiskit.circuit.QuantumCircuit` into IQM JSON.
 
     The IQM JSON format is a device-specific format that encodes quantum operations
     as JSON objects with site names, operation names, and arguments.
 
     Note:
-        The conversion currently supports only operations that are natively
+        The serialization currently supports only operations that are natively
         supported by the IQM hardware. Unsupported operations will raise
         :class:`~mqt.core.plugins.qiskit.exceptions.UnsupportedOperationError`.
 
     Args:
-        circuit: The Qiskit quantum circuit to convert.
-        device: The QDMI device wrapper that provides site mapping and metadata.
+        circuit: The Qiskit quantum circuit to serialize.
+        backend: The backend that runs the circuit. Its device provides the site
+            names the format uses as loci.
 
     Returns:
         JSON string representation of the circuit in IQM format.
@@ -72,17 +73,17 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, device: QDMIDevice) -> str:
     Raises:
         UnsupportedOperationError: If the circuit contains operations not supported
             by IQM hardware.
-        TranslationError: If the conversion process fails.
+        TranslationError: If the serialization fails.
 
     Examples:
         >>> from qiskit import QuantumCircuit
         >>> import numpy as np
-        >>> from iqm.qdmi.converters import qiskit_to_iqm_json
+        >>> from iqm.qdmi.serializers import qiskit_to_iqm_json
         >>> qc = QuantumCircuit(2, 2)
         >>> qc.r(np.pi / 2, 0, 0)
         >>> qc.cz(0, 1)
         >>> qc.measure_all()
-        >>> json_str = qiskit_to_iqm_json(qc, device)
+        >>> json_str = qiskit_to_iqm_json(qc, backend)
     """
 
     def _raise_error(exception_type: type[Exception], message: str) -> None:
@@ -100,12 +101,12 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, device: QDMIDevice) -> str:
             param_names = ", ".join(sorted(p.name for p in circuit.parameters))
             msg = (
                 f"Circuit contains unbound parameters: {param_names}. "
-                "All parameters must be bound to numeric values before conversion to IQM JSON. "
+                "All parameters must be bound to numeric values before serialization to IQM JSON. "
                 "Use circuit.assign_parameters() to bind parameters."
             )
             _raise_error(UnsupportedOperationError, msg)
 
-        sites = device.sites()
+        sites = backend.device.sites()
         instructions: list[dict[str, Any]] = []
 
         for instruction in circuit.data:
@@ -193,5 +194,5 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, device: QDMIDevice) -> str:
         raise
 
     except Exception as exc:
-        msg = f"Failed to convert circuit to IQM JSON: {exc}"
+        msg = f"Failed to serialize the circuit to IQM JSON: {exc}"
         raise TranslationError(msg) from exc
