@@ -19,18 +19,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from mqt.core.plugins.qiskit.backend import QDMIBackend
 from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 
 from iqm.qdmi.qiskit import IQMBackend
 
-if TYPE_CHECKING:
-    from mqt.core.plugins.qiskit.backend import QDMIBackend
-
-_SIMULATOR_DEVICE = "MQT Core DDSIM QDMI Device"
+_SIMULATOR_DEVICE_ID = "mqt.ddsim.default"
 
 #: Optimization level used whenever a circuit is transpiled for execution
 #: (offloader local path and the `iqm-sampler` Slurm worker), so the two
@@ -45,18 +40,18 @@ def build_sampler(
     tokens_file: str | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
-) -> tuple[QDMIBackend, QDMISampler]:
-    """Build the backend and Sampler primitive to use for a sampling job.
+) -> QDMISampler:
+    """Build the Sampler primitive to use for a sampling job.
 
     Returns:
-        A tuple of the resolved backend and a Sampler primitive bound to it.
+        A Sampler primitive bound to the resolved backend, which it exposes as
+        its `backend` property.
     """
     if simulator:
-        backend = QDMIProvider().get_backend(_SIMULATOR_DEVICE)
-        return backend, QDMISampler(backend)
+        return QDMISampler(QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID))
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
-    return backend, backend.sampler()
+    return backend.sampler()
 
 
 def build_estimator(
@@ -66,15 +61,15 @@ def build_estimator(
     tokens_file: str | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
-) -> tuple[QDMIBackend, QDMIEstimator]:
-    """Build the backend and Estimator primitive to use for a VQE estimation job.
+) -> QDMIEstimator:
+    """Build the Estimator primitive to use for a VQE estimation job.
 
     Returns:
-        A tuple of the resolved backend and an Estimator primitive bound to it.
+        An Estimator primitive bound to the resolved backend, which it exposes
+        as its `backend` property.
     """
     if simulator:
-        backend = QDMIProvider().get_backend(_SIMULATOR_DEVICE)
-        return backend, QDMIEstimator(backend)
+        return QDMIEstimator(QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID))
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
-    return backend, backend.estimator()
+    return backend.estimator()
