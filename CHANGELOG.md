@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Take over the IQM JSON serialization and the `MoveGate` from MQT Core,
+  which removed both in v4, and advertise the serializer through MQT Core's
+  `mqt.core.qiskit.program_serializers` entry point group so any QDMI backend
+  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
@@ -181,6 +185,7 @@ Compatible with QDMI `v1.3.0`.
 
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
+[#189]: https://github.com/iqm-finland/QDMI-on-IQM/pull/189
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
 [#181]: https://github.com/iqm-finland/QDMI-on-IQM/pull/181
