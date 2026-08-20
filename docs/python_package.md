@@ -225,19 +225,3 @@ print(job.check())
 ```
 
 A retrieved job cannot be resubmitted, and its parameters cannot be changed.
-
-### Triggering a Calibration Run
-
-Where the quantum computer supports it, the device advertises
-`ProgramFormat.CALIBRATION` among its supported program formats, and
-`submit_calibration_job` starts a run. A calibration run executes no circuit, so
-it takes no shot count, and the optional payload is a configuration for the run:
-
-```python
-job = device.submit_calibration_job()
-```
-
-```{warning}
-A calibration run is a real operation on a shared quantum computer. Trigger one
-only with the operator's agreement.
-```

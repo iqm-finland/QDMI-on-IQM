@@ -13,7 +13,7 @@ releases may include breaking changes.
 ### Added
 
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
-  existing job by ID, and calibration-format advertisement through MQT Core's
+  existing job by ID, and its advertised program formats through MQT Core's
   Python QDMI API ([#195]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
