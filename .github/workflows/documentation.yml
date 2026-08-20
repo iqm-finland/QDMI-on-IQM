@@ -40,9 +40,9 @@ jobs:
       # `mqt-core` is pinned to a git reference, so it is built from source and
       # needs MLIR. Drop this once MQT Core v4 ships and the pin is a version.
       - name: Set up MLIR
-        uses: munich-quantum-software/setup-mlir@fc08baf0a172e98008e6528d465de3b5dd99bc68 # v1.4.1
+        uses: munich-quantum-software/setup-mlir@3f32263ce571a8b745068980f30f188b6e800763 # v1.4.2
         with:
-          llvm-version: 22.1.7
+          llvm-version: 22.1.8
 
       # `docs/examples.md` shells out to the example scripts, which resolve
       # their own environment through `uv run --script`. While `mqt-core` is

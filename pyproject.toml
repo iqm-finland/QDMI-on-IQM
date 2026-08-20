@@ -266,9 +266,9 @@ environment-pass = [
 # the pin is a released version with wheels.
 before-all = [
   "yum install -y openssl-devel",
-  "curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/latest/download/setup-mlir.sh | bash -s -- -v 22.1.7 -p /opt/llvm-22.1.7",
+  "curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/latest/download/setup-mlir.sh | bash -s -- -v 22.1.8 -p /opt/llvm-22.1.8",
 ]
-test-environment = { MLIR_DIR = "/opt/llvm-22.1.7/lib/cmake/mlir" }
+test-environment = { MLIR_DIR = "/opt/llvm-22.1.8/lib/cmake/mlir" }
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
