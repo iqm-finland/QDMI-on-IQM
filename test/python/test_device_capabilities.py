@@ -15,12 +15,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Tests for device capabilities reached through MQT Core's QDMI client API.
+"""Tests for the device's queue, job-retrieval, and calibration capabilities.
 
-The device implements queue reporting, retrieval of an existing job by its ID,
-and calibration jobs. MQT Core 3.9.0 is the first release whose Python API
-reaches all three, so these tests cover the seam between the two packages
-rather than the device internals, which `test/unit/` already covers.
+These drive the device through MQT Core's Python QDMI client, the way an
+application reaches it. `test/unit/` covers the same properties at the C API
+level, against a stubbed server.
 """
 
 from __future__ import annotations
@@ -88,10 +87,9 @@ def circuit() -> QuantumCircuit:
 def test_device_advertises_exactly_its_supported_formats(device: Device) -> None:
     """The device should advertise QIR and IQM JSON, and calibration where supported.
 
-    Calibration is the only optional format. It is advertised when the quantum
-    computer's API reports calibration support, which is what makes
-    `Device.submit_calibration_job` usable against this device at all. No test
-    calls it: a calibration run is a real operation on shared hardware.
+    Calibration is the only optional format; the device advertises it when the
+    quantum computer's API reports calibration support. No test submits one,
+    because a calibration run is a real operation on shared hardware.
     """
     formats = set(device.supported_program_formats())
 
