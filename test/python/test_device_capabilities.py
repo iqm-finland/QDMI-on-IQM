@@ -15,8 +15,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# pyright: reportArgumentType=false, reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportMissingImports=false, reportMissingModuleSource=false, reportMissingTypeStubs=false
-
 """Tests for device capabilities reached through MQT Core's QDMI client API.
 
 The device implements queue reporting, retrieval of an existing job by its ID,
