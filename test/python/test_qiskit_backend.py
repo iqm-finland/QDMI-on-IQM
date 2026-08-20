@@ -15,8 +15,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# pyright: reportArgumentType=false, reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportMissingImports=false, reportMissingModuleSource=false, reportMissingTypeStubs=false
-
 """Tests for the Qiskit-facing IQM backend wrapper."""
 
 from __future__ import annotations
@@ -264,7 +262,7 @@ def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> 
     """The bound estimator should execute a simple observable on the live IQM backend."""
     observable = SparsePauliOp("Z" * backend.num_qubits)
     transpiled_circuit = transpile(circuit, backend=backend)
-    job = backend.estimator(options={"default_shots": 32}).run([(transpiled_circuit, observable)])
+    job = backend.estimator(default_shots=32).run([(transpiled_circuit, observable)])
     result = job.result()[0]
     expectation_value = float(result.data["evs"][()])
     standard_deviation = float(result.data["stds"][()])
