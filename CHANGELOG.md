@@ -10,6 +10,12 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Submit pulse-level `RunDefinition` programs and retrieve raw sweep results,
+  including after reopening a job by ID ([#200]) ([**@marcelwa**],
+  [**@burgholzer**]).
+
 ### Changed
 
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
