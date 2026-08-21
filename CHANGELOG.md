@@ -29,6 +29,10 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Report a cancellation that the server refuses because the job already
+  finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
+  `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
+  the job interface ([#199]) ([**@marcelwa**])
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
   ([**@marcelwa**])
@@ -179,6 +183,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
