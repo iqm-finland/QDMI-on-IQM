@@ -63,6 +63,19 @@ public:
   static Logger &get_instance();
 
   /**
+   * Resolve the logging level configured in the environment.
+   *
+   * `IQM_LOG_LEVEL` names the level. `IQM_CPP_API_LOG_LEVEL` is a deprecated
+   * alias that is only consulted when `IQM_LOG_LEVEL` is unset. Recognized
+   * values are `NONE`, `ERROR`, `INFO`, and `DEBUG`; any other value disables
+   * logging.
+   *
+   * @return The configured level, or LOG_LEVEL::ERROR if neither variable is
+   * set.
+   */
+  static LOG_LEVEL level_from_environment();
+
+  /**
    * Get the current logging level.
    * @return The current logging level.
    */

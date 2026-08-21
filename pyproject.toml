@@ -251,6 +251,7 @@ environment-pass = [
   "IQM_BASE_URL",
   "IQM_QC_ALIAS",
   "IQM_TOKEN",
+  "IQM_LOG_LEVEL",
   "IQM_CPP_API_LOG_LEVEL",
 ]
 

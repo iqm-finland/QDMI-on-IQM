@@ -41,7 +41,7 @@ jobs:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+          IQM_LOG_LEVEL: "DEBUG"
 
       - name: Verify clean directory
         run: git diff --exit-code

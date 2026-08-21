@@ -22,6 +22,7 @@ job tasks.
 | `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.       |
 | `--iqm-qc-id`       | `IQM_QC_ID`          | The unique identifier of the target quantum computer. |
 | `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | The alias of the target quantum computer.             |
+| `--iqm-log-level`   | `IQM_LOG_LEVEL`      | Verbosity of the QDMI device log on the compute node. |
 
 ### Credential Security
 

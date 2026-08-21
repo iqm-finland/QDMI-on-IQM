@@ -34,18 +34,29 @@ Logger &Logger::get_instance() {
   return instance;
 }
 
-Logger::Logger()
-    : current_level_(LOG_LEVEL::ERROR), output_stream_(&std::cerr) {
-  if (const char *level_str = std::getenv("IQM_CPP_API_LOG_LEVEL")) {
-    if (const std::string level = level_str; level == "INFO") {
-      current_level_ = LOG_LEVEL::INFO;
-    } else if (level == "DEBUG") {
-      current_level_ = LOG_LEVEL::DEBUG;
-    } else if (level != "ERROR") {
-      current_level_ = LOG_LEVEL::NONE;
-    }
+LOG_LEVEL Logger::level_from_environment() {
+  const char *level_str = std::getenv("IQM_LOG_LEVEL");
+  if (level_str == nullptr) {
+    level_str = std::getenv("IQM_CPP_API_LOG_LEVEL");
   }
+  if (level_str == nullptr) {
+    return LOG_LEVEL::ERROR;
+  }
+  const std::string level = level_str;
+  if (level == "ERROR") {
+    return LOG_LEVEL::ERROR;
+  }
+  if (level == "INFO") {
+    return LOG_LEVEL::INFO;
+  }
+  if (level == "DEBUG") {
+    return LOG_LEVEL::DEBUG;
+  }
+  return LOG_LEVEL::NONE;
 }
+
+Logger::Logger()
+    : current_level_(level_from_environment()), output_stream_(&std::cerr) {}
 
 LOG_LEVEL Logger::get_level() const { return current_level_; }
 
