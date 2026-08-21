@@ -200,13 +200,13 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
 
   const auto get_response = iqm::http::Get("https://example.test/jobs",
                                            bearer_token, connection_pool);
-  const auto optional_get_response = iqm::http::Get_optional(
+  const auto probe_get_response = iqm::http::Get(
       "https://example.test/capability", bearer_token, connection_pool);
   const auto post_response = iqm::http::Post(
       "https://example.test/jobs", bearer_token, connection_pool, "{}");
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
-  EXPECT_EQ(iqm::http::Handle_response(optional_get_response), QDMI_SUCCESS);
+  EXPECT_EQ(iqm::http::Handle_response(probe_get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
 
   ASSERT_EQ(http_stub.get_bearer_tokens().size(), 2U);

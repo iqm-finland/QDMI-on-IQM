@@ -389,20 +389,6 @@ cpr::Response Get(const cpr::Url &url,
       });
 }
 
-cpr::Response Get_optional(const cpr::Url &url,
-                           const std::optional<cpr::Bearer> &bearer_token,
-                           const cpr::ConnectionPool &connection_pool,
-                           const std::chrono::milliseconds timeout) {
-  LOG_INFO("Performing GET request to " + url.str());
-  const auto &hooks = internal::Get_hooks();
-  const auto headers = internal::Make_headers();
-  return internal::Perform_with_retries(
-      url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, connection_pool, headers,
-                         remaining);
-      });
-}
-
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::ConnectionPool &connection_pool,

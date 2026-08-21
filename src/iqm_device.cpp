@@ -747,7 +747,7 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Checking whether calibration jobs are supported");
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
-  const auto cocos_health_response = iqm::http::Get_optional(
+  const auto cocos_health_response = iqm::http::Get(
       cocos_health_url, session->token_manager_->get_bearer_token(),
       *session->connection_pool_, session->request_timeout_);
   const auto status = iqm::http::Handle_response(
@@ -2015,9 +2015,9 @@ Probe_quantum_computer(IQM_QDMI_Device_Session session,
 
   const auto url =
       session->api_config_->url(endpoint, *session->quantum_computer_id_);
-  const auto http_response = iqm::http::Get_optional(
-      url, session->token_manager_->get_bearer_token(),
-      *session->connection_pool_, session->request_timeout_);
+  const auto http_response =
+      iqm::http::Get(url, session->token_manager_->get_bearer_token(),
+                     *session->connection_pool_, session->request_timeout_);
   switch (iqm::http::Handle_response(
       http_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG)) {
   case QDMI_SUCCESS:
