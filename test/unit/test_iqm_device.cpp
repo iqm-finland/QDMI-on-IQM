@@ -2159,6 +2159,32 @@ TEST_F(DeviceIntegrationMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsQuantumComputersWithoutAnAlias) {
+  // Every endpoint the device reaches after the listing is addressed by alias,
+  // so an entry that names an ID but no alias cannot be used.
+  const std::string qc_list_without_aliases =
+      R"({"quantum_computers":[{"id":"01966208-f3ec-73b7-890d-100000000000","display_name":"x"}]})";
+  const auto requests_before = http_stub.get_urls().size();
+
+  // No selection criteria: the first entry is used.
+  http_stub.queue_get(200, qc_list_without_aliases);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  // Initialization stops at the listing instead of requesting an architecture
+  // for an empty alias.
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 1);
+
+  // Selection by ID: the matching entry still has to name its alias.
+  const std::string qc_id = "01966208-f3ec-73b7-890d-100000000000";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
+                qc_id.size() + 1, qc_id.c_str()),
+            QDMI_SUCCESS);
+  http_stub.queue_get(200, qc_list_without_aliases);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 2);
+}
+
+TEST_F(DeviceIntegrationMockTest,
        SessionInitializationSelectsQuantumComputerByAliasOrId) {
   const auto device_name = [](IQM_QDMI_Device_Session device_session) {
     size_t name_size = 0;
