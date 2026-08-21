@@ -177,3 +177,91 @@ qc.measure_all()
 counts = sample(qc, shots=512, simulator=True)
 print("Counts:", counts)
 ```
+
+## Querying the Device Directly
+
+The Qiskit backend covers circuit execution, but a QDMI device also answers
+questions about itself. Open a session with MQT Core's driver to reach them.
+Constructing an {py:class}`~iqm.qdmi.qiskit.IQMBackend` registers the device
+under the stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID`, after which
+`open_device` resolves it:
+
+```python
+from mqt.core.qdmi.driver import open_device
+
+from iqm.qdmi import IQM_QDMI_DEVICE_ID
+
+device = open_device(IQM_QDMI_DEVICE_ID, token="…", custom2="emerald")
+
+print(device.status())
+print(device.supported_program_formats())
+```
+
+### Queue Length and Queue Position
+
+The device reports how busy the quantum computer is, so a client can decide
+whether to submit now or wait:
+
+```python
+waiting = device.queue_length()  # jobs waiting, excluding those executing
+```
+
+`queue_length()` returns `None` when the IQM API does not supply a trustworthy
+value. A queued job reports how many jobs are ahead of it; querying it refreshes
+the job's status first:
+
+```python
+ahead = job.queue_position  # None once the job is no longer queued
+```
+
+### Retrieving an Existing Job
+
+A job outlives the session that submitted it. Given its ID, a later session can
+pick it up again to poll, wait, cancel, or fetch results:
+
+```python
+job = device.retrieve_job_by_id("d3416f0a-…")
+print(job.check())
+```
+
+A retrieved job cannot be resubmitted, and its parameters cannot be changed.
+
+## Pulse-Level Programs
+
+The device accepts pulse-level programs in custom program format 1, as
+[Submitting Pulse-Level Jobs](usage.md#submitting-pulse-level-jobs) describes.
+Producing one means compiling circuits down to a pulse schedule, which needs
+IQM's circuit-to-pulse compiler. That compiler is a heavy dependency, so it
+comes with the optional `pulla` extra:
+
+```console
+uv pip install iqm-qdmi[pulla]
+```
+
+:::{important}
+`iqm-pulla` supports Python 3.11 to 3.14, a narrower range than `iqm-qdmi`
+itself. Outside that range the extra installs nothing and
+{py:mod}`iqm.qdmi.pulse` raises an {py:exc}`ImportError`.
+:::
+
+{py:func}`~iqm.qdmi.pulse.compile_pulse_program` opens its own connection to the
+IQM Server, because compiling needs the quantum computer's settings, chip
+topology, and calibration set:
+
+```python
+from iqm.qdmi.pulse import compile_pulse_program, decode_sweep_results
+
+program = compile_pulse_program(circuits, base_url="…", quantum_computer="emerald", shots=1024)
+```
+
+`program.payload` is what goes in as the QDMI program. Once the job is done,
+read custom job result 2 and hand the bytes back:
+
+```python
+results = decode_sweep_results(program, raw_sweep_results)
+
+print(results.circuit_measurement_results)
+```
+
+Decoding needs the run definition and compiler context that produced the
+payload, which is why {py:class}`~iqm.qdmi.pulse.PulseProgram` carries both.

@@ -50,13 +50,8 @@ target_link_libraries(
 
 # Publish the metadata consumers need to identify this separately built QDMI
 # device target and synthesize a relocatable manifest.
-set_target_properties(
-  ${QDMI_TARGET_NAME} PROPERTIES QDMI_DEVICE_ID iqm.default QDMI_DEVICE_PREFIX
-                                                            ${QDMI_PREFIX})
-set_property(
-  TARGET ${QDMI_TARGET_NAME}
-  APPEND
-  PROPERTY EXPORT_PROPERTIES QDMI_DEVICE_ID QDMI_DEVICE_PREFIX)
+configure_qdmi_device_target(TARGET ${QDMI_TARGET_NAME} ID iqm.default PREFIX
+                             ${QDMI_PREFIX})
 
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"

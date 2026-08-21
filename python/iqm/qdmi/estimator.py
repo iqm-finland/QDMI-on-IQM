@@ -70,7 +70,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.observable).open("rb") as file_obj:
         observable: SparsePauliOp = pickle.load(file_obj)  # ruff:ignore[suspicious-pickle-usage]
 
-    _, estimator = build_estimator(
+    estimator = build_estimator(
         simulator=args.simulator,
         base_url=args.base_url,
         tokens_file=args.tokens_file,
