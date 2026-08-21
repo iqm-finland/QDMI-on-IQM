@@ -47,6 +47,7 @@
  *   - iqm_tokens_file  /  --iqm-tokens-file  → IQM_TOKENS_FILE
  *   - iqm_qc_id        /  --iqm-qc-id        → IQM_QC_ID
  *   - iqm_qc_alias     /  --iqm-qc-alias     → IQM_QC_ALIAS
+ *   - iqm_log_level    /  --iqm-log-level    → IQM_LOG_LEVEL
  *
  * Additional plugstack-only arguments:
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
@@ -154,7 +155,7 @@ struct Validation_state {
 };
 
 /// All recognized configuration entries and their mappings.
-constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
+constexpr std::array<Config_mapping, 5> K_CONFIG_MAPPINGS = {{
     {.key = "iqm_base_url",
      .env_var = "IQM_BASE_URL",
      .option_name = "iqm-base-url",
@@ -171,6 +172,10 @@ constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
      .env_var = "IQM_QC_ALIAS",
      .option_name = "iqm-qc-alias",
      .option_usage = "Quantum computer alias"},
+    {.key = "iqm_log_level",
+     .env_var = "IQM_LOG_LEVEL",
+     .option_name = "iqm-log-level",
+     .option_usage = "QDMI log level: NONE, ERROR, INFO, or DEBUG"},
 }};
 
 /// Effective job values passed explicitly to the validation session.
