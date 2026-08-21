@@ -335,9 +335,13 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
     }
   }
 
-  // Fall back to raw response if no structured errors are available
+  // The raw body is unvalidated server output that can echo request content,
+  // so it is confined to the DEBUG level.
   if (!logged_structured_error && !response.text.empty()) {
-    internal::Log_error(error_log_policy, "Response: " + response.text);
+    internal::Log_error(error_log_policy,
+                        "Response carries no structured error; the raw body is "
+                        "logged at DEBUG level");
+    LOG_DEBUG("Response: " + response.text);
   }
 
   // Log IQM messages if present (might contain additional context)

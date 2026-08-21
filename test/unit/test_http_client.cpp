@@ -45,11 +45,12 @@ class LoggerCapture {
 public:
   /**
    * @brief Redirect logger output to an internal string stream.
+   * @param level Level the logger runs at while the guard is alive.
    */
-  LoggerCapture()
+  explicit LoggerCapture(const iqm::LOG_LEVEL level = iqm::LOG_LEVEL::DEBUG)
       : logger_(&iqm::Logger::get_instance()),
         original_level_(logger_->get_level()) {
-    logger_->set_level(iqm::LOG_LEVEL::DEBUG);
+    logger_->set_level(level);
     logger_->set_output(log_stream_);
   }
 
@@ -121,6 +122,24 @@ TEST(HttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   EXPECT_NE(logs.find("failed with HTTP 503 (Server Error)"),
             std::string::npos);
   EXPECT_NE(logs.find("Response: not-json"), std::string::npos);
+}
+
+TEST(HttpClientTest, RawResponseBodyStaysOutOfErrorLevelLogs) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::ERROR};
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(500, "https://example.test/jobs",
+                    R"({"access_token":"do-not-log-me"})"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+
+  const auto logs = logger_capture.str();
+  EXPECT_NE(logs.find("failed with HTTP 500 (Server Error)"),
+            std::string::npos);
+  EXPECT_NE(logs.find("the raw body is logged at DEBUG level"),
+            std::string::npos);
+  EXPECT_EQ(logs.find("do-not-log-me"), std::string::npos);
 }
 
 TEST(HttpClientTest, RedirectResponseLogsAdditionalMessages) {
