@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
+  level, and let the SPANK plugin inject it through `iqm_log_level` and
+  `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
+  ([#206]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
@@ -179,6 +183,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
