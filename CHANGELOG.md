@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
+  `sample`/`estimate`, resolving the partition from `IQM_SLURM_PARTITION` when
+  it is not passed, so a site whose quantum partition is not named `quantum` can
+  use the offloader ([#202]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
@@ -179,6 +183,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
