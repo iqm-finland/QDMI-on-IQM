@@ -33,6 +33,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cpr/connection_pool.h>
 #include <cstdint>
 #include <cstdlib>
@@ -572,6 +573,48 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
+/**
+ * @brief Convert a coherence time reported in seconds to whole microseconds.
+ * @param key The quality metric the value came from.
+ * @param seconds The value the server reported for that metric.
+ * @return The value in microseconds, or `std::nullopt` when it is negative,
+ * not finite, or too large for a `uint64_t`.
+ */
+std::optional<uint64_t> Coherence_time_in_microseconds(const std::string &key,
+                                                       double seconds) {
+  const auto microseconds = seconds * 1e6;
+  const auto upper_bound =
+      static_cast<double>(std::numeric_limits<uint64_t>::max());
+  if (!std::isfinite(microseconds) || microseconds < 0.0 ||
+      microseconds >= upper_bound) {
+    LOG_ERROR("Metric '" + key +
+              "' reports a value no coherence time can represent; ignoring it");
+    return std::nullopt;
+  }
+  return static_cast<uint64_t>(microseconds);
+}
+
+/**
+ * @brief Check that a calibrated locus holds the number of sites its gate acts
+ * on.
+ * @param gate_name The gate the locus belongs to.
+ * @param locus The locus taken from the dynamic quantum architecture.
+ * @param arity The number of sites the gate acts on.
+ * @return True when the locus holds exactly @p arity sites.
+ */
+bool Locus_has_arity(const std::string &gate_name,
+                     const std::vector<IQM_QDMI_Site_impl_d *> &locus,
+                     size_t arity) {
+  if (locus.size() == arity) [[likely]] {
+    return true;
+  }
+  LOG_ERROR("Gate '" + gate_name + "' reports a locus of " +
+            std::to_string(locus.size()) + " site(s) where " +
+            std::to_string(arity) +
+            " are expected; skipping its quality metrics");
+  return false;
+}
+
 int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   LOG_INFO(
       "Processing calibration set quality metrics for calibration set ID: " +
@@ -612,14 +655,18 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
     const std::string t1_key =
         "characterization.model." + qubit->name_ + ".t1_time";
     if (const auto t1_value = metrics.find(t1_key); t1_value != metrics.end()) {
-      // convert from seconds to us
-      qubit->t1_ = static_cast<uint64_t>(t1_value->second * 1e6);
+      if (const auto t1 =
+              Coherence_time_in_microseconds(t1_key, t1_value->second)) {
+        qubit->t1_ = *t1;
+      }
     }
     const std::string t2_key =
         "characterization.model." + qubit->name_ + ".t2_time";
     if (const auto t2_value = metrics.find(t2_key); t2_value != metrics.end()) {
-      // convert from seconds to us
-      qubit->t2_ = static_cast<uint64_t>(t2_value->second * 1e6);
+      if (const auto t2 =
+              Coherence_time_in_microseconds(t2_key, t2_value->second)) {
+        qubit->t2_ = *t2;
+      }
     }
   }
 
@@ -633,7 +680,9 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
           "metrics.ssro.measure." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 1);
+        if (!Locus_has_arity(name, qubit_list, 1)) {
+          continue;
+        }
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key = measure_key + qubit->name_ + ".fidelity";
         if (const auto metric = metrics.find(measure_qubit_key);
@@ -649,7 +698,9 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
           "metrics.rb.prx." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 1);
+        if (!Locus_has_arity(name, qubit_list, 1)) {
+          continue;
+        }
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key =
             prx_key + qubit->name_ + ".fidelity:par=d2";
@@ -666,7 +717,9 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
           "metrics.irb.cz." + operation->implementation_ + ".";
       two_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 2);
+        if (!Locus_has_arity(name, qubit_list, 2)) {
+          continue;
+        }
         const auto &qubit1 = qubit_list[0];
         const auto &qubit2 = qubit_list[1];
         const auto cz_qubit_key =

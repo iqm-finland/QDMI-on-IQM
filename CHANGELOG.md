@@ -29,6 +29,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Survive a calibration set whose gate loci or coherence times have an
+  unexpected shape, instead of reading past the reported sites or converting an
+  out-of-range value ([#204]) ([**@marcelwa**])
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
   ([**@marcelwa**])
@@ -179,6 +182,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
