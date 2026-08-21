@@ -45,6 +45,9 @@ if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_algorithms import VQEResult
 
+_DEFAULT_PARTITION = "quantum"
+_DEFAULT_NODES = 1
+
 
 def _count_to_int(count: object) -> int:
     """Convert an external count payload to a plain integer.
@@ -185,6 +188,22 @@ def _licenses_arg(licenses: str | None) -> list[str]:
     return [f"--licenses={licenses}"] if licenses else []
 
 
+def _resolve_partition(partition: str | None) -> str:
+    """Resolve the Slurm partition the `srun` job is submitted to.
+
+    The partition holding the QC nodes carries whatever name its administrator
+    gave it, so an explicit *partition* takes precedence over the
+    `IQM_SLURM_PARTITION` environment variable, which in turn takes precedence
+    over the `quantum` name the administrator guide provisions. This mirrors how
+    the QDMI-on-IQM SPANK plugin's `IQM_BASE_URL`/`IQM_QC_ID`/`IQM_QC_ALIAS`
+    variables let a site set a default once for every user.
+
+    Returns:
+        The partition name to pass to `srun`.
+    """
+    return partition or os.getenv("IQM_SLURM_PARTITION") or _DEFAULT_PARTITION
+
+
 def _run_srun(
     command: list[str],
     job_dir: Path,
@@ -258,6 +277,8 @@ def sample(
     qc_id: str | None = None,
     qc_alias: str | None = None,
     licenses: str | None = None,
+    partition: str | None = None,
+    nodes: int = _DEFAULT_NODES,
 ) -> dict[str, int]:
     """Sample from a quantum circuit.
 
@@ -288,6 +309,12 @@ def sample(
             cap concurrent jobs against a QC -- e.g. required by the SPANK
             plugin's `iqm_require_license` option. Only used when
             `local=False`.
+        partition: The Slurm partition to submit to, passed as `--partition`
+            to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
+            variable, and to `quantum` when that is unset. Only used when
+            `local=False`.
+        nodes: The number of nodes to request, passed as `--nodes` to `srun`.
+            Default is 1. Only used when `local=False`.
 
     Returns:
         A dictionary of measurement counts.
@@ -323,8 +350,8 @@ def sample(
     command = [
         "srun",
         f"--job-name={job_name}",
-        "--nodes=1",
-        "--partition=quantum",
+        f"--nodes={nodes}",
+        f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
         "iqm-sampler",
@@ -359,6 +386,8 @@ def estimate(
     qc_id: str | None = None,
     qc_alias: str | None = None,
     licenses: str | None = None,
+    partition: str | None = None,
+    nodes: int = _DEFAULT_NODES,
 ) -> VQEResult:
     """Estimate the optimal parameters for a given ansatz circuit and operator.
 
@@ -396,6 +425,12 @@ def estimate(
             cap concurrent jobs against a QC -- e.g. required by the SPANK
             plugin's `iqm_require_license` option. Only used when
             `local=False`.
+        partition: The Slurm partition to submit to, passed as `--partition`
+            to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
+            variable, and to `quantum` when that is unset. Only used when
+            `local=False`.
+        nodes: The number of nodes to request, passed as `--nodes` to `srun`.
+            Default is 1. Only used when `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -433,8 +468,8 @@ def estimate(
     command = [
         "srun",
         f"--job-name={job_name}",
-        "--nodes=1",
-        "--partition=quantum",
+        f"--nodes={nodes}",
+        f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
         "iqm-estimator",

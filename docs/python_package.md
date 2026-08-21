@@ -115,15 +115,26 @@ Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when
 submitting Slurm jobs to target simulated devices instead of real QPU hardware.
 
-### Slurm Partition Requirement
+### Selecting the Slurm Partition
 
-Both functions submit their `srun` jobs to a partition named `quantum`
-(`srun --partition=quantum ...`). This assumes the cluster has a partition of
-that exact name configured, typically gating access to nodes with the quantum
-computer exposed as a Slurm GRES resource. Ensure such a `quantum` partition
-exists before using the offloader; see the
-[SPANK plugin documentation](spank_plugin.md) for an example cluster
-configuration.
+Both functions submit their `srun` jobs to the partition gating the nodes that
+expose the quantum computer as a Slurm GRES resource. Its name is a per-site
+choice, resolved in this order:
+
+1. The `partition` keyword argument.
+2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
+   set the site's name once for every user.
+3. `quantum`, the name used throughout the
+   [SPANK plugin documentation](spank_plugin.md) and the
+   [Administrator Guide](admin_guide.md).
+
+Both functions also accept a `nodes` keyword argument, forwarded as `--nodes`
+and defaulting to a single node. It has no environment fallback: the node count
+is a per-job resource request rather than a site-wide constant.
+
+```python
+counts = sample(qc, shots=512, partition="qc-nodes", nodes=1)
+```
 
 ### Shared Jobs Directory
 
