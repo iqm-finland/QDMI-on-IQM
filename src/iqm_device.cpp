@@ -587,8 +587,8 @@ std::optional<uint64_t> Coherence_time_in_microseconds(const std::string &key,
       static_cast<double>(std::numeric_limits<uint64_t>::max());
   if (!std::isfinite(microseconds) || microseconds < 0.0 ||
       microseconds >= upper_bound) {
-    LOG_ERROR("Metric '" + key + "' reports " + std::to_string(seconds) +
-              " s, which no coherence time can represent; ignoring it");
+    LOG_ERROR("Metric '" + key +
+              "' reports a value no coherence time can represent; ignoring it");
     return std::nullopt;
   }
   return static_cast<uint64_t>(microseconds);
