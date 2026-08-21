@@ -1340,6 +1340,24 @@ TEST_F(DeviceJobMockTest, CancelingAJobThatAlreadyFinishedIsAnInvalidArgument) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest,
+       CancelRefusalWithAnUnreadableBodyKeepsItsHttpMapping) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  // Reading the error code must not change what a refusal means when there is
+  // no error code to read. A body that is not JSON at all keeps the mapping the
+  // HTTP status code alone would have produced.
+  http_stub.queue_post(403, "<html>Forbidden</html>");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_PERMISSIONDENIED);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
 TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
