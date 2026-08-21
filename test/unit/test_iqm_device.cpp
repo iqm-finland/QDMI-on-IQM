@@ -1706,6 +1706,53 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 }
 
+TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
+  // The submission response reports both the queued status and a position. QDMI
+  // requires the property to refresh anyway, so the position the server reports
+  // at query time is the one that must come back.
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 1})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 1U);
+  // The size delta is the assertion that matters: the stub never verifies that
+  // a queued response was consumed, so a value check alone passes even when no
+  // request was issued at all.
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
+TEST_F(DeviceJobMockTest, SubmissionStatusIsAdoptedOnlyWhileQueued) {
+  // A submission response reporting a terminal status must not be adopted:
+  // IQM_QDMI_device_job_check short-circuits on a job it believes is finished,
+  // so adopting it would keep the job from ever being polled.
+  http_stub.queue_post(200, R"({"id": "job-queue", "status": "failed"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 2})");
+  QDMI_Job_Status status{};
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_QUEUED);
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
 TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
   http_stub.queue_post(200, R"({"id": "job-queue"})");
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
