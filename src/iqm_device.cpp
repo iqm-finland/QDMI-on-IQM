@@ -134,12 +134,21 @@ struct IQM_QDMI_Device_Session_impl_d {
                      std::unordered_map<IQM_QDMI_Site_impl_d *, double>>
       operations_single_qubit_fidelity_map_;
 
+  /// Hash for an ordered pair of sites.
   struct Pair_hash {
+    /**
+     * @brief Combine the hashes of both elements of a pair.
+     * @param p Pair to hash
+     * @return Hash value that depends on the order of the two elements
+     */
     template <class T1, class T2>
     size_t operator()(const std::pair<T1, T2> &p) const {
-      auto hash1 = std::hash<T1>{}(p.first);
-      auto hash2 = std::hash<T2>{}(p.second);
-      return hash1 ^ hash2;
+      const size_t hash1 = std::hash<T1>{}(p.first);
+      const size_t hash2 = std::hash<T2>{}(p.second);
+      // Golden-ratio mixing as in boost::hash_combine. The shift terms keep
+      // (a, b) and (b, a) in different buckets, which matters because the
+      // two-qubit fidelity map is looked up in both orders.
+      return hash1 ^ (hash2 + 0x9e37'79b9U + (hash1 << 6U) + (hash1 >> 2U));
     }
   };
 
@@ -738,7 +747,7 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Checking whether calibration jobs are supported");
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
-  const auto cocos_health_response = iqm::http::Get_optional(
+  const auto cocos_health_response = iqm::http::Get(
       cocos_health_url, session->token_manager_->get_bearer_token(),
       *session->connection_pool_, session->request_timeout_);
   const auto status = iqm::http::Handle_response(
@@ -2006,9 +2015,9 @@ Probe_quantum_computer(IQM_QDMI_Device_Session session,
 
   const auto url =
       session->api_config_->url(endpoint, *session->quantum_computer_id_);
-  const auto http_response = iqm::http::Get_optional(
-      url, session->token_manager_->get_bearer_token(),
-      *session->connection_pool_, session->request_timeout_);
+  const auto http_response =
+      iqm::http::Get(url, session->token_manager_->get_bearer_token(),
+                     *session->connection_pool_, session->request_timeout_);
   switch (iqm::http::Handle_response(
       http_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG)) {
   case QDMI_SUCCESS:

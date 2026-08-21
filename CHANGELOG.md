@@ -29,6 +29,11 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, so a
+  response that echoes request contents no longer surfaces at the default log
+  level ([#205]) ([**@marcelwa**])
+- 🐛 Keep authentication working past January 2038 by reading JWT expiry times
+  as 64-bit values ([#205]) ([**@marcelwa**])
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
   ([**@marcelwa**])
@@ -179,6 +184,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187

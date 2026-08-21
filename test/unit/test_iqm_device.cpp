@@ -2281,6 +2281,66 @@ TEST_F(DeviceIntegrationMockTest, QualityMetricObservationsMayOmitInvalidFlag) {
   EXPECT_EQ(t1, 20U);
 }
 
+TEST_F(DeviceIntegrationMockTest, TwoQubitFidelityIsFoundInEitherSiteOrder) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  size_t operations_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_OPERATIONS, 0, nullptr,
+                &operations_size),
+            QDMI_SUCCESS);
+  std::vector<IQM_QDMI_Operation> operations(operations_size /
+                                             sizeof(IQM_QDMI_Operation));
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_OPERATIONS, operations_size,
+                static_cast<void *>(operations.data()), nullptr),
+            QDMI_SUCCESS);
+
+  const auto operation_name = [this](IQM_QDMI_Operation operation) {
+    size_t name_size = 0;
+    EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
+                  session, operation, 0, nullptr, 0, nullptr,
+                  QDMI_OPERATION_PROPERTY_NAME, 0, nullptr, &name_size),
+              QDMI_SUCCESS);
+    std::string name(name_size - 1, '\0');
+    EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
+                  session, operation, 0, nullptr, 0, nullptr,
+                  QDMI_OPERATION_PROPERTY_NAME, name_size, name.data(),
+                  nullptr),
+              QDMI_SUCCESS);
+    return name;
+  };
+  const auto cz =
+      std::ranges::find_if(operations, [&](IQM_QDMI_Operation operation) {
+        return operation_name(operation) == "cz";
+      });
+  ASSERT_NE(cz, operations.end());
+
+  std::vector<IQM_QDMI_Site> sites(2);
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_SITES,
+                sites.size() * sizeof(IQM_QDMI_Site),
+                static_cast<void *>(sites.data()), nullptr),
+            QDMI_SUCCESS);
+
+  const auto fidelity_for = [this,
+                             &cz](const std::array<IQM_QDMI_Site, 2> &locus) {
+    double fidelity = 0.0;
+    EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
+                  session, *cz, locus.size(), locus.data(), 0, nullptr,
+                  QDMI_OPERATION_PROPERTY_FIDELITY, sizeof(fidelity), &fidelity,
+                  nullptr),
+              QDMI_SUCCESS);
+    return fidelity;
+  };
+
+  // The calibration set reports the CZ fidelity for the locus QB1__QB2 only,
+  // and both site orders name the same physical gate.
+  EXPECT_DOUBLE_EQ(fidelity_for({sites[0], sites[1]}), 0.97);
+  EXPECT_DOUBLE_EQ(fidelity_for({sites[1], sites[0]}), 0.97);
+}
+
 TEST_F(DeviceIntegrationMockTest, QueueLengthQueryContainsCxxExceptions) {
   queue_successful_initialization();
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);

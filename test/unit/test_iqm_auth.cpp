@@ -20,8 +20,10 @@
 #include "iqm_auth.hpp"
 
 #include <cpr/bearer.h>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <optional>
@@ -138,6 +140,22 @@ TEST(TokenManagerTest, TimeLeftSeconds) {
 
   // An empty token
   EXPECT_EQ(iqm::TokenManager::time_left_seconds(""), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsHandlesExpiryBeyond2038) {
+  // "exp": 4102444800 is 2100-01-01T00:00:00Z, past the point where a signed
+  // 32-bit seconds count wraps.
+  constexpr int64_t expiry = 4'102'444'800;
+  const std::string token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                            "eyJleHAiOjQxMDI0NDQ4MDAsIm5iZiI6MTYyMDY3NTIwM"
+                            "CwiaWF0IjoxNjIwNjc1MjAwfQ.signature";
+
+  const auto before = static_cast<int64_t>(std::time(nullptr));
+  const auto time_left = iqm::TokenManager::time_left_seconds(token);
+  const auto after = static_cast<int64_t>(std::time(nullptr));
+
+  EXPECT_LE(expiry - after, time_left);
+  EXPECT_GE(expiry - before, time_left);
 }
 
 TEST(TokenManagerTest, ConstructorWithExplicitToken) {
