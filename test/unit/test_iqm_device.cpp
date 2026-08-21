@@ -1306,6 +1306,40 @@ TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnServerError) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest, CancelingAJobThatAlreadyFinishedIsAnInvalidArgument) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  // The server refuses to cancel a job that has already reached a terminal
+  // status. The HTTP 403 it answers with is also what an authorization failure
+  // looks like, so the error code is what tells them apart.
+  http_stub.queue_post(403, R"({"error_code": "illegal_job_status",
+                                "message": "Illegal job status"})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+
+  // The same refusal, reported through the errors array the API also uses.
+  http_stub.queue_post(403, R"({"errors": [{"error_code": "illegal_job_status",
+                                            "message": "Illegal job status"}]})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+
+  // The refusal does not say which terminal status the job reached, so the job
+  // stays observable and the next check is what learns it.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "completed", "type": "circuit"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
 TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
