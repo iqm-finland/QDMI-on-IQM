@@ -77,11 +77,13 @@ sudo scontrol reconfigure
 ```
 
 Provision the `quantum` partition itself (or whatever name you chose) as a
-regular Slurm partition gating the nodes with QC access — the
-{py:mod}`~iqm.qdmi.offloader` module submits jobs to a partition named `quantum`
-by default, so match that name unless your users configure otherwise. See the
-full option reference, including `iqm_validation_timeout`, `iqm_license_prefix`,
-and `iqm_require_license`, in
+regular Slurm partition gating the nodes with QC access. The
+{py:mod}`~iqm.qdmi.offloader` module submits to `quantum` by default; if you
+chose another name, export `IQM_SLURM_PARTITION` in your users' login
+environment so they do not have to pass it on every call — see
+[Python Package](python_package.md#selecting-the-slurm-partition). See the full
+option reference, including `iqm_validation_timeout`, `iqm_license_prefix`, and
+`iqm_require_license`, in
 [Configuration](spank_plugin.md#configuration).
 
 ## 4. Set Up Authentication
