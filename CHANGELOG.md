@@ -12,6 +12,13 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Accept pulse-level programs as `QDMI_PROGRAM_FORMAT_CUSTOM1`, submit them
+  to the IQM Server's pulse-level job endpoint, and return the raw sweep results
+  as `QDMI_JOB_RESULT_CUSTOM2`. The device now reports channel-level pulse
+  support ([#199] — unverified) ([**@marcelwa**])
+- ✨ Add a `pulla` extra and an `iqm.qdmi.pulse` module that compiles circuits
+  into a pulse-level program and decodes its results ([#199] — unverified)
+  ([**@marcelwa**])
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
   existing job by ID, and its advertised program formats through MQT Core's
   Python QDMI API ([#195]) ([**@marcelwa**])
@@ -188,6 +195,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
