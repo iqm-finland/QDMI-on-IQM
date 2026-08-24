@@ -2553,7 +2553,7 @@ TEST_F(DeviceIntegrationMockTest, TwoQubitGateLocusWithOneSiteIsSkipped) {
   http_stub.queue_get(200, cocos_health_response);
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  EXPECT_NE(log_capture.str().find("Gate 'cz' reports a locus of 1 site(s)"),
+  EXPECT_NE(log_capture.str().find("Gate 'cz' reports loci of 1 site(s)"),
             std::string::npos);
 
   // The well-formed gate in the same response keeps its fidelity.
@@ -2592,9 +2592,8 @@ TEST_F(DeviceIntegrationMockTest, SingleQubitGateLocusWithTwoSitesIsSkipped) {
   http_stub.queue_get(200, cocos_health_response);
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  EXPECT_NE(
-      log_capture.str().find("Gate 'measure' reports a locus of 2 site(s)"),
-      std::string::npos);
+  EXPECT_NE(log_capture.str().find("Gate 'measure' reports loci of 2 site(s)"),
+            std::string::npos);
 
   const auto sites = Query_sites(session);
   ASSERT_EQ(sites.size(), 2U);
@@ -2604,7 +2603,7 @@ TEST_F(DeviceIntegrationMockTest, SingleQubitGateLocusWithTwoSitesIsSkipped) {
   EXPECT_DOUBLE_EQ(fidelity, 0.99);
 }
 
-TEST_F(DeviceIntegrationMockTest, SingleQubitGateLocusWithNoSitesIsSkipped) {
+TEST_F(DeviceIntegrationMockTest, GateWithASiteLessLocusIsNotRegistered) {
   const ScopedLogCapture log_capture;
   http_stub.queue_get(200, list_quantum_computers_response);
   http_stub.queue_get(200, get_static_quantum_architectures_response);
@@ -2629,8 +2628,11 @@ TEST_F(DeviceIntegrationMockTest, SingleQubitGateLocusWithNoSitesIsSkipped) {
   http_stub.queue_get(200, cocos_health_response);
 
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  EXPECT_NE(log_capture.str().find("Gate 'prx' reports a locus of 0 site(s)"),
+  EXPECT_NE(log_capture.str().find("Gate 'prx' reports a locus without sites"),
             std::string::npos);
+
+  // The gate is gone rather than advertised with an arity of zero.
+  EXPECT_EQ(Query_operation(session, "prx"), nullptr);
 
   const auto sites = Query_sites(session);
   ASSERT_EQ(sites.size(), 2U);
@@ -2638,6 +2640,109 @@ TEST_F(DeviceIntegrationMockTest, SingleQubitGateLocusWithNoSitesIsSkipped) {
   EXPECT_EQ(Query_fidelity(session, "measure", {sites.front()}, fidelity),
             QDMI_SUCCESS);
   EXPECT_DOUBLE_EQ(fidelity, 0.96);
+}
+
+/// The flattened site list an operation reports, and its declared arity.
+struct Operation_sites {
+  size_t arity;
+  size_t total_sites;
+};
+
+Operation_sites Query_operation_sites(IQM_QDMI_Device_Session session,
+                                      IQM_QDMI_Operation operation) {
+  Operation_sites result{};
+  EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
+                session, operation, 0, nullptr, 0, nullptr,
+                QDMI_OPERATION_PROPERTY_QUBITSNUM, sizeof(result.arity),
+                &result.arity, nullptr),
+            QDMI_SUCCESS);
+  size_t sites_size = 0;
+  EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
+                session, operation, 0, nullptr, 0, nullptr,
+                QDMI_OPERATION_PROPERTY_SITES, 0, nullptr, &sites_size),
+            QDMI_SUCCESS);
+  result.total_sites = sites_size / sizeof(IQM_QDMI_Site);
+  return result;
+}
+
+TEST_F(DeviceIntegrationMockTest, GateWithLociOfDifferingSizesIsNotRegistered) {
+  const ScopedLogCapture log_capture;
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, R"({
+      "calibration_set_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+      "qubits": ["QB1", "QB2"],
+      "computational_resonators": [],
+      "gates": {
+        "cz": {
+          "implementations": {"tgss": {"loci": [["QB1", "QB2"], ["QB1"]]}},
+          "default_implementation": "tgss",
+          "override_default_implementation": {}
+        },
+        "prx": {
+          "implementations": {
+            "drag_gaussian": {"loci": [["QB1"], ["QB2"]]}
+          },
+          "default_implementation": "drag_gaussian",
+          "override_default_implementation": {}
+        }
+      }
+    })");
+  http_stub.queue_get(200, SINGLE_QUBIT_QUALITY_METRICS);
+  http_stub.queue_get(200, cocos_health_response);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_NE(log_capture.str().find("Gate 'cz' reports loci of differing sizes"),
+            std::string::npos);
+
+  // Reporting the gate would flatten three sites under an arity of two, which
+  // no caller can slice back into loci.
+  EXPECT_EQ(Query_operation(session, "cz"), nullptr);
+
+  auto *const prx = Query_operation(session, "prx");
+  ASSERT_NE(prx, nullptr);
+  const auto sites = Query_operation_sites(session, prx);
+  EXPECT_EQ(sites.arity, 1U);
+  EXPECT_EQ(sites.total_sites, 2U);
+}
+
+TEST_F(DeviceIntegrationMockTest, GateWithoutAnyLocusIsNotRegistered) {
+  const ScopedLogCapture log_capture;
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, R"({
+      "calibration_set_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+      "qubits": ["QB1", "QB2"],
+      "computational_resonators": [],
+      "gates": {
+        "prx": {
+          "implementations": {"drag_gaussian": {"loci": []}},
+          "default_implementation": "drag_gaussian",
+          "override_default_implementation": {}
+        },
+        "measure": {
+          "implementations": {"constant": {"loci": [["QB1"], ["QB2"]]}},
+          "default_implementation": "constant",
+          "override_default_implementation": {}
+        }
+      }
+    })");
+  http_stub.queue_get(200, SINGLE_QUBIT_QUALITY_METRICS);
+  http_stub.queue_get(200, cocos_health_response);
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  EXPECT_NE(log_capture.str().find("Gate 'prx' reports no loci"),
+            std::string::npos);
+
+  // Reporting the gate would leave the property interface without an arity to
+  // read off its first locus.
+  EXPECT_EQ(Query_operation(session, "prx"), nullptr);
+
+  auto *const measure = Query_operation(session, "measure");
+  ASSERT_NE(measure, nullptr);
+  const auto sites = Query_operation_sites(session, measure);
+  EXPECT_EQ(sites.arity, 1U);
+  EXPECT_EQ(sites.total_sites, 2U);
 }
 
 TEST_F(DeviceIntegrationMockTest, CoherenceTimesOutsideUint64RangeAreIgnored) {

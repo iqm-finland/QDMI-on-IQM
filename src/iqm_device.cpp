@@ -501,6 +501,42 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
+/**
+ * @brief Check that a gate's loci can be described through QDMI.
+ *
+ * The operation property interface reports a single arity for the whole gate
+ * and flattens every locus into one site list, so loci that disagree on their
+ * size cannot be sliced apart again by a caller, and a gate without loci has
+ * no arity to report at all.
+ *
+ * @param gate_name The gate the loci belong to.
+ * @param loci The loci taken from the dynamic quantum architecture.
+ * @return True when every locus holds the same non-zero number of sites.
+ */
+bool Loci_are_describable(
+    const std::string &gate_name,
+    const std::vector<std::vector<IQM_QDMI_Site_impl_d *>> &loci) {
+  if (loci.empty()) {
+    LOG_ERROR("Gate '" + gate_name + "' reports no loci; skipping the gate");
+    return false;
+  }
+  const auto arity = loci.front().size();
+  if (arity == 0) {
+    LOG_ERROR("Gate '" + gate_name +
+              "' reports a locus without sites; skipping the gate");
+    return false;
+  }
+  if (std::ranges::any_of(
+          loci, [arity](const auto &locus) { return locus.size() != arity; })) {
+    LOG_ERROR("Gate '" + gate_name +
+              "' reports loci of differing sizes where " +
+              std::to_string(arity) +
+              " site(s) are expected throughout; skipping the gate");
+    return false;
+  }
+  return true;
+}
+
 int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
   LOG_INFO("Processing calibrated gates");
   const auto bearer_token = session->token_manager_->get_bearer_token();
@@ -537,24 +573,18 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       continue; // Skip unsupported gates
     }
     LOG_DEBUG("Processing gate: " + gate_name);
-    auto &operation = session->operations_.emplace_back(
-        std::make_unique<IQM_QDMI_Operation_impl_d>());
-    operation->name_ = gate_name;
-    session->operations_ptr_.emplace_back(operation.get());
-    session->operations_map_[gate_name] = operation.get();
 
     const auto default_implementation =
         gate_details.at("default_implementation").get<std::string>();
-    operation->implementation_ = default_implementation;
     const auto &qubit_lists = gate_details.at("implementations")
                                   .at(default_implementation)
                                   .at("loci");
-    auto &operation_qubit_lists =
-        session->operations_sites_map_[operation.get()];
-    operation_qubit_lists.reserve(qubit_lists.size());
+
+    std::vector<std::vector<IQM_QDMI_Site_impl_d *>> loci;
+    loci.reserve(qubit_lists.size());
     for (const auto &qubit_list : qubit_lists) {
-      auto &qubit_list_vec = operation_qubit_lists.emplace_back();
-      qubit_list_vec.reserve(qubit_list.size());
+      auto &locus = loci.emplace_back();
+      locus.reserve(qubit_list.size());
       for (const auto &qubit : qubit_list) {
         const auto site_name = qubit.get<std::string>();
         const auto site_it = session->sites_map_.find(site_name);
@@ -567,9 +597,23 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
           LOG_ERROR(msg);
           return QDMI_ERROR_FATAL;
         }
-        qubit_list_vec.emplace_back(site_it->second);
+        locus.emplace_back(site_it->second);
       }
     }
+
+    // The operation is only registered once its loci can be reported, so that
+    // the property interface never sees a gate it cannot describe.
+    if (!Loci_are_describable(gate_name, loci)) {
+      continue;
+    }
+
+    auto &operation = session->operations_.emplace_back(
+        std::make_unique<IQM_QDMI_Operation_impl_d>());
+    operation->name_ = gate_name;
+    operation->implementation_ = default_implementation;
+    session->operations_ptr_.emplace_back(operation.get());
+    session->operations_map_[gate_name] = operation.get();
+    session->operations_sites_map_[operation.get()] = std::move(loci);
   }
   return QDMI_SUCCESS;
 }
@@ -586,7 +630,9 @@ std::optional<uint64_t> Coherence_time_in_microseconds(const std::string &key,
   const auto microseconds = seconds * 1e6;
   const auto upper_bound =
       static_cast<double>(std::numeric_limits<uint64_t>::max());
-  if (!std::isfinite(microseconds) || microseconds < 0.0 ||
+  // A value below one microsecond truncates to zero, which the site property
+  // interface already uses to mean that no coherence time was reported.
+  if (!std::isfinite(microseconds) || microseconds < 1.0 ||
       microseconds >= upper_bound) {
     LOG_ERROR("Metric '" + key +
               "' reports a value no coherence time can represent; ignoring it");
@@ -596,22 +642,26 @@ std::optional<uint64_t> Coherence_time_in_microseconds(const std::string &key,
 }
 
 /**
- * @brief Check that a calibrated locus holds the number of sites its gate acts
- * on.
- * @param gate_name The gate the locus belongs to.
- * @param locus The locus taken from the dynamic quantum architecture.
+ * @brief Check that a gate's loci hold the number of sites the gate acts on.
+ *
+ * Every locus of a registered gate holds the same number of sites, so the
+ * first one speaks for all of them.
+ *
+ * @param gate_name The gate the loci belong to.
+ * @param loci The loci taken from the dynamic quantum architecture.
  * @param arity The number of sites the gate acts on.
- * @return True when the locus holds exactly @p arity sites.
+ * @return True when the loci hold exactly @p arity sites each.
  */
-bool Locus_has_arity(const std::string &gate_name,
-                     const std::vector<IQM_QDMI_Site_impl_d *> &locus,
-                     size_t arity) {
-  if (locus.size() == arity) [[likely]] {
+bool Gate_has_arity(
+    const std::string &gate_name,
+    const std::vector<std::vector<IQM_QDMI_Site_impl_d *>> &loci,
+    size_t arity) {
+  if (!loci.empty() && loci.front().size() == arity) [[likely]] {
     return true;
   }
-  LOG_ERROR("Gate '" + gate_name + "' reports a locus of " +
-            std::to_string(locus.size()) + " site(s) where " +
-            std::to_string(arity) +
+  LOG_ERROR("Gate '" + gate_name + "' reports loci of " +
+            std::to_string(loci.empty() ? 0 : loci.front().size()) +
+            " site(s) where " + std::to_string(arity) +
             " are expected; skipping its quality metrics");
   return false;
 }
@@ -675,15 +725,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
     const auto &name = operation->name_;
     const auto &qubit_lists = session->operations_sites_map_[operation.get()];
     if (name == "measure") {
+      if (!Gate_has_arity(name, qubit_lists, 1)) {
+        continue;
+      }
       auto &single_qubit_fidelity_map =
           session->operations_single_qubit_fidelity_map_[operation.get()];
       const std::string measure_key =
           "metrics.ssro.measure." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        if (!Locus_has_arity(name, qubit_list, 1)) {
-          continue;
-        }
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key = measure_key + qubit->name_ + ".fidelity";
         if (const auto metric = metrics.find(measure_qubit_key);
@@ -693,15 +743,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       }
     }
     if (name == "prx") {
+      if (!Gate_has_arity(name, qubit_lists, 1)) {
+        continue;
+      }
       auto &single_qubit_fidelity_map =
           session->operations_single_qubit_fidelity_map_[operation.get()];
       const std::string prx_key =
           "metrics.rb.prx." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        if (!Locus_has_arity(name, qubit_list, 1)) {
-          continue;
-        }
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key =
             prx_key + qubit->name_ + ".fidelity:par=d2";
@@ -712,15 +762,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       }
     }
     if (name == "cz") {
+      if (!Gate_has_arity(name, qubit_lists, 2)) {
+        continue;
+      }
       auto &two_qubit_fidelity_map =
           session->operations_two_qubit_fidelity_map_[operation.get()];
       const std::string cz_key =
           "metrics.irb.cz." + operation->implementation_ + ".";
       two_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        if (!Locus_has_arity(name, qubit_list, 2)) {
-          continue;
-        }
         const auto &qubit1 = qubit_list[0];
         const auto &qubit2 = qubit_list[1];
         const auto cz_qubit_key =
@@ -2351,7 +2401,8 @@ int IQM_QDMI_device_session_query_operation_property(
        prop != QDMI_OPERATION_PROPERTY_CUSTOM3 &&
        prop != QDMI_OPERATION_PROPERTY_CUSTOM4 &&
        prop != QDMI_OPERATION_PROPERTY_CUSTOM5) ||
-      !session->operations_sites_map_.contains(operation)) {
+      !session->operations_sites_map_.contains(operation) ||
+      session->operations_sites_map_.at(operation).empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   // General properties
@@ -2360,7 +2411,6 @@ int IQM_QDMI_device_session_query_operation_property(
 
   const auto &available_sites_for_op =
       session->operations_sites_map_.at(operation);
-  assert(!available_sites_for_op.empty());
   const auto num_op_sites = available_sites_for_op.front().size();
   ADD_SINGLE_VALUE_PROPERTY(QDMI_OPERATION_PROPERTY_QUBITSNUM, size_t,
                             num_op_sites, prop, size, value, size_ret)
