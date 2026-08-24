@@ -36,6 +36,11 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, keeping
+  only their size and content type at the default log level ([#205])
+  ([**@marcelwa**])
+- 🐛 Keep authentication working past January 2038 by reading JWT expiry times
+  as 64-bit values ([#205]) ([**@marcelwa**])
 - 🐛 Survive a calibration set whose gate loci or coherence times have an
   unexpected shape, dropping the affected gate or metric instead of crashing or
   misreporting it ([#204]) ([**@marcelwa**])
@@ -200,6 +205,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
+[#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195

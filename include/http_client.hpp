@@ -68,24 +68,6 @@ cpr::Response Get(const cpr::Url &url,
                   std::chrono::milliseconds timeout = std::chrono::hours{1});
 
 /**
- * @brief Perform an optional HTTP GET request.
- *
- * Behaves like Get(), but downgrades non-success logging for capability
- * probes where missing endpoints are expected.
- *
- * @param url The target URL for the GET request.
- * @param bearer_token Bearer token used for authentication, if configured.
- * @param connection_pool Connection pool shared by the owning device session.
- * @param timeout Overall timeout for the request and any rate-limit retries.
- * @return CPR response object.
- */
-cpr::Response
-Get_optional(const cpr::Url &url,
-             const std::optional<cpr::Bearer> &bearer_token,
-             const cpr::ConnectionPool &connection_pool,
-             std::chrono::milliseconds timeout = std::chrono::hours{1});
-
-/**
  * @brief Perform an HTTP POST request.
  *
  * Sends an HTTP POST request to the specified URL with a JSON body. The
