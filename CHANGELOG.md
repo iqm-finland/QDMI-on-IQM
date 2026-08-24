@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- ✅ Cover the device's queue length, a queued job's position, retrieval of an
+  existing job by ID, and its advertised program formats through MQT Core's
+  Python QDMI API ([#195]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
@@ -54,6 +57,12 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
+  and its explicit sampler and estimator shot and precision defaults ([#195])
+  ([**@marcelwa**])
+- ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
+  prefix through QDMI's `configure_qdmi_device_target` ([#195])
+  ([**@marcelwa**])
 - ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
   setup during initialization and subsequent requests ([#163])
   ([**@burgholzer**])
@@ -184,6 +193,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
+[#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187

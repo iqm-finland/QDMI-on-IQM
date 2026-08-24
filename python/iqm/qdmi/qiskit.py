@@ -21,13 +21,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
 
 try:
-    from mqt.core.fomac import DeviceDefinition, open_device, register_device_if_absent
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-    from mqt.core.plugins.qiskit.sampler import QDMISampler
+    from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -95,21 +92,3 @@ class IQMBackend(QDMIBackend):
             custom2=resolved_qc_alias,
         )
         super().__init__(device=device)
-
-    def sampler(
-        self,
-        *,
-        default_shots: int = 1024,
-        options: dict[str, Any] | None = None,
-    ) -> QDMISampler:
-        """Returns SamplerV2 primitive bound to this backend."""
-        return QDMISampler(self, default_shots=default_shots, options=options)
-
-    def estimator(
-        self,
-        *,
-        default_precision: float = 0.0,
-        options: dict[str, Any] | None = None,
-    ) -> QDMIEstimator:
-        """Returns an EstimatorV2 primitive bound to this backend."""
-        return QDMIEstimator(self, default_precision=default_precision, options=options)

@@ -37,18 +37,14 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 from mqt.bench import BenchmarkLevel, get_benchmark
-from mqt.core.plugins.qiskit.provider import QDMIProvider
+from mqt.core.plugins.qiskit.backend import QDMIBackend
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit.quantum_info import hellinger_fidelity
 
 from iqm.qdmi.qiskit import IQMBackend
-
-if TYPE_CHECKING:
-    from mqt.core.plugins.qiskit.backend import QDMIBackend
 
 log = logging.getLogger(__name__)
 
@@ -128,7 +124,7 @@ BENCHMARKS: dict[str, BenchmarkConfig] = {
 def _build_backend(backend_name: str) -> QDMIBackend:
     if backend_name == "iqm":
         return IQMBackend()
-    return QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+    return QDMIBackend.from_device_id("mqt.ddsim.default")
 
 
 def _describe_result(key: str, counts: dict[str, int], num_qubits: int, shots: int) -> str:

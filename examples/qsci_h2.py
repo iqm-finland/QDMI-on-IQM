@@ -42,8 +42,8 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import scipy.linalg as sla
+from mqt.core.plugins.qiskit.backend import QDMIBackend
 from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-from mqt.core.plugins.qiskit.provider import QDMIProvider
 from mqt.core.plugins.qiskit.sampler import QDMISampler
 from pyscf import ao2mo, gto, scf
 from qiskit.compiler import transpile
@@ -93,7 +93,7 @@ def main() -> None:
     )
 
     log.info("Initialising '%s' backend...", args.backend)
-    backend = IQMBackend() if args.backend == "iqm" else QDMIProvider().get_backend("MQT Core DDSIM QDMI Device")
+    backend = IQMBackend() if args.backend == "iqm" else QDMIBackend.from_device_id("mqt.ddsim.default")
     log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
 
     log.info("Setting up H2 problem (atom='%s', basis='%s')...", ATOM.strip(), BASIS)
@@ -141,7 +141,7 @@ def main() -> None:
     )
 
     log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", args.maxiter, args.shots)
-    estimator = QDMIEstimator(backend, options={"default_shots": args.shots})
+    estimator = QDMIEstimator(backend, default_shots=args.shots)
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     optimal_parameters = result.optimal_parameters
