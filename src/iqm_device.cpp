@@ -146,10 +146,14 @@ struct IQM_QDMI_Device_Session_impl_d {
     size_t operator()(const std::pair<T1, T2> &p) const {
       const size_t hash1 = std::hash<T1>{}(p.first);
       const size_t hash2 = std::hash<T2>{}(p.second);
-      // Golden-ratio mixing as in boost::hash_combine. The shift terms keep
-      // (a, b) and (b, a) in different buckets, which matters because the
-      // two-qubit fidelity map is looked up in both orders.
-      return hash1 ^ (hash2 + 0x9e37'79b9U + (hash1 << 6U) + (hash1 >> 2U));
+      // Golden-ratio mixing as in boost::hash_combine, sized to the hash
+      // width. A plain XOR gives (a, b) and (b, a) the same hash, and the
+      // two-qubit fidelity map holds both orderings of neighbouring sites, so
+      // every such pair lands in one bucket. Key equality still tells them
+      // apart; this only keeps the buckets from degenerating into lists.
+      constexpr auto golden_ratio = static_cast<size_t>(
+          sizeof(size_t) >= 8 ? 0x9e37'79b9'7f4a'7c15ULL : 0x9e37'79b9ULL);
+      return hash1 ^ (hash2 + golden_ratio + (hash1 << 6U) + (hash1 >> 2U));
     }
   };
 

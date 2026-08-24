@@ -34,7 +34,8 @@ releases may include breaking changes.
 
 - 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, so a
   response that echoes request contents no longer surfaces at the default log
-  level ([#205]) ([**@marcelwa**])
+  level, while still reporting the body's size and content type at `ERROR` so an
+  opaque upstream failure stays diagnosable ([#205]) ([**@marcelwa**])
 - 🐛 Keep authentication working past January 2038 by reading JWT expiry times
   as 64-bit values ([#205]) ([**@marcelwa**])
 - 🐛 Report a cancellation that the server refuses because the job already

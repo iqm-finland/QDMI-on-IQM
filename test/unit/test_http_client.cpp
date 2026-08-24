@@ -33,6 +33,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -83,11 +84,15 @@ private:
 };
 
 cpr::Response Make_response(const int64_t status_code, std::string url,
-                            std::string body) {
+                            std::string body,
+                            const std::string &content_type = "") {
   cpr::Response response;
   response.status_code = status_code;
   response.url = cpr::Url{std::move(url)};
   response.text = std::move(body);
+  if (!content_type.empty()) {
+    response.header["Content-Type"] = content_type;
+  }
   return response;
 }
 
@@ -126,10 +131,10 @@ TEST(HttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
 
 TEST(HttpClientTest, RawResponseBodyStaysOutOfErrorLevelLogs) {
   const LoggerCapture logger_capture{iqm::LOG_LEVEL::ERROR};
+  constexpr auto body = R"({"access_token":"do-not-log-me"})";
 
   const auto ret = iqm::http::Handle_response(
-      Make_response(500, "https://example.test/jobs",
-                    R"({"access_token":"do-not-log-me"})"),
+      Make_response(500, "https://example.test/jobs", body, "application/json"),
       iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
 
   EXPECT_EQ(ret, QDMI_ERROR_FATAL);
@@ -137,9 +142,38 @@ TEST(HttpClientTest, RawResponseBodyStaysOutOfErrorLevelLogs) {
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("failed with HTTP 500 (Server Error)"),
             std::string::npos);
-  EXPECT_NE(logs.find("the raw body is logged at DEBUG level"),
-            std::string::npos);
   EXPECT_EQ(logs.find("do-not-log-me"), std::string::npos);
+
+  // The shape of the body still reaches the default log level, so an opaque
+  // upstream failure remains diagnosable without raising verbosity.
+  EXPECT_NE(logs.find("Response carries no structured error: " +
+                      std::to_string(std::string_view{body}.size()) +
+                      " byte(s) of application/json"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, UntypedResponseBodyIsReportedWithoutAContentType) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::ERROR};
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(502, "https://example.test/jobs", "<html>gateway</html>"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+  EXPECT_NE(logger_capture.str().find("20 byte(s) of an unnamed content type"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, RawResponseBodyReachesDebugLevelLogs) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::DEBUG};
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(500, "https://example.test/jobs", "opaque-upstream-detail"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+  EXPECT_NE(logger_capture.str().find("Response: opaque-upstream-detail"),
+            std::string::npos);
 }
 
 TEST(HttpClientTest, RedirectResponseLogsAdditionalMessages) {
