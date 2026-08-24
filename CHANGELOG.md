@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
+  level, injected by the SPANK plugin through `iqm_log_level` and
+  `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
+  ([#206]) ([**@marcelwa**])
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
   existing job by ID, and its advertised program formats through MQT Core's
   Python QDMI API ([#195]) ([**@marcelwa**])
@@ -200,6 +204,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199

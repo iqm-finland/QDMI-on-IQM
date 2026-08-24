@@ -19,21 +19,70 @@
 
 #include "logging.hpp"
 
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <optional>
 #include <sstream>
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 
-// NOTE: The logger is a singleton, and its log level is set on the first call
-// to get_instance() based on the IQM_CPP_API_LOG_LEVEL environment variable.
-// Because gtest runs all tests in a single process, it's not possible to test
-// different log levels by setting the environment variable in different tests,
-// as the logger will only be initialized once.
-//
-// This test checks the default behavior, where the log level is ERROR.
-// To test other log levels, you would need to run tests in separate processes,
-// for example by using ctest with the --repeat-until-fail option and setting
-// the environment variable before running the test executable.
+namespace {
+int Set_env_var_raw(const char *key, const char *value) {
+#ifdef _WIN32
+  return _putenv_s(key, value);
+#else
+  return setenv(key, value, 1);
+#endif
+}
+
+int Unset_env_var_raw(const char *key) {
+#ifdef _WIN32
+  return _putenv_s(key, "");
+#else
+  return unsetenv(key);
+#endif
+}
+
+class ScopedEnvVar {
+public:
+  ScopedEnvVar(const char *key, const char *value) : key_(key) {
+    if (const char *existing_value = std::getenv(key);
+        existing_value != nullptr) {
+      previous_value_ = existing_value;
+    }
+    if (value != nullptr) {
+      EXPECT_EQ(Set_env_var_raw(key, value), 0);
+    } else {
+      EXPECT_EQ(Unset_env_var_raw(key), 0);
+    }
+  }
+
+  ScopedEnvVar(const ScopedEnvVar &) = delete;
+  ScopedEnvVar &operator=(const ScopedEnvVar &) = delete;
+  ScopedEnvVar(ScopedEnvVar &&) = delete;
+  ScopedEnvVar &operator=(ScopedEnvVar &&) = delete;
+
+  ~ScopedEnvVar() {
+    // Restore original process env var state for test isolation.
+    if (previous_value_.has_value()) {
+      static_cast<void>(
+          Set_env_var_raw(key_.c_str(), previous_value_->c_str()));
+    } else {
+      static_cast<void>(Unset_env_var_raw(key_.c_str()));
+    }
+  }
+
+private:
+  std::string key_;
+  std::optional<std::string> previous_value_;
+};
+} // namespace
+
+// NOTE: The logger is a singleton, and its own level is set on the first call
+// to get_instance(). Because gtest runs all tests in a single process, the
+// environment is exercised through level_from_environment() rather than
+// through repeated construction of the singleton.
 
 TEST(LoggingTest, DefaultLogLevel) {
   std::stringstream log_stream{};
@@ -54,4 +103,70 @@ TEST(LoggingTest, DefaultLogLevel) {
 
   // Restore original output stream
   logger.set_output(std::cerr);
+}
+
+TEST(LoggingTest, LogLevelIsReadFromTheEnvironment) {
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", nullptr);
+  const auto level_for = [](const char *value) {
+    const ScopedEnvVar variable("IQM_LOG_LEVEL", value);
+    return iqm::Logger::level_from_environment();
+  };
+
+  EXPECT_EQ(level_for(nullptr), iqm::LOG_LEVEL::ERROR);
+  EXPECT_EQ(level_for("ERROR"), iqm::LOG_LEVEL::ERROR);
+  EXPECT_EQ(level_for("INFO"), iqm::LOG_LEVEL::INFO);
+  EXPECT_EQ(level_for("DEBUG"), iqm::LOG_LEVEL::DEBUG);
+  EXPECT_EQ(level_for("verbose"), iqm::LOG_LEVEL::NONE);
+}
+
+TEST(LoggingTest,
+     DeprecatedLogLevelVariableOnlyAppliesWhenTheCurrentOneIsUnset) {
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", "DEBUG");
+
+  {
+    const ScopedEnvVar variable("IQM_LOG_LEVEL", nullptr);
+    EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::DEBUG);
+  }
+
+  const ScopedEnvVar variable("IQM_LOG_LEVEL", "INFO");
+  EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::INFO);
+}
+
+TEST(LoggingTest, AnEmptyLogLevelVariableCountsAsUnset) {
+  // Schedulers and container runtimes export empty variables routinely, so an
+  // empty value must neither select a level nor hide the deprecated alias.
+  const ScopedEnvVar variable("IQM_LOG_LEVEL", "");
+
+  {
+    const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", nullptr);
+    EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::ERROR);
+  }
+
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", "DEBUG");
+  EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::DEBUG);
+}
+
+TEST(LoggingTest, AnEmptyDeprecatedLogLevelVariableCountsAsUnset) {
+  const ScopedEnvVar variable("IQM_LOG_LEVEL", nullptr);
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", "");
+
+  EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::ERROR);
+}
+
+TEST(LoggingTest, TheDeprecatedVariableIsAnnouncedOnlyWhenItSuppliesTheLevel) {
+  const auto notice_for = [](const char *current, const char *deprecated) {
+    const ScopedEnvVar variable("IQM_LOG_LEVEL", current);
+    const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", deprecated);
+    return iqm::Logger::deprecation_notice();
+  };
+
+  EXPECT_TRUE(notice_for(nullptr, nullptr).empty());
+  EXPECT_TRUE(notice_for("INFO", nullptr).empty());
+  EXPECT_TRUE(notice_for("INFO", "DEBUG").empty());
+  EXPECT_TRUE(notice_for(nullptr, "").empty());
+
+  const auto notice = notice_for(nullptr, "DEBUG");
+  EXPECT_NE(notice.find("IQM_CPP_API_LOG_LEVEL is deprecated"),
+            std::string::npos);
+  EXPECT_NE(notice.find("set IQM_LOG_LEVEL instead"), std::string::npos);
 }
