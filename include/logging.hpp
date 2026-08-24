@@ -66,9 +66,9 @@ public:
    * Resolve the logging level configured in the environment.
    *
    * `IQM_LOG_LEVEL` names the level. `IQM_CPP_API_LOG_LEVEL` is a deprecated
-   * alias that is only consulted when `IQM_LOG_LEVEL` is unset. Recognized
-   * values are `NONE`, `ERROR`, `INFO`, and `DEBUG`; any other value disables
-   * logging.
+   * alias that is only consulted when `IQM_LOG_LEVEL` is unset or empty.
+   * Recognized values are `NONE`, `ERROR`, `INFO`, and `DEBUG`; any other
+   * value disables logging.
    *
    * @return The configured level, or LOG_LEVEL::ERROR if neither variable is
    * set.

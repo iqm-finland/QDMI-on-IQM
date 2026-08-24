@@ -131,3 +131,24 @@ TEST(LoggingTest,
   const ScopedEnvVar variable("IQM_LOG_LEVEL", "INFO");
   EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::INFO);
 }
+
+TEST(LoggingTest, AnEmptyLogLevelVariableCountsAsUnset) {
+  // Schedulers and container runtimes export empty variables routinely, so an
+  // empty value must neither select a level nor hide the deprecated alias.
+  const ScopedEnvVar variable("IQM_LOG_LEVEL", "");
+
+  {
+    const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", nullptr);
+    EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::ERROR);
+  }
+
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", "DEBUG");
+  EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::DEBUG);
+}
+
+TEST(LoggingTest, AnEmptyDeprecatedLogLevelVariableCountsAsUnset) {
+  const ScopedEnvVar variable("IQM_LOG_LEVEL", nullptr);
+  const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", "");
+
+  EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::ERROR);
+}

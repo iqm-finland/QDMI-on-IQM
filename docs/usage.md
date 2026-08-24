@@ -707,5 +707,6 @@ requests. Treat that output as sensitive and avoid it in shared logs.
 
 :::{note}
 `IQM_CPP_API_LOG_LEVEL` is a deprecated alias for `IQM_LOG_LEVEL`. It is only
-read when `IQM_LOG_LEVEL` is unset, and it will be removed in a future release.
+read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
+`ERROR` level. It will be removed in a future release.
 :::
