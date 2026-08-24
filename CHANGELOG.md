@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- ✅ Cover the device's queue length, a queued job's position, retrieval of an
+  existing job by ID, and its advertised program formats through MQT Core's
+  Python QDMI API ([#195]) ([**@marcelwa**])
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
@@ -34,6 +37,10 @@ releases may include breaking changes.
   level ([#205]) ([**@marcelwa**])
 - 🐛 Keep authentication working past January 2038 by reading JWT expiry times
   as 64-bit values ([#205]) ([**@marcelwa**])
+- 🐛 Report a cancellation that the server refuses because the job already
+  finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
+  `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
+  the job interface ([#199]) ([**@marcelwa**])
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
   ([**@marcelwa**])
@@ -55,6 +62,12 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
+  and its explicit sampler and estimator shot and precision defaults ([#195])
+  ([**@marcelwa**])
+- ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
+  prefix through QDMI's `configure_qdmi_device_target` ([#195])
+  ([**@marcelwa**])
 - ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
   setup during initialization and subsequent requests ([#163])
   ([**@burgholzer**])
@@ -185,6 +198,8 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
+[#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
+[#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187

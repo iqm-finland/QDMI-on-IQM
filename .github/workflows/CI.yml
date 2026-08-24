@@ -17,7 +17,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@579203ef22082fa5d5483412f442e50d0c5ff4a7 # v2.2.2
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@f33c11c5cf68957b3074fff11ae43cfce2aaf593 # v2.2.3
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -26,6 +26,9 @@ jobs:
         .github/workflows/cpp-linter.yml
         .github/workflows/cpp-install-tests.yml
         .github/workflows/cpp-sanitizers.yml
+      additional-python-files: |
+        .github/workflows/CI.yml
+        .github/workflows/python-*.yml
       additional-cd-files: |
         spank/**
         .github/workflows/spank-tests.yml
@@ -152,7 +155,7 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@579203ef22082fa5d5483412f442e50d0c5ff4a7 # v2.2.2
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@f33c11c5cf68957b3074fff11ae43cfce2aaf593 # v2.2.3
     with:
       check-stubs: false
       enable-ty: true
