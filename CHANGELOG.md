@@ -13,11 +13,9 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
-  level, and let the SPANK plugin inject it through `iqm_log_level` and
-  `--iqm-log-level`, rejecting a value that names no level rather than silencing
-  the compute node. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias,
-  now logging a notice when it is read; either variable counts as unset when it
-  is empty ([#206]) ([**@marcelwa**])
+  level, injected by the SPANK plugin through `iqm_log_level` and
+  `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
+  ([#206]) ([**@marcelwa**])
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
   existing job by ID, and its advertised program formats through MQT Core's
   Python QDMI API ([#195]) ([**@marcelwa**])
