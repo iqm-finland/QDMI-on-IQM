@@ -202,7 +202,7 @@ runtime-copy helper to synthesize a relocatable manifest and colocate it with
 the device library beside the executable:
 
 ```cmake
-find_package(mqt-core 3.8 CONFIG REQUIRED)
+find_package(mqt-core 3.9 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my-application main.cpp)

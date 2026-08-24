@@ -1306,6 +1306,58 @@ TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnServerError) {
   IQM_QDMI_device_job_free(retrieved_job);
 }
 
+TEST_F(DeviceJobMockTest, CancelingAJobThatAlreadyFinishedIsAnInvalidArgument) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  // The server refuses to cancel a job that has already reached a terminal
+  // status. The HTTP 403 it answers with is also what an authorization failure
+  // looks like, so the error code is what tells them apart.
+  http_stub.queue_post(403, R"({"error_code": "illegal_job_status",
+                                "message": "Illegal job status"})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+
+  // The same refusal, reported through the errors array the API also uses.
+  http_stub.queue_post(403, R"({"errors": [{"error_code": "illegal_job_status",
+                                            "message": "Illegal job status"}]})");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_INVALIDARGUMENT);
+
+  // The refusal does not say which terminal status the job reached, so the job
+  // stays observable and the next check is what learns it.
+  const auto requests_before_recheck = http_stub.get_urls().size();
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "completed", "type": "circuit"})");
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before_recheck + 1);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest,
+       CancelRefusalWithAnUnreadableBodyKeepsItsHttpMapping) {
+  http_stub.queue_get(
+      200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "job-123", &retrieved_job),
+            QDMI_SUCCESS);
+
+  // Reading the error code must not change what a refusal means when there is
+  // no error code to read. A body that is not JSON at all keeps the mapping the
+  // HTTP status code alone would have produced.
+  http_stub.queue_post(403, "<html>Forbidden</html>");
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(retrieved_job),
+            QDMI_ERROR_PERMISSIONDENIED);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
 TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
@@ -1706,6 +1758,33 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 }
 
+TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
+  // The submission response already carries a queue position. QDMI requires the
+  // property to refresh regardless, so the position the server reports at query
+  // time is the one that must come back.
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 1})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 1U);
+  // The size delta is the assertion that matters: the stub never verifies that
+  // a queued response was consumed, so a value check alone passes even when no
+  // request was issued at all.
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
 TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
   http_stub.queue_post(200, R"({"id": "job-queue"})");
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1923,6 +2002,37 @@ constexpr auto TEST_CALIBRATION_CONFIG = R"(
       "graph_config": {},
       "graph_definition": null,
     })";
+
+TEST_F(DeviceJobMockTest,
+       CalibrationSubmissionQueuePositionDoesNotSkipTheRefresh) {
+  // The calibration path reads the submission response the same way the circuit
+  // path does, so the position it reports must not stand in for the refresh
+  // there either.
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(
+      200, R"({"id": "cal-queue", "status": "waiting", "queue_position": 6})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 5})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 5U);
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
 
 TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   // Job submission
@@ -2156,6 +2266,32 @@ TEST_F(DeviceIntegrationMockTest,
             QDMI_SUCCESS);
   http_stub.queue_get(200, qc_list_without_identifiers);
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+}
+
+TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationRejectsQuantumComputersWithoutAnAlias) {
+  // Every endpoint the device reaches after the listing is addressed by alias,
+  // so an entry that names an ID but no alias cannot be used.
+  const std::string qc_list_without_aliases =
+      R"({"quantum_computers":[{"id":"01966208-f3ec-73b7-890d-100000000000","display_name":"x"}]})";
+  const auto requests_before = http_stub.get_urls().size();
+
+  // No selection criteria: the first entry is used.
+  http_stub.queue_get(200, qc_list_without_aliases);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  // Initialization stops at the listing instead of requesting an architecture
+  // for an empty alias.
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 1);
+
+  // Selection by ID: the matching entry still has to name its alias.
+  const std::string qc_id = "01966208-f3ec-73b7-890d-100000000000";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
+                qc_id.size() + 1, qc_id.c_str()),
+            QDMI_SUCCESS);
+  http_stub.queue_get(200, qc_list_without_aliases);
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 2);
 }
 
 TEST_F(DeviceIntegrationMockTest,
