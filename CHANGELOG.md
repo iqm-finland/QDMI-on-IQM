@@ -36,6 +36,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Survive a calibration set whose gate loci or coherence times have an
+  unexpected shape, dropping the affected gate or metric instead of crashing or
+  misreporting it ([#204]) ([**@marcelwa**])
 - 🐛 Report a cancellation that the server refuses because the job already
   finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
   `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
@@ -197,6 +200,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
+[#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
