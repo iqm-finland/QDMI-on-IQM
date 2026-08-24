@@ -896,10 +896,27 @@ TEST_F(QDMIIntegrationTest, JobCancellation) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
   auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
-  EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_SUCCESS);
+
+  // A mock job of this size can reach a terminal status before the cancellation
+  // request lands, and a job that is no longer running can no longer be
+  // canceled. Which of the two happens is the backend's timing rather than this
+  // device's behavior, so assert against whichever one occurred.
+  const auto cancellation = IQM_QDMI_device_job_cancel(job);
   QDMI_Job_Status status{};
-  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
-  EXPECT_EQ(status, QDMI_JOB_STATUS_CANCELED);
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  if (cancellation == QDMI_SUCCESS) {
+    EXPECT_EQ(status, QDMI_JOB_STATUS_CANCELED);
+  } else {
+    EXPECT_EQ(cancellation, QDMI_ERROR_INVALIDARGUMENT)
+        << "A cancellation can only be refused because the job already reached "
+           "a terminal status";
+    EXPECT_TRUE(status == QDMI_JOB_STATUS_DONE ||
+                status == QDMI_JOB_STATUS_CANCELED ||
+                status == QDMI_JOB_STATUS_FAILED)
+        << "The cancellation was refused, so the job must have finished; its "
+           "status is "
+        << status;
+  }
   IQM_QDMI_device_job_free(job);
 }
 

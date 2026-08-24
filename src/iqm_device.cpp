@@ -34,6 +34,7 @@
 #include <cassert>
 #include <chrono>
 #include <cpr/connection_pool.h>
+#include <cpr/response.h>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -1336,6 +1337,37 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   return QDMI_ERROR_FATAL;
 }
 
+namespace {
+/**
+ * @brief Whether a refused request reports that the job was in an illegal
+ *        status for it.
+ * @details The IQM Server refuses to cancel a job that has already reached a
+ *          terminal status, and says so with an @c illegal_job_status error
+ *          code alongside HTTP 403. That status code on its own is
+ *          indistinguishable from an authorization failure, so the error code
+ *          is what separates the two. It arrives either at the root of the
+ *          response or inside an @c errors array.
+ * @param response The raw response to a request that did not succeed.
+ * @return @c true if the response reports an illegal job status.
+ */
+bool Reports_illegal_job_status(const cpr::Response &response) {
+  const auto json = nlohmann::json::parse(response.text, nullptr, false);
+  if (json.is_discarded()) {
+    return false;
+  }
+  const auto reports_it = [](const nlohmann::json &error) {
+    const auto code = error.find("error_code");
+    return code != error.end() && code->is_string() &&
+           code->get<std::string>() == "illegal_job_status";
+  };
+  if (const auto errors = json.find("errors");
+      errors != json.end() && errors->is_array()) {
+    return std::ranges::any_of(*errors, reports_it);
+  }
+  return reports_it(json);
+}
+} // namespace
+
 int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   if (job == nullptr || job->status_ == QDMI_JOB_STATUS_DONE) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -1356,6 +1388,17 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
       job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
+    if (Reports_illegal_job_status(job_abortion_response)) {
+      // The job already reached a terminal status, so it can no longer be
+      // canceled. QDMI documents QDMI_ERROR_INVALIDARGUMENT for that, which is
+      // also what the guard at the top of this function returns when the
+      // device already knows the status locally. The refusal does not say
+      // which terminal status the job reached, so leave that for the next
+      // check to observe.
+      LOG_DEBUG("Cancellation request for job with ID: " + job->job_id_ +
+                " was refused because the job is no longer running");
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
     // A cancellation request that never reached the server says nothing about
     // the job itself, which keeps running remotely. Leave the status untouched
     // so that the job stays observable and the request can be retried.
