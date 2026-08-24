@@ -2665,6 +2665,26 @@ Operation_sites Query_operation_sites(IQM_QDMI_Device_Session session,
   return result;
 }
 
+TEST_F(DeviceIntegrationMockTest, TwoQubitFidelityIsFoundInEitherSiteOrder) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  const auto sites = Query_sites(session);
+  ASSERT_GE(sites.size(), 2U);
+
+  // The calibration set reports the CZ fidelity for the locus QB1__QB2 only,
+  // and both site orders name the same physical gate.
+  double fidelity = 0.0;
+  EXPECT_EQ(Query_fidelity(session, "cz", {sites[0], sites[1]}, fidelity),
+            QDMI_SUCCESS);
+  EXPECT_DOUBLE_EQ(fidelity, 0.97);
+
+  fidelity = 0.0;
+  EXPECT_EQ(Query_fidelity(session, "cz", {sites[1], sites[0]}, fidelity),
+            QDMI_SUCCESS);
+  EXPECT_DOUBLE_EQ(fidelity, 0.97);
+}
+
 TEST_F(DeviceIntegrationMockTest, GateWithLociOfDifferingSizesIsNotRegistered) {
   const ScopedLogCapture log_capture;
   http_stub.queue_get(200, list_quantum_computers_response);
