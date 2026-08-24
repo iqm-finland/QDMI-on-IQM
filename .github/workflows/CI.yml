@@ -26,6 +26,9 @@ jobs:
         .github/workflows/cpp-linter.yml
         .github/workflows/cpp-install-tests.yml
         .github/workflows/cpp-sanitizers.yml
+      additional-python-files: |
+        .github/workflows/CI.yml
+        .github/workflows/python-*.yml
       additional-cd-files: |
         spank/**
         .github/workflows/spank-tests.yml

@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: ${{ !startsWith(inputs.runs-on, 'ubuntu') }}
           save-cache: ${{ github.ref == 'refs/heads/main' }}
@@ -52,7 +52,7 @@ jobs:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+          IQM_LOG_LEVEL: "DEBUG"
 
       - name: Verify clean directory
         run: git diff --exit-code

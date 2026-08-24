@@ -177,3 +177,51 @@ qc.measure_all()
 counts = sample(qc, shots=512, simulator=True)
 print("Counts:", counts)
 ```
+
+## Querying the Device Directly
+
+The Qiskit backend covers circuit execution, but a QDMI device also answers
+questions about itself. Open a session with MQT Core's driver to reach them.
+Constructing an {py:class}`~iqm.qdmi.qiskit.IQMBackend` registers the device
+under the stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID`, after which
+`open_device` resolves it:
+
+```python
+from mqt.core.qdmi.driver import open_device
+
+from iqm.qdmi import IQM_QDMI_DEVICE_ID
+
+device = open_device(IQM_QDMI_DEVICE_ID, token="…", custom2="emerald")
+
+print(device.status())
+print(device.supported_program_formats())
+```
+
+### Queue Length and Queue Position
+
+The device reports how busy the quantum computer is, so a client can decide
+whether to submit now or wait:
+
+```python
+waiting = device.queue_length()  # jobs waiting, excluding those executing
+```
+
+`queue_length()` returns `None` when the IQM API does not supply a trustworthy
+value. A queued job reports how many jobs are ahead of it; querying it refreshes
+the job's status first:
+
+```python
+ahead = job.queue_position  # None once the job is no longer queued
+```
+
+### Retrieving an Existing Job
+
+A job outlives the session that submitted it. Given its ID, a later session can
+pick it up again to poll, wait, cancel, or fetch results:
+
+```python
+job = device.retrieve_job_by_id("d3416f0a-…")
+print(job.check())
+```
+
+A retrieved job cannot be resubmitted, and its parameters cannot be changed.

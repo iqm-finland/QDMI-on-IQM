@@ -171,7 +171,7 @@ std::string Read_access_token_from_file(const std::string &path) {
 // TokenManager implementation
 //
 
-int TokenManager::time_left_seconds(const std::string &token) {
+int64_t TokenManager::time_left_seconds(const std::string &token) {
   if (token.empty()) {
     return 0;
   }
@@ -209,8 +209,9 @@ int TokenManager::time_left_seconds(const std::string &token) {
         nlohmann::json::parse(decoded); // NOLINT(misc-include-cleaner)
 
     // Get expiration time
-    const int exp_time = json.value("exp", 0);
-    return (std::max)(0, exp_time - static_cast<int>(std::time(nullptr)));
+    const auto exp_time = json.value("exp", int64_t{0});
+    return (std::max)(int64_t{0},
+                      exp_time - static_cast<int64_t>(std::time(nullptr)));
   } catch (const std::exception &e) {
     LOG_DEBUG("Failed to parse token body: " + std::string(e.what()));
     return 0;

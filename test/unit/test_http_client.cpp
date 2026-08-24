@@ -33,6 +33,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -45,11 +46,12 @@ class LoggerCapture {
 public:
   /**
    * @brief Redirect logger output to an internal string stream.
+   * @param level Level the logger runs at while the guard is alive.
    */
-  LoggerCapture()
+  explicit LoggerCapture(const iqm::LOG_LEVEL level = iqm::LOG_LEVEL::DEBUG)
       : logger_(&iqm::Logger::get_instance()),
         original_level_(logger_->get_level()) {
-    logger_->set_level(iqm::LOG_LEVEL::DEBUG);
+    logger_->set_level(level);
     logger_->set_output(log_stream_);
   }
 
@@ -82,11 +84,15 @@ private:
 };
 
 cpr::Response Make_response(const int64_t status_code, std::string url,
-                            std::string body) {
+                            std::string body,
+                            const std::string &content_type = "") {
   cpr::Response response;
   response.status_code = status_code;
   response.url = cpr::Url{std::move(url)};
   response.text = std::move(body);
+  if (!content_type.empty()) {
+    response.header["Content-Type"] = content_type;
+  }
   return response;
 }
 
@@ -121,6 +127,53 @@ TEST(HttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   EXPECT_NE(logs.find("failed with HTTP 503 (Server Error)"),
             std::string::npos);
   EXPECT_NE(logs.find("Response: not-json"), std::string::npos);
+}
+
+TEST(HttpClientTest, RawResponseBodyStaysOutOfErrorLevelLogs) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::ERROR};
+  constexpr auto body = R"({"access_token":"do-not-log-me"})";
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(500, "https://example.test/jobs", body, "application/json"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+
+  const auto logs = logger_capture.str();
+  EXPECT_NE(logs.find("failed with HTTP 500 (Server Error)"),
+            std::string::npos);
+  EXPECT_EQ(logs.find("do-not-log-me"), std::string::npos);
+
+  // The shape of the body still reaches the default log level, so an opaque
+  // upstream failure remains diagnosable without raising verbosity.
+  EXPECT_NE(logs.find("Response carries no structured error: " +
+                      std::to_string(std::string_view{body}.size()) +
+                      " byte(s) of application/json"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, UntypedResponseBodyIsReportedWithoutAContentType) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::ERROR};
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(502, "https://example.test/jobs", "<html>gateway</html>"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+  EXPECT_NE(logger_capture.str().find("20 byte(s) of an unnamed content type"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, RawResponseBodyReachesDebugLevelLogs) {
+  const LoggerCapture logger_capture{iqm::LOG_LEVEL::DEBUG};
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(500, "https://example.test/jobs", "opaque-upstream-detail"),
+      iqm::http::ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+  EXPECT_EQ(ret, QDMI_ERROR_FATAL);
+  EXPECT_NE(logger_capture.str().find("Response: opaque-upstream-detail"),
+            std::string::npos);
 }
 
 TEST(HttpClientTest, RedirectResponseLogsAdditionalMessages) {
@@ -200,13 +253,13 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
 
   const auto get_response = iqm::http::Get("https://example.test/jobs",
                                            bearer_token, connection_pool);
-  const auto optional_get_response = iqm::http::Get_optional(
+  const auto probe_get_response = iqm::http::Get(
       "https://example.test/capability", bearer_token, connection_pool);
   const auto post_response = iqm::http::Post(
       "https://example.test/jobs", bearer_token, connection_pool, "{}");
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
-  EXPECT_EQ(iqm::http::Handle_response(optional_get_response), QDMI_SUCCESS);
+  EXPECT_EQ(iqm::http::Handle_response(probe_get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
 
   ASSERT_EQ(http_stub.get_bearer_tokens().size(), 2U);

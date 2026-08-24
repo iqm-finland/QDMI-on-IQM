@@ -335,9 +335,23 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
     }
   }
 
-  // Fall back to raw response if no structured errors are available
+  // The raw body is unvalidated server output that can echo request content,
+  // so its content stays at DEBUG level. Its size and type are safe to report
+  // alongside the status, and are often all that separates an upstream proxy
+  // failure from one the device itself produced.
   if (!logged_structured_error && !response.text.empty()) {
-    internal::Log_error(error_log_policy, "Response: " + response.text);
+    if (error_log_policy == ERROR_LOG_POLICY::LOG_AS_ERROR) {
+      const auto content_type = response.header.find("content-type");
+      internal::Log_error(error_log_policy,
+                          "Response carries no structured error: " +
+                              std::to_string(response.text.size()) +
+                              " byte(s) of " +
+                              (content_type == response.header.end()
+                                   ? std::string{"an unnamed content type"}
+                                   : content_type->second) +
+                              ", logged at DEBUG level");
+    }
+    LOG_DEBUG("Response: " + response.text);
   }
 
   // Log IQM messages if present (might contain additional context)
@@ -379,20 +393,6 @@ cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
                   const cpr::ConnectionPool &connection_pool,
                   const std::chrono::milliseconds timeout) {
-  LOG_INFO("Performing GET request to " + url.str());
-  const auto &hooks = internal::Get_hooks();
-  const auto headers = internal::Make_headers();
-  return internal::Perform_with_retries(
-      url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, connection_pool, headers,
-                         remaining);
-      });
-}
-
-cpr::Response Get_optional(const cpr::Url &url,
-                           const std::optional<cpr::Bearer> &bearer_token,
-                           const cpr::ConnectionPool &connection_pool,
-                           const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();

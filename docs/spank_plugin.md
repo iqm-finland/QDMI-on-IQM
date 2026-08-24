@@ -16,12 +16,13 @@ job tasks.
 
 ### Supported Options
 
-| Option              | Environment Variable | Description                                           |
-| :------------------ | :------------------- | :---------------------------------------------------- |
-| `--iqm-base-url`    | `IQM_BASE_URL`       | The endpoint URL of the IQM service.                  |
-| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.       |
-| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique identifier of the target quantum computer. |
-| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | The alias of the target quantum computer.             |
+| Option              | Environment Variable | Description                                                                                                             |
+| :------------------ | :------------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| `--iqm-base-url`    | `IQM_BASE_URL`       | The endpoint URL of the IQM service.                                                                                    |
+| `--iqm-tokens-file` | `IQM_TOKENS_FILE`    | Path to the file containing your access tokens.                                                                         |
+| `--iqm-qc-id`       | `IQM_QC_ID`          | The unique identifier of the target quantum computer.                                                                   |
+| `--iqm-qc-alias`    | `IQM_QC_ALIAS`       | The alias of the target quantum computer.                                                                               |
+| `--iqm-log-level`   | `IQM_LOG_LEVEL`      | Verbosity of the QDMI device log on the compute node: `NONE`, `ERROR`, `INFO`, or `DEBUG`. Any other value is rejected. |
 
 ### Credential Security
 
