@@ -76,6 +76,14 @@ public:
   static LOG_LEVEL level_from_environment();
 
   /**
+   * The notice to emit about a deprecated log level variable.
+   *
+   * @return The notice, or an empty string when the level did not come from a
+   * deprecated variable.
+   */
+  static std::string deprecation_notice();
+
+  /**
    * Get the current logging level.
    * @return The current logging level.
    */

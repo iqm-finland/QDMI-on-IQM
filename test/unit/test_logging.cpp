@@ -152,3 +152,21 @@ TEST(LoggingTest, AnEmptyDeprecatedLogLevelVariableCountsAsUnset) {
 
   EXPECT_EQ(iqm::Logger::level_from_environment(), iqm::LOG_LEVEL::ERROR);
 }
+
+TEST(LoggingTest, TheDeprecatedVariableIsAnnouncedOnlyWhenItSuppliesTheLevel) {
+  const auto notice_for = [](const char *current, const char *deprecated) {
+    const ScopedEnvVar variable("IQM_LOG_LEVEL", current);
+    const ScopedEnvVar deprecated_variable("IQM_CPP_API_LOG_LEVEL", deprecated);
+    return iqm::Logger::deprecation_notice();
+  };
+
+  EXPECT_TRUE(notice_for(nullptr, nullptr).empty());
+  EXPECT_TRUE(notice_for("INFO", nullptr).empty());
+  EXPECT_TRUE(notice_for("INFO", "DEBUG").empty());
+  EXPECT_TRUE(notice_for(nullptr, "").empty());
+
+  const auto notice = notice_for(nullptr, "DEBUG");
+  EXPECT_NE(notice.find("IQM_CPP_API_LOG_LEVEL is deprecated"),
+            std::string::npos);
+  EXPECT_NE(notice.find("set IQM_LOG_LEVEL instead"), std::string::npos);
+}

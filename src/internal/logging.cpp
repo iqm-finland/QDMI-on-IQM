@@ -89,15 +89,22 @@ LOG_LEVEL Logger::level_from_environment() {
   return LOG_LEVEL::ERROR;
 }
 
+std::string Logger::deprecation_notice() {
+  if (Non_empty_env(LOG_LEVEL_VARIABLE) != nullptr ||
+      Non_empty_env(DEPRECATED_LOG_LEVEL_VARIABLE) == nullptr) {
+    return {};
+  }
+  return std::string{DEPRECATED_LOG_LEVEL_VARIABLE} +
+         " is deprecated and will be removed in a future release; set " +
+         LOG_LEVEL_VARIABLE + " instead";
+}
+
 Logger::Logger()
     : current_level_(level_from_environment()), output_stream_(&std::cerr) {
   // Reported through this instance rather than the LOG_ERROR macro, which
   // would re-enter get_instance() while it is still constructing.
-  if (Non_empty_env(LOG_LEVEL_VARIABLE) == nullptr &&
-      Non_empty_env(DEPRECATED_LOG_LEVEL_VARIABLE) != nullptr) {
-    error(std::string{DEPRECATED_LOG_LEVEL_VARIABLE} +
-          " is deprecated and will be removed in a future release; set " +
-          LOG_LEVEL_VARIABLE + " instead");
+  if (const auto notice = deprecation_notice(); !notice.empty()) {
+    error(notice);
   }
 }
 
