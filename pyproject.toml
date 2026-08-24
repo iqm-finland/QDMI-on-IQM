@@ -260,26 +260,13 @@ environment-pass = [
 ]
 
 [tool.cibuildwheel.linux]
-# The MLIR toolchain is only needed because `mqt-core` is pinned to a git
-# reference and therefore built from source in the test environment. Installing
-# it in `before-all` keeps it to one download per container, which is then
-# reused for every Python version. Drop all of this once MQT Core v4 ships and
-# the pin is a released version with wheels.
-before-all = [
-  "yum install -y openssl-devel",
-  "curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/latest/download/setup-mlir.sh | bash -s -- -v 22.1.8 -p /opt/llvm-22.1.8",
-]
-test-environment = { MLIR_DIR = "/opt/llvm-22.1.8/lib/cmake/mlir" }
+before-all = "yum install -y openssl-devel"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
-# `MLIR_DIR` comes from the `setup-mlir` step in the workflow. Drop it together
-# with that step once MQT Core v4 ships.
-test-environment = { MLIR_DIR = "$MLIR_DIR" }
 
 [tool.cibuildwheel.windows]
 repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg iqm"
-test-environment = { MLIR_DIR = "$MLIR_DIR" }
 
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
