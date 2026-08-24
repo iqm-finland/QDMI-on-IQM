@@ -1758,6 +1758,33 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 }
 
+TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
+  // The submission response already carries a queue position. QDMI requires the
+  // property to refresh regardless, so the position the server reports at query
+  // time is the one that must come back.
+  http_stub.queue_post(
+      200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 1})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 1U);
+  // The size delta is the assertion that matters: the stub never verifies that
+  // a queued response was consumed, so a value check alone passes even when no
+  // request was issued at all.
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
+
 TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
   http_stub.queue_post(200, R"({"id": "job-queue"})");
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1975,6 +2002,37 @@ constexpr auto TEST_CALIBRATION_CONFIG = R"(
       "graph_config": {},
       "graph_definition": null,
     })";
+
+TEST_F(DeviceJobMockTest,
+       CalibrationSubmissionQueuePositionDoesNotSkipTheRefresh) {
+  // The calibration path reads the submission response the same way the circuit
+  // path does, so the position it reports must not stand in for the refresh
+  // there either.
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(
+      200, R"({"id": "cal-queue", "status": "waiting", "queue_position": 6})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  const auto gets_after_submission = http_stub.get_urls().size();
+
+  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 5})");
+  size_t queue_position = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+                sizeof(queue_position), &queue_position, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(queue_position, 5U);
+  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
+}
 
 TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   // Job submission
