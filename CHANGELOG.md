@@ -33,10 +33,8 @@ releases may include breaking changes.
 ### Fixed
 
 - 🐛 Survive a calibration set whose gate loci or coherence times have an
-  unexpected shape: drop a gate whose loci are absent, site-less, or of
-  differing sizes rather than advertising more sites than its reported arity
-  accounts for, and ignore a coherence time that no site property can represent
-  ([#204]) ([**@marcelwa**])
+  unexpected shape, dropping the affected gate or metric instead of crashing or
+  misreporting it ([#204]) ([**@marcelwa**])
 - 🐛 Report a cancellation that the server refuses because the job already
   finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
   `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
