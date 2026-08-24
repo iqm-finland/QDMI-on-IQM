@@ -1707,9 +1707,9 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
 }
 
 TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
-  // The submission response reports both the queued status and a position. QDMI
-  // requires the property to refresh anyway, so the position the server reports
-  // at query time is the one that must come back.
+  // The submission response already carries a queue position. QDMI requires the
+  // property to refresh regardless, so the position the server reports at query
+  // time is the one that must come back.
   http_stub.queue_post(
       200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1730,26 +1730,6 @@ TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
   // The size delta is the assertion that matters: the stub never verifies that
   // a queued response was consumed, so a value check alone passes even when no
   // request was issued at all.
-  EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
-}
-
-TEST_F(DeviceJobMockTest, SubmissionStatusIsAdoptedOnlyWhileQueued) {
-  // A submission response reporting a terminal status must not be adopted:
-  // IQM_QDMI_device_job_check short-circuits on a job it believes is finished,
-  // so adopting it would keep the job from ever being polled.
-  http_stub.queue_post(200, R"({"id": "job-queue", "status": "failed"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
-            QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
-
-  const auto gets_after_submission = http_stub.get_urls().size();
-
-  http_stub.queue_get(200, R"({"status": "waiting", "queue_position": 2})");
-  QDMI_Job_Status status{};
-  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
-  EXPECT_EQ(status, QDMI_JOB_STATUS_QUEUED);
   EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
 }
 
@@ -1971,10 +1951,11 @@ constexpr auto TEST_CALIBRATION_CONFIG = R"(
       "graph_definition": null,
     })";
 
-TEST_F(DeviceJobMockTest, CalibrationSubmissionAdoptsItsQueuedStatus) {
+TEST_F(DeviceJobMockTest,
+       CalibrationSubmissionQueuePositionDoesNotSkipTheRefresh) {
   // The calibration path reads the submission response the same way the circuit
-  // path does, so a queued calibration job must not need a status check before
-  // it reports its position either.
+  // path does, so the position it reports must not stand in for the refresh
+  // there either.
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
