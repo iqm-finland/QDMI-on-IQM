@@ -60,9 +60,9 @@ releases may include breaking changes.
 - ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
   and its explicit sampler and estimator shot and precision defaults ([#195])
   ([**@marcelwa**])
-- ⬆️ Pin QDMI to the released v1.3.3 tag instead of a `develop` commit, and
-  publish the device target's stable ID and symbol prefix through QDMI's
-  `configure_qdmi_device_target` ([#195]) ([**@marcelwa**])
+- ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
+  prefix through QDMI's `configure_qdmi_device_target` ([#195])
+  ([**@marcelwa**])
 - ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
   setup during initialization and subsequent requests ([#163])
   ([**@burgholzer**])
