@@ -43,6 +43,8 @@
 #include <utility>
 #include <vector>
 
+using std::string_view_literals::operator""sv;
+
 namespace {
 
 int Set_env_var_raw(const char *key, const char *value) {
@@ -496,6 +498,8 @@ protected:
   ///          `iqm-station-control-client`. It carries zero bytes both inside
   ///          the payload and as its final byte, which is what pins the
   ///          requirement that the device forward it verbatim.
+  /// @note The `sv` suffix keeps the array size; without it `strlen` cuts this
+  ///       at the first zero byte.
   static constexpr std::string_view TEST_PROGRAM_RUN_DEFINITION =
       "\x0a\x24\x31\x31\x31\x31\x31\x31\x31\x31\x2d\x32\x32\x32\x32\x2d\x33"
       "\x33\x33\x33\x2d\x34\x34\x34\x34\x2d\x35\x35\x35\x35\x35\x35\x35\x35"
@@ -508,11 +512,11 @@ protected:
       "\x75\x65\x73\x74\x12\x38\x0a\x24\x36\x36\x36\x36\x36\x36\x36\x36\x2d"
       "\x37\x37\x37\x37\x2d\x38\x38\x38\x38\x2d\x39\x39\x39\x39\x2d\x61\x61"
       "\x61\x61\x61\x61\x61\x61\x61\x61\x61\x61\x12\x06\x0a\x04\x72\x6f\x6f"
-      "\x74\x1a\x00\x32\x04\x63\x68\x69\x70\x3a\x00";
+      "\x74\x1a\x00\x32\x04\x63\x68\x69\x70\x3a\x00"sv;
 
   /// A stand-in for the protobuf `sweep_results` artifact, zero bytes included.
   static constexpr std::string_view TEST_SWEEP_RESULTS =
-      "\x0a\x00\x12\x03\x51\x42\x31\x1a\x00";
+      "\x0a\x00\x12\x03\x51\x42\x31\x1a\x00"sv;
 
   static constexpr auto TEST_CIRCUIT_IQM_JSON = R"(
     {
