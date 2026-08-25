@@ -114,7 +114,10 @@ HttpStub::HttpStub() {
 
   hooks.sleep = [this](const int seconds) {
     sleep_durations_.push_back(seconds);
+    now_ += std::chrono::seconds{seconds};
   };
+
+  hooks.now = [this]() { return now_; };
 }
 
 HttpStub::~HttpStub() {
@@ -194,6 +197,10 @@ size_t HttpStub::sleep_call_count() const { return sleep_durations_.size(); }
 
 const std::vector<int> &HttpStub::sleep_durations() const {
   return sleep_durations_;
+}
+
+void HttpStub::advance(const std::chrono::milliseconds elapsed) {
+  now_ += elapsed;
 }
 
 } // namespace iqm::test_support
