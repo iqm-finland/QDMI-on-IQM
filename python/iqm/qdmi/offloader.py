@@ -156,8 +156,8 @@ def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[st
     Unlike backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`), which reach
     the job purely through the environment -- either plain Slurm propagation
     from the submitting shell, or the QDMI-on-IQM SPANK plugin's own
-    plugstack.conf.d defaults on the `quantum` partition -- QC selection is a
-    per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
+    plugstack.conf.d defaults on whichever partitions it is configured for --
+    QC selection is a per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
     `srun` itself, which the SPANK plugin resolves into the job's
     `IQM_QC_ID`/`IQM_QC_ALIAS` environment variable.
 
@@ -196,7 +196,9 @@ def _resolve_partition(partition: str | None) -> str:
     `IQM_SLURM_PARTITION` environment variable, which in turn takes precedence
     over the `quantum` name the administrator guide provisions. This mirrors how
     the QDMI-on-IQM SPANK plugin's `IQM_BASE_URL`/`IQM_QC_ID`/`IQM_QC_ALIAS`
-    variables let a site set a default once for every user.
+    variables let a site set a default once for every user. Slurm's own
+    `SLURM_PARTITION` cannot serve that role here, because the resolved name is
+    always passed as an explicit `--partition`, which overrides it.
 
     Returns:
         The partition name to pass to `srun`.
@@ -313,8 +315,10 @@ def sample(
             to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
             variable, and to `quantum` when that is unset. Only used when
             `local=False`.
-        nodes: The number of nodes to request, passed as `--nodes` to `srun`.
-            Default is 1. Only used when `local=False`.
+        nodes: The number of nodes to allocate, passed as `--nodes` to `srun`.
+            The worker always runs as a single task (`--ntasks=1`), so this
+            only sizes the allocation for sites whose partition demands more
+            than one node. Default is 1. Only used when `local=False`.
 
     Returns:
         A dictionary of measurement counts.
@@ -351,6 +355,7 @@ def sample(
         "srun",
         f"--job-name={job_name}",
         f"--nodes={nodes}",
+        "--ntasks=1",
         f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
@@ -429,8 +434,10 @@ def estimate(
             to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
             variable, and to `quantum` when that is unset. Only used when
             `local=False`.
-        nodes: The number of nodes to request, passed as `--nodes` to `srun`.
-            Default is 1. Only used when `local=False`.
+        nodes: The number of nodes to allocate, passed as `--nodes` to `srun`.
+            The worker always runs as a single task (`--ntasks=1`), so this
+            only sizes the allocation for sites whose partition demands more
+            than one node. Default is 1. Only used when `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -469,6 +476,7 @@ def estimate(
         "srun",
         f"--job-name={job_name}",
         f"--nodes={nodes}",
+        "--ntasks=1",
         f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
