@@ -210,6 +210,12 @@ target_link_libraries(my-application PRIVATE MQT::CoreFoMaC)
 mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
 ```
 
+:::{important}
+`MQT::CoreFoMaC` is the client target of the MQT Core 3.9 series this project
+requires. MQT Core 4 renames it to `MQT::CoreQDMI` and removes the old name.
+Link against `MQT::CoreQDMI` once you build against MQT Core 4.
+:::
+
 For dynamically linked consumers, automatic discovery searches beside the driver
 library rather than the executable. Such consumers must place the generated
 manifest in a discovered location or select a complete configuration with
