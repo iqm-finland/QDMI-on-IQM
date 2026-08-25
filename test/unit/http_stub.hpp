@@ -69,8 +69,9 @@ struct Scripted_response {
  * caught reliably. The retry backoff delay is stubbed out (counted, not
  * slept), so tests that exercise HTTP 429 retries run instantly.
  *
- * The default hooks are restored on destruction (RAII), so each test that
- * owns an instance of this class gets an isolated, self-cleaning stub.
+ * The default hooks are restored on destruction (RAII), and the process-wide
+ * rate-limit quota is cleared at both ends, so each test that owns an instance
+ * of this class gets an isolated, self-cleaning stub.
  */
 class HttpStub {
 public:

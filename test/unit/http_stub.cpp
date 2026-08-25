@@ -58,6 +58,9 @@ cpr::Response Make_response(const Scripted_response &scripted) {
 } // namespace
 
 HttpStub::HttpStub() {
+  // The rate-limit quota is tracked once per process, so it outlives any single
+  // test unless both ends of this guard clear it.
+  http::internal::Reset_rate_limit_state();
   auto &hooks = http::internal::Get_hooks();
 
   hooks.get = [this](const cpr::Url &url,
@@ -114,7 +117,10 @@ HttpStub::HttpStub() {
   };
 }
 
-HttpStub::~HttpStub() { http::internal::Reset_hooks(); }
+HttpStub::~HttpStub() {
+  http::internal::Reset_hooks();
+  http::internal::Reset_rate_limit_state();
+}
 
 HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body,
                               cpr::Header headers) {
