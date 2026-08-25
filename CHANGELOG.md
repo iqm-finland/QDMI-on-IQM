@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Take over the IQM JSON serialization and the `MoveGate` from MQT Core,
+  which removed both in 3.9.1, and advertise the serializer through MQT Core's
+  `mqt.core.qiskit.program_serializers` entry point group so any QDMI backend
+  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**])
 - ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
   level, injected by the SPANK plugin through `iqm_log_level` and
   `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
@@ -210,6 +214,7 @@ Compatible with QDMI `v1.3.0`.
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
+[#189]: https://github.com/iqm-finland/QDMI-on-IQM/pull/189
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182

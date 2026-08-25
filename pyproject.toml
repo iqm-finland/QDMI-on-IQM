@@ -55,7 +55,7 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.9.0",
+  "mqt-core~=3.9.1",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -72,9 +72,13 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 iqm-sampler = "iqm.qdmi.sampler:main"
 iqm-estimator = "iqm.qdmi.estimator:main"
 
+# Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
+[project.entry-points."mqt.core.qiskit.program_serializers"]
+IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
+
 [dependency-groups]
 qiskit = [
-  "mqt-core~=3.9.0",
+  "mqt-core~=3.9.1",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
