@@ -2034,6 +2034,29 @@ TEST_F(DeviceJobMockTest,
   EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
 }
 
+TEST_F(DeviceJobMockTest, CalibrationSubmissionWithoutAJobIdFailsTheJob) {
+  // The calibration path reads the submission response the same way the circuit
+  // path does, so an accepted submission this client cannot name must fail the
+  // job there too rather than invite a duplicate calibration run.
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+
+  http_stub.queue_post(200, R"({"queue_position": 2})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+
+  QDMI_Job_Status status{};
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_FAILED);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_BADSTATE);
+}
+
 TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   // Job submission
   auto ret = IQM_QDMI_device_job_set_parameter(
@@ -2856,18 +2879,33 @@ TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
             QDMI_SUCCESS);
 
-  http_stub.queue_post(200, R"({"queue_position": 3})");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  // The server accepted every one of these, so each leaves a job queued that
+  // this client cannot name. The handle is failed rather than left
+  // resubmittable, so a retry cannot queue a duplicate onto the hardware.
+  for (const auto *const response : {R"({"queue_position": 3})",
+                                     // A job ID of the wrong type must be
+                                     // reported, not retyped.
+                                     R"({"id": 5})", R"({"id": )"}) {
+    IQM_QDMI_Device_Job unreadable = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &unreadable),
+              QDMI_SUCCESS);
+    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                  unreadable, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                  strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
 
-  // A job ID of the wrong type must be reported, not retyped.
-  http_stub.queue_post(200, R"({"id": 5})");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+    http_stub.queue_post(200, response);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(unreadable), QDMI_ERROR_FATAL);
 
-  http_stub.queue_post(200, R"({"id": )");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+    QDMI_Job_Status status{};
+    EXPECT_EQ(IQM_QDMI_device_job_check(unreadable, &status), QDMI_SUCCESS);
+    EXPECT_EQ(status, QDMI_JOB_STATUS_FAILED);
+    // A second submission would duplicate the job the server already took.
+    EXPECT_EQ(IQM_QDMI_device_job_submit(unreadable), QDMI_ERROR_BADSTATE);
 
-  // An unreadable submission response says nothing about the remote job, so
-  // the handle stays usable and can be submitted again.
+    IQM_QDMI_device_job_free(unreadable);
+  }
+
   http_stub.queue_post(200, R"({"id": "job-123"})");
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 }
@@ -3041,8 +3079,6 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
                 &format),
             QDMI_SUCCESS);
-  http_stub.queue_post(200, R"({"id": )");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
   http_stub.queue_post(200, R"({"id": "job-123"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   http_stub.queue_get(200, R"({"status": "ready"})");
