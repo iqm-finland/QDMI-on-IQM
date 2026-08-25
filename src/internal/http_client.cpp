@@ -410,7 +410,19 @@ cpr::Response Post(const cpr::Url &url,
                    const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing POST request to " + url.str());
   if (const auto &data_str = data.str(); !data_str.empty()) {
-    LOG_DEBUG("POST data: " + data_str);
+    // A binary body puts zero and control bytes into the log stream, which
+    // truncates the line for whatever reads it.
+    const auto content_type = additional_headers.find("Content-Type");
+    const auto is_textual =
+        content_type == additional_headers.end() ||
+        content_type->second.starts_with("application/json") ||
+        content_type->second.starts_with("text/");
+    if (is_textual) {
+      LOG_DEBUG("POST data: " + data_str);
+    } else {
+      LOG_DEBUG("POST data: " + std::to_string(data_str.size()) +
+                " byte(s) of " + content_type->second);
+    }
   }
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_json_headers(additional_headers);
