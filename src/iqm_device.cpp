@@ -1048,6 +1048,23 @@ Submission_queue_position(const nlohmann::json &response) {
   }
   return position->get<size_t>();
 }
+
+/**
+ * @brief Fail a job whose submission response could not be read.
+ * @details @ref iqm::http::Handle_response only reports success for HTTP 2xx,
+ *          so by this point the IQM Server has accepted the request and a job
+ *          is queued remotely. A response this client cannot read costs it the
+ *          job ID, and with it every way to poll, cancel, or collect that job.
+ *          Failing the handle keeps @ref IQM_QDMI_device_job_submit from
+ *          accepting it a second time, because a retry would queue a duplicate
+ *          job onto the hardware while the first one still runs untracked.
+ * @param job The job whose submission response was unreadable.
+ */
+void Fail_unreadable_submission(IQM_QDMI_Device_Job job) {
+  LOG_ERROR("The submission was accepted but its response carried no usable "
+            "job ID; the job may be running and cannot be tracked");
+  job->status_ = QDMI_JOB_STATUS_FAILED;
+}
 } // namespace
 
 int IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1361,11 +1378,18 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
       nlohmann::json::parse(job_submission_response.text, nullptr, false);
   if (job_submission_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the job submission response");
+    Fail_unreadable_submission(job);
     return QDMI_ERROR_FATAL;
   }
   LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
-  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  const auto job_id = job_submission_json_response.find("id");
+  if (job_id == job_submission_json_response.end() || !job_id->is_string()) {
+    LOG_ERROR("The job submission response carries no job ID");
+    Fail_unreadable_submission(job);
+    return QDMI_ERROR_FATAL;
+  }
+  job->job_id_ = job_id->get<std::string>();
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
@@ -1402,12 +1426,19 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
       nlohmann::json::parse(job_submission_response.text, nullptr, false);
   if (job_submission_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the calibration job submission response");
+    Fail_unreadable_submission(job);
     return QDMI_ERROR_FATAL;
   }
   LOG_DEBUG("Calibration job submission response:\n" +
             job_submission_json_response.dump());
 
-  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  const auto job_id = job_submission_json_response.find("id");
+  if (job_id == job_submission_json_response.end() || !job_id->is_string()) {
+    LOG_ERROR("The calibration job submission response carries no job ID");
+    Fail_unreadable_submission(job);
+    return QDMI_ERROR_FATAL;
+  }
+  job->job_id_ = job_id->get<std::string>();
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
