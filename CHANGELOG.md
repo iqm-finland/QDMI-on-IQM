@@ -13,10 +13,9 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
-  out the remaining quota window once the reported quota runs low instead of
-  taking a 30-second block. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to move the
-  point at which that happens, or to `0` to turn it off ([#214])
-  ([**@marcelwa**])
+  out the quota window instead of taking a 30-second block.
+  `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
+  ([#214]) ([**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
 
