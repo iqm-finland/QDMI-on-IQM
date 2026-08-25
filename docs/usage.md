@@ -668,6 +668,20 @@ status and cancellation with circuit jobs:
 - Submit: `/api/v1/jobs/<quantum_computer>/run`
 - Results: `/api/v1/jobs/<job_id>/artifacts/sweep_results`
 
+Two limitations follow from the program being opaque to the device.
+
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`
+does not apply. The repetition count is compiled into the `RunDefinition`, and
+the device forwards the payload without reading it, so setting the parameter
+succeeds and changes nothing. Ask for the shot count when compiling instead —
+`compile_pulse_program(..., shots=...)`.
+
+{cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` does not return
+pulse-level jobs in a usable form. A retrieved job carries no program format, so
+it is treated as a circuit job and
+{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM2` is refused on it.
+Read a pulse-level job's results through the handle that submitted them.
+
 ## Triggering Calibration Jobs
 
 Calibrations can be triggered using the

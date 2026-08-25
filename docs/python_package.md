@@ -265,3 +265,15 @@ print(results.circuit_measurement_results)
 
 Decoding needs the run definition and compiler context that produced the
 payload, which is why {py:class}`~iqm.qdmi.pulse.PulseProgram` carries both.
+
+:::{important}
+A compiled program is good for one submission. `compile_pulse_program` stamps
+the run and sweep identifiers that the IQM Server uses to tell submissions
+apart, so submitting the same `payload` twice is rejected. Compile again for a
+second run.
+:::
+
+The shot count belongs to the compiled program, not to the QDMI job:
+`QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` has no effect on a pulse-level job, because
+the device never reads the payload. Pass `shots` to `compile_pulse_program`
+instead.
