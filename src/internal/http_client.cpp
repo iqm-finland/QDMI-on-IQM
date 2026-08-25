@@ -139,7 +139,8 @@ constexpr auto RATE_LIMIT_THRESHOLD_VARIABLE =
  * @return The value, or std::nullopt when @p value is not a whole non-negative
  * number.
  */
-std::optional<std::int64_t> Parse_non_negative_number(const std::string &value) {
+std::optional<std::int64_t>
+Parse_non_negative_number(const std::string &value) {
   const char *text = value.c_str();
   errno = 0;
   char *end = nullptr;
