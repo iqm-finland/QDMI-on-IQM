@@ -2036,8 +2036,7 @@ TEST_F(DeviceJobMockTest,
 
 TEST_F(DeviceJobMockTest, CalibrationSubmissionWithoutAJobIdFailsTheJob) {
   // The calibration path reads the submission response the same way the circuit
-  // path does, so an accepted submission this client cannot name must fail the
-  // job there too rather than invite a duplicate calibration run.
+  // path does, so it must fail the job there too.
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
@@ -2880,12 +2879,9 @@ TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
             QDMI_SUCCESS);
 
   // The server accepted every one of these, so each leaves a job queued that
-  // this client cannot name. The handle is failed rather than left
-  // resubmittable, so a retry cannot queue a duplicate onto the hardware.
-  for (const auto *const response : {R"({"queue_position": 3})",
-                                     // A job ID of the wrong type must be
-                                     // reported, not retyped.
-                                     R"({"id": 5})", R"({"id": )"}) {
+  // this client cannot name. A wrongly typed ID is reported, not retyped.
+  for (const auto *const response :
+       {R"({"queue_position": 3})", R"({"id": 5})", R"({"id": )"}) {
     IQM_QDMI_Device_Job unreadable = nullptr;
     ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &unreadable),
               QDMI_SUCCESS);

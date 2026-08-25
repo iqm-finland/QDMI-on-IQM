@@ -1052,12 +1052,10 @@ Submission_queue_position(const nlohmann::json &response) {
 /**
  * @brief Fail a job whose submission response could not be read.
  * @details @ref iqm::http::Handle_response only reports success for HTTP 2xx,
- *          so by this point the IQM Server has accepted the request and a job
- *          is queued remotely. A response this client cannot read costs it the
- *          job ID, and with it every way to poll, cancel, or collect that job.
- *          Failing the handle keeps @ref IQM_QDMI_device_job_submit from
- *          accepting it a second time, because a retry would queue a duplicate
- *          job onto the hardware while the first one still runs untracked.
+ *          so the server has accepted the request and a job is queued
+ *          remotely. Without its ID there is no way to poll, cancel, or
+ *          collect it, and leaving the handle submittable invites a retry that
+ *          queues a duplicate.
  * @param job The job whose submission response was unreadable.
  */
 void Fail_unreadable_submission(IQM_QDMI_Device_Job job) {
