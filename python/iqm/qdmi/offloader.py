@@ -330,8 +330,8 @@ def sample(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        backend, sampler = build_sampler(simulator=simulator)
-        qc_for_execution = transpile(qc, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
+        sampler = build_sampler(simulator=simulator)
+        qc_for_execution = transpile(qc, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
         first_pub = _first_pub(cast("Iterable[PubResult]", job.result()))
         return extract_counts(first_pub)
@@ -446,7 +446,7 @@ def estimate(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        _, estimator = build_estimator(simulator=simulator)
+        estimator = build_estimator(simulator=simulator)
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
         return vqe.compute_minimum_eigenvalue(operator=operator)
 

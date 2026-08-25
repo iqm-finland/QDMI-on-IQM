@@ -21,13 +21,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, ClassVar
 
 try:
-    from mqt.core.fomac import DeviceDefinition, open_device, register_device_if_absent
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-    from mqt.core.plugins.qiskit.sampler import QDMISampler
+    from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -36,6 +34,10 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
+from .gates import MoveGate
+
+if TYPE_CHECKING:
+    from qiskit.circuit import Instruction
 
 __all__ = ["IQMBackend"]
 
@@ -60,6 +62,10 @@ class IQMBackend(QDMIBackend):
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
         qc_alias: Optional IQM quantum computer alias. Defaults to `IQM_QC_ALIAS`.
     """
+
+    #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
+    #: standard gate library, so the Target needs it supplied here.
+    _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
 
     def __init__(
         self,
@@ -95,21 +101,3 @@ class IQMBackend(QDMIBackend):
             custom2=resolved_qc_alias,
         )
         super().__init__(device=device)
-
-    def sampler(
-        self,
-        *,
-        default_shots: int = 1024,
-        options: dict[str, Any] | None = None,
-    ) -> QDMISampler:
-        """Returns SamplerV2 primitive bound to this backend."""
-        return QDMISampler(self, default_shots=default_shots, options=options)
-
-    def estimator(
-        self,
-        *,
-        default_precision: float = 0.0,
-        options: dict[str, Any] | None = None,
-    ) -> QDMIEstimator:
-        """Returns an EstimatorV2 primitive bound to this backend."""
-        return QDMIEstimator(self, default_precision=default_precision, options=options)

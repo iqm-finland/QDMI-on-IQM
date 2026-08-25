@@ -52,7 +52,7 @@ struct Scripted_response {
 };
 
 /**
- * @brief Scripts HTTP responses so that iqm::http::Get/Get_optional/Post
+ * @brief Scripts HTTP responses so that iqm::http::Get/Post
  * (and everything built on top of them, up to and including the public
  * `IQM_QDMI_device_session_init`) can be exercised end-to-end without any
  * live network traffic or real time delays.
