@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "iqm-qdmi"
-version = "1.3.0"
+version = "1.4.0"
 requires-python = ">=3.10"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
@@ -60,7 +60,7 @@ pulla = [
   "iqm-pulla>=14.0,<15; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
-  "mqt-core~=3.9.0",
+  "mqt-core~=3.9.1",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -77,6 +77,10 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 iqm-sampler = "iqm.qdmi.sampler:main"
 iqm-estimator = "iqm.qdmi.estimator:main"
 
+# Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
+[project.entry-points."mqt.core.qiskit.program_serializers"]
+IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
+
 [dependency-groups]
 # Deliberately not part of the `test` group: the wheel jobs run that group on
 # Python versions iqm-pulla does not support.
@@ -84,7 +88,7 @@ pulla = [
   "iqm-pulla>=14.0,<15; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
-  "mqt-core~=3.9.0",
+  "mqt-core~=3.9.1",
   "qiskit[qasm3-import]>=1.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
@@ -261,6 +265,7 @@ environment-pass = [
   "IQM_BASE_URL",
   "IQM_QC_ALIAS",
   "IQM_TOKEN",
+  "IQM_LOG_LEVEL",
   "IQM_CPP_API_LOG_LEVEL",
 ]
 

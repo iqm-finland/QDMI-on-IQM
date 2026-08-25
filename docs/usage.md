@@ -736,13 +736,22 @@ IQM_QDMI_device_job_check(job, &status);
 ## Logging
 
 The project provides a simple logging mechanism to help you debug your
-application. You can control the logging level by setting the
-`IQM_CPP_API_LOG_LEVEL` environment variable. The following logging levels are
-available:
+application. You can control the logging level by setting the `IQM_LOG_LEVEL`
+environment variable. The following logging levels are available:
 
 - `NONE`: No logging.
 - `ERROR`: Log only errors.
 - `INFO`: Log errors and info messages.
 - `DEBUG`: Log errors, info, and debug messages.
 
-By default, the logging level is set to `ERROR`.
+By default, the logging level is set to `ERROR`. Any other value disables
+logging entirely.
+
+`DEBUG` logs raw request and response bodies, including the bodies of failed
+requests. Treat that output as sensitive and avoid it in shared logs.
+
+:::{note}
+`IQM_CPP_API_LOG_LEVEL` is a deprecated alias for `IQM_LOG_LEVEL`. It is only
+read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
+`ERROR` level. It will be removed in a future release.
+:::

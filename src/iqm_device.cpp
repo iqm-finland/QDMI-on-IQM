@@ -33,6 +33,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cpr/connection_pool.h>
 #include <cpr/response.h>
 #include <cstdint>
@@ -146,12 +147,25 @@ struct IQM_QDMI_Device_Session_impl_d {
                      std::unordered_map<IQM_QDMI_Site_impl_d *, double>>
       operations_single_qubit_fidelity_map_;
 
+  /// Hash for an ordered pair of sites.
   struct Pair_hash {
+    /**
+     * @brief Combine the hashes of both elements of a pair.
+     * @param p Pair to hash
+     * @return Hash value that depends on the order of the two elements
+     */
     template <class T1, class T2>
     size_t operator()(const std::pair<T1, T2> &p) const {
-      auto hash1 = std::hash<T1>{}(p.first);
-      auto hash2 = std::hash<T2>{}(p.second);
-      return hash1 ^ hash2;
+      const size_t hash1 = std::hash<T1>{}(p.first);
+      const size_t hash2 = std::hash<T2>{}(p.second);
+      // Golden-ratio mixing as in boost::hash_combine, sized to the hash
+      // width. A plain XOR gives (a, b) and (b, a) the same hash, and the
+      // two-qubit fidelity map holds both orderings of neighbouring sites, so
+      // every such pair lands in one bucket. Key equality still tells them
+      // apart; this only keeps the buckets from degenerating into lists.
+      constexpr auto golden_ratio = static_cast<size_t>(
+          sizeof(size_t) >= 8 ? 0x9e37'79b9'7f4a'7c15ULL : 0x9e37'79b9ULL);
+      return hash1 ^ (hash2 + golden_ratio + (hash1 << 6U) + (hash1 >> 2U));
     }
   };
 
@@ -515,6 +529,42 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
+/**
+ * @brief Check that a gate's loci can be described through QDMI.
+ *
+ * The operation property interface reports a single arity for the whole gate
+ * and flattens every locus into one site list, so loci that disagree on their
+ * size cannot be sliced apart again by a caller, and a gate without loci has
+ * no arity to report at all.
+ *
+ * @param gate_name The gate the loci belong to.
+ * @param loci The loci taken from the dynamic quantum architecture.
+ * @return True when every locus holds the same non-zero number of sites.
+ */
+bool Loci_are_describable(
+    const std::string &gate_name,
+    const std::vector<std::vector<IQM_QDMI_Site_impl_d *>> &loci) {
+  if (loci.empty()) {
+    LOG_ERROR("Gate '" + gate_name + "' reports no loci; skipping the gate");
+    return false;
+  }
+  const auto arity = loci.front().size();
+  if (arity == 0) {
+    LOG_ERROR("Gate '" + gate_name +
+              "' reports a locus without sites; skipping the gate");
+    return false;
+  }
+  if (std::ranges::any_of(
+          loci, [arity](const auto &locus) { return locus.size() != arity; })) {
+    LOG_ERROR("Gate '" + gate_name +
+              "' reports loci of differing sizes where " +
+              std::to_string(arity) +
+              " site(s) are expected throughout; skipping the gate");
+    return false;
+  }
+  return true;
+}
+
 int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
   LOG_INFO("Processing calibrated gates");
   const auto bearer_token = session->token_manager_->get_bearer_token();
@@ -551,24 +601,18 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       continue; // Skip unsupported gates
     }
     LOG_DEBUG("Processing gate: " + gate_name);
-    auto &operation = session->operations_.emplace_back(
-        std::make_unique<IQM_QDMI_Operation_impl_d>());
-    operation->name_ = gate_name;
-    session->operations_ptr_.emplace_back(operation.get());
-    session->operations_map_[gate_name] = operation.get();
 
     const auto default_implementation =
         gate_details.at("default_implementation").get<std::string>();
-    operation->implementation_ = default_implementation;
     const auto &qubit_lists = gate_details.at("implementations")
                                   .at(default_implementation)
                                   .at("loci");
-    auto &operation_qubit_lists =
-        session->operations_sites_map_[operation.get()];
-    operation_qubit_lists.reserve(qubit_lists.size());
+
+    std::vector<std::vector<IQM_QDMI_Site_impl_d *>> loci;
+    loci.reserve(qubit_lists.size());
     for (const auto &qubit_list : qubit_lists) {
-      auto &qubit_list_vec = operation_qubit_lists.emplace_back();
-      qubit_list_vec.reserve(qubit_list.size());
+      auto &locus = loci.emplace_back();
+      locus.reserve(qubit_list.size());
       for (const auto &qubit : qubit_list) {
         const auto site_name = qubit.get<std::string>();
         const auto site_it = session->sites_map_.find(site_name);
@@ -581,11 +625,73 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
           LOG_ERROR(msg);
           return QDMI_ERROR_FATAL;
         }
-        qubit_list_vec.emplace_back(site_it->second);
+        locus.emplace_back(site_it->second);
       }
     }
+
+    // The operation is only registered once its loci can be reported, so that
+    // the property interface never sees a gate it cannot describe.
+    if (!Loci_are_describable(gate_name, loci)) {
+      continue;
+    }
+
+    auto &operation = session->operations_.emplace_back(
+        std::make_unique<IQM_QDMI_Operation_impl_d>());
+    operation->name_ = gate_name;
+    operation->implementation_ = default_implementation;
+    session->operations_ptr_.emplace_back(operation.get());
+    session->operations_map_[gate_name] = operation.get();
+    session->operations_sites_map_[operation.get()] = std::move(loci);
   }
   return QDMI_SUCCESS;
+}
+
+/**
+ * @brief Convert a coherence time reported in seconds to whole microseconds.
+ * @param key The quality metric the value came from.
+ * @param seconds The value the server reported for that metric.
+ * @return The value in microseconds, or `std::nullopt` when it is negative,
+ * not finite, or too large for a `uint64_t`.
+ */
+std::optional<uint64_t> Coherence_time_in_microseconds(const std::string &key,
+                                                       double seconds) {
+  const auto microseconds = seconds * 1e6;
+  const auto upper_bound =
+      static_cast<double>(std::numeric_limits<uint64_t>::max());
+  // A value below one microsecond truncates to zero, which the site property
+  // interface already uses to mean that no coherence time was reported.
+  if (!std::isfinite(microseconds) || microseconds < 1.0 ||
+      microseconds >= upper_bound) {
+    LOG_ERROR("Metric '" + key +
+              "' reports a value no coherence time can represent; ignoring it");
+    return std::nullopt;
+  }
+  return static_cast<uint64_t>(microseconds);
+}
+
+/**
+ * @brief Check that a gate's loci hold the number of sites the gate acts on.
+ *
+ * Every locus of a registered gate holds the same number of sites, so the
+ * first one speaks for all of them.
+ *
+ * @param gate_name The gate the loci belong to.
+ * @param loci The loci taken from the dynamic quantum architecture.
+ * @param arity The number of sites the gate acts on.
+ * @return True when the loci hold exactly @p arity sites each.
+ */
+bool Gate_has_arity(
+    const std::string &gate_name,
+    const std::vector<std::vector<IQM_QDMI_Site_impl_d *>> &loci,
+    size_t arity) {
+  if (!loci.empty() && loci.front().size() == arity) [[likely]] {
+    return true;
+  }
+  LOG_ERROR("Gate '" + gate_name + "' reports loci of " +
+            std::to_string(loci.empty() ? 0 : loci.front().size()) +
+            " site(s) where " + std::to_string(arity) +
+            " are expected; skipping its quality metrics");
+  return false;
 }
 
 int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
@@ -628,14 +734,18 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
     const std::string t1_key =
         "characterization.model." + qubit->name_ + ".t1_time";
     if (const auto t1_value = metrics.find(t1_key); t1_value != metrics.end()) {
-      // convert from seconds to us
-      qubit->t1_ = static_cast<uint64_t>(t1_value->second * 1e6);
+      if (const auto t1 =
+              Coherence_time_in_microseconds(t1_key, t1_value->second)) {
+        qubit->t1_ = *t1;
+      }
     }
     const std::string t2_key =
         "characterization.model." + qubit->name_ + ".t2_time";
     if (const auto t2_value = metrics.find(t2_key); t2_value != metrics.end()) {
-      // convert from seconds to us
-      qubit->t2_ = static_cast<uint64_t>(t2_value->second * 1e6);
+      if (const auto t2 =
+              Coherence_time_in_microseconds(t2_key, t2_value->second)) {
+        qubit->t2_ = *t2;
+      }
     }
   }
 
@@ -643,13 +753,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
     const auto &name = operation->name_;
     const auto &qubit_lists = session->operations_sites_map_[operation.get()];
     if (name == "measure") {
+      if (!Gate_has_arity(name, qubit_lists, 1)) {
+        continue;
+      }
       auto &single_qubit_fidelity_map =
           session->operations_single_qubit_fidelity_map_[operation.get()];
       const std::string measure_key =
           "metrics.ssro.measure." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 1);
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key = measure_key + qubit->name_ + ".fidelity";
         if (const auto metric = metrics.find(measure_qubit_key);
@@ -659,13 +771,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       }
     }
     if (name == "prx") {
+      if (!Gate_has_arity(name, qubit_lists, 1)) {
+        continue;
+      }
       auto &single_qubit_fidelity_map =
           session->operations_single_qubit_fidelity_map_[operation.get()];
       const std::string prx_key =
           "metrics.rb.prx." + operation->implementation_ + ".";
       single_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 1);
         const auto &qubit = qubit_list[0];
         const auto measure_qubit_key =
             prx_key + qubit->name_ + ".fidelity:par=d2";
@@ -676,13 +790,15 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       }
     }
     if (name == "cz") {
+      if (!Gate_has_arity(name, qubit_lists, 2)) {
+        continue;
+      }
       auto &two_qubit_fidelity_map =
           session->operations_two_qubit_fidelity_map_[operation.get()];
       const std::string cz_key =
           "metrics.irb.cz." + operation->implementation_ + ".";
       two_qubit_fidelity_map.reserve(qubit_lists.size());
       for (const auto &qubit_list : qubit_lists) {
-        assert(qubit_list.size() == 2);
         const auto &qubit1 = qubit_list[0];
         const auto &qubit2 = qubit_list[1];
         const auto cz_qubit_key =
@@ -754,7 +870,7 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Checking whether calibration jobs are supported");
   const auto cocos_health_url =
       session->api_config_->url(iqm::API_ENDPOINT::COCOS_HEALTH);
-  const auto cocos_health_response = iqm::http::Get_optional(
+  const auto cocos_health_response = iqm::http::Get(
       cocos_health_url, session->token_manager_->get_bearer_token(),
       *session->connection_pool_, session->request_timeout_);
   const auto status = iqm::http::Handle_response(
@@ -946,68 +1062,6 @@ Submission_queue_position(const nlohmann::json &response) {
     return std::nullopt;
   }
   return position->get<size_t>();
-}
-
-/**
- * @brief Adopt the native status that a submission response reports, as long as
- *        it says the job is queued.
- * @details A submission response carries the job's native status, which is a
- *          more precise observation than the generic submitted status. Only a
- *          queued observation is adopted: a terminal status would make @ref
- *          IQM_QDMI_device_job_done consider the job finished and keep @ref
- *          IQM_QDMI_device_job_wait from ever polling for it.
- * @param job The job that was just submitted.
- * @param response The parsed submission response.
- */
-void Adopt_submission_status(IQM_QDMI_Device_Job job,
-                             const nlohmann::json &response) {
-  const auto native_status = response.find("status");
-  if (native_status == response.end() || !native_status->is_string()) {
-    return;
-  }
-  // Run the observation through the regular mapping rather than repeating the
-  // native status names here.
-  const auto submitted_status = job->status_;
-  if (Set_job_status(job, native_status->get<std::string>()) != QDMI_SUCCESS ||
-      job->status_ != QDMI_JOB_STATUS_QUEUED) {
-    job->status_ = submitted_status;
-  }
-}
-
-/**
- * @brief Take the job ID, status, and queue position from a submission
- *        response.
- * @param job The job that was just submitted.
- * @param response The raw submission response.
- * @param description How the job kind is named in log messages.
- * @return @ref QDMI_SUCCESS, or @ref QDMI_ERROR_FATAL when the response is not
- *         usable JSON.
- */
-int Adopt_submission_response(IQM_QDMI_Device_Job job,
-                              const cpr::Response &response,
-                              const std::string_view description) {
-  const auto json_response =
-      nlohmann::json::parse(response.text, nullptr, false);
-  if (json_response.is_discarded()) {
-    LOG_ERROR("Failed to parse the " + std::string{description} +
-              " submission response");
-    return QDMI_ERROR_FATAL;
-  }
-  LOG_DEBUG("Submission response:\n" + json_response.dump());
-
-  job->job_id_ = json_response.at("id").get<std::string>();
-  job->status_ = QDMI_JOB_STATUS_SUBMITTED;
-  Adopt_submission_status(job, json_response);
-
-  std::string log_message =
-      "Submitted " + std::string{description} + " with ID: " + job->job_id_;
-  if (const auto queue_position = Submission_queue_position(json_response);
-      queue_position.has_value()) {
-    log_message += " (queue position: " + std::to_string(*queue_position) + ")";
-  }
-  LOG_INFO(log_message);
-
-  return QDMI_SUCCESS;
 }
 } // namespace
 
@@ -1319,7 +1373,27 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
-  return Adopt_submission_response(job, job_submission_response, "job");
+  const auto job_submission_json_response =
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the job submission response");
+    return QDMI_ERROR_FATAL;
+  }
+  LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
+
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->status_ = QDMI_JOB_STATUS_SUBMITTED;
+
+  // Log queue position if available
+  std::string log_message = "Submitted job with ID: " + job->job_id_;
+  if (const auto queue_position =
+          Submission_queue_position(job_submission_json_response);
+      queue_position.has_value()) {
+    log_message += " (queue position: " + std::to_string(*queue_position) + ")";
+  }
+  LOG_INFO(log_message);
+
+  return QDMI_SUCCESS;
 }
 
 int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
@@ -1339,8 +1413,29 @@ int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
-  return Adopt_submission_response(job, job_submission_response,
-                                   "pulse-level job");
+  const auto job_submission_json_response =
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the pulse-level job submission response");
+    return QDMI_ERROR_FATAL;
+  }
+  LOG_DEBUG("Pulse-level job submission response:\n" +
+            job_submission_json_response.dump());
+
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->status_ = QDMI_JOB_STATUS_SUBMITTED;
+
+  // Log queue position if available
+  std::string log_message =
+      "Submitted pulse-level job with ID: " + job->job_id_;
+  if (const auto queue_position =
+          Submission_queue_position(job_submission_json_response);
+      queue_position.has_value()) {
+    log_message += " (queue position: " + std::to_string(*queue_position) + ")";
+  }
+  LOG_INFO(log_message);
+
+  return QDMI_SUCCESS;
 }
 
 int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
@@ -1361,8 +1456,29 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return QDMI_ERROR_FATAL;
   }
-  return Adopt_submission_response(job, job_submission_response,
-                                   "calibration job");
+  const auto job_submission_json_response =
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the calibration job submission response");
+    return QDMI_ERROR_FATAL;
+  }
+  LOG_DEBUG("Calibration job submission response:\n" +
+            job_submission_json_response.dump());
+
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->status_ = QDMI_JOB_STATUS_SUBMITTED;
+
+  // Log queue position if available
+  std::string log_message =
+      "Submitted calibration job with ID: " + job->job_id_;
+  if (const auto queue_position =
+          Submission_queue_position(job_submission_json_response);
+      queue_position.has_value()) {
+    log_message += " (queue position: " + std::to_string(*queue_position) + ")";
+  }
+  LOG_INFO(log_message);
+
+  return QDMI_SUCCESS;
 }
 } // namespace
 
@@ -1398,6 +1514,37 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   return QDMI_ERROR_FATAL;
 }
 
+namespace {
+/**
+ * @brief Whether a refused request reports that the job was in an illegal
+ *        status for it.
+ * @details The IQM Server refuses to cancel a job that has already reached a
+ *          terminal status, and says so with an @c illegal_job_status error
+ *          code alongside HTTP 403. That status code on its own is
+ *          indistinguishable from an authorization failure, so the error code
+ *          is what separates the two. It arrives either at the root of the
+ *          response or inside an @c errors array.
+ * @param response The raw response to a request that did not succeed.
+ * @return @c true if the response reports an illegal job status.
+ */
+bool Reports_illegal_job_status(const cpr::Response &response) {
+  const auto json = nlohmann::json::parse(response.text, nullptr, false);
+  if (json.is_discarded()) {
+    return false;
+  }
+  const auto reports_it = [](const nlohmann::json &error) {
+    const auto code = error.find("error_code");
+    return code != error.end() && code->is_string() &&
+           code->get<std::string>() == "illegal_job_status";
+  };
+  if (const auto errors = json.find("errors");
+      errors != json.end() && errors->is_array()) {
+    return std::ranges::any_of(*errors, reports_it);
+  }
+  return reports_it(json);
+}
+} // namespace
+
 int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   if (job == nullptr || job->status_ == QDMI_JOB_STATUS_DONE) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -1418,6 +1565,17 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
       job->session_->request_timeout_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
+    if (Reports_illegal_job_status(job_abortion_response)) {
+      // The job already reached a terminal status, so it can no longer be
+      // canceled. QDMI documents QDMI_ERROR_INVALIDARGUMENT for that, which is
+      // also what the guard at the top of this function returns when the
+      // device already knows the status locally. The refusal does not say
+      // which terminal status the job reached, so leave that for the next
+      // check to observe.
+      LOG_DEBUG("Cancellation request for job with ID: " + job->job_id_ +
+                " was refused because the job is no longer running");
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
     // A cancellation request that never reached the server says nothing about
     // the job itself, which keeps running remotely. Leave the status untouched
     // so that the job stays observable and the request can be retried.
@@ -2130,9 +2288,9 @@ Probe_quantum_computer(IQM_QDMI_Device_Session session,
 
   const auto url =
       session->api_config_->url(endpoint, *session->quantum_computer_id_);
-  const auto http_response = iqm::http::Get_optional(
-      url, session->token_manager_->get_bearer_token(),
-      *session->connection_pool_, session->request_timeout_);
+  const auto http_response =
+      iqm::http::Get(url, session->token_manager_->get_bearer_token(),
+                     *session->connection_pool_, session->request_timeout_);
   switch (iqm::http::Handle_response(
       http_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG)) {
   case QDMI_SUCCESS:
@@ -2372,7 +2530,8 @@ int IQM_QDMI_device_session_query_operation_property(
        prop != QDMI_OPERATION_PROPERTY_CUSTOM3 &&
        prop != QDMI_OPERATION_PROPERTY_CUSTOM4 &&
        prop != QDMI_OPERATION_PROPERTY_CUSTOM5) ||
-      !session->operations_sites_map_.contains(operation)) {
+      !session->operations_sites_map_.contains(operation) ||
+      session->operations_sites_map_.at(operation).empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   // General properties
@@ -2381,7 +2540,6 @@ int IQM_QDMI_device_session_query_operation_property(
 
   const auto &available_sites_for_op =
       session->operations_sites_map_.at(operation);
-  assert(!available_sites_for_op.empty());
   const auto num_op_sites = available_sites_for_op.front().size();
   ADD_SINGLE_VALUE_PROPERTY(QDMI_OPERATION_PROPERTY_QUBITSNUM, size_t,
                             num_op_sites, prop, size, value, size_ret)

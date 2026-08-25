@@ -19,11 +19,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from mqt.core.plugins.qiskit.backend import QDMIBackend
-from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-from mqt.core.plugins.qiskit.sampler import QDMISampler
 
 from iqm.qdmi.qiskit import IQMBackend
+
+if TYPE_CHECKING:
+    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
+    from mqt.core.plugins.qiskit.sampler import QDMISampler
 
 _SIMULATOR_DEVICE_ID = "mqt.ddsim.default"
 
@@ -48,7 +52,7 @@ def build_sampler(
         its `backend` property.
     """
     if simulator:
-        return QDMISampler(QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID))
+        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).sampler()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.sampler()
@@ -69,7 +73,7 @@ def build_estimator(
         as its `backend` property.
     """
     if simulator:
-        return QDMIEstimator(QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID))
+        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).estimator()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.estimator()

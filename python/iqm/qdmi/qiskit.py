@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
@@ -33,6 +34,10 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
+from .gates import MoveGate
+
+if TYPE_CHECKING:
+    from qiskit.circuit import Instruction
 
 __all__ = ["IQMBackend"]
 
@@ -57,6 +62,10 @@ class IQMBackend(QDMIBackend):
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
         qc_alias: Optional IQM quantum computer alias. Defaults to `IQM_QC_ALIAS`.
     """
+
+    #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
+    #: standard gate library, so the Target needs it supplied here.
+    _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
 
     def __init__(
         self,

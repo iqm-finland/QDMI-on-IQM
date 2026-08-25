@@ -18,6 +18,19 @@ releases may include breaking changes.
   support ([#200]) ([**@marcelwa**])
 - ✨ Add a `pulla` extra and an `iqm.qdmi.pulse` module that compiles circuits
   into a pulse-level program and decodes its results ([#200]) ([**@marcelwa**])
+
+## [1.4.0] - 2026-08-25
+
+### Added
+
+- ✨ Take over the IQM JSON serialization and the `MoveGate` from MQT Core,
+  which removed both in 3.9.1, and advertise the serializer through MQT Core's
+  `mqt.core.qiskit.program_serializers` entry point group so any QDMI backend
+  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**])
+- ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
+  level, injected by the SPANK plugin through `iqm_log_level` and
+  `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
+  ([#206]) ([**@marcelwa**])
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
   existing job by ID, and its advertised program formats through MQT Core's
   Python QDMI API ([#195]) ([**@marcelwa**])
@@ -38,6 +51,18 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, keeping
+  only their size and content type at the default log level ([#205])
+  ([**@marcelwa**])
+- 🐛 Keep authentication working past January 2038 by reading JWT expiry times
+  as 64-bit values ([#205]) ([**@marcelwa**])
+- 🐛 Survive a calibration set whose gate loci or coherence times have an
+  unexpected shape, dropping the affected gate or metric instead of crashing or
+  misreporting it ([#204]) ([**@marcelwa**])
+- 🐛 Report a cancellation that the server refuses because the job already
+  finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
+  `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
+  the job interface ([#199]) ([**@marcelwa**])
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
   ([**@marcelwa**])
@@ -62,9 +87,9 @@ releases may include breaking changes.
 - ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
   and its explicit sampler and estimator shot and precision defaults ([#195])
   ([**@marcelwa**])
-- ⬆️ Pin QDMI to the released v1.3.3 tag instead of a `develop` commit, and
-  publish the device target's stable ID and symbol prefix through QDMI's
-  `configure_qdmi_device_target` ([#195]) ([**@marcelwa**])
+- ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
+  prefix through QDMI's `configure_qdmi_device_target` ([#195])
+  ([**@marcelwa**])
 - ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
   setup during initialization and subsequent requests ([#163])
   ([**@burgholzer**])
@@ -184,7 +209,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
@@ -194,9 +220,14 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
+[#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
+[#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#200]: https://github.com/iqm-finland/QDMI-on-IQM/pull/200
+[#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
+[#189]: https://github.com/iqm-finland/QDMI-on-IQM/pull/189
 [#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
 [#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
 [#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
