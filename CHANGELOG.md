@@ -13,8 +13,7 @@ releases may include breaking changes.
 ### Fixed
 
 - 🩹 Fail a job whose submission the IQM Server accepted but whose response
-  carried no readable job ID, instead of leaving the handle submittable. A retry
-  would have queued a second job while the first ran untracked ([#213])
+  carried no readable job ID, instead of leaving the handle submittable ([#213])
   ([**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
