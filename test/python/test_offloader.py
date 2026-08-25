@@ -365,6 +365,174 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
 
 
+@pytest.mark.parametrize(
+    ("partition", "partition_env", "expected"),
+    [
+        (None, None, "--partition=quantum"),
+        (None, "qc-nodes", "--partition=qc-nodes"),
+        ("qc-nodes", "ignored", "--partition=qc-nodes"),
+    ],
+)
+def test_sample_slurm_resolves_partition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    partition: str | None,
+    partition_env: str | None,
+    expected: str,
+) -> None:
+    """An explicit `partition` wins over `IQM_SLURM_PARTITION`, which wins over the `quantum` default."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    if partition_env is None:
+        monkeypatch.delenv("IQM_SLURM_PARTITION", raising=False)
+    else:
+        monkeypatch.setenv("IQM_SLURM_PARTITION", partition_env)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True, partition=partition)
+
+    assert expected in captured_command
+    assert captured_command.index(expected) < captured_command.index("iqm-sampler")
+
+
+def test_sample_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The `nodes` kwarg sizes the allocation while the worker stays a single task."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    # Both options only reach Slurm if they precede the worker on the command
+    # line; after it they would be the worker's own arguments.
+    offloader.sample(circuit, shots=7, local=False, simulator=True)
+    worker_index = captured_command.index("iqm-sampler")
+    assert captured_command.index("--nodes=1") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True, nodes=4)
+    worker_index = captured_command.index("iqm-sampler")
+    assert captured_command.index("--nodes=4") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+
+@pytest.mark.parametrize(
+    ("partition", "partition_env", "expected"),
+    [
+        (None, None, "--partition=quantum"),
+        (None, "qc-nodes", "--partition=qc-nodes"),
+        ("qc-nodes", "ignored", "--partition=qc-nodes"),
+    ],
+)
+def test_estimate_slurm_resolves_partition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    partition: str | None,
+    partition_env: str | None,
+    expected: str,
+) -> None:
+    """`estimate()` walks the same resolution order as `test_sample_slurm_resolves_partition`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    if partition_env is None:
+        monkeypatch.delenv("IQM_SLURM_PARTITION", raising=False)
+    else:
+        monkeypatch.setenv("IQM_SLURM_PARTITION", partition_env)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, partition=partition)
+
+    assert expected in captured_command
+    assert captured_command.index(expected) < captured_command.index("iqm-estimator")
+
+
+def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Mirrors `test_sample_slurm_requests_nodes` for `estimate()`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
+    worker_index = captured_command.index("iqm-estimator")
+    assert captured_command.index("--nodes=1") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, nodes=2)
+    worker_index = captured_command.index("iqm-estimator")
+    assert captured_command.index("--nodes=2") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+
 def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A failed Slurm job leaves its input files in place and reports where to find them."""
 

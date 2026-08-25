@@ -10,6 +10,13 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
+  `sample`/`estimate`, with the partition also resolvable from
+  `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
+  `quantum` can use the offloader ([#202]) ([**@marcelwa**])
+
 ## [1.4.0] - 2026-08-25
 
 ### Added
@@ -214,6 +221,7 @@ Compatible with QDMI `v1.3.0`.
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
+[#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
