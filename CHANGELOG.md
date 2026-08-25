@@ -10,6 +10,14 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
+  out the remaining quota window once the reported quota runs low instead of
+  taking a 30-second block. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to move the
+  point at which that happens, or to `0` to turn it off ([#214])
+  ([**@marcelwa**])
+
 ## [1.4.0] - 2026-08-25
 
 ### Added
@@ -211,6 +219,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
