@@ -10,6 +10,13 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- 🩹 Fail a job whose submission the IQM Server accepted but whose response
+  carried no readable job ID, instead of leaving the handle submittable. A retry
+  would have queued a second job while the first ran untracked ([#213])
+  ([**@marcelwa**])
+
 ## [1.4.0] - 2026-08-25
 
 ### Added
@@ -211,6 +218,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#213]: https://github.com/iqm-finland/QDMI-on-IQM/pull/213
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
