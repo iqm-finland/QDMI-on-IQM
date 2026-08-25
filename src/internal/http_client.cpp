@@ -41,6 +41,8 @@
 #include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -118,21 +120,164 @@ constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 10;
 /// Conservative fallback for malformed test servers or proxies that strip
 /// Retry-After from HTTP 429 responses. IQM's documented block duration is 30s.
 constexpr int DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS = 30;
+/// Length of the IQM Server API's rolling quota window. A quota observed now is
+/// fully replenished this long after the observation.
+constexpr int RATE_LIMIT_WINDOW_SECONDS = 10;
+/// Quota assumed when a response carries RateLimit-Remaining without a
+/// RateLimit-Limit to go with it. Matches the documented IQM Server API quota.
+constexpr std::int64_t DEFAULT_RATE_LIMIT_UNITS = 2000;
+/// Share of the quota below which a request waits for the window to replenish.
+constexpr std::int64_t DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT = 10;
+/// Names the threshold percentage. Zero disables pre-emptive throttling.
+constexpr auto RATE_LIMIT_THRESHOLD_VARIABLE =
+    "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
+
+/**
+ * @brief Parse a decimal string that must denote a non-negative number.
+ *
+ * @param value The text to parse.
+ * @return The value, or std::nullopt when @p value is not a whole non-negative
+ * number.
+ */
+std::optional<std::int64_t> Parse_non_negative_number(const std::string &value) {
+  const char *text = value.c_str();
+  errno = 0;
+  char *end = nullptr;
+  const auto parsed = std::strtoll(text, &end, 10);
+  if (end == text || *end != '\0' || errno == ERANGE || parsed < 0) {
+    return std::nullopt;
+  }
+  return parsed;
+}
 
 int Retry_after_seconds(const cpr::Response &http_response) {
   const auto retry_after = http_response.header.find("Retry-After");
   if (retry_after == http_response.header.end()) {
     return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
   }
-
-  errno = 0;
-  char *end = nullptr;
-  if (const auto seconds = std::strtol(retry_after->second.c_str(), &end, 10);
-      end != retry_after->second.c_str() && *end == '\0' && errno != ERANGE &&
-      seconds >= 0) {
-    return static_cast<int>(seconds);
+  const auto seconds = Parse_non_negative_number(retry_after->second);
+  if (!seconds.has_value() || *seconds > std::numeric_limits<int>::max()) {
+    return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
   }
-  return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+  return static_cast<int>(*seconds);
+}
+
+/// The quota reported by the most recent successful response, and when it was
+/// reported. The quota belongs to the user account rather than to a session, so
+/// every session in the process shares one tracker.
+struct Rate_limit_tracker {
+  std::mutex mutex;
+  std::int64_t remaining = 0;
+  std::int64_t limit = 0;
+  std::chrono::steady_clock::time_point observed_at;
+  bool known = false;
+};
+
+Rate_limit_tracker &Get_rate_limit_tracker() {
+  static Rate_limit_tracker tracker;
+  return tracker;
+}
+
+/**
+ * @brief Resolve the configured throttling threshold.
+ *
+ * @return The percentage of the quota below which requests wait, or zero when
+ * pre-emptive throttling is turned off.
+ */
+std::int64_t Threshold_percent() {
+  const char *configured = std::getenv(RATE_LIMIT_THRESHOLD_VARIABLE);
+  // Job schedulers and container runtimes routinely export a variable with an
+  // empty value, which must not count as a threshold the caller asked for.
+  if (configured == nullptr || *configured == '\0') {
+    return DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT;
+  }
+  const auto percent = Parse_non_negative_number(configured);
+  if (!percent.has_value() || *percent > 100) {
+    LOG_DEBUG(std::string{RATE_LIMIT_THRESHOLD_VARIABLE} +
+              " must be a whole percentage between 0 and 100; using the "
+              "default of " +
+              std::to_string(DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT));
+    return DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT;
+  }
+  return *percent;
+}
+
+/// Record the quota a successful response reports. A response without the
+/// headers teaches nothing and leaves the previous observation in place.
+void Record_rate_limit(const cpr::Response &http_response) {
+  if (http_response.status_code < 200 || http_response.status_code >= 300) {
+    return;
+  }
+  const auto remaining_header =
+      http_response.header.find("RateLimit-Remaining");
+  if (remaining_header == http_response.header.end()) {
+    return;
+  }
+  const auto remaining = Parse_non_negative_number(remaining_header->second);
+  if (!remaining.has_value()) {
+    return;
+  }
+
+  auto limit = DEFAULT_RATE_LIMIT_UNITS;
+  if (const auto limit_header = http_response.header.find("RateLimit-Limit");
+      limit_header != http_response.header.end()) {
+    if (const auto reported = Parse_non_negative_number(limit_header->second);
+        reported.has_value() && *reported > 0) {
+      limit = *reported;
+    }
+  }
+
+  auto &tracker = Get_rate_limit_tracker();
+  const std::scoped_lock lock{tracker.mutex};
+  tracker.remaining = *remaining;
+  tracker.limit = limit;
+  tracker.observed_at = std::chrono::steady_clock::now();
+  tracker.known = true;
+}
+
+/// A pending pre-emptive wait and the observation that motivated it.
+struct Rate_limit_throttle {
+  int seconds = 0;
+  std::int64_t remaining = 0;
+  std::int64_t threshold = 0;
+};
+
+/**
+ * @brief Decide whether to wait out the quota window before spending more of
+ * it.
+ *
+ * Consumes the observation, so a request that waits is followed by requests
+ * that proceed until a successful response reports the quota again.
+ *
+ * @return The wait, or std::nullopt when the quota is unknown, healthy, or
+ * already replenished.
+ */
+std::optional<Rate_limit_throttle> Rate_limit_wait() {
+  auto &tracker = Get_rate_limit_tracker();
+  const std::scoped_lock lock{tracker.mutex};
+  if (!tracker.known) {
+    return std::nullopt;
+  }
+  const auto threshold_percent = Threshold_percent();
+  if (threshold_percent == 0) {
+    return std::nullopt;
+  }
+  const auto threshold = tracker.limit * threshold_percent / 100;
+  if (tracker.remaining >= threshold) {
+    return std::nullopt;
+  }
+
+  tracker.known = false;
+  const auto left = std::chrono::seconds{RATE_LIMIT_WINDOW_SECONDS} -
+                    (std::chrono::steady_clock::now() - tracker.observed_at);
+  if (left <= std::chrono::steady_clock::duration::zero()) {
+    return std::nullopt;
+  }
+  return Rate_limit_throttle{
+      .seconds = static_cast<int>(
+          std::chrono::ceil<std::chrono::seconds>(left).count()),
+      .remaining = tracker.remaining,
+      .threshold = threshold};
 }
 
 void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
@@ -143,8 +288,9 @@ void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   LOG_ERROR(message);
 }
 
-/// Execute a hooked request, obeying IQM Server API Retry-After headers for
-/// HTTP 429 rate limiting.
+/// Execute a hooked request, holding back when the IQM Server API reports the
+/// quota running low and obeying Retry-After headers for HTTP 429 rate
+/// limiting.
 template <typename Perform_attempt>
 cpr::Response Perform_with_retries(const cpr::Url &url,
                                    const std::chrono::milliseconds timeout,
@@ -157,23 +303,51 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
     return elapsed >= timeout ? std::chrono::milliseconds::zero()
                               : timeout - elapsed;
   };
+  const auto deadline_exceeded = [&url]() {
+    cpr::Response response;
+    response.url = url;
+    response.error =
+        cpr::Error{static_cast<int>(cpr::ErrorCode::OPERATION_TIMEDOUT),
+                   "Request and rate-limit retry deadline exceeded"};
+    return response;
+  };
+  bool budget_spent = false;
   for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
-    const auto remaining = remaining_timeout();
+    auto remaining = remaining_timeout();
     if (remaining <= std::chrono::milliseconds::zero()) {
-      cpr::Response response;
-      response.url = url;
-      response.error =
-          cpr::Error{static_cast<int>(cpr::ErrorCode::OPERATION_TIMEDOUT),
-                     "Request and rate-limit retry deadline exceeded"};
-      return response;
+      return deadline_exceeded();
+    }
+
+    if (const auto throttle = Rate_limit_wait(); throttle.has_value()) {
+      if (std::chrono::seconds{throttle->seconds} >= remaining) {
+        LOG_DEBUG("Request to URL '" + url.str() +
+                  "' would wait out the rate-limit window, but that exceeds "
+                  "the remaining request timeout; proceeding without waiting");
+      } else {
+        LOG_DEBUG("Request to URL '" + url.str() + "' is holding back for " +
+                  std::to_string(throttle->seconds) +
+                  " second(s) to let the rate-limit window replenish; the "
+                  "quota is down to " +
+                  std::to_string(throttle->remaining) +
+                  " unit(s), below the threshold of " +
+                  std::to_string(throttle->threshold));
+        hooks.sleep(throttle->seconds);
+        budget_spent = true;
+        remaining = remaining_timeout();
+        if (remaining <= std::chrono::milliseconds::zero()) {
+          return deadline_exceeded();
+        }
+      }
     }
 
     const auto http_response =
-        perform_attempt(attempt == 0 ? timeout : remaining);
+        perform_attempt(attempt == 0 && !budget_spent ? timeout : remaining);
 
     if (http_response.error) {
       return http_response;
     }
+
+    Record_rate_limit(http_response);
 
     if (http_response.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
       return http_response;
@@ -218,6 +392,12 @@ void Reset_hooks() {
   get = Default_get;
   post = Default_post;
   sleep = Default_sleep;
+}
+
+void Reset_rate_limit_state() {
+  auto &tracker = Get_rate_limit_tracker();
+  const std::scoped_lock lock{tracker.mutex};
+  tracker.known = false;
 }
 
 } // namespace internal
