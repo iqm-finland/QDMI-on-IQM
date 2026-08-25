@@ -123,18 +123,35 @@ choice, resolved in this order:
 
 1. The `partition` keyword argument.
 2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
-   set the site's name once for every user.
+   set the site's name once for every user. An empty value counts as unset.
 3. `quantum`, the name used throughout the
    [SPANK plugin documentation](spank_plugin.md) and the
    [Administrator Guide](admin_guide.md).
 
-Both functions also accept a `nodes` keyword argument, forwarded as `--nodes`
-and defaulting to a single node. It has no environment fallback: the node count
-is a per-job resource request rather than a site-wide constant.
-
 ```python
-counts = sample(qc, shots=512, partition="qc-nodes", nodes=1)
+counts = sample(qc, shots=512, partition="qc-nodes")
 ```
+
+Slurm's own `SLURM_PARTITION` has no effect here, because the resolved name is
+always passed as an explicit `--partition`, which takes precedence over it.
+
+:::{important}
+Renaming the partition is not enough on its own. The SPANK plugin only runs on
+the partitions its `partitions=` option lists, so that list has to carry the new
+name too — see [Configuration](spank_plugin.md#configuration). Otherwise the
+plugin silently skips the job and never injects `IQM_BASE_URL`, `IQM_QC_ID`, or
+`IQM_QC_ALIAS`.
+:::
+
+### Sizing the Slurm Allocation
+
+Both functions accept a `nodes` keyword argument, forwarded as `--nodes` and
+defaulting to a single node. The worker itself always runs as one task
+(`--ntasks=1`), so `nodes` only sizes the allocation for a site whose partition
+demands more than one node; it does not distribute or parallelize the workload.
+
+It has no environment fallback: the node count is a per-job resource request
+rather than a site-wide constant.
 
 ### Shared Jobs Directory
 
