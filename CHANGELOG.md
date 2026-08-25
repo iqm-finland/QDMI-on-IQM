@@ -13,9 +13,9 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
-  `sample`/`estimate`, resolving the partition from `IQM_SLURM_PARTITION` when
-  it is not passed, so a site whose quantum partition is not named `quantum` can
-  use the offloader ([#202]) ([**@marcelwa**])
+  `sample`/`estimate`, with the partition also resolvable from
+  `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
+  `quantum` can use the offloader ([#202]) ([**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
 
