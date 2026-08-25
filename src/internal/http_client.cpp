@@ -26,6 +26,7 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cpr/bearer.h>
@@ -114,6 +115,10 @@ void Default_sleep(const int seconds) {
   std::this_thread::sleep_for(std::chrono::seconds(seconds));
 }
 
+std::chrono::steady_clock::time_point Default_now() {
+  return std::chrono::steady_clock::now();
+}
+
 /// Number of times to retry after receiving HTTP 429. Each retry waits for the
 /// server-provided Retry-After duration.
 constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 10;
@@ -133,19 +138,20 @@ constexpr auto RATE_LIMIT_THRESHOLD_VARIABLE =
     "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 
 /**
- * @brief Parse a decimal string that must denote a non-negative number.
+ * @brief Parse a decimal string that must denote a whole number.
+ *
+ * Callers apply their own bounds; this only rejects text that is not a number
+ * at all, or one the platform cannot represent.
  *
  * @param value The text to parse.
- * @return The value, or std::nullopt when @p value is not a whole non-negative
- * number.
+ * @return The value, or std::nullopt when @p value is not a whole number.
  */
-std::optional<std::int64_t>
-Parse_non_negative_number(const std::string &value) {
+std::optional<std::int64_t> Parse_number(const std::string &value) {
   const char *text = value.c_str();
   errno = 0;
   char *end = nullptr;
   const auto parsed = std::strtoll(text, &end, 10);
-  if (end == text || *end != '\0' || errno == ERANGE || parsed < 0) {
+  if (end == text || *end != '\0' || errno == ERANGE) {
     return std::nullopt;
   }
   return parsed;
@@ -156,8 +162,9 @@ int Retry_after_seconds(const cpr::Response &http_response) {
   if (retry_after == http_response.header.end()) {
     return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
   }
-  const auto seconds = Parse_non_negative_number(retry_after->second);
-  if (!seconds.has_value() || *seconds > std::numeric_limits<int>::max()) {
+  const auto seconds = Parse_number(retry_after->second);
+  if (!seconds.has_value() || *seconds < 0 ||
+      *seconds > std::numeric_limits<int>::max()) {
     return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
   }
   return static_cast<int>(*seconds);
@@ -192,8 +199,8 @@ std::int64_t Threshold_percent() {
   if (configured == nullptr || *configured == '\0') {
     return DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT;
   }
-  const auto percent = Parse_non_negative_number(configured);
-  if (!percent.has_value() || *percent > 100) {
+  const auto percent = Parse_number(configured);
+  if (!percent.has_value() || *percent < 0 || *percent > 100) {
     LOG_DEBUG(std::string{RATE_LIMIT_THRESHOLD_VARIABLE} +
               " must be a whole percentage between 0 and 100; using the "
               "default of " +
@@ -214,7 +221,7 @@ void Record_rate_limit(const cpr::Response &http_response) {
   if (remaining_header == http_response.header.end()) {
     return;
   }
-  const auto remaining = Parse_non_negative_number(remaining_header->second);
+  const auto remaining = Parse_number(remaining_header->second);
   if (!remaining.has_value()) {
     return;
   }
@@ -222,17 +229,22 @@ void Record_rate_limit(const cpr::Response &http_response) {
   auto limit = DEFAULT_RATE_LIMIT_UNITS;
   if (const auto limit_header = http_response.header.find("RateLimit-Limit");
       limit_header != http_response.header.end()) {
-    if (const auto reported = Parse_non_negative_number(limit_header->second);
-        reported.has_value() && *reported > 0) {
+    // A limit large enough to overflow the threshold arithmetic is not a quota
+    // any server means, so fall back to the documented one rather than trust
+    // it.
+    if (const auto reported = Parse_number(limit_header->second);
+        reported.has_value() && *reported > 0 &&
+        *reported <= std::numeric_limits<std::int64_t>::max() / 100) {
       limit = *reported;
     }
   }
 
   auto &tracker = Get_rate_limit_tracker();
   const std::scoped_lock lock{tracker.mutex};
-  tracker.remaining = *remaining;
+  // A negative count means the quota is overdrawn, which is exhausted.
+  tracker.remaining = std::max<std::int64_t>(0, *remaining);
   tracker.limit = limit;
-  tracker.observed_at = std::chrono::steady_clock::now();
+  tracker.observed_at = Get_hooks().now();
   tracker.known = true;
 }
 
@@ -247,20 +259,29 @@ struct Rate_limit_throttle {
  * @brief Decide whether to wait out the quota window before spending more of
  * it.
  *
- * Consumes the observation, so a request that waits is followed by requests
- * that proceed until a successful response reports the quota again.
+ * The answer is the time left until the observed window replenishes, so every
+ * request issued while a low quota stands waits for the same moment rather
+ * than one request waiting and the rest going through. Nothing is consumed:
+ * once the window has passed, the observation is stale and requests proceed
+ * until a successful response reports the quota again.
  *
+ * @param now The current time, from the clock hook.
  * @return The wait, or std::nullopt when the quota is unknown, healthy, or
  * already replenished.
  */
-std::optional<Rate_limit_throttle> Rate_limit_wait() {
+std::optional<Rate_limit_throttle>
+Rate_limit_wait(const std::chrono::steady_clock::time_point now) {
+  // Resolved before the lock: it reads nothing from the tracker, and neither
+  // the environment lookup nor its logging belongs in a section that every
+  // request in the process serializes on.
+  const auto threshold_percent = Threshold_percent();
+  if (threshold_percent == 0) {
+    return std::nullopt;
+  }
+
   auto &tracker = Get_rate_limit_tracker();
   const std::scoped_lock lock{tracker.mutex};
   if (!tracker.known) {
-    return std::nullopt;
-  }
-  const auto threshold_percent = Threshold_percent();
-  if (threshold_percent == 0) {
     return std::nullopt;
   }
   const auto threshold = tracker.limit * threshold_percent / 100;
@@ -268,15 +289,16 @@ std::optional<Rate_limit_throttle> Rate_limit_wait() {
     return std::nullopt;
   }
 
-  tracker.known = false;
-  const auto left = std::chrono::seconds{RATE_LIMIT_WINDOW_SECONDS} -
-                    (std::chrono::steady_clock::now() - tracker.observed_at);
-  if (left <= std::chrono::steady_clock::duration::zero()) {
+  const auto replenished_at =
+      tracker.observed_at + std::chrono::seconds{RATE_LIMIT_WINDOW_SECONDS};
+  if (replenished_at <= now) {
+    tracker.known = false;
     return std::nullopt;
   }
   return Rate_limit_throttle{
       .seconds = static_cast<int>(
-          std::chrono::ceil<std::chrono::seconds>(left).count()),
+          std::chrono::ceil<std::chrono::seconds>(replenished_at - now)
+              .count()),
       .remaining = tracker.remaining,
       .threshold = threshold};
 }
@@ -297,10 +319,10 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
                                    const std::chrono::milliseconds timeout,
                                    Perform_attempt perform_attempt) {
   const auto &hooks = Get_hooks();
-  const auto start = std::chrono::steady_clock::now();
+  const auto start = hooks.now();
   const auto remaining_timeout = [&]() {
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
+        hooks.now() - start);
     return elapsed >= timeout ? std::chrono::milliseconds::zero()
                               : timeout - elapsed;
   };
@@ -319,7 +341,8 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
       return deadline_exceeded();
     }
 
-    if (const auto throttle = Rate_limit_wait(); throttle.has_value()) {
+    if (const auto throttle = Rate_limit_wait(hooks.now());
+        throttle.has_value()) {
       if (std::chrono::seconds{throttle->seconds} >= remaining) {
         LOG_DEBUG("Request to URL '" + url.str() +
                   "' would wait out the rate-limit window, but that exceeds "
@@ -383,16 +406,19 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
 } // namespace
 
 Hooks &Get_hooks() {
-  static Hooks hooks{
-      .get = Default_get, .post = Default_post, .sleep = Default_sleep};
+  static Hooks hooks{.get = Default_get,
+                     .post = Default_post,
+                     .sleep = Default_sleep,
+                     .now = Default_now};
   return hooks;
 }
 
 void Reset_hooks() {
-  auto &[get, post, sleep] = Get_hooks();
+  auto &[get, post, sleep, now] = Get_hooks();
   get = Default_get;
   post = Default_post;
   sleep = Default_sleep;
+  now = Default_now;
 }
 
 void Reset_rate_limit_state() {

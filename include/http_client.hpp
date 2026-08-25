@@ -61,7 +61,8 @@ enum class ERROR_LOG_POLICY : uint8_t {
  * @param bearer_token Bearer token used for authentication, if configured.
  * @param connection_pool Connection pool shared by the owning device session.
  * @param timeout Overall timeout for the request, any rate-limit wait, and any
- * rate-limit retries.
+ * rate-limit retries. A timeout shorter than the wait leaves no room for it,
+ * so the request proceeds unthrottled and relies on the Retry-After path.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
@@ -84,7 +85,8 @@ cpr::Response Get(const cpr::Url &url,
  * @param data The request body data.
  * @param additional_headers Additional HTTP headers to include.
  * @param timeout Overall timeout for the request, any rate-limit wait, and any
- * rate-limit retries.
+ * rate-limit retries. A timeout shorter than the wait leaves no room for it,
+ * so the request proceeds unthrottled and relies on the Retry-After path.
  * @return CPR response object.
  */
 cpr::Response Post(const cpr::Url &url,
@@ -153,6 +155,10 @@ struct Hooks {
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;
+  /// Hook for the monotonic clock that drives request deadlines and the
+  /// rate-limit window. Tests replace it with a clock the stubbed sleep
+  /// advances, so waits are exact instead of racing the wall clock.
+  std::function<std::chrono::steady_clock::time_point()> now;
 };
 
 /// Access the mutable, process-wide hook set.
