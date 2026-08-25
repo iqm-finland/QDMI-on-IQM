@@ -54,10 +54,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-# iqm-pulla supports a narrower Python range than this package, so the marker
-# keeps `pip install iqm-qdmi[pulla]` resolvable everywhere else.
+# 13.0.0 is the first release carrying `iqm.cpc.compiler.post_process`.
 pulla = [
-  "iqm-pulla>=14.0,<15; python_version >= '3.11' and python_version < '3.15'",
+  "iqm-pulla>=13.0.0; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
   "mqt-core~=3.9.1",
@@ -82,10 +81,10 @@ iqm-estimator = "iqm.qdmi.estimator:main"
 IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
 [dependency-groups]
-# Deliberately not part of the `test` group: the wheel jobs run that group on
-# Python versions iqm-pulla does not support.
+# The marker leaves this out where iqm-pulla cannot install, and
+# `test/python/test_pulse.py` skips itself there.
 pulla = [
-  "iqm-pulla>=14.0,<15; python_version >= '3.11' and python_version < '3.15'",
+  "iqm-pulla>=13.0.0; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
   "mqt-core~=3.9.1",
@@ -101,6 +100,7 @@ test = [
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
   {include-group = "qiskit"},
+  {include-group = "pulla"},
 ]
 docs = [
   "breathe>=4.36.0",
@@ -291,20 +291,6 @@ cache-keys = [
 ]
 
 [tool.ty.analysis]
-# The following packages are solely used in the end-to-end demonstrations and are not required for the core functionality of the library.
-# To avoid limiting the usability of the core library, we purposely do not add these packages as dependencies.
-# As a consequence, we need to ignore the unresolved imports from these packages in the type analysis.
-# The `iqm.cpc`, `iqm.models`, `iqm.pulla`, `iqm.pulse`, `iqm.station_control`, and `exa` packages come with the
-# optional `pulla` extra, which the lint environment does not install.
-allowed-unresolved-imports = [
-  "mqt.bench.**",
-  "qiskit_nature.**",
-  "qiskit_algorithms.**",
-  "pyscf.**",
-  "exa.**",
-  "iqm.cpc.**",
-  "iqm.models.**",
-  "iqm.pulla.**",
-  "iqm.pulse.**",
-  "iqm.station_control.**",
-]
+# Used only by the end-to-end demonstrations, which resolve their own
+# environment, so the type analysis never sees these installed.
+allowed-unresolved-imports = ["mqt.bench.**", "qiskit_nature.**", "qiskit_algorithms.**", "pyscf.**"]

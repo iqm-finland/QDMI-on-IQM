@@ -1183,6 +1183,7 @@ qiskit = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'" },
     { name = "mqt-core" },
     { name = "nox" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
@@ -1217,6 +1218,7 @@ qiskit = [
     { name = "qiskit-algorithms" },
 ]
 test = [
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'" },
     { name = "mqt-core" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "pytest" },
@@ -1230,7 +1232,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15' and extra == 'pulla'", specifier = ">=14.0,<15" },
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15' and extra == 'pulla'", specifier = ">=13.0.0" },
     { name = "mqt-core", marker = "extra == 'qiskit'", specifier = "~=3.9.1" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
@@ -1241,6 +1243,7 @@ provides-extras = ["pulla", "qiskit"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=13.0.0" },
     { name = "mqt-core", specifier = "~=3.9.1" },
     { name = "nox", specifier = ">=2026.4.10" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
@@ -1263,7 +1266,7 @@ docs = [
     { name = "sphinx-design", specifier = ">=0.6.1" },
     { name = "sphinx-llm", specifier = ">=0.4.1" },
 ]
-pulla = [{ name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0,<15" }]
+pulla = [{ name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=13.0.0" }]
 qiskit = [
     { name = "mqt-core", specifier = "~=3.9.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
@@ -1272,6 +1275,7 @@ qiskit = [
     { name = "qiskit-algorithms", specifier = ">=0.4.0" },
 ]
 test = [
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=13.0.0" },
     { name = "mqt-core", specifier = "~=3.9.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
