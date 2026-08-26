@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
+  environment variables for IQM Server and quantum computer selection, while
+  keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
+  ([**@burgholzer**])
 - ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
   `sample`/`estimate`, with the partition also resolvable from
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
@@ -218,6 +222,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204

@@ -55,12 +55,13 @@ class IQMBackend(QDMIBackend):
     exposes it through MQT Core's Qiskit-compatible QDMI backend.
 
     Args:
-        base_url: Base URL of the IQM service. Overrides `IQM_BASE_URL` and
-            the registered device default when provided.
+        base_url: Base URL of the IQM service. Overrides `IQM_SERVER_URL`, its
+            `IQM_BASE_URL` alias, and the registered device default when provided.
         token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
-        qc_alias: Optional IQM quantum computer alias. Defaults to `IQM_QC_ALIAS`.
+        qc_alias: Optional IQM quantum computer alias. Defaults to
+            `IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias.
     """
 
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
@@ -77,12 +78,12 @@ class IQMBackend(QDMIBackend):
         qc_alias: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
-        resolved_base_url = base_url or os.getenv("IQM_BASE_URL") or None
+        resolved_base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
         tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
         resolved_tokens_file = Path(tokens_file_value) if tokens_file_value else None
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
-        resolved_qc_alias = qc_alias or os.getenv("IQM_QC_ALIAS")
+        resolved_qc_alias = qc_alias or os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS")
 
         register_device_if_absent(
             DeviceDefinition(
