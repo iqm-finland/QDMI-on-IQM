@@ -56,7 +56,8 @@ classifiers = [
 [project.optional-dependencies]
 qiskit = [
   "mqt-core~=3.9.1",
-  "qiskit[qasm3-import]>=1.1",
+  "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
+  "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
@@ -79,7 +80,8 @@ IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 [dependency-groups]
 qiskit = [
   "mqt-core~=3.9.1",
-  "qiskit[qasm3-import]>=1.1",
+  "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
+  "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
