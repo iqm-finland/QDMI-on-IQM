@@ -62,7 +62,7 @@ struct Rate_limit_budget {
   /// Quota the same response reported. Zero until one does.
   std::int64_t limit = 0;
   /// When the reading arrived.
-  std::chrono::steady_clock::time_point observed_at{};
+  std::chrono::steady_clock::time_point observed_at;
 };
 
 /**
