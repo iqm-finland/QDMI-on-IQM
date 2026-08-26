@@ -44,10 +44,11 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-Explicit arguments to `IQMBackend(...)` take precedence over `IQM_BASE_URL`,
-`IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QC_ALIAS` from the
-environment. For the endpoint, an explicit argument takes precedence over
-`IQM_BASE_URL`, which takes precedence over the registered device default.
+Explicit arguments to `IQMBackend(...)` take precedence over `IQM_SERVER_URL`,
+`IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QUANTUM_COMPUTER` from the
+environment. `IQM_BASE_URL` and `IQM_QC_ALIAS` remain supported as legacy
+aliases. Canonical variables take precedence over their legacy aliases, which
+take precedence over the registered device default.
 
 The wrapper registers the packaged IQM QDMI device as a fallback under the
 stable ID `iqm.default` with the standard Resonance endpoint as its default. An

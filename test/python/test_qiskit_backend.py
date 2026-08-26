@@ -92,11 +92,13 @@ def _expected_definition() -> dict[str, str | os.PathLike[str]]:
 def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     """The backend should forward the canonical IQM environment variables."""
     captured = _stub_backend_construction(monkeypatch)
-    monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
+    monkeypatch.setenv("IQM_SERVER_URL", "https://canonical.example")
+    monkeypatch.setenv("IQM_BASE_URL", "https://legacy.example")
     monkeypatch.setenv("IQM_TOKEN", "environment-token")
     monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
-    monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
+    monkeypatch.setenv("IQM_QUANTUM_COMPUTER", "canonical-qc-alias")
+    monkeypatch.setenv("IQM_QC_ALIAS", "legacy-qc-alias")
     environment_token = "environment-token"  # ruff:ignore[hardcoded-password-string]
 
     IQMBackend()
@@ -106,12 +108,26 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     assert captured["definition_kwargs"] == _expected_definition()
     assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"] == {
-        "base_url": "https://environment.example",
+        "base_url": "https://canonical.example",
         "token": environment_token,
         "auth_file": ENVIRONMENT_TOKENS_FILE,
         "custom1": "environment-qc-id",
-        "custom2": "environment-qc-alias",
+        "custom2": "canonical-qc-alias",
     }
+
+
+def test_iqm_backend_supports_legacy_environment_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The former routing variables should remain supported aliases."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.delenv("IQM_SERVER_URL", raising=False)
+    monkeypatch.delenv("IQM_QUANTUM_COMPUTER", raising=False)
+    monkeypatch.setenv("IQM_BASE_URL", "https://legacy.example")
+    monkeypatch.setenv("IQM_QC_ALIAS", "legacy-qc-alias")
+
+    IQMBackend()
+
+    assert captured["session"]["base_url"] == "https://legacy.example"
+    assert captured["session"]["custom2"] == "legacy-qc-alias"
 
 
 def test_iqm_backend_prefers_explicit_arguments_over_environment(
@@ -119,11 +135,13 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
 ) -> None:
     """Explicit backend arguments should override inherited environment values."""
     captured = _stub_backend_construction(monkeypatch)
-    monkeypatch.setenv("IQM_BASE_URL", "https://environment.example")
+    monkeypatch.setenv("IQM_SERVER_URL", "https://canonical.example")
+    monkeypatch.setenv("IQM_BASE_URL", "https://legacy.example")
     monkeypatch.setenv("IQM_TOKEN", "environment-token")
     monkeypatch.setenv("IQM_TOKENS_FILE", str(ENVIRONMENT_TOKENS_FILE))
     monkeypatch.setenv("IQM_QC_ID", "environment-qc-id")
-    monkeypatch.setenv("IQM_QC_ALIAS", "environment-qc-alias")
+    monkeypatch.setenv("IQM_QUANTUM_COMPUTER", "canonical-qc-alias")
+    monkeypatch.setenv("IQM_QC_ALIAS", "legacy-qc-alias")
     explicit_token = "explicit-token"  # ruff:ignore[hardcoded-password-string]
 
     IQMBackend(
@@ -146,6 +164,7 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
 def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyPatch) -> None:
     """An existing configured definition should win over the packaged fallback."""
     captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.delenv("IQM_SERVER_URL", raising=False)
     monkeypatch.delenv("IQM_BASE_URL", raising=False)
 
     def existing_registration(_definition: object) -> bool:
@@ -174,9 +193,10 @@ def test_iqm_backend_treats_empty_base_url_as_unset(
     """An empty endpoint should not override the registered device default."""
     captured = _stub_backend_construction(monkeypatch)
     if environment_base_url is None:
-        monkeypatch.delenv("IQM_BASE_URL", raising=False)
+        monkeypatch.delenv("IQM_SERVER_URL", raising=False)
     else:
-        monkeypatch.setenv("IQM_BASE_URL", environment_base_url)
+        monkeypatch.setenv("IQM_SERVER_URL", environment_base_url)
+    monkeypatch.delenv("IQM_BASE_URL", raising=False)
 
     IQMBackend(base_url=base_url)
 

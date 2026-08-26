@@ -20,6 +20,20 @@ releases may include breaking changes.
 - ✨ Add a `pulla` extra and an `iqm.qdmi.pulse` module that compiles circuits
   through a caller-owned reusable compiler and decodes its results ([#200])
   ([**@marcelwa**])
+- ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
+  environment variables for IQM Server and quantum computer selection, while
+  keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
+  ([**@burgholzer**])
+- ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
+  `sample`/`estimate`, with the partition also resolvable from
+  `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
+  `quantum` can use the offloader ([#202]) ([**@marcelwa**])
+
+### Fixed
+
+- ⬆️ Require Qiskit 2.0 on Python 3.10–3.13 and Qiskit 2.1 on Python 3.14 and
+  newer so the supported minimum environments install and run ([#218])
+  ([**@burgholzer**])
 
 ## [1.4.0] - 2026-08-25
 
@@ -222,9 +236,12 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
+[#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
+[#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
 [#200]: https://github.com/iqm-finland/QDMI-on-IQM/pull/200
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
