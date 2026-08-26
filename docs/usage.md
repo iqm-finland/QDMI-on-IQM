@@ -715,24 +715,19 @@ read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
 
 The IQM Server API meters requests against a per-account quota of 2000 units
 over a rolling ten-second window, and blocks the account for 30 seconds once
-that quota is exhausted. Submitting or cancelling a job costs 100 units, and
-reading a status or a device property costs 10, so twenty submissions inside one
-window are enough to run the quota out.
+that quota is exhausted. Submitting or cancelling a job costs 100 units and a
+read costs 10, so twenty submissions inside one window run the quota out.
 
-Every successful response reports `RateLimit-Limit` and `RateLimit-Remaining`.
-The device follows those headers and waits for the window to replenish once the
-remaining quota falls below ten percent of the limit, which is far cheaper than
-the 30-second block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to another
-whole percentage to move that point, or to `0` to turn the waiting off and take
-the block instead.
+Every successful response reports `RateLimit-Limit` and `RateLimit-Remaining`. A
+session follows what its own requests were told and waits out the rest of the
+window once the remaining quota falls below ten percent of the limit, which is
+far cheaper than the block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to
+another whole percentage to move that point, or to `0` to take the block
+instead. The wait comes out of the timeout of the request that triggered it; a
+request with less time than that left proceeds without waiting.
 
 :::{note}
-The quota belongs to the account rather than to a session, and other clients
-using the same token spend from it too. The device therefore still honors the
-`Retry-After` header of an HTTP 429 response, whether or not it saw the quota
-running out first.
+The quota belongs to the account, and other clients using the same token spend
+from it too, so no session sees all of it. The device therefore still honors the
+`Retry-After` header of an HTTP 429 response.
 :::
-
-Waiting counts against the timeout of the request that triggered it. A request
-whose remaining budget is shorter than the wait proceeds without waiting. Set
-`IQM_LOG_LEVEL` to `DEBUG` to see when the device holds a request back and why.
