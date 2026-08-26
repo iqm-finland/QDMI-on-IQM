@@ -17,6 +17,12 @@ releases may include breaking changes.
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
   `quantum` can use the offloader ([#202]) ([**@marcelwa**])
 
+### Fixed
+
+- ⬆️ Require Qiskit 2.0 on Python 3.10–3.13 and Qiskit 2.1 on Python 3.14 and
+  newer so the supported minimum environments install and run ([#218])
+  ([**@burgholzer**])
+
 ## [1.4.0] - 2026-08-25
 
 ### Added
@@ -218,6 +224,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
