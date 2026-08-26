@@ -356,7 +356,10 @@ including the
   {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT`,
 - **number of shots**: The number of shots to execute for a quantum circuit job,
   set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`,
+  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`.
+  A circuit job that sets none is rejected with
+  {cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_INVALIDARGUMENT`, while a
+  calibration job runs no circuit and carries none,
 - **heralding mode**: Controls heralding behavior (valid values: "none",
   "zeros"), set via
   {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`,

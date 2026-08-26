@@ -181,8 +181,9 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::string program_;
   /// Whether a program has been set.
   bool program_set_ = false;
-  /// The number of shots to execute for a quantum circuit job.
-  size_t num_shots_ = 0;
+  /// @brief The number of shots to execute for a quantum circuit job.
+  /// @details Unset for calibration jobs, which execute no circuit.
+  std::optional<size_t> num_shots_;
   /// @brief Heralding mode for the job.
   /// @details Valid values include "none" and "zeros".
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 parameter.
@@ -1302,8 +1303,12 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   }
   ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
                     size, value, size_ret)
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM &&
+      !job->num_shots_.has_value()) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
-                            job->num_shots_, prop, size, value, size_ret)
+                            *job->num_shots_, prop, size, value, size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
 }
 
@@ -1317,6 +1322,12 @@ std::string_view Program_contents(const std::string &stored_program) {
 }
 
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
+  if (!job->num_shots_.has_value()) {
+    // The IQM Server has no default; reject here instead of asking it to run
+    // zero shots.
+    LOG_ERROR("Submitting a circuit job without a number of shots");
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
   LOG_INFO("Submitting circuit job");
   auto json_program = nlohmann::json();
   json_program["circuits"] = nlohmann::json::array();
@@ -1328,7 +1339,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     json_program["circuits"].emplace_back(std::string{program});
   }
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
-  json_program["shots"] = job->num_shots_;
+  json_program["shots"] = *job->num_shots_;
   json_program["heralding_mode"] = job->heralding_mode_;
   json_program["move_gate_validation"] = job->move_gate_validation_;
   json_program["move_gate_frame_tracking"] = job->move_gate_frame_tracking_;
@@ -1946,11 +1957,12 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         }
 
         // Validate that the number of shots matches what was requested
-        if (!job->retrieved_ && num_shots != job->num_shots_) {
+        if (!job->retrieved_ && job->num_shots_.has_value() &&
+            num_shots != *job->num_shots_) {
           LOG_ERROR(
               "Number of shots in measurement response (" +
               std::to_string(num_shots) + ") does not match requested shots (" +
-              std::to_string(job->num_shots_) + ") for job " + job->job_id_);
+              std::to_string(*job->num_shots_) + ") for job " + job->job_id_);
           job->status_ = QDMI_JOB_STATUS_FAILED;
           return QDMI_ERROR_FATAL;
         }
