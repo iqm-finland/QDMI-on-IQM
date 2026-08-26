@@ -50,33 +50,52 @@ enum class ERROR_LOG_POLICY : uint8_t {
 };
 
 /**
+ * @brief The rate-limit quota the IQM Server API last reported to a session.
+ *
+ * The quota is metered per user account, so no client-side view of it is ever
+ * complete; a session slows down on what its own requests were told. Requests
+ * update it in place.
+ */
+struct Rate_limit_budget {
+  /// Units left in the window at the time of the reading.
+  std::int64_t remaining = 0;
+  /// Quota the same response reported. Zero until one does.
+  std::int64_t limit = 0;
+  /// When the reading arrived.
+  std::chrono::steady_clock::time_point observed_at{};
+};
+
+/**
  * @brief Perform an HTTP GET request.
  *
  * Sends an HTTP GET request to the specified URL with bearer token
- * authentication. The request waits when the IQM Server API has reported the
+ * authentication. The request waits when @p rate_limit_budget reports the
  * remaining quota running low, and HTTP 429 responses are retried according to
  * the server's Retry-After header.
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
  * @param connection_pool Connection pool shared by the owning device session.
- * @param timeout Overall timeout for the request, any rate-limit wait, and any
- * rate-limit retries. A timeout shorter than the wait leaves no room for it,
- * so the request proceeds unthrottled and relies on the Retry-After path.
+ * @param timeout Overall timeout for the request, the rate-limit wait, and any
+ * rate-limit retries.
+ * @param rate_limit_budget Quota the calling session last saw, updated in
+ * place. A request that belongs to no session passes nullptr and relies on
+ * Retry-After alone.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
                   const cpr::ConnectionPool &connection_pool,
-                  std::chrono::milliseconds timeout = std::chrono::hours{1});
+                  std::chrono::milliseconds timeout = std::chrono::hours{1},
+                  Rate_limit_budget *rate_limit_budget = nullptr);
 
 /**
  * @brief Perform an HTTP POST request.
  *
  * Sends an HTTP POST request to the specified URL with a JSON body. The
  * request automatically includes a JSON content type header and supports
- * additional custom headers. The request waits when the IQM Server API has
- * reported the remaining quota running low, and HTTP 429 responses are retried
+ * additional custom headers. The request waits when @p rate_limit_budget
+ * reports the remaining quota running low, and HTTP 429 responses are retried
  * according to the server's Retry-After header.
  *
  * @param url The target URL for the POST request.
@@ -84,9 +103,11 @@ cpr::Response Get(const cpr::Url &url,
  * @param connection_pool Connection pool shared by the owning device session.
  * @param data The request body data.
  * @param additional_headers Additional HTTP headers to include.
- * @param timeout Overall timeout for the request, any rate-limit wait, and any
- * rate-limit retries. A timeout shorter than the wait leaves no room for it,
- * so the request proceeds unthrottled and relies on the Retry-After path.
+ * @param timeout Overall timeout for the request, the rate-limit wait, and any
+ * rate-limit retries.
+ * @param rate_limit_budget Quota the calling session last saw, updated in
+ * place. A request that belongs to no session passes nullptr and relies on
+ * Retry-After alone.
  * @return CPR response object.
  */
 cpr::Response Post(const cpr::Url &url,
@@ -94,7 +115,8 @@ cpr::Response Post(const cpr::Url &url,
                    const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data,
                    const cpr::Header &additional_headers = {},
-                   std::chrono::milliseconds timeout = std::chrono::hours{1});
+                   std::chrono::milliseconds timeout = std::chrono::hours{1},
+                   Rate_limit_budget *rate_limit_budget = nullptr);
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -167,15 +189,6 @@ Hooks &Get_hooks();
 /// Restore the default (real) hooks. Used by tests to clean up after
 /// themselves.
 void Reset_hooks();
-
-/**
- * @brief Forget the rate-limit quota reported by the IQM Server API.
- *
- * The quota belongs to the user account, so it is tracked once per process and
- * outlives any single session. Tests call this to keep that state from leaking
- * between them.
- */
-void Reset_rate_limit_state();
 } // namespace internal
 
 } // namespace iqm::http
