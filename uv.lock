@@ -1015,7 +1015,8 @@ requires-dist = [
     { name = "mqt-core", marker = "extra == 'qiskit'", specifier = "~=3.9.1" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
-    { name = "qiskit", extras = ["qasm3-import"], marker = "extra == 'qiskit'", specifier = ">=1.1" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.1" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version < '3.14' and extra == 'qiskit'", specifier = ">=2.0" },
     { name = "qiskit-algorithms", marker = "extra == 'qiskit'", specifier = ">=0.4.0" },
 ]
 provides-extras = ["qiskit"]
@@ -1031,7 +1032,8 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-sugar", specifier = ">=1.1.1" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "qiskit", extras = ["qasm3-import"], specifier = ">=1.1" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version < '3.14'", specifier = ">=2.0" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version >= '3.14'", specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4.0" },
 ]
 docs = [
@@ -1048,7 +1050,8 @@ qiskit = [
     { name = "mqt-core", specifier = "~=3.9.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
-    { name = "qiskit", extras = ["qasm3-import"], specifier = ">=1.1" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version < '3.14'", specifier = ">=2.0" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version >= '3.14'", specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4.0" },
 ]
 test = [
@@ -1060,7 +1063,8 @@ test = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-sugar", specifier = ">=1.1.1" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "qiskit", extras = ["qasm3-import"], specifier = ">=1.1" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version < '3.14'", specifier = ">=2.0" },
+    { name = "qiskit", extras = ["qasm3-import"], marker = "python_full_version >= '3.14'", specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4.0" },
 ]
 
