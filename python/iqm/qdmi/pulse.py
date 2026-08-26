@@ -42,8 +42,6 @@ try:
         PullaData,
         construct_circuit_execution_results,
     )
-    from iqm.cpc.core.observation.observation_loading_rules import LatestFromStash
-    from iqm.pulla.pulla import Pulla
     from iqm.station_control.client.serializers import deserialize_sweep_results, serialize_run_definition
     from iqm.station_control.interface.models import JobExecutorStatus, RunData, RunDefinition, SweepData
 except ImportError as e:
@@ -56,6 +54,7 @@ except ImportError as e:
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from iqm.cpc.compiler.compiler import Compiler
     from iqm.pulse import Circuit
 
 __all__ = ["PulseProgram", "compile_pulse_program", "decode_sweep_results"]
@@ -87,37 +86,21 @@ class PulseProgram:
 
 
 def compile_pulse_program(
+    compiler: Compiler,
     circuits: Sequence[Circuit],
     *,
-    base_url: str | None = None,
-    quantum_computer: str | None = None,
-    token: str | None = None,
-    tokens_file: str | None = None,
     shots: int = DEFAULT_SHOTS,
-    calibration_set_id: str = "default",
 ) -> PulseProgram:
-    """Compile circuits into a pulse-level program for a quantum computer.
-
-    This opens its own connection to the IQM Server, because compiling needs the
-    quantum computer's settings, chip topology, and calibration set.
+    """Compile circuits with a caller-owned IQM pulse compiler.
 
     Args:
+        compiler: Reusable compiler configured by the caller's Pulla instance.
         circuits: Circuits to compile.
-        base_url: Base URL of the IQM Server. Defaults to `IQM_SERVER_URL`.
-        quantum_computer: ID or alias of the quantum computer. Defaults to
-            `IQM_QUANTUM_COMPUTER`, then to the server's own default.
-        token: Authentication token. Defaults to `IQM_TOKEN`.
-        tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         shots: Number of repetitions of each circuit.
-        calibration_set_id: Calibration set to compile against.
 
     Returns:
         The compiled program.
     """
-    pulla = Pulla(base_url, quantum_computer=quantum_computer, token=token, tokens_file=tokens_file)
-    compiler = pulla.get_standard_compiler(
-        loading_rules=[LatestFromStash(pulla.get_calibration_stash(calibration_set_id))]
-    )
     settings = compiler.get_settings(circuits=circuits)
     settings.set_shots(shots)
     run_definition, context = compiler.compile(circuits, settings=settings)

@@ -54,9 +54,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-# 13.0.0 is the first release carrying `iqm.cpc.compiler.post_process`.
+# 14.0.1 is the oldest Pulla release supported by this integration.
 pulla = [
-  "iqm-pulla>=13.0.0; python_version >= '3.11' and python_version < '3.15'",
+  "iqm-pulla>=14.0.1; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
   "mqt-core~=3.9.1",
@@ -84,7 +84,7 @@ IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 # The marker leaves this out where iqm-pulla cannot install, and
 # `test/python/test_pulse.py` skips itself there.
 pulla = [
-  "iqm-pulla>=13.0.0; python_version >= '3.11' and python_version < '3.15'",
+  "iqm-pulla>=14.0.1; python_version >= '3.11' and python_version < '3.15'",
 ]
 qiskit = [
   "mqt-core~=3.9.1",

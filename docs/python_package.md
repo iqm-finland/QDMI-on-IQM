@@ -235,7 +235,7 @@ IQM's circuit-to-pulse compiler. That compiler is a heavy dependency, so it
 comes with the optional `pulla` extra:
 
 ```console
-uv pip install iqm-qdmi[pulla]
+uv pip install iqm-qdmi[pulla,qiskit]
 ```
 
 :::{important}
@@ -244,21 +244,43 @@ itself. Outside that range the extra installs nothing and
 {py:mod}`iqm.qdmi.pulse` raises an {py:exc}`ImportError`.
 :::
 
-{py:func}`~iqm.qdmi.pulse.compile_pulse_program` opens its own connection to the
-IQM Server, because compiling needs the quantum computer's settings, chip
-topology, and calibration set:
+The caller owns the Pulla connection, calibration policy, and compiler. Create
+them once and reuse the compiler across runs. With `IQM_SERVER_URL`,
+`IQM_QUANTUM_COMPUTER`, and `IQM_TOKEN` set, a complete one-qubit workflow is:
 
 ```python
+from iqm.cpc.core.observation.observation_loading_rules import LatestFromStash
+from iqm.pulla.pulla import Pulla
+from iqm.pulse import Circuit, CircuitOperation
+from mqt.core.qdmi import CustomProperty, ProgramFormat
+
 from iqm.qdmi.pulse import compile_pulse_program, decode_sweep_results
+from iqm.qdmi.qiskit import IQMBackend
 
-program = compile_pulse_program(circuits, base_url="…", quantum_computer="emerald", shots=1024)
-```
+pulla = Pulla()
+compiler = pulla.get_standard_compiler(loading_rules=[LatestFromStash(pulla.get_calibration_stash("default"))])
+circuits = [
+    Circuit(
+        "measure-qb1",
+        (CircuitOperation("measure", ("QB1",), {"key": "m"}),),
+    )
+]
+program = compile_pulse_program(compiler, circuits, shots=1)
 
-`program.payload` is what goes in as the QDMI program. Once the job is done,
-read custom job result 2 and hand the bytes back:
+device = IQMBackend().device
+job = device.submit_job(program.payload, ProgramFormat.CUSTOM1)
+job_id = job.id
+if not job.wait(timeout=600):
+    job.cancel()
+    raise TimeoutError("pulse-level job did not finish within 10 minutes")
 
-```python
+raw_sweep_results = job.get_custom_result(CustomProperty.CUSTOM2, bytes)
+assert raw_sweep_results is not None
 results = decode_sweep_results(program, raw_sweep_results)
+
+reopened = device.retrieve_job_by_id(job_id)
+reopened_sweep_results = reopened.get_custom_result(CustomProperty.CUSTOM2, bytes)
+assert reopened_sweep_results == raw_sweep_results
 
 print(results.circuit_measurement_results)
 ```
@@ -273,7 +295,6 @@ apart, so submitting the same `payload` twice is rejected. Compile again for a
 second run.
 :::
 
-The shot count belongs to the compiled program, not to the QDMI job:
-`QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` has no effect on a pulse-level job, because
-the device never reads the payload. Pass `shots` to `compile_pulse_program`
-instead.
+The shot count belongs to the compiled program, not to the QDMI job: setting or
+querying `QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` returns `QDMI_ERROR_NOTSUPPORTED`.
+Pass `shots` to `compile_pulse_program` instead.
