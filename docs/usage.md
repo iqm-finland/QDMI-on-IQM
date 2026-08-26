@@ -305,6 +305,9 @@ The following properties about the device can be queried via the
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_PULSESUPPORT`:
+  {cpp:enumerator}`~QDMI_DEVICE_PULSE_SUPPORT_LEVEL_T::QDMI_DEVICE_PULSE_SUPPORT_LEVEL_CHANNEL`,
+  because IQM's pulse schedules address controller channels rather than sites.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
 
@@ -489,6 +492,10 @@ The QDMI device currently supports the following program formats:
 - **Calibration Configurations**
   ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION`):
   Calibration job configurations (only if server supports calibration jobs).
+- **Pulse-level programs**
+  ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CUSTOM1`): a
+  serialized IQM `RunDefinition` protobuf, described under "Submitting
+  Pulse-Level Jobs" below.
 
 For QIR and JSON formats, the program should be provided as a string via the
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
@@ -625,6 +632,55 @@ return measurement data, not state vectors or probability distributions:
 
 Attempting to retrieve these formats will return
 {cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`.
+
+## Submitting Pulse-Level Jobs
+
+QDMI has no program format of its own for pulse-level programs, so this device
+carries one in
+{cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CUSTOM1`. The
+program is a serialized IQM `RunDefinition` protobuf, the same payload IQM's own
+client submits, and the device forwards it to the IQM Server byte for byte
+without reading it.
+
+Because the payload is binary, its length is the byte count, with no terminator:
+
+```cpp
+IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
+                                  sizeof(QDMI_Program_Format), &format);
+IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                                  payload.size(), payload.data());
+IQM_QDMI_device_job_submit(job);
+```
+
+Results come back as the raw `sweep_results` artifact via the
+{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM2` job result, again
+as protobuf bytes with no terminator. Shot and histogram results are not
+available for a pulse-level job, because the IQM Server produces no measurement
+artifacts for one; asking for them returns
+{cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`.
+
+:::{note}
+Producing the payload and decoding the artifact both need IQM's circuit-to-pulse
+compiler. The `iqm.qdmi.pulse` Python module does both; see
+[Pulse-Level Programs](python_package.md#pulse-level-programs).
+:::
+
+Pulse-level jobs use their own submission and artifact endpoints, but share
+status and cancellation with circuit jobs:
+
+- Submit: `/api/v1/jobs/<quantum_computer>/run`
+- Results: `/api/v1/jobs/<job_id>/artifacts/sweep_results`
+
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`
+does not apply. The repetition count is compiled into the `RunDefinition`, and
+the device forwards the payload without reading it, so setting or querying the
+parameter returns {cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`. Ask
+for the shot count when compiling instead —
+`compile_pulse_program(..., shots=...)`.
+
+{cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` recognizes the IQM
+Server's `run` job type, so a later session can reopen a pulse-level job and
+retrieve {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM2`.
 
 ## Triggering Calibration Jobs
 

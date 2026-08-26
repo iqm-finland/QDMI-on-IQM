@@ -113,6 +113,31 @@ TEST(HttpClientTest, SuccessMessagesAreLogged) {
   EXPECT_NE(logs.find("Request successful (HTTP 200)"), std::string::npos);
 }
 
+TEST(HttpClientTest, SuccessfulProtobufResponseSkipsJsonParsing) {
+  const LoggerCapture logger_capture;
+
+  const auto ret = iqm::http::Handle_response(
+      Make_response(200, "https://example.test/artifact",
+                    std::string{"\0\x01", 2}, "application/protobuf"));
+
+  EXPECT_EQ(ret, QDMI_SUCCESS);
+  EXPECT_EQ(logger_capture.str().find("Response is not valid JSON"),
+            std::string::npos);
+}
+
+TEST(HttpClientTest, ProtobufErrorResponseStillParsesJson) {
+  const LoggerCapture logger_capture;
+
+  const auto ret = iqm::http::Handle_response(Make_response(
+      400, "https://example.test/run",
+      R"({"error_code":"unsupported_job_type","message":"not enabled"})",
+      "application/protobuf"));
+
+  EXPECT_EQ(ret, QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_NE(logger_capture.str().find("[unsupported_job_type] not enabled"),
+            std::string::npos);
+}
+
 TEST(HttpClientTest, InvalidJsonServerErrorFallsBackToRawResponse) {
   const LoggerCapture logger_capture;
 
@@ -243,6 +268,22 @@ TEST(HttpClientTest, PostReturnsFatalWhenRequestFails) {
   EXPECT_NE(
       logger_capture.str().find("Request failed: Failed to connect to host"),
       std::string::npos);
+}
+
+TEST(HttpClientTest, PostLogsOnlyTheSizeOfProtobufData) {
+  const LoggerCapture logger_capture;
+  iqm::test_support::HttpStub http_stub;
+  const cpr::ConnectionPool connection_pool;
+  http_stub.queue_post(200);
+
+  const auto response = iqm::http::Post(
+      "https://example.test/run", std::nullopt, connection_pool,
+      std::string{"x\0y", 3}, {{"Content-Type", "application/protobuf"}});
+
+  EXPECT_EQ(iqm::http::Handle_response(response), QDMI_SUCCESS);
+  EXPECT_NE(logger_capture.str().find("POST data: 3 protobuf byte(s)"),
+            std::string::npos);
+  EXPECT_EQ(logger_capture.str().find("POST data: x"), std::string::npos);
 }
 
 TEST(HttpClientTest, BearerTokenIsPassedToHooks) {

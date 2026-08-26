@@ -253,3 +253,76 @@ print(job.check())
 ```
 
 A retrieved job cannot be resubmitted, and its parameters cannot be changed.
+
+## Pulse-Level Programs
+
+The device accepts pulse-level programs in custom program format 1, as
+[Submitting Pulse-Level Jobs](usage.md#submitting-pulse-level-jobs) describes.
+Producing one means compiling circuits down to a pulse schedule, which needs
+IQM's circuit-to-pulse compiler. That compiler is a heavy dependency, so it
+comes with the optional `pulla` extra:
+
+```console
+uv pip install iqm-qdmi[pulla,qiskit]
+```
+
+:::{important}
+`iqm-pulla` supports Python 3.11 to 3.14, a narrower range than `iqm-qdmi`
+itself. Outside that range the extra installs nothing and
+{py:mod}`iqm.qdmi.pulse` raises an {py:exc}`ImportError`.
+:::
+
+The caller owns the Pulla connection, calibration policy, and compiler. Create
+them once and reuse the compiler across runs. With `IQM_SERVER_URL`,
+`IQM_QUANTUM_COMPUTER`, and `IQM_TOKEN` set, a complete one-qubit workflow is:
+
+```python
+from iqm.cpc.core.observation.observation_loading_rules import LatestFromStash
+from iqm.pulla.pulla import Pulla
+from iqm.pulse import Circuit, CircuitOperation
+from mqt.core.qdmi import CustomProperty, ProgramFormat
+
+from iqm.qdmi.pulse import compile_pulse_program, decode_sweep_results
+from iqm.qdmi.qiskit import IQMBackend
+
+pulla = Pulla()
+compiler = pulla.get_standard_compiler(loading_rules=[LatestFromStash(pulla.get_calibration_stash("default"))])
+circuits = [
+    Circuit(
+        "measure-qb1",
+        (CircuitOperation("measure", ("QB1",), {"key": "m"}),),
+    )
+]
+program = compile_pulse_program(compiler, circuits, shots=1)
+
+device = IQMBackend().device
+job = device.submit_job(program.payload, ProgramFormat.CUSTOM1)
+job_id = job.id
+if not job.wait(timeout=600):
+    job.cancel()
+    raise TimeoutError("pulse-level job did not finish within 10 minutes")
+
+raw_sweep_results = job.get_custom_result(CustomProperty.CUSTOM2, bytes)
+assert raw_sweep_results is not None
+results = decode_sweep_results(program, raw_sweep_results)
+
+reopened = device.retrieve_job_by_id(job_id)
+reopened_sweep_results = reopened.get_custom_result(CustomProperty.CUSTOM2, bytes)
+assert reopened_sweep_results == raw_sweep_results
+
+print(results.circuit_measurement_results)
+```
+
+Decoding needs the run definition and compiler context that produced the
+payload, which is why {py:class}`~iqm.qdmi.pulse.PulseProgram` carries both.
+
+:::{important}
+A compiled program is good for one submission. `compile_pulse_program` stamps
+the run and sweep identifiers that the IQM Server uses to tell submissions
+apart, so submitting the same `payload` twice is rejected. Compile again for a
+second run.
+:::
+
+The shot count belongs to the compiled program, not to the QDMI job: setting or
+querying `QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` returns `QDMI_ERROR_NOTSUPPORTED`.
+Pass `shots` to `compile_pulse_program` instead.

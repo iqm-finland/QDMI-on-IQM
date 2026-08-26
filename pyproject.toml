@@ -54,8 +54,12 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+# 14.0.1 is the oldest Pulla release supported by this integration.
+pulla = [
+  "iqm-pulla>=14.0.1; python_version >= '3.11' and python_version < '3.15'",
+]
 qiskit = [
-  "mqt-core~=3.9.1",
+  "mqt-core~=3.9.2",
   "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
   "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
   "qiskit-algorithms>=0.4.0",
@@ -78,8 +82,13 @@ iqm-estimator = "iqm.qdmi.estimator:main"
 IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
 [dependency-groups]
+# The marker leaves this out where iqm-pulla cannot install, and
+# `test/python/test_pulse.py` skips itself there.
+pulla = [
+  "iqm-pulla>=14.0.1; python_version >= '3.11' and python_version < '3.15'",
+]
 qiskit = [
-  "mqt-core~=3.9.1",
+  "mqt-core~=3.9.2",
   "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
   "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
   "qiskit-algorithms>=0.4.0",
@@ -93,6 +102,7 @@ test = [
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8.0",
   {include-group = "qiskit"},
+  {include-group = "pulla"},
 ]
 docs = [
   "breathe>=4.36.0",
@@ -283,7 +293,6 @@ cache-keys = [
 ]
 
 [tool.ty.analysis]
-# The following packages are solely used in the end-to-end demonstrations and are not required for the core functionality of the library.
-# To avoid limiting the usability of the core library, we purposely do not add these packages as dependencies.
-# As a consequence, we need to ignore the unresolved imports from these packages in the type analysis.
+# Used only by the end-to-end demonstrations, which resolve their own
+# environment, so the type analysis never sees these installed.
 allowed-unresolved-imports = ["mqt.bench.**", "qiskit_nature.**", "qiskit_algorithms.**", "pyscf.**"]

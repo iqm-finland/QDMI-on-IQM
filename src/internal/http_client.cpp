@@ -231,11 +231,16 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
   }
 
   const auto response_code = response.status_code;
+  const auto response_content_type = response.header.find("Content-Type");
+  const auto is_successful_protobuf =
+      response_code >= 200 && response_code < 300 &&
+      response_content_type != response.header.end() &&
+      response_content_type->second.starts_with("application/protobuf");
 
   // Parse JSON response for IQM-specific errors and messages
   nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
-  if (!response.text.empty()) {
+  if (!response.text.empty() && !is_successful_protobuf) {
     try {
       json_response = nlohmann::json::parse(response.text);
       has_json = true;
@@ -410,7 +415,12 @@ cpr::Response Post(const cpr::Url &url,
                    const std::chrono::milliseconds timeout) {
   LOG_INFO("Performing POST request to " + url.str());
   if (const auto &data_str = data.str(); !data_str.empty()) {
-    LOG_DEBUG("POST data: " + data_str);
+    const auto content_type = additional_headers.find("Content-Type");
+    LOG_DEBUG(content_type != additional_headers.end() &&
+                      content_type->second.starts_with("application/protobuf")
+                  ? "POST data: " + std::to_string(data_str.size()) +
+                        " protobuf byte(s)"
+                  : "POST data: " + data_str);
   }
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_json_headers(additional_headers);

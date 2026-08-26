@@ -12,6 +12,14 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Accept pulse-level programs as `QDMI_PROGRAM_FORMAT_CUSTOM1`, submit them
+  to the IQM Server's pulse-level job endpoint, and return the raw sweep results
+  as `QDMI_JOB_RESULT_CUSTOM2`, including after reopening a run by ID. The
+  device reports channel-level pulse support and rejects QDMI shot parameters,
+  because repetitions live in the pulse payload ([#200]) ([**@marcelwa**])
+- ✨ Add a `pulla` extra and an `iqm.qdmi.pulse` module that compiles circuits
+  through a caller-owned reusable compiler and decodes its results ([#200])
+  ([**@marcelwa**])
 - ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
   environment variables for IQM Server and quantum computer selection, while
   keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
@@ -234,6 +242,7 @@ Compatible with QDMI `v1.3.0`.
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
+[#200]: https://github.com/iqm-finland/QDMI-on-IQM/pull/200
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
