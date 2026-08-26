@@ -115,15 +115,43 @@ Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when
 submitting Slurm jobs to target simulated devices instead of real QPU hardware.
 
-### Slurm Partition Requirement
+### Selecting the Slurm Partition
 
-Both functions submit their `srun` jobs to a partition named `quantum`
-(`srun --partition=quantum ...`). This assumes the cluster has a partition of
-that exact name configured, typically gating access to nodes with the quantum
-computer exposed as a Slurm GRES resource. Ensure such a `quantum` partition
-exists before using the offloader; see the
-[SPANK plugin documentation](spank_plugin.md) for an example cluster
-configuration.
+Both functions submit their `srun` jobs to the partition gating the nodes that
+expose the quantum computer as a Slurm GRES resource. Its name is a per-site
+choice, resolved in this order:
+
+1. The `partition` keyword argument.
+2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
+   set the site's name once for every user. An empty value counts as unset.
+3. `quantum`, the name used throughout the
+   [SPANK plugin documentation](spank_plugin.md) and the
+   [Administrator Guide](admin_guide.md).
+
+```python
+counts = sample(qc, shots=512, partition="qc-nodes")
+```
+
+Slurm's own `SLURM_PARTITION` has no effect here, because the resolved name is
+always passed as an explicit `--partition`, which takes precedence over it.
+
+:::{important}
+Renaming the partition is not enough on its own. The SPANK plugin only runs on
+the partitions its `partitions=` option lists, so that list has to carry the new
+name too — see [Configuration](spank_plugin.md#configuration). Otherwise the
+plugin silently skips the job and never injects `IQM_BASE_URL`, `IQM_QC_ID`, or
+`IQM_QC_ALIAS`.
+:::
+
+### Sizing the Slurm Allocation
+
+Both functions accept a `nodes` keyword argument, forwarded as `--nodes` and
+defaulting to a single node. The worker itself always runs as one task
+(`--ntasks=1`), so `nodes` only sizes the allocation for a site whose partition
+demands more than one node; it does not distribute or parallelize the workload.
+
+It has no environment fallback: the node count is a per-job resource request
+rather than a site-wide constant.
 
 ### Shared Jobs Directory
 
