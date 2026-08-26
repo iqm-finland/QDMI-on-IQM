@@ -21,7 +21,6 @@
 #include "http_stub.hpp"
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
-#include "scoped_env_var.hpp"
 
 #include <chrono>
 #include <cpr/body.h>
@@ -29,11 +28,13 @@
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 #include <string_view>
 #include <utility>
@@ -85,8 +86,6 @@ private:
   std::stringstream log_stream_;
 };
 
-using iqm::test_support::ScopedEnvVar;
-
 /// Names the share of the quota below which requests hold back.
 constexpr auto THRESHOLD_VARIABLE = "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 
@@ -95,6 +94,58 @@ constexpr auto THRESHOLD_VARIABLE = "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 cpr::Header Quota_headers(const std::string &remaining) {
   return {{"RateLimit-Limit", "2000"}, {"RateLimit-Remaining", remaining}};
 }
+
+/**
+ * @brief Fixture for the wait that precedes a request when the quota runs low.
+ *
+ * Holds the session's quota and pins the threshold variable off the
+ * environment, so a value the developer exports cannot change what a test
+ * means.
+ */
+class RateLimitTest : public testing::Test {
+protected:
+  void SetUp() override {
+    if (const char *existing = std::getenv(THRESHOLD_VARIABLE);
+        existing != nullptr) {
+      previous_threshold_ = existing;
+    }
+    set_threshold(nullptr);
+  }
+
+  void TearDown() override {
+    set_threshold(previous_threshold_.has_value() ? previous_threshold_->c_str()
+                                                  : nullptr);
+  }
+
+  /// Set the threshold to @p percent, or unset it to get the built-in default.
+  static void set_threshold(const char *percent) {
+#ifdef _WIN32
+    static_cast<void>(
+        _putenv_s(THRESHOLD_VARIABLE, percent == nullptr ? "" : percent));
+#else
+    static_cast<void>(percent == nullptr
+                          ? unsetenv(THRESHOLD_VARIABLE)
+                          : setenv(THRESHOLD_VARIABLE, percent, 1));
+#endif
+  }
+
+  /// Issue @p count requests on this session, spending its quota.
+  void get(const int count,
+           const std::chrono::milliseconds timeout = std::chrono::hours{1}) {
+    for (int request = 0; request < count; ++request) {
+      static_cast<void>(iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool_, timeout,
+                                       &budget_));
+    }
+  }
+
+  iqm::test_support::HttpStub http_stub_;
+  cpr::ConnectionPool connection_pool_;
+  iqm::http::Rate_limit_budget budget_;
+
+private:
+  std::optional<std::string> previous_threshold_;
+};
 
 cpr::Response Make_response(const int64_t status_code, std::string url,
                             std::string body,
@@ -446,412 +497,114 @@ TEST(HttpClientTest, RetriesExhaustedForHttp429ReturnsInvalidArgument) {
             std::string::npos);
 }
 
-TEST(HttpClientTest, ThrottlesBeforeTheRateLimitQuotaRunsOut) {
+TEST_F(RateLimitTest, WaitsForTheWindowWhenTheQuotaRunsLow) {
   const LoggerCapture logger_capture;
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+  get(1);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+  get(1);
 
-  const auto response = iqm::http::Get("https://example.test/jobs",
-                                       std::nullopt, connection_pool);
-
-  EXPECT_EQ(iqm::http::Handle_response(response), QDMI_SUCCESS);
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-  EXPECT_NE(logger_capture.str().find(
-                "is holding back for 10 second(s) to let the rate-limit window "
-                "replenish; the quota is down to 50 unit(s), below the "
-                "threshold of 200"),
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
+  // The wait comes out of the request's own timeout.
+  EXPECT_EQ(http_stub_.get_timeouts().back(),
+            std::chrono::hours{1} - std::chrono::seconds{10});
+  EXPECT_NE(logger_capture.str().find("is holding back for 10 second(s) to let "
+                                      "the rate-limit window replenish"),
             std::string::npos);
 }
 
-TEST(HttpClientTest, DoesNotThrottleWhileTheRateLimitQuotaIsHealthy) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("1500")).queue_get(200);
+TEST_F(RateLimitTest, DoesNotWaitWhileTheQuotaIsHealthy) {
+  // 200 units is exactly the default threshold of ten percent, which is not
+  // yet low enough to hold anything back.
+  http_stub_.queue_get(200, "", Quota_headers("200")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
+  get(2);
 
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
 }
 
-TEST(HttpClientTest, DoesNotThrottleWithoutRateLimitHeaders) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
-}
-
-TEST(HttpClientTest, IgnoresRateLimitHeadersOnAFailedResponse) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(500, "", Quota_headers("0")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
-}
-
-TEST(HttpClientTest, ThrottlesOnceUntilTheQuotaIsReportedAgain) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50"))
-      .queue_get(200)
+TEST_F(RateLimitTest, DoesNotWaitWithoutUsableRateLimitHeaders) {
+  http_stub_.queue_get(200)
+      .queue_get(200, "", {{"RateLimit-Remaining", "50"}})
+      .queue_get(
+          200, "",
+          {{"RateLimit-Limit", "2000"}, {"RateLimit-Remaining", "none left"}})
       .queue_get(200);
 
-  for (int request = 0; request < 3; ++request) {
-    static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                     connection_pool));
-  }
+  get(4);
 
-  EXPECT_EQ(http_stub.get_urls().size(), 3U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
+  EXPECT_EQ(http_stub_.get_urls().size(), 4U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
 }
 
-TEST(HttpClientTest, AssumesTheDocumentedQuotaWithoutARateLimitLimitHeader) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", {{"RateLimit-Remaining", "100"}}).queue_get(200);
+TEST_F(RateLimitTest, IgnoresRateLimitHeadersOnAFailedResponse) {
+  http_stub_.queue_get(500, "", Quota_headers("0")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
+  get(2);
 
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
 }
 
-TEST(HttpClientTest, ThrottlingIsDisabledByAZeroThreshold) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, "0");
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("0")).queue_get(200);
+TEST_F(RateLimitTest, DoesNotWaitOnAQuotaReadingOlderThanTheWindow) {
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
+  get(1);
+  http_stub_.advance(std::chrono::seconds{10});
+  get(1);
 
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
 }
 
-TEST(HttpClientTest, ThrottlingHonorsAConfiguredThreshold) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, "50");
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  // Well above the default threshold of ten percent, below the configured one.
-  http_stub.queue_get(200, "", Quota_headers("900")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, MalformedThresholdFallsBackToTheDefault) {
+TEST_F(RateLimitTest, DoesNotWaitLongerThanTheRequestTimeout) {
   const LoggerCapture logger_capture;
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, "half");
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
+  get(1);
+  get(1, std::chrono::seconds{5});
 
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-  EXPECT_NE(logger_capture.str().find(
-                "IQM_RATE_LIMIT_THRESHOLD_PERCENT must be a whole percentage "
-                "between 0 and 100; using the default of 10"),
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+  EXPECT_NE(logger_capture.str().find("exceeds the request timeout"),
             std::string::npos);
 }
 
-TEST(HttpClientTest, ThrottleWaitDoesNotOutliveRequestTimeout) {
+TEST_F(RateLimitTest, AZeroThresholdTurnsTheWaitingOff) {
+  set_threshold("0");
+  // An overdrawn quota is the extreme the knob still has to let through.
+  http_stub_.queue_get(200, "", Quota_headers("-5")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, AConfiguredThresholdMovesThePoint) {
+  set_threshold("50");
+  // Healthy at the default threshold of ten percent, low at fifty.
+  http_stub_.queue_get(200, "", Quota_headers("900")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
+}
+
+TEST_F(RateLimitTest, AMalformedThresholdFallsBackToTheDefault) {
   const LoggerCapture logger_capture;
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
+  set_threshold("101");
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
 
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  const auto response =
-      iqm::http::Get("https://example.test/jobs", std::nullopt, connection_pool,
-                     std::chrono::milliseconds{1'000});
+  get(2);
 
-  EXPECT_EQ(iqm::http::Handle_response(response), QDMI_SUCCESS);
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
   EXPECT_NE(logger_capture.str().find(
-                "would wait out the rate-limit window, but that exceeds the "
-                "remaining request timeout"),
+                "must be a whole percentage between 0 and 100; using 10"),
             std::string::npos);
-}
-
-TEST(HttpClientTest, ThrottlesAPostFromAQuotaObservedOnAGet) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50"));
-  http_stub.queue_post(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Post("https://example.test/jobs", std::nullopt,
-                                    connection_pool, cpr::Body{"{}"}));
-
-  EXPECT_EQ(http_stub.post_urls().size(), 1U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, ShortensTheWaitByTheTimeAlreadyElapsed) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  http_stub.advance(std::chrono::milliseconds{6'000});
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{4});
-}
-
-TEST(HttpClientTest, RoundsAPartialSecondOfTheWindowUp) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  http_stub.advance(std::chrono::milliseconds{6'500});
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{4});
-}
-
-TEST(HttpClientTest, DoesNotWaitOnAnObservationOlderThanTheWindow) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  http_stub.advance(std::chrono::milliseconds{11'000});
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.get_urls().size(), 2U);
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
-}
-
-TEST(HttpClientTest, ThrottledAttemptGetsTheTimeoutTheWaitLeftBehind) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50")).queue_get(200);
-  constexpr auto timeout = std::chrono::milliseconds{60'000};
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool, timeout));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool, timeout));
-
-  ASSERT_EQ(http_stub.get_timeouts().size(), 2U);
-  EXPECT_EQ(http_stub.get_timeouts().front(), timeout);
-  // The ten seconds spent waiting must come off the request's own budget.
-  EXPECT_EQ(http_stub.get_timeouts().back(), std::chrono::milliseconds{50'000});
-}
-
-TEST(HttpClientTest, DecliningTheWaitKeepsTheQuotaObservation) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50"))
-      .queue_get(200)
-      .queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  // No room for the wait, so this one proceeds; the reading must survive it.
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool,
-                                   std::chrono::milliseconds{1'000}));
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.get_urls().size(), 3U);
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, AnAbsurdRateLimitLimitFallsBackToTheDocumentedQuota) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub
-      .queue_get(200, "",
-                 {{"RateLimit-Limit", "9223372036854775807"},
-                  {"RateLimit-Remaining", "0"}})
-      .queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, AZeroRateLimitLimitFallsBackToTheDocumentedQuota) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub
-      .queue_get(200, "",
-                 {{"RateLimit-Limit", "0"}, {"RateLimit-Remaining", "100"}})
-      .queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, TreatsAnOverdrawnQuotaAsExhausted) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("-5")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, AMalformedRemainingQuotaLeavesThePreviousObservation) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("50"))
-      .queue_get(200, "", Quota_headers("plenty"))
-      .queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  http_stub.advance(std::chrono::milliseconds{3'000});
-  // Too short a budget to wait out the window, so this one goes through and
-  // brings back a reading that cannot be read.
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool,
-                                   std::chrono::milliseconds{1'000}));
-  http_stub.advance(std::chrono::milliseconds{1'000});
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  // Six seconds, not ten and not none: the unreadable reading neither erased
-  // the first observation nor restarted its window.
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{6});
-}
-
-TEST(HttpClientTest, DoesNotWaitAtExactlyTheThreshold) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  // Ten percent of 2000 exactly; the quota has not fallen below it yet.
-  http_stub.queue_get(200, "", Quota_headers("200")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
-}
-
-TEST(HttpClientTest, WaitsOneUnitBelowTheThreshold) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, nullptr);
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("199")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, AnOutOfRangeThresholdFallsBackToTheDefault) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, "101");
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  // Below the default threshold of 200, above nothing a 101% one would allow.
-  http_stub.queue_get(200, "", Quota_headers("150")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
-}
-
-TEST(HttpClientTest, ANegativeThresholdFallsBackToTheDefault) {
-  const ScopedEnvVar threshold(THRESHOLD_VARIABLE, "-5");
-  iqm::test_support::HttpStub http_stub;
-  const cpr::ConnectionPool connection_pool;
-  http_stub.queue_get(200, "", Quota_headers("150")).queue_get(200);
-
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-  static_cast<void>(iqm::http::Get("https://example.test/jobs", std::nullopt,
-                                   connection_pool));
-
-  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{10});
 }
 
 } // namespace

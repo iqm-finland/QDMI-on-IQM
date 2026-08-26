@@ -73,9 +73,8 @@ struct Scripted_response {
  * stubbed sleep and advance() move, so request deadlines and rate-limit
  * waits are exact rather than racing the wall clock.
  *
- * The default hooks are restored on destruction (RAII), and the process-wide
- * rate-limit quota is cleared at both ends, so each test that owns an instance
- * of this class gets an isolated, self-cleaning stub.
+ * The default hooks are restored on destruction (RAII), so each test that
+ * owns an instance of this class gets an isolated, self-cleaning stub.
  */
 class HttpStub {
 public:

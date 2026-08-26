@@ -18,15 +18,65 @@
  */
 
 #include "logging.hpp"
-#include "scoped_env_var.hpp"
 
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <optional>
 #include <sstream>
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 
 namespace {
-using iqm::test_support::ScopedEnvVar;
+int Set_env_var_raw(const char *key, const char *value) {
+#ifdef _WIN32
+  return _putenv_s(key, value);
+#else
+  return setenv(key, value, 1);
+#endif
+}
+
+int Unset_env_var_raw(const char *key) {
+#ifdef _WIN32
+  return _putenv_s(key, "");
+#else
+  return unsetenv(key);
+#endif
+}
+
+class ScopedEnvVar {
+public:
+  ScopedEnvVar(const char *key, const char *value) : key_(key) {
+    if (const char *existing_value = std::getenv(key);
+        existing_value != nullptr) {
+      previous_value_ = existing_value;
+    }
+    if (value != nullptr) {
+      EXPECT_EQ(Set_env_var_raw(key, value), 0);
+    } else {
+      EXPECT_EQ(Unset_env_var_raw(key), 0);
+    }
+  }
+
+  ScopedEnvVar(const ScopedEnvVar &) = delete;
+  ScopedEnvVar &operator=(const ScopedEnvVar &) = delete;
+  ScopedEnvVar(ScopedEnvVar &&) = delete;
+  ScopedEnvVar &operator=(ScopedEnvVar &&) = delete;
+
+  ~ScopedEnvVar() {
+    // Restore original process env var state for test isolation.
+    if (previous_value_.has_value()) {
+      static_cast<void>(
+          Set_env_var_raw(key_.c_str(), previous_value_->c_str()));
+    } else {
+      static_cast<void>(Unset_env_var_raw(key_.c_str()));
+    }
+  }
+
+private:
+  std::string key_;
+  std::optional<std::string> previous_value_;
+};
 } // namespace
 
 // NOTE: The logger is a singleton, and its own level is set on the first call
