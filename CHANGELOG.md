@@ -23,6 +23,10 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Reject a circuit job that carries no shot count instead of asking the IQM
+  Server to run zero shots, and report an unset shot count as absent rather than
+  as zero, now that MQT Core 3.9.2 lets a client omit it ([#219])
+  ([**@marcelwa**])
 - ⬆️ Require Qiskit 2.0 on Python 3.10–3.13 and Qiskit 2.1 on Python 3.14 and
   newer so the supported minimum environments install and run ([#218])
   ([**@burgholzer**])
@@ -228,6 +232,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#219]: https://github.com/iqm-finland/QDMI-on-IQM/pull/219
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
