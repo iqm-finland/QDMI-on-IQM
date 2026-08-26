@@ -42,7 +42,6 @@
 #include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
-#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -133,6 +132,22 @@ constexpr std::int64_t DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT = 10;
 constexpr auto RATE_LIMIT_THRESHOLD_VARIABLE =
     "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 
+int Retry_after_seconds(const cpr::Response &http_response) {
+  const auto retry_after = http_response.header.find("Retry-After");
+  if (retry_after == http_response.header.end()) {
+    return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+  }
+
+  errno = 0;
+  char *end = nullptr;
+  if (const auto seconds = std::strtol(retry_after->second.c_str(), &end, 10);
+      end != retry_after->second.c_str() && *end == '\0' && errno != ERANGE &&
+      seconds >= 0) {
+    return static_cast<int>(seconds);
+  }
+  return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+}
+
 /// Parse a decimal string that must denote a whole number. Callers apply their
 /// own bounds; this rejects only what is no whole number at all, or one the
 /// platform cannot represent.
@@ -145,19 +160,6 @@ std::optional<std::int64_t> Parse_number(const std::string &value) {
     return std::nullopt;
   }
   return parsed;
-}
-
-int Retry_after_seconds(const cpr::Response &http_response) {
-  const auto retry_after = http_response.header.find("Retry-After");
-  if (retry_after == http_response.header.end()) {
-    return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
-  }
-  const auto seconds = Parse_number(retry_after->second);
-  if (!seconds.has_value() || *seconds < 0 ||
-      *seconds > std::numeric_limits<int>::max()) {
-    return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
-  }
-  return static_cast<int>(*seconds);
 }
 
 /// The percentage of the quota below which requests wait, or zero when the
@@ -506,12 +508,12 @@ cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
                   const cpr::ConnectionPool &connection_pool,
                   const std::chrono::milliseconds timeout,
-                  Rate_limit_budget *rate_limit_budget) {
+                  Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, timeout, rate_limit_budget, [&](const auto remaining) {
+      url, timeout, rate_limit, [&](const auto remaining) {
         return hooks.get(url, bearer_token, connection_pool, headers,
                          remaining);
       });
@@ -522,7 +524,7 @@ cpr::Response Post(const cpr::Url &url,
                    const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data, const cpr::Header &additional_headers,
                    const std::chrono::milliseconds timeout,
-                   Rate_limit_budget *rate_limit_budget) {
+                   Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing POST request to " + url.str());
   if (const auto &data_str = data.str(); !data_str.empty()) {
     LOG_DEBUG("POST data: " + data_str);
@@ -530,7 +532,7 @@ cpr::Response Post(const cpr::Url &url,
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_json_headers(additional_headers);
   return internal::Perform_with_retries(
-      url, timeout, rate_limit_budget, [&](const auto remaining) {
+      url, timeout, rate_limit, [&](const auto remaining) {
         return hooks.post(url, bearer_token, connection_pool, headers, data,
                           remaining);
       });

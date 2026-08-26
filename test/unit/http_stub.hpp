@@ -69,9 +69,8 @@ struct Scripted_response {
  * caught reliably. The retry backoff delay is stubbed out (counted, not
  * slept), so tests that exercise HTTP 429 retries run instantly.
  *
- * Time is stubbed with it. The clock hook reads a counter that only the
- * stubbed sleep and advance() move, so request deadlines and rate-limit
- * waits are exact rather than racing the wall clock.
+ * Time is stubbed with it: the clock hook reads a counter only the stubbed
+ * sleep and advance() move, so waits are exact rather than racing the clock.
  *
  * The default hooks are restored on destruction (RAII), so each test that
  * owns an instance of this class gets an isolated, self-cleaning stub.

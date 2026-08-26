@@ -53,15 +53,12 @@ enum class ERROR_LOG_POLICY : uint8_t {
  * @brief The rate-limit quota the IQM Server API last reported to a session.
  *
  * The quota is metered per user account, so no client-side view of it is ever
- * complete; a session slows down on what its own requests were told. Requests
- * update it in place.
+ * complete; a session slows down on what its own requests were told. A limit of
+ * zero means no response has reported one yet.
  */
 struct Rate_limit_budget {
-  /// Units left in the window at the time of the reading.
   std::int64_t remaining = 0;
-  /// Quota the same response reported. Zero until one does.
   std::int64_t limit = 0;
-  /// When the reading arrived.
   std::chrono::steady_clock::time_point observed_at;
 };
 
@@ -69,7 +66,7 @@ struct Rate_limit_budget {
  * @brief Perform an HTTP GET request.
  *
  * Sends an HTTP GET request to the specified URL with bearer token
- * authentication. The request waits when @p rate_limit_budget reports the
+ * authentication. The request waits when @p rate_limit reports the
  * remaining quota running low, and HTTP 429 responses are retried according to
  * the server's Retry-After header.
  *
@@ -78,16 +75,15 @@ struct Rate_limit_budget {
  * @param connection_pool Connection pool shared by the owning device session.
  * @param timeout Overall timeout for the request, the rate-limit wait, and any
  * rate-limit retries.
- * @param rate_limit_budget Quota the calling session last saw, updated in
- * place. A request that belongs to no session passes nullptr and relies on
- * Retry-After alone.
+ * @param rate_limit Quota the calling session last saw, updated in place.
+ * A request belonging to no session passes nullptr and relies on Retry-After.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
                   const cpr::ConnectionPool &connection_pool,
                   std::chrono::milliseconds timeout = std::chrono::hours{1},
-                  Rate_limit_budget *rate_limit_budget = nullptr);
+                  Rate_limit_budget *rate_limit = nullptr);
 
 /**
  * @brief Perform an HTTP POST request.
@@ -105,9 +101,8 @@ cpr::Response Get(const cpr::Url &url,
  * @param additional_headers Additional HTTP headers to include.
  * @param timeout Overall timeout for the request, the rate-limit wait, and any
  * rate-limit retries.
- * @param rate_limit_budget Quota the calling session last saw, updated in
- * place. A request that belongs to no session passes nullptr and relies on
- * Retry-After alone.
+ * @param rate_limit Quota the calling session last saw, updated in place.
+ * A request belonging to no session passes nullptr and relies on Retry-After.
  * @return CPR response object.
  */
 cpr::Response Post(const cpr::Url &url,
@@ -116,7 +111,7 @@ cpr::Response Post(const cpr::Url &url,
                    const cpr::Body &data,
                    const cpr::Header &additional_headers = {},
                    std::chrono::milliseconds timeout = std::chrono::hours{1},
-                   Rate_limit_budget *rate_limit_budget = nullptr);
+                   Rate_limit_budget *rate_limit = nullptr);
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -177,9 +172,8 @@ struct Hooks {
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;
-  /// Hook for the monotonic clock that drives request deadlines and the
-  /// rate-limit window. Tests replace it with a clock the stubbed sleep
-  /// advances, so waits are exact instead of racing the wall clock.
+  /// Hook for the monotonic clock behind request deadlines and the rate-limit
+  /// window. Tests replace it with one the stubbed sleep advances.
   std::function<std::chrono::steady_clock::time_point()> now;
 };
 

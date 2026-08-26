@@ -724,10 +724,6 @@ window once the remaining quota falls below ten percent of the limit, which is
 far cheaper than the block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to
 another whole percentage to move that point, or to `0` to take the block
 instead. The wait comes out of the timeout of the request that triggered it; a
-request with less time than that left proceeds without waiting.
-
-:::{note}
-The quota belongs to the account, and other clients using the same token spend
-from it too, so no session sees all of it. The device therefore still honors the
+request with less time than that left proceeds without waiting. Other clients
+using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
-:::

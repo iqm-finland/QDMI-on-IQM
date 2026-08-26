@@ -97,7 +97,7 @@ struct IQM_QDMI_Device_Session_impl_d {
 
   /// Rate-limit quota this session's requests last saw, so they can slow down
   /// before the account's quota runs out.
-  iqm::http::Rate_limit_budget rate_limit_budget_;
+  iqm::http::Rate_limit_budget rate_limit_;
 
   /// Session status
   IQM_QDMI_DEVICE_SESSION_STATUS session_status_ =
@@ -367,7 +367,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto qc_list_response =
       iqm::http::Get(qc_list_url, bearer_token, *session->connection_pool_,
-                     session->request_timeout_, &session->rate_limit_budget_);
+                     session->request_timeout_, &session->rate_limit_);
   if (const auto status = iqm::http::Handle_response(qc_list_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -437,7 +437,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       *session->quantum_computer_alias_);
   const auto arch_response =
       iqm::http::Get(arch_url, bearer_token, *session->connection_pool_,
-                     session->request_timeout_, &session->rate_limit_budget_);
+                     session->request_timeout_, &session->rate_limit_);
   if (const auto status = iqm::http::Handle_response(arch_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -562,7 +562,7 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       *session->quantum_computer_alias_, session->calibration_set_id_);
   const auto dyn_arch_response =
       iqm::http::Get(dyn_arch_url, bearer_token, *session->connection_pool_,
-                     session->request_timeout_, &session->rate_limit_budget_);
+                     session->request_timeout_, &session->rate_limit_);
   if (const auto status = iqm::http::Handle_response(dyn_arch_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -693,7 +693,7 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto calibration_response =
       iqm::http::Get(calibration_url, bearer_token, *session->connection_pool_,
-                     session->request_timeout_, &session->rate_limit_budget_);
+                     session->request_timeout_, &session->rate_limit_);
   if (const auto status = iqm::http::Handle_response(calibration_response);
       status != QDMI_SUCCESS) {
     return status;
@@ -862,7 +862,7 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
   const auto cocos_health_response = iqm::http::Get(
       cocos_health_url, session->token_manager_->get_bearer_token(),
       *session->connection_pool_, session->request_timeout_,
-      &session->rate_limit_budget_);
+      &session->rate_limit_);
   const auto status = iqm::http::Handle_response(
       cocos_health_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG);
   session->supports_calibration_jobs_ = (status == QDMI_SUCCESS);
@@ -1073,7 +1073,7 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
     const auto job_status_response = iqm::http::Get(
         job_status_url, session->token_manager_->get_bearer_token(),
         *session->connection_pool_, session->request_timeout_,
-        &session->rate_limit_budget_);
+        &session->rate_limit_);
     if (const auto status = iqm::http::Handle_response(job_status_response);
         status != QDMI_SUCCESS) {
       return status;
@@ -1358,7 +1358,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
       *job->session_->connection_pool_, json_program.dump(),
       {{"Expect", "100-continue"}}, job->session_->request_timeout_,
-      &job->session_->rate_limit_budget_);
+      &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1399,7 +1399,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, job->session_->token_manager_->get_bearer_token(),
       *job->session_->connection_pool_, program, {{"Expect", "100-continue"}},
-      job->session_->request_timeout_, &job->session_->rate_limit_budget_);
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1508,7 +1508,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   const auto job_abortion_response = iqm::http::Post(
       job_abortion_url, job->session_->token_manager_->get_bearer_token(),
       *job->session_->connection_pool_, "", {}, job->session_->request_timeout_,
-      &job->session_->rate_limit_budget_);
+      &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
     if (Reports_illegal_job_status(job_abortion_response)) {
@@ -1563,7 +1563,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   const auto job_status_response = iqm::http::Get(
       job_status_url, job->session_->token_manager_->get_bearer_token(),
       *job->session_->connection_pool_, job->session_->request_timeout_,
-      &job->session_->rate_limit_budget_);
+      &job->session_->rate_limit_);
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
     // A failed status query says nothing about the job itself, which keeps
@@ -1688,7 +1688,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       const auto job_results_response = iqm::http::Get(
           job_results_url, job->session_->token_manager_->get_bearer_token(),
           *job->session_->connection_pool_, job->session_->request_timeout_,
-          &job->session_->rate_limit_budget_);
+          &job->session_->rate_limit_);
       const auto status = iqm::http::Handle_response(job_results_response);
       if (status != QDMI_SUCCESS) {
         // Only mark the job as failed for truly fatal errors, but always
@@ -1791,7 +1791,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     const auto job_calibration_response = iqm::http::Get(
         job_calibration_url, job->session_->token_manager_->get_bearer_token(),
         *job->session_->connection_pool_, job->session_->request_timeout_,
-        &job->session_->rate_limit_budget_);
+        &job->session_->rate_limit_);
     const auto status = iqm::http::Handle_response(job_calibration_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
@@ -1871,7 +1871,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     const auto job_measurements_response = iqm::http::Get(
         job_measurements_url, job->session_->token_manager_->get_bearer_token(),
         *job->session_->connection_pool_, job->session_->request_timeout_,
-        &job->session_->rate_limit_budget_);
+        &job->session_->rate_limit_);
     const auto status = iqm::http::Handle_response(job_measurements_response);
     if (status != QDMI_SUCCESS) {
       // Only mark the job as failed for truly fatal errors, but always
@@ -2186,7 +2186,7 @@ Probe_quantum_computer(IQM_QDMI_Device_Session session,
   const auto http_response =
       iqm::http::Get(url, session->token_manager_->get_bearer_token(),
                      *session->connection_pool_, session->request_timeout_,
-                     &session->rate_limit_budget_);
+                     &session->rate_limit_);
   switch (iqm::http::Handle_response(
       http_response, iqm::http::ERROR_LOG_POLICY::LOG_AS_DEBUG)) {
   case QDMI_SUCCESS:

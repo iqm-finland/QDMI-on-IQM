@@ -28,7 +28,6 @@
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
-#include <cstdlib>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
@@ -89,35 +88,19 @@ private:
 /// Names the share of the quota below which requests hold back.
 constexpr auto THRESHOLD_VARIABLE = "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 
-/// Headers reporting the documented IQM Server API quota with @p remaining
-/// units left in the current window.
+/// The documented IQM Server API quota with @p remaining units left in it.
 cpr::Header Quota_headers(const std::string &remaining) {
   return {{"RateLimit-Limit", "2000"}, {"RateLimit-Remaining", remaining}};
 }
 
-/**
- * @brief Fixture for the wait that precedes a request when the quota runs low.
- *
- * Holds the session's quota and pins the threshold variable off the
- * environment, so a value the developer exports cannot change what a test
- * means.
- */
+/// Fixture for the wait that precedes a request when the quota runs low: it
+/// holds the session's quota and starts every test from the built-in
+/// threshold, so a value the developer exports cannot change what a test means.
 class RateLimitTest : public testing::Test {
 protected:
-  void SetUp() override {
-    if (const char *existing = std::getenv(THRESHOLD_VARIABLE);
-        existing != nullptr) {
-      previous_threshold_ = existing;
-    }
-    set_threshold(nullptr);
-  }
+  void SetUp() override { set_threshold(nullptr); }
 
-  void TearDown() override {
-    set_threshold(previous_threshold_.has_value() ? previous_threshold_->c_str()
-                                                  : nullptr);
-  }
-
-  /// Set the threshold to @p percent, or unset it to get the built-in default.
+  /// Set the threshold to @p percent, or unset it for the built-in default.
   static void set_threshold(const char *percent) {
 #ifdef _WIN32
     static_cast<void>(
@@ -142,9 +125,6 @@ protected:
   iqm::test_support::HttpStub http_stub_;
   cpr::ConnectionPool connection_pool_;
   iqm::http::Rate_limit_budget budget_;
-
-private:
-  std::optional<std::string> previous_threshold_;
 };
 
 cpr::Response Make_response(const int64_t status_code, std::string url,
