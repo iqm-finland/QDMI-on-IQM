@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = [
 #   "iqm-qdmi[qiskit]",
 #   "mqt-bench>=2.2.2",

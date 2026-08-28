@@ -21,10 +21,18 @@ releases may include breaking changes.
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
   `quantum` can use the offloader ([#202]) ([**@marcelwa**])
 
+### Changed
+
+- 💥 Drop support for x86 macOS and stop publishing the respective wheels
+  ([#220]) ([**@denialhaag**])
+- ⬆️ Raise the macOS deployment target to 13.3 ([#220])
+  ([**@denialhaag**])
+- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
+
 ### Fixed
 
-- ⬆️ Require Qiskit 2.0 on Python 3.10–3.13 and Qiskit 2.1 on Python 3.14 and
-  newer so the supported minimum environments install and run ([#218])
+- ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
+  newer so the supported minimum environments install and run ([#218], [#220])
   ([**@burgholzer**])
 
 ## [1.4.0] - 2026-08-25
@@ -228,6 +236,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
