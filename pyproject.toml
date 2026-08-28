@@ -22,7 +22,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "iqm-qdmi"
 version = "1.4.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
@@ -43,7 +43,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -115,7 +114,7 @@ cmake.version = "CMakeLists.txt"
 ninja.make-fallback = true
 build-dir = "build/{wheel_tag}/{build_type}"
 build.targets = ["iqm-qdmi-device"]
-wheel.py-api = "py310"
+wheel.py-api = "py311"
 wheel.expand-macos-universal-tags = true
 wheel.packages = ["python/iqm"]
 wheel.install-dir = "iqm/qdmi/data"
@@ -265,7 +264,7 @@ environment-pass = [
 before-all = "yum install -y openssl-devel"
 
 [tool.cibuildwheel.macos]
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
 
 [tool.cibuildwheel.windows]
 repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg iqm"

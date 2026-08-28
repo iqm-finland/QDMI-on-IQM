@@ -17,7 +17,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = []
 # ///
 

@@ -66,7 +66,7 @@ explicit intent, valid credentials, and an appropriate target.
 
 ### Python
 
-- Python 3.10+
+- Python 3.11+
 - `scikit-build-core` as the build backend
 - `pytest` for tests in `test/python/`
 - `ruff` for formatting and linting

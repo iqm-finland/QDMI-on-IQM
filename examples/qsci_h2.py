@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # /// script
-# requires-python = ">=3.10,<3.14"
+# requires-python = ">=3.11,<3.14"
 # dependencies = [
 #   "iqm-qdmi[qiskit]",
 #   "qiskit-nature[pyscf]>=0.7.2",

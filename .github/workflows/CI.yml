@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [macos-26-intel, macos-26]
+        runs-on: [macos-26]
         config: [Release]
         iqm-qc-alias: ["emerald:mock"]
         include:
@@ -184,7 +184,6 @@ jobs:
           [
             ubuntu-24.04,
             ubuntu-24.04-arm,
-            macos-26-intel,
             macos-26,
             windows-2025,
             windows-11-arm,
