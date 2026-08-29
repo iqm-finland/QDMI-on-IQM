@@ -132,7 +132,10 @@ If neither quantum computer ID nor alias is specified, the first available
 quantum computer from the server will be used.
 
 If the base URL is not specified explicitly, the session initialization path
-falls back to `IQM_BASE_URL` before using the standard Resonance endpoint.
+falls back to `IQM_SERVER_URL`, then its `IQM_BASE_URL` alias, before using the
+standard Resonance endpoint. A quantum computer alias similarly falls back to
+`IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias. `IQM_QC_ID` remains a
+separate quantum computer ID selector.
 
 The session is initialized with {cpp:func}`IQM_QDMI_device_session_init`, which:
 

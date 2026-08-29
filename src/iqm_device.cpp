@@ -336,8 +336,11 @@ std::optional<std::string> Get_nonempty_env_var(const char *name) {
 }
 
 void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
-  const auto env_base_url = Get_nonempty_env_var("IQM_BASE_URL");
-  LOG_DEBUG(std::string("IQM_BASE_URL environment default is ") +
+  auto env_base_url = Get_nonempty_env_var("IQM_SERVER_URL");
+  if (!env_base_url.has_value()) {
+    env_base_url = Get_nonempty_env_var("IQM_BASE_URL");
+  }
+  LOG_DEBUG(std::string("IQM_SERVER_URL/IQM_BASE_URL environment default is ") +
             (env_base_url.has_value() ? "set" : "unset"));
   if (session->base_url_.empty() && env_base_url.has_value()) {
     session->base_url_ = *env_base_url;
@@ -350,9 +353,13 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
     session->quantum_computer_id_ = env_qc_id;
   }
 
-  const auto env_qc_alias = Get_nonempty_env_var("IQM_QC_ALIAS");
-  LOG_DEBUG(std::string("IQM_QC_ALIAS environment default is ") +
-            (env_qc_alias.has_value() ? "set" : "unset"));
+  auto env_qc_alias = Get_nonempty_env_var("IQM_QUANTUM_COMPUTER");
+  if (!env_qc_alias.has_value()) {
+    env_qc_alias = Get_nonempty_env_var("IQM_QC_ALIAS");
+  }
+  LOG_DEBUG(
+      std::string("IQM_QUANTUM_COMPUTER/IQM_QC_ALIAS environment default is ") +
+      (env_qc_alias.has_value() ? "set" : "unset"));
   if (!session->quantum_computer_alias_.has_value() &&
       env_qc_alias.has_value()) {
     session->quantum_computer_alias_ = env_qc_alias;

@@ -130,11 +130,13 @@ protected:
   IQM_QDMI_Device_Session session = nullptr;
 
 private:
+  ScopedUnsetEnvVar server_url_env_{"IQM_SERVER_URL"};
   ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
   ScopedUnsetEnvVar token_env_{"IQM_TOKEN"};
   ScopedUnsetEnvVar tokens_file_env_{"IQM_TOKENS_FILE"};
   ScopedUnsetEnvVar qc_id_env_{"IQM_QC_ID"};
   ScopedUnsetEnvVar qc_alias_env_{"IQM_QC_ALIAS"};
+  ScopedUnsetEnvVar quantum_computer_env_{"IQM_QUANTUM_COMPUTER"};
 
 protected:
   void SetUp() override {
@@ -157,11 +159,13 @@ protected:
   iqm::test_support::HttpStub http_stub;
 
 private:
+  ScopedUnsetEnvVar server_url_env_{"IQM_SERVER_URL"};
   ScopedUnsetEnvVar base_url_env_{"IQM_BASE_URL"};
   ScopedUnsetEnvVar token_env_{"IQM_TOKEN"};
   ScopedUnsetEnvVar tokens_file_env_{"IQM_TOKENS_FILE"};
   ScopedUnsetEnvVar qc_id_env_{"IQM_QC_ID"};
   ScopedUnsetEnvVar qc_alias_env_{"IQM_QC_ALIAS"};
+  ScopedUnsetEnvVar quantum_computer_env_{"IQM_QUANTUM_COMPUTER"};
 
 protected:
   const std::string list_quantum_computers_response = R"({
@@ -576,10 +580,53 @@ TEST_F(DeviceIntegrationEnvMockTest,
             "https://environment.example/api/v1/quantum-computers");
 }
 
+TEST_F(DeviceIntegrationEnvMockTest,
+       SessionInitializationPrefersCanonicalServerUrlEnvironment) {
+  const ScopedEnvVar server_url_env("IQM_SERVER_URL");
+  const ScopedEnvVar base_url_env("IQM_BASE_URL");
+  ASSERT_EQ(Set_env_var_raw("IQM_SERVER_URL", "https://canonical.example"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://legacy.example"), 0);
+
+  queue_successful_initialization();
+
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  ASSERT_FALSE(http_stub.get_urls().empty());
+  EXPECT_EQ(http_stub.get_urls().front(),
+            "https://canonical.example/api/v1/quantum-computers");
+}
+
+TEST_F(DeviceIntegrationEnvMockTest,
+       SessionInitializationPrefersCanonicalQuantumComputerEnvironment) {
+  const ScopedEnvVar server_url_env("IQM_SERVER_URL");
+  const ScopedEnvVar quantum_computer_env("IQM_QUANTUM_COMPUTER");
+  const ScopedEnvVar qc_alias_env("IQM_QC_ALIAS");
+  ASSERT_EQ(Set_env_var_raw("IQM_SERVER_URL", "https://localhost"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_QUANTUM_COMPUTER", "default"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_QC_ALIAS", "missing"), 0);
+
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceIntegrationEnvMockTest,
+       SessionInitializationUsesLegacyQuantumComputerEnvironment) {
+  const ScopedEnvVar server_url_env("IQM_SERVER_URL");
+  const ScopedEnvVar qc_alias_env("IQM_QC_ALIAS");
+  ASSERT_EQ(Set_env_var_raw("IQM_SERVER_URL", "https://localhost"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_QC_ALIAS", "default"), 0);
+
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+}
+
 TEST_F(DeviceIntegrationMockTest,
        SessionInitializationPrefersExplicitBaseUrlOverEnvironment) {
+  const ScopedEnvVar server_url_env("IQM_SERVER_URL");
   const ScopedEnvVar base_url_env("IQM_BASE_URL");
-  ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://environment.example"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_SERVER_URL", "https://canonical.example"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_BASE_URL", "https://legacy.example"), 0);
 
   queue_successful_initialization();
 

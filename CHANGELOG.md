@@ -16,10 +16,28 @@ releases may include breaking changes.
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
   ([#214]) ([**@marcelwa**])
+- ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
+  environment variables for IQM Server and quantum computer selection, while
+  keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
+  ([**@burgholzer**])
 - ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
   `sample`/`estimate`, with the partition also resolvable from
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
   `quantum` can use the offloader ([#202]) ([**@marcelwa**])
+
+### Changed
+
+- 💥 Drop support for x86 macOS and stop publishing the respective wheels
+  ([#220]) ([**@denialhaag**])
+- ⬆️ Raise the macOS deployment target to 13.3 ([#220])
+  ([**@denialhaag**])
+- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
+
+### Fixed
+
+- ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
+  newer so the supported minimum environments install and run ([#218], [#220])
+  ([**@burgholzer**])
 
 ## [1.4.0] - 2026-08-25
 
@@ -223,6 +241,9 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
+[#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
+[#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
+[#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
