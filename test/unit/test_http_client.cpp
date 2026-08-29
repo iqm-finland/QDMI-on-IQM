@@ -23,6 +23,7 @@
 #include "logging.hpp"
 
 #include <chrono>
+#include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
@@ -32,6 +33,7 @@
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 #include <string_view>
 #include <utility>
@@ -81,6 +83,48 @@ private:
   iqm::LOG_LEVEL original_level_;
   /// Buffer that captures log output for test assertions.
   std::stringstream log_stream_;
+};
+
+/// Names the share of the quota below which requests hold back.
+constexpr auto THRESHOLD_VARIABLE = "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
+
+/// The documented IQM Server API quota with @p remaining units left in it.
+cpr::Header Quota_headers(const std::string &remaining) {
+  return {{"RateLimit-Limit", "2000"}, {"RateLimit-Remaining", remaining}};
+}
+
+/// Fixture for the wait that precedes a request when the quota runs low: it
+/// holds the session's quota and starts every test from the built-in
+/// threshold, so a value the developer exports cannot change what a test means.
+class RateLimitTest : public testing::Test {
+protected:
+  void SetUp() override { set_threshold(nullptr); }
+
+  /// Set the threshold to @p percent, or unset it for the built-in default.
+  static void set_threshold(const char *percent) {
+#ifdef _WIN32
+    static_cast<void>(
+        _putenv_s(THRESHOLD_VARIABLE, percent == nullptr ? "" : percent));
+#else
+    static_cast<void>(percent == nullptr
+                          ? unsetenv(THRESHOLD_VARIABLE)
+                          : setenv(THRESHOLD_VARIABLE, percent, 1));
+#endif
+  }
+
+  /// Issue @p count requests on this session, spending its quota.
+  void get(const int count,
+           const std::chrono::milliseconds timeout = std::chrono::hours{1}) {
+    for (int request = 0; request < count; ++request) {
+      static_cast<void>(iqm::http::Get("https://example.test/jobs",
+                                       std::nullopt, connection_pool_, timeout,
+                                       &budget_));
+    }
+  }
+
+  iqm::test_support::HttpStub http_stub_;
+  cpr::ConnectionPool connection_pool_;
+  iqm::http::Rate_limit_budget budget_;
 };
 
 cpr::Response Make_response(const int64_t status_code, std::string url,
@@ -430,6 +474,116 @@ TEST(HttpClientTest, RetriesExhaustedForHttp429ReturnsInvalidArgument) {
 
   const auto logs = logger_capture.str();
   EXPECT_NE(logs.find("failed with HTTP 429 (Client Error)"),
+            std::string::npos);
+}
+
+TEST_F(RateLimitTest, WaitsForTheWindowWhenTheQuotaRunsLow) {
+  const LoggerCapture logger_capture;
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
+
+  get(1);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+  get(1);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
+  // The wait comes out of the request's own timeout.
+  EXPECT_EQ(http_stub_.get_timeouts().back(),
+            std::chrono::hours{1} - std::chrono::seconds{10});
+  EXPECT_NE(logger_capture.str().find("is holding back for 10 second(s) to let "
+                                      "the rate-limit window replenish"),
+            std::string::npos);
+}
+
+TEST_F(RateLimitTest, DoesNotWaitWhileTheQuotaIsHealthy) {
+  // 200 units is exactly the default threshold of ten percent, which is not
+  // yet low enough to hold anything back.
+  http_stub_.queue_get(200, "", Quota_headers("200")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, DoesNotWaitWithoutUsableRateLimitHeaders) {
+  http_stub_.queue_get(200)
+      .queue_get(200, "", {{"RateLimit-Remaining", "50"}})
+      .queue_get(
+          200, "",
+          {{"RateLimit-Limit", "2000"}, {"RateLimit-Remaining", "none left"}})
+      .queue_get(200);
+
+  get(4);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 4U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, IgnoresRateLimitHeadersOnAFailedResponse) {
+  http_stub_.queue_get(500, "", Quota_headers("0")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, DoesNotWaitOnAQuotaReadingOlderThanTheWindow) {
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
+
+  get(1);
+  http_stub_.advance(std::chrono::seconds{10});
+  get(1);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, DoesNotWaitLongerThanTheRequestTimeout) {
+  const LoggerCapture logger_capture;
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
+
+  get(1);
+  get(1, std::chrono::seconds{5});
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+  EXPECT_NE(logger_capture.str().find("exceeds the request timeout"),
+            std::string::npos);
+}
+
+TEST_F(RateLimitTest, AZeroThresholdTurnsTheWaitingOff) {
+  set_threshold("0");
+  // An overdrawn quota is the extreme the knob still has to let through.
+  http_stub_.queue_get(200, "", Quota_headers("-5")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.get_urls().size(), 2U);
+  EXPECT_EQ(http_stub_.sleep_call_count(), 0U);
+}
+
+TEST_F(RateLimitTest, AConfiguredThresholdMovesThePoint) {
+  set_threshold("50");
+  // Healthy at the default threshold of ten percent, low at fifty.
+  http_stub_.queue_get(200, "", Quota_headers("900")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
+}
+
+TEST_F(RateLimitTest, AMalformedThresholdFallsBackToTheDefault) {
+  const LoggerCapture logger_capture;
+  set_threshold("101");
+  http_stub_.queue_get(200, "", Quota_headers("50")).queue_get(200);
+
+  get(2);
+
+  EXPECT_EQ(http_stub_.sleep_durations(), std::vector<int>{10});
+  EXPECT_NE(logger_capture.str().find(
+                "must be a whole percentage between 0 and 100; using 10"),
             std::string::npos);
 }
 

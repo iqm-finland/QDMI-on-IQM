@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
+  out the quota window instead of taking a 30-second block.
+  `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
+  ([#214]) ([**@marcelwa**])
 - ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
   environment variables for IQM Server and quantum computer selection, while
   keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
@@ -236,6 +240,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217

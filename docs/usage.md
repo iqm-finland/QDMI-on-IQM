@@ -713,3 +713,20 @@ requests. Treat that output as sensitive and avoid it in shared logs.
 read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
 `ERROR` level. It will be removed in a future release.
 :::
+
+## Rate limiting
+
+The IQM Server API meters requests against a per-account quota of 2000 units
+over a rolling ten-second window, and blocks the account for 30 seconds once
+that quota is exhausted. Submitting or cancelling a job costs 100 units and a
+read costs 10, so twenty submissions inside one window run the quota out.
+
+Every successful response reports `RateLimit-Limit` and `RateLimit-Remaining`. A
+session follows what its own requests were told and waits out the rest of the
+window once the remaining quota falls below ten percent of the limit, which is
+far cheaper than the block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to
+another whole percentage to move that point, or to `0` to take the block
+instead. The wait comes out of the timeout of the request that triggered it; a
+request with less time than that left proceeds without waiting. Other clients
+using the same token spend from the same quota, so the device still honors the
+`Retry-After` header of an HTTP 429 response.
