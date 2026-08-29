@@ -42,10 +42,13 @@ The IQM-backed path relies on a small environment-variable contract to
 authenticate and route your jobs. Before running any of the examples, make sure
 the following variables are set as needed:
 
-- `IQM_BASE_URL`: The endpoint of the IQM server you are targeting (e.g.,
+- `IQM_SERVER_URL`: The endpoint of the IQM server you are targeting (e.g.,
   `https://resonance.iqm.tech` for IQM Resonance).
 - `IQM_TOKEN`: Your authentication token.
-- `IQM_QC_ALIAS`: Optional explicit selection of the target quantum computer.
+- `IQM_QUANTUM_COMPUTER`: Optional explicit selection of the target quantum
+  computer.
+
+`IQM_BASE_URL` and `IQM_QC_ALIAS` remain supported as legacy aliases.
 
 For the full set of authentication options available when configuring C++
 sessions directly, see [Authentication Methods](usage.md#authentication-methods)

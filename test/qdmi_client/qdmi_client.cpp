@@ -29,12 +29,28 @@
 #include <iqm_qdmi/constants.h>
 #include <iqm_qdmi/device.h>
 #include <map>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
+
+namespace {
+/// @brief Frees a device session, for use as a `std::unique_ptr` deleter.
+struct Session_deleter {
+  void operator()(IQM_QDMI_Device_Session session) const noexcept {
+    IQM_QDMI_device_session_free(session);
+  }
+};
+
+/// A device session that frees itself when it goes out of scope.
+using Owned_session =
+    std::unique_ptr<std::remove_pointer_t<IQM_QDMI_Device_Session>,
+                    Session_deleter>;
+} // namespace
 
 auto QDMIClient::throw_if_error(const int status, const std::string &message)
     -> void {
@@ -93,26 +109,29 @@ QDMIClient::get_iqm_session(const std::string &base_url,
                             const std::optional<std::string> &tokens_file,
                             const std::optional<std::string> &qc_id,
                             const std::optional<std::string> &qc_alias) {
-  IQM_QDMI_Device_Session session = nullptr;
-  auto ret = IQM_QDMI_device_session_alloc(&session);
+  IQM_QDMI_Device_Session raw_session = nullptr;
+  auto ret = IQM_QDMI_device_session_alloc(&raw_session);
   throw_if_error(ret, "Failed to allocate IQM QDMI device session.");
+  // Every step below reports failure by throwing, and the caller has no handle
+  // to free until this function returns one.
+  Owned_session session{raw_session};
 
   // Set the session parameters
   ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
+      session.get(), QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
       base_url.c_str());
   throw_if_error(ret, "Failed to set the base URL for the device session.");
 
   if (token.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
         token->c_str());
     throw_if_error(ret, "Failed to set the token for the device session.");
   }
 
   if (tokens_file.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
         tokens_file->size() + 1, tokens_file->c_str());
     throw_if_error(ret,
                    "Failed to set the tokens file for the device session.");
@@ -120,7 +139,7 @@ QDMIClient::get_iqm_session(const std::string &base_url,
 
   if (qc_id.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1, qc_id->size() + 1,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1, qc_id->size() + 1,
         qc_id->c_str());
     throw_if_error(
         ret, "Failed to set the quantum computer ID for the device session.");
@@ -128,17 +147,17 @@ QDMIClient::get_iqm_session(const std::string &base_url,
 
   if (qc_alias.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2, qc_alias->size() + 1,
-        qc_alias->c_str());
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+        qc_alias->size() + 1, qc_alias->c_str());
     throw_if_error(
         ret,
         "Failed to set the quantum computer alias for the device session.");
   }
 
-  ret = IQM_QDMI_device_session_init(session);
+  ret = IQM_QDMI_device_session_init(session.get());
   throw_if_error(ret, "Failed to initialize the device session.");
 
-  return session;
+  return session.release();
 }
 
 auto QDMIClient::get_name() const -> std::string {

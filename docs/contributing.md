@@ -265,7 +265,7 @@ Before running the integration tests, make sure you have set the necessary
 environment variables:
 
 ```console
-export IQM_BASE_URL="https://desired-iqm-server.com"
+export IQM_SERVER_URL="https://desired-iqm-server.com"
 export IQM_TOKEN="your-api-key"
 ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
