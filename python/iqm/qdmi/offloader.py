@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import io
 import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
@@ -253,8 +254,70 @@ def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
     return base64.b64decode(stdout.encode())
 
 
+_ALLOWED_RESULT_MODULES = frozenset({"qiskit", "qiskit_algorithms"})
+
+#: NumPy reconstructs arrays through module-level helpers rather than classes,
+#: so its share of a result payload is allowed by name instead of by module.
+_ALLOWED_NUMPY_NAMES = frozenset({"_frombuffer", "_reconstruct", "dtype", "ndarray", "scalar"})
+
+
+def _is_result_global(module: str, name: str) -> bool:
+    """Decide whether `module.name` is part of the result types the workers send back.
+
+    Returns:
+        True if the global may be resolved while loading a result payload.
+    """
+    root = module.partition(".")[0]
+    if root in _ALLOWED_RESULT_MODULES:
+        return True
+    return root == "numpy" and name in _ALLOWED_NUMPY_NAMES
+
+
+def _result_getattr(obj: object, name: str) -> object:
+    """Look up *name* on *obj* on behalf of a result payload.
+
+    Qiskit's `Qubit` and `Clbit` reduce through `getattr`, so a payload carrying
+    a circuit needs it; confining it to the result types keeps it from reaching
+    arbitrary callables.
+
+    Returns:
+        The requested attribute.
+
+    Raises:
+        RuntimeError: If the lookup is not one the result types make.
+    """
+    if isinstance(obj, type) and not name.startswith("__") and _is_result_global(obj.__module__, obj.__qualname__):
+        return getattr(obj, name)
+    msg = f"Job result payload requested a disallowed attribute: {name}"
+    raise RuntimeError(msg)
+
+
+class _ResultUnpickler(pickle.Unpickler):  # ruff:ignore[suspicious-pickle-usage]
+    """Unpickler restricted to the result types the Slurm workers send back."""
+
+    def find_class(self, module: str, name: str) -> object:
+        """Resolve a global named by a result payload.
+
+        Returns:
+            The resolved global.
+
+        Raises:
+            RuntimeError: If the payload names anything outside the result types.
+        """
+        if _is_result_global(module, name):
+            return super().find_class(module, name)
+        if module == "builtins" and name == "getattr":
+            return _result_getattr
+        msg = f"Job result payload named a disallowed class: {module}.{name}"
+        raise RuntimeError(msg)
+
+
 def _load_pickled_result(payload: bytes) -> object:
     """Unpickle a decoded job result payload.
+
+    The worker runs on a compute node and reaches the submitting process through
+    a stream anything on that node can write to, so the payload is loaded with
+    an unpickler that refuses to instantiate anything but the result types.
 
     Returns:
         The unpickled result object.
@@ -263,7 +326,7 @@ def _load_pickled_result(payload: bytes) -> object:
         RuntimeError: If the payload cannot be unpickled.
     """
     try:
-        return pickle.loads(payload)  # ruff:ignore[suspicious-pickle-usage]
+        return _ResultUnpickler(io.BytesIO(payload)).load()
     except Exception as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
