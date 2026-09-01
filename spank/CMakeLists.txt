@@ -26,6 +26,18 @@ target_link_libraries(
                                     qdmi::qdmi_project_warnings)
 set_target_properties(${BUILD_IQM_SPANK_TARGET} PROPERTIES PREFIX "")
 
+# Export only the SPANK ABI. Slurm dlopens the plugin into slurmstepd next to
+# other site plugins, so the statically linked cpr, libcurl, and OpenSSL symbols
+# must not be visible there for anything else to bind against.
+set(IQM_QDMI_SPANK_VERSION_SCRIPT
+    "${CMAKE_CURRENT_SOURCE_DIR}/iqm-spank-plugin.map")
+target_link_options(${BUILD_IQM_SPANK_TARGET} PRIVATE
+                    "LINKER:--version-script=${IQM_QDMI_SPANK_VERSION_SCRIPT}")
+set_property(
+  TARGET ${BUILD_IQM_SPANK_TARGET}
+  APPEND
+  PROPERTY LINK_DEPENDS "${IQM_QDMI_SPANK_VERSION_SCRIPT}")
+
 # Detect the Slurm plugin directory for the SPANK plugin.
 set(IQM_QDMI_SPANK_INSTALL_DIR_DEFAULT "/usr/lib/slurm")
 find_program(IQM_QDMI_SCONTROL_EXECUTABLE scontrol)
