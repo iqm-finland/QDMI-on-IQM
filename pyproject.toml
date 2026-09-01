@@ -288,3 +288,8 @@ cache-keys = [
 # To avoid limiting the usability of the core library, we purposely do not add these packages as dependencies.
 # As a consequence, we need to ignore the unresolved imports from these packages in the type analysis.
 allowed-unresolved-imports = ["mqt.bench.**", "qiskit_nature.**", "qiskit_algorithms.**", "pyscf.**"]
+
+[tool.ty.terminal]
+# Warnings are not surfaced by the exit code unless this is set, so `ty` findings
+# below error level would otherwise pass CI unnoticed.
+error-on-warning = true
