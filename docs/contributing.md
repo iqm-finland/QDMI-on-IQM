@@ -259,6 +259,10 @@ ctest -C Release --test-dir build --output-on-failure
 ctest -C Release --test-dir build/test/unit --output-on-failure
 ```
 
+The integration tests also carry the `integration` CTest label, so
+`ctest -C Release --test-dir build -LE integration --output-on-failure` selects
+the same offline subset from the top-level build directory.
+
 **Running integration tests (requires IQM access):**
 
 Before running the integration tests, make sure you have set the necessary
