@@ -38,6 +38,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
+  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
 - ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
   newer so the supported minimum environments install and run ([#218], [#220])
   ([**@burgholzer**])
@@ -243,6 +245,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
