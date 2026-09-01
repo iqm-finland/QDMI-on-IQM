@@ -197,11 +197,11 @@ TEST(TokenManagerTest, TimeLeftSecondsDecodesPaddedStandardBase64Payload) {
 }
 
 TEST(TokenManagerTest, TimeLeftSecondsRejectsPayloadOfUndecodableLength) {
-  // A body length congruent to 1 (mod 4) cannot encode any byte sequence, so
-  // padding it out must not yield a token that looks valid.
-  const std::string token =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-      "eyJleHAiOjQxMDI0NDQ4MDAsInJvbGUiOiJpcW0-cWMif.signature";
+  // The first 24 characters of the body decode to {"exp":4102444800}; the
+  // stray 25th leaves a length congruent to 1 (mod 4), which no byte sequence
+  // can encode. Padding that out must not yield a token that looks valid.
+  const std::string token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                            "eyJleHAiOjQxMDI0NDQ4MDB9a.signature";
 
   EXPECT_EQ(iqm::TokenManager::time_left_seconds(token), 0);
 }
