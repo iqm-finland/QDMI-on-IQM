@@ -2358,6 +2358,10 @@ int IQM_QDMI_device_session_query_device_property(
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_COUPLINGMAP,
                     (std::pair<IQM_QDMI_Site, IQM_QDMI_Site>{}),
                     session->connectivity_, prop, size, value, size_ret)
+  // Recalibration is scheduled by IQM, and the IQM Server exposes no signal
+  // asking a client to trigger one.
+  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION, size_t, 0,
+                            prop, size, value, size_ret)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONUNIT, "us", prop, size,
                       value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONSCALEFACTOR, double,

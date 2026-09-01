@@ -305,6 +305,12 @@ The following properties about the device can be queried via the
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION`:
+  Whether the device needs calibration. IQM schedules recalibration itself and
+  the IQM Server publishes no signal asking a client to trigger one, so this is
+  always zero. A quantum computer that is unfit to run reports itself as under
+  maintenance through
+  {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
 

@@ -916,6 +916,21 @@ TEST_F(DeviceIntegrationMockTest, QubitCountMatchesSiteCountWithoutResonators) {
   EXPECT_EQ(sites_size / sizeof(IQM_QDMI_Site), 2U);
 }
 
+TEST_F(DeviceIntegrationMockTest, ReportsNoCalibrationRequirement) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  const auto requests_before = http_stub.get_urls().size();
+
+  size_t needs_calibration = 1;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION,
+                sizeof(needs_calibration), &needs_calibration, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(needs_calibration, 0U);
+  // No IQM Server signal backs the answer, so no request is issued for it.
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before);
+}
+
 TEST_F(DeviceTest, SessionAllocation) {
   // Session should be allocated in SetUp
   EXPECT_NE(session, nullptr);
