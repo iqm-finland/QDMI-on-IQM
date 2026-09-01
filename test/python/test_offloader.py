@@ -25,42 +25,29 @@ import pickle  # ruff:ignore[suspicious-pickle-import]
 import re
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter
+from qiskit.primitives.containers import BitArray, DataBin, PrimitiveResult, SamplerPubResult
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms import VQEResult
 
 from iqm.qdmi import offloader
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-class FakeBitArray:
-    """Mock for Qiskit's BitArray."""
+_SAMPLE_RESULT = PrimitiveResult([SamplerPubResult(DataBin(meas=BitArray.from_counts({"0": 1})))])
+_VQE_RESULT = VQEResult()
+_VQE_RESULT.optimal_parameters = {"theta": 0.125}
 
-    def __init__(self, counts: dict[str, int]) -> None:
-        """Initialize counts."""
-        self.counts = counts
+#: The stdout a worker produces for a sampling job returning a single `0` shot.
+SAMPLE_STDOUT = base64.b64encode(pickle.dumps(_SAMPLE_RESULT))
 
-    def get_counts(self) -> dict[str, int]:
-        """Return counts."""
-        return self.counts
-
-
-class FakePubResult:
-    """Mock for PubResult."""
-
-    def __init__(self, data: dict[str, FakeBitArray]) -> None:
-        """Initialize data."""
-        self.data = data
-        self.metadata: dict[str, object] = {}
-
-
-class FakeVQEResult:
-    """Mock for VQEResult."""
-
-    def __init__(self, optimal_parameters: dict[str, float]) -> None:
-        """Initialize optimal parameters."""
-        self.optimal_parameters = optimal_parameters
+#: The stdout a worker produces for an estimation job converging on `theta`.
+ESTIMATE_STDOUT = base64.b64encode(pickle.dumps(_VQE_RESULT))
 
 
 def test_sample_local_simulator() -> None:
@@ -97,7 +84,7 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -133,7 +120,7 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -178,7 +165,7 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -223,7 +210,7 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -268,7 +255,7 @@ def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -302,7 +289,7 @@ def test_sample_slurm_omits_licenses_by_default(monkeypatch: pytest.MonkeyPatch,
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -331,7 +318,7 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -385,7 +372,7 @@ def test_sample_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -419,7 +406,7 @@ def test_sample_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -470,7 +457,7 @@ def test_estimate_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -504,7 +491,7 @@ def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -590,3 +577,107 @@ def test_first_pub_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
         offloader._first_pub([])  # ruff:ignore[private-member-access]
+
+
+_EXECUTED_MARKERS: list[str] = []
+
+
+def _record_execution(marker: str) -> str:
+    """Record that a result payload got this module to run code of its choosing.
+
+    Returns:
+        The marker it was called with.
+    """
+    _EXECUTED_MARKERS.append(marker)
+    return marker
+
+
+class _CallingPayload:
+    """A result payload that calls a function of its own choosing while being loaded."""
+
+    def __reduce__(self) -> tuple[Callable[[str], str], tuple[str]]:
+        """Reduce to the call the loading process is asked to make.
+
+        Returns:
+            The callable and its arguments.
+        """
+        return (_record_execution, ("executed",))
+
+
+class _AttributeWalkingPayload:
+    """A result payload that tries to walk out of the result types through `getattr`."""
+
+    def __reduce__(self) -> tuple[Callable[[object, str], object], tuple[object, str]]:
+        """Reduce to an attribute lookup that reaches a function's own scope.
+
+        Returns:
+            The callable and its arguments.
+        """
+        return (getattr, (QuantumCircuit, "__init__"))
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [(_CallingPayload(), "disallowed class"), (_AttributeWalkingPayload(), "disallowed attribute")],
+)
+def test_sample_slurm_refuses_payload_outside_the_result_types(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, payload: object, message: str
+) -> None:
+    """A worker payload naming anything but the result types is refused rather than run."""
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(payload))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert command
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    with pytest.raises(RuntimeError, match=message):
+        offloader.sample(circuit, shots=7, local=False, simulator=True)
+
+    assert _EXECUTED_MARKERS == []
+
+
+def test_estimate_slurm_accepts_a_genuine_vqe_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A real `VQEResult`, circuit and NumPy arrays included, still crosses the Slurm boundary intact."""
+    theta = Parameter("theta")
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(theta, 0)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+    expected = offloader.estimate(ansatz, operator, maxiter=3, local=True, simulator=True)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = base64.b64encode(pickle.dumps(expected))
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert command
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
+
+    assert result.optimal_parameters == expected.optimal_parameters
+    assert result.optimal_circuit == expected.optimal_circuit
+    assert result.optimal_value == expected.optimal_value
