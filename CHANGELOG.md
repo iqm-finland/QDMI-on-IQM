@@ -41,6 +41,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🔒️ Load an offloaded job's result with an unpickler restricted to the Qiskit
+  result types, so a `sample`/`estimate` payload naming anything else is
+  reported as an error instead of loaded ([#231]) ([**@marcelwa**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
   in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
@@ -258,6 +261,7 @@ Compatible with QDMI `v1.3.0`.
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
