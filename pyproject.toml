@@ -64,6 +64,7 @@ qiskit = [
 
 [project.urls]
 Homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
+Documentation = "https://iqm-finland.github.io/QDMI-on-IQM/"
 Issues = "https://github.com/iqm-finland/QDMI-on-IQM/issues"
 Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 
