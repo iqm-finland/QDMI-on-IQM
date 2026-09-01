@@ -123,6 +123,8 @@ install.components = ["iqm-qdmi-device_Runtime", "iqm-qdmi-device_Development"]
 sdist.include = ["python/iqm/qdmi/_version.py"]
 sdist.exclude = [
   "**/docs",
+  "**/test",
+  "spank/**",
   "sitecustomize.py",
   ".*",
 ]
