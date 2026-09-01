@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
+from qiskit.circuit import Parameter, ParameterVector
 from qiskit.primitives.containers import BitArray, DataBin, PrimitiveResult, SamplerPubResult
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms import VQEResult
@@ -608,12 +608,39 @@ class _AttributeWalkingPayload:
     """A result payload that tries to walk out of the result types through `getattr`."""
 
     def __reduce__(self) -> tuple[Callable[[object, str], object], tuple[object, str]]:
-        """Reduce to an attribute lookup that reaches a function's own scope.
+        """Reduce to an attribute lookup reaching a method that writes a file of its choosing.
 
         Returns:
             The callable and its arguments.
         """
-        return (getattr, (QuantumCircuit, "__init__"))
+        return (getattr, (QuantumCircuit, "draw"))
+
+
+def _global_payload(module: str, name: str) -> bytes:
+    """Build a payload whose only content is a reference to `module.name`.
+
+    Returns:
+        The pickled stream.
+    """
+    parts = b"".join(pickle.SHORT_BINUNICODE + bytes([len(raw)]) + raw for raw in (module.encode(), name.encode()))
+    return pickle.PROTO + b"\x04" + parts + pickle.STACK_GLOBAL + pickle.STOP
+
+
+@pytest.mark.parametrize(
+    ("module", "name"),
+    [
+        # A dotted name would walk attributes out of the module, into what it imported.
+        ("qiskit.circuit.quantumcircuit", "multiprocessing.Process"),
+        # Qiskit's C API module wraps its native library rather than a result type.
+        ("qiskit.capi._ctypes", "QkCircuit"),
+        # A module-level Qiskit function is called with the payload's arguments.
+        ("qiskit.qasm2", "dump"),
+    ],
+)
+def test_load_pickled_result_refuses_globals_outside_the_result_types(module: str, name: str) -> None:
+    """Reaching past the result types within an allowed module is refused, not resolved."""
+    with pytest.raises(RuntimeError, match="disallowed class"):
+        offloader._load_pickled_result(_global_payload(module, name))  # ruff:ignore[private-member-access]
 
 
 @pytest.mark.parametrize(
@@ -653,10 +680,12 @@ def test_sample_slurm_refuses_payload_outside_the_result_types(
 
 def test_estimate_slurm_accepts_a_genuine_vqe_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A real `VQEResult`, circuit and NumPy arrays included, still crosses the Slurm boundary intact."""
-    theta = Parameter("theta")
-    ansatz = QuantumCircuit(1)
-    ansatz.ry(theta, 0)
-    operator = SparsePauliOp.from_list([("Z", 1.0)])
+    theta = ParameterVector("theta", 2)
+    ansatz = QuantumCircuit(2)
+    ansatz.ry(theta[0], 0)
+    ansatz.cx(0, 1)
+    ansatz.ry(theta[1], 1)
+    operator = SparsePauliOp.from_list([("ZZ", 1.0)])
     expected = offloader.estimate(ansatz, operator, maxiter=3, local=True, simulator=True)
 
     class FakeCompletedProcess:
