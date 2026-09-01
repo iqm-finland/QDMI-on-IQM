@@ -111,6 +111,10 @@ The module provides two primary functions:
   pickled `VQEResult` to return it, matching the semantics of running `VQE`
   directly against the regular (non-offloaded) estimator.
 
+Both parse that payload with an unpickler restricted to the Qiskit result types,
+so a job whose output names anything else is reported as an error instead of
+being loaded.
+
 Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when
 submitting Slurm jobs to target simulated devices instead of real QPU hardware.
