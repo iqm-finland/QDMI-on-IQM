@@ -256,9 +256,25 @@ def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
 
 _ALLOWED_RESULT_MODULES = frozenset({"qiskit", "qiskit_algorithms"})
 
-#: NumPy reconstructs arrays through module-level helpers rather than classes,
-#: so its share of a result payload is allowed by name instead of by module.
-_ALLOWED_NUMPY_NAMES = frozenset({"_frombuffer", "_reconstruct", "dtype", "ndarray", "scalar"})
+#: Qiskit's C API module holds raw function pointers into the native library. A
+#: result is never reconstructed through one, and calling one with arguments a
+#: payload picked would reach the library's memory rather than build a result.
+_DENIED_RESULT_MODULE = "qiskit.capi"
+
+#: A result's arrays, gate factories, parameter identities and (through Qiskit
+#: 2.0) symbolic expressions are rebuilt by helpers outside Qiskit, so their
+#: share of a payload is allowed by exact name instead of by module.
+_ALLOWED_HELPER_NAMES = {
+    "numpy": frozenset({"_frombuffer", "_reconstruct", "dtype", "ndarray", "scalar"}),
+    "functools": frozenset({"partial"}),
+    "uuid": frozenset({"UUID"}),
+    "symengine": frozenset({"load_basic"}),
+}
+
+#: The attribute lookups the result types reduce through: a bit rebuilds from
+#: its owning register or as an anonymous one, and a parameter expression from
+#: the operations recorded on it.
+_ALLOWED_RESULT_ATTRIBUTES = frozenset({"_from_anonymous", "_from_owned", "_reconstruct"})
 
 
 def _is_result_global(module: str, name: str) -> bool:
@@ -269,16 +285,16 @@ def _is_result_global(module: str, name: str) -> bool:
     """
     root = module.partition(".")[0]
     if root in _ALLOWED_RESULT_MODULES:
-        return True
-    return root == "numpy" and name in _ALLOWED_NUMPY_NAMES
+        return module != _DENIED_RESULT_MODULE and not module.startswith(f"{_DENIED_RESULT_MODULE}.")
+    return name in _ALLOWED_HELPER_NAMES.get(root, frozenset())
 
 
 def _result_getattr(obj: object, name: str) -> object:
     """Look up *name* on *obj* on behalf of a result payload.
 
-    Qiskit's `Qubit` and `Clbit` reduce through `getattr`, so a payload carrying
-    a circuit needs it; confining it to the result types keeps it from reaching
-    arbitrary callables.
+    Qiskit's `Qubit`, `Clbit` and `ParameterExpression` reduce through `getattr`,
+    so a payload carrying a circuit needs it; confining it to their own
+    reconstruction hooks keeps it from reaching arbitrary callables.
 
     Returns:
         The requested attribute.
@@ -286,7 +302,11 @@ def _result_getattr(obj: object, name: str) -> object:
     Raises:
         RuntimeError: If the lookup is not one the result types make.
     """
-    if isinstance(obj, type) and not name.startswith("__") and _is_result_global(obj.__module__, obj.__qualname__):
+    if (
+        isinstance(obj, type)
+        and name in _ALLOWED_RESULT_ATTRIBUTES
+        and _is_result_global(obj.__module__, obj.__qualname__)
+    ):
         return getattr(obj, name)
     msg = f"Job result payload requested a disallowed attribute: {name}"
     raise RuntimeError(msg)
@@ -298,15 +318,23 @@ class _ResultUnpickler(pickle.Unpickler):  # ruff:ignore[suspicious-pickle-usage
     def find_class(self, module: str, name: str) -> object:
         """Resolve a global named by a result payload.
 
+        A dotted *name* makes `pickle` walk attributes out of *module*, reaching
+        whatever that module imported, so only a plain module-level global is
+        resolved -- which is all the result types ever name.
+
         Returns:
             The resolved global.
 
         Raises:
             RuntimeError: If the payload names anything outside the result types.
         """
-        if _is_result_global(module, name):
-            return super().find_class(module, name)
-        if module == "builtins" and name == "getattr":
+        if "." not in name and _is_result_global(module, name):
+            resolved = super().find_class(module, name)
+            # Every Qiskit global a result rebuilds through is a class, so a
+            # module-level function reached this way is not part of a result.
+            if isinstance(resolved, type) or name in _ALLOWED_HELPER_NAMES.get(module.partition(".")[0], ()):
+                return resolved
+        elif module == "builtins" and name == "getattr":
             return _result_getattr
         msg = f"Job result payload named a disallowed class: {module}.{name}"
         raise RuntimeError(msg)
