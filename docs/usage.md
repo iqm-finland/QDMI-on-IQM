@@ -39,12 +39,12 @@ To initiate a session with a particular endpoint and authentication method, the
 following code snippet can be used:
 
 ```cpp
-IQM_QDMI_Device_Session
-FoMaC::get_iqm_session(const std::string &base_url,
-                       const std::optional<std::string> &quantum_computer_id,
-                       const std::optional<std::string> &quantum_computer_alias,
-                       const std::optional<std::string> &token,
-                       const std::optional<std::string> &tokens_file) {
+IQM_QDMI_Device_Session QDMIClient::get_iqm_session(
+    const std::string &base_url,
+    const std::optional<std::string> &quantum_computer_id,
+    const std::optional<std::string> &quantum_computer_alias,
+    const std::optional<std::string> &token,
+    const std::optional<std::string> &tokens_file) {
   IQM_QDMI_Device_Session session = nullptr;
   auto ret = IQM_QDMI_device_session_alloc(&session);
 
@@ -212,6 +212,12 @@ add_executable(my-application main.cpp)
 target_link_libraries(my-application PRIVATE MQT::CoreFoMaC)
 mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
 ```
+
+:::{important}
+`MQT::CoreFoMaC` is the client target of the MQT Core 3.9 series this project
+requires. MQT Core 4 renames it to `MQT::CoreQDMI` and removes the old name.
+Link against `MQT::CoreQDMI` once you build against MQT Core 4.
+:::
 
 For dynamically linked consumers, automatic discovery searches beside the driver
 library rather than the executable. Such consumers must place the generated
@@ -396,7 +402,7 @@ returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
 position.
 
 ```cpp
-auto FoMaC::submit_job(
+auto QDMIClient::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots, const std::string &heralding_mode,
     const std::string &move_validation_mode,
@@ -660,12 +666,12 @@ calibration job completes.
 Here's an example of submitting a calibration job:
 
 ```cpp
-auto *job = fomac.submit_job(TEST_CALIBRATION_CONFIG,
-                               QDMI_PROGRAM_FORMAT_CALIBRATION);
+auto *job = client.submit_job(TEST_CALIBRATION_CONFIG,
+                              QDMI_PROGRAM_FORMAT_CALIBRATION);
 IQM_QDMI_device_job_wait(job, 0);
 
 // Get the new calibration set ID
-const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
+const auto calibration_set_id = QDMIClient::get_calibration_set_id(job);
 // The session is now updated with the new calibration data
 ```
 
@@ -688,7 +694,7 @@ When you check a job's status using {cpp:func}`IQM_QDMI_device_job_check()` and
 the job has failed, all errors and messages will be automatically logged:
 
 ```cpp
-auto *job = fomac.submit_job(TEST_PROGRAM, QDMI_PROGRAM_FORMAT_QIRBASESTRING);
+auto *job = client.submit_job(TEST_PROGRAM, QDMI_PROGRAM_FORMAT_QIRBASESTRING);
 IQM_QDMI_device_job_wait(job, 0);
 
 QDMI_Job_Status status;

@@ -18,10 +18,10 @@
  */
 
 /** @file
- * @brief FoMaC Implementation for testing the IQM QDMI Device.
+ * @brief QDMI client implementation for testing the IQM QDMI Device.
  */
 
-#include "fomac.hpp"
+#include "qdmi_client.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -52,7 +52,7 @@ using Owned_session =
                     Session_deleter>;
 } // namespace
 
-auto FoMaC::throw_if_error(const int status, const std::string &message)
+auto QDMIClient::throw_if_error(const int status, const std::string &message)
     -> void {
   if (status == QDMI_SUCCESS) {
     return;
@@ -104,11 +104,11 @@ auto FoMaC::throw_if_error(const int status, const std::string &message)
 }
 
 IQM_QDMI_Device_Session
-FoMaC::get_iqm_session(const std::string &base_url,
-                       const std::optional<std::string> &token,
-                       const std::optional<std::string> &tokens_file,
-                       const std::optional<std::string> &qc_id,
-                       const std::optional<std::string> &qc_alias) {
+QDMIClient::get_iqm_session(const std::string &base_url,
+                            const std::optional<std::string> &token,
+                            const std::optional<std::string> &tokens_file,
+                            const std::optional<std::string> &qc_id,
+                            const std::optional<std::string> &qc_alias) {
   IQM_QDMI_Device_Session raw_session = nullptr;
   auto ret = IQM_QDMI_device_session_alloc(&raw_session);
   throw_if_error(ret, "Failed to allocate IQM QDMI device session.");
@@ -160,7 +160,7 @@ FoMaC::get_iqm_session(const std::string &base_url,
   return session.release();
 }
 
-auto FoMaC::get_name() const -> std::string {
+auto QDMIClient::get_name() const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_NAME, 0, nullptr, &size);
@@ -172,7 +172,7 @@ auto FoMaC::get_name() const -> std::string {
   return name;
 }
 
-auto FoMaC::get_version() const -> std::string {
+auto QDMIClient::get_version() const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_VERSION, 0, nullptr, &size);
@@ -184,7 +184,7 @@ auto FoMaC::get_version() const -> std::string {
   return version;
 }
 
-auto FoMaC::get_library_version() const -> std::string {
+auto QDMIClient::get_library_version() const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_LIBRARYVERSION, 0, nullptr, &size);
@@ -197,7 +197,7 @@ auto FoMaC::get_library_version() const -> std::string {
   return version;
 }
 
-auto FoMaC::get_qubits_num() const -> size_t {
+auto QDMIClient::get_qubits_num() const -> size_t {
   size_t num_qubits = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_QUBITSNUM, sizeof(size_t), &num_qubits,
@@ -206,7 +206,7 @@ auto FoMaC::get_qubits_num() const -> size_t {
   return num_qubits;
 }
 
-auto FoMaC::get_operation_map() const
+auto QDMIClient::get_operation_map() const
     -> std::map<std::string, IQM_QDMI_Operation> {
   size_t ops_size = 0;
   int ret = IQM_QDMI_device_session_query_device_property(
@@ -234,7 +234,7 @@ auto FoMaC::get_operation_map() const
   return ops_map;
 }
 
-auto FoMaC::get_coupling_map() const
+auto QDMIClient::get_coupling_map() const
     -> std::vector<std::pair<IQM_QDMI_Site, IQM_QDMI_Site>> {
   size_t size = 0;
   int ret = IQM_QDMI_device_session_query_device_property(
@@ -257,7 +257,7 @@ auto FoMaC::get_coupling_map() const
   return coupling_pairs;
 }
 
-auto FoMaC::get_sites() const -> std::vector<IQM_QDMI_Site> {
+auto QDMIClient::get_sites() const -> std::vector<IQM_QDMI_Site> {
   size_t sites_size = 0;
   int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_SITES, 0, nullptr, &sites_size);
@@ -270,7 +270,7 @@ auto FoMaC::get_sites() const -> std::vector<IQM_QDMI_Site> {
   return sites;
 }
 
-auto FoMaC::get_duration_unit() const -> std::string {
+auto QDMIClient::get_duration_unit() const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_DURATIONUNIT, 0, nullptr, &size);
@@ -282,7 +282,7 @@ auto FoMaC::get_duration_unit() const -> std::string {
   return unit;
 }
 
-auto FoMaC::get_duration_scale_factor() const -> double {
+auto QDMIClient::get_duration_scale_factor() const -> double {
   double scale_factor = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_DURATIONSCALEFACTOR, sizeof(double),
@@ -291,7 +291,7 @@ auto FoMaC::get_duration_scale_factor() const -> double {
   return scale_factor;
 }
 
-auto FoMaC::get_calibration_set_id() const -> std::string {
+auto QDMIClient::get_calibration_set_id() const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_device_property(
       session_, QDMI_DEVICE_PROPERTY_CUSTOM1, 0, nullptr, &size);
@@ -304,7 +304,7 @@ auto FoMaC::get_calibration_set_id() const -> std::string {
   return calibration_set_id;
 }
 
-auto FoMaC::get_site_index(IQM_QDMI_Site site) const -> uint64_t {
+auto QDMIClient::get_site_index(IQM_QDMI_Site site) const -> uint64_t {
   uint64_t site_id = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
       session_, site, QDMI_SITE_PROPERTY_INDEX, sizeof(uint64_t), &site_id,
@@ -313,7 +313,7 @@ auto FoMaC::get_site_index(IQM_QDMI_Site site) const -> uint64_t {
   return site_id;
 }
 
-auto FoMaC::get_site_t1(IQM_QDMI_Site site) const -> uint64_t {
+auto QDMIClient::get_site_t1(IQM_QDMI_Site site) const -> uint64_t {
   uint64_t t1 = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
       session_, site, QDMI_SITE_PROPERTY_T1, sizeof(uint64_t), &t1, nullptr);
@@ -321,7 +321,7 @@ auto FoMaC::get_site_t1(IQM_QDMI_Site site) const -> uint64_t {
   return t1;
 }
 
-auto FoMaC::get_site_t2(IQM_QDMI_Site site) const -> uint64_t {
+auto QDMIClient::get_site_t2(IQM_QDMI_Site site) const -> uint64_t {
   uint64_t t2 = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
       session_, site, QDMI_SITE_PROPERTY_T2, sizeof(uint64_t), &t2, nullptr);
@@ -329,7 +329,7 @@ auto FoMaC::get_site_t2(IQM_QDMI_Site site) const -> uint64_t {
   return t2;
 }
 
-auto FoMaC::get_site_name(IQM_QDMI_Site site) const -> std::string {
+auto QDMIClient::get_site_name(IQM_QDMI_Site site) const -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
       session_, site, QDMI_SITE_PROPERTY_NAME, 0, nullptr, &size);
@@ -341,7 +341,7 @@ auto FoMaC::get_site_name(IQM_QDMI_Site site) const -> std::string {
   return custom;
 }
 
-auto FoMaC::get_operation_name(const IQM_QDMI_Operation &op) const
+auto QDMIClient::get_operation_name(const IQM_QDMI_Operation &op) const
     -> std::string {
   size_t name_length = 0;
   const int ret = IQM_QDMI_device_session_query_operation_property(
@@ -356,7 +356,7 @@ auto FoMaC::get_operation_name(const IQM_QDMI_Operation &op) const
   return name;
 }
 
-auto FoMaC::get_operation_operands_num(const IQM_QDMI_Operation &op) const
+auto QDMIClient::get_operation_operands_num(const IQM_QDMI_Operation &op) const
     -> size_t {
   size_t operands_num = 0;
   const int ret = IQM_QDMI_device_session_query_operation_property(
@@ -367,8 +367,8 @@ auto FoMaC::get_operation_operands_num(const IQM_QDMI_Operation &op) const
   return operands_num;
 }
 
-auto FoMaC::get_operation_parameters_num(const IQM_QDMI_Operation &op) const
-    -> size_t {
+auto QDMIClient::get_operation_parameters_num(
+    const IQM_QDMI_Operation &op) const -> size_t {
   size_t parameters_num = 0;
   const int ret = IQM_QDMI_device_session_query_operation_property(
       session_, op, 0, nullptr, 0, nullptr,
@@ -379,9 +379,9 @@ auto FoMaC::get_operation_parameters_num(const IQM_QDMI_Operation &op) const
   return parameters_num;
 }
 
-auto FoMaC::get_operation_fidelity(const IQM_QDMI_Operation &op,
-                                   const std::vector<IQM_QDMI_Site> &sites,
-                                   const std::vector<double> &params) const
+auto QDMIClient::get_operation_fidelity(const IQM_QDMI_Operation &op,
+                                        const std::vector<IQM_QDMI_Site> &sites,
+                                        const std::vector<double> &params) const
     -> double {
   double fidelity = 0;
   const int ret = IQM_QDMI_device_session_query_operation_property(
@@ -392,9 +392,9 @@ auto FoMaC::get_operation_fidelity(const IQM_QDMI_Operation &op,
   return fidelity;
 }
 
-auto FoMaC::get_operation_duration(const IQM_QDMI_Operation &op,
-                                   const std::vector<IQM_QDMI_Site> &sites,
-                                   const std::vector<double> &params) const
+auto QDMIClient::get_operation_duration(const IQM_QDMI_Operation &op,
+                                        const std::vector<IQM_QDMI_Site> &sites,
+                                        const std::vector<double> &params) const
     -> double {
   double duration = 0;
   const int ret = IQM_QDMI_device_session_query_operation_property(
@@ -405,7 +405,7 @@ auto FoMaC::get_operation_duration(const IQM_QDMI_Operation &op,
   return duration;
 }
 
-auto FoMaC::get_operation_sites(const IQM_QDMI_Operation &op) const
+auto QDMIClient::get_operation_sites(const IQM_QDMI_Operation &op) const
     -> std::vector<IQM_QDMI_Site> {
   size_t size = 0;
   int ret = IQM_QDMI_device_session_query_operation_property(
@@ -422,7 +422,7 @@ auto FoMaC::get_operation_sites(const IQM_QDMI_Operation &op) const
   return sites;
 }
 
-auto FoMaC::get_supported_program_formats() const
+auto QDMIClient::get_supported_program_formats() const
     -> std::vector<QDMI_Program_Format> {
   size_t size = 0;
   int ret = IQM_QDMI_device_session_query_device_property(
@@ -469,7 +469,7 @@ private:
 };
 } // namespace
 
-auto FoMaC::submit_job(
+auto QDMIClient::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots, const std::string &heralding_mode,
     const std::string &move_validation_mode,
@@ -557,24 +557,24 @@ auto FoMaC::submit_job(
   return guard.release();
 }
 
-auto FoMaC::get_status(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {
+auto QDMIClient::get_status(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {
   QDMI_Job_Status status{};
   const int ret = IQM_QDMI_device_job_check(job, &status);
   throw_if_error(ret, "Failed to check the job status");
   return status;
 }
 
-auto FoMaC::wait(IQM_QDMI_Device_Job job, const size_t timeout) -> void {
+auto QDMIClient::wait(IQM_QDMI_Device_Job job, const size_t timeout) -> void {
   const int ret = IQM_QDMI_device_job_wait(job, timeout);
   throw_if_error(ret, "Failed to wait for the job");
 }
 
-auto FoMaC::cancel(IQM_QDMI_Device_Job job) -> void {
+auto QDMIClient::cancel(IQM_QDMI_Device_Job job) -> void {
   const int ret = IQM_QDMI_device_job_cancel(job);
   throw_if_error(ret, "Failed to cancel the job");
 }
 
-auto FoMaC::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
+auto QDMIClient::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
   size_t job_id_size = 0;
   const int ret = IQM_QDMI_device_job_query_property(
       job, QDMI_DEVICE_JOB_PROPERTY_ID, 0, nullptr, &job_id_size);
@@ -586,7 +586,7 @@ auto FoMaC::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
   return job_id;
 }
 
-auto FoMaC::get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t {
+auto QDMIClient::get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t {
   size_t num_shots = 0;
   const int ret =
       IQM_QDMI_device_job_query_property(job, QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM,
@@ -595,7 +595,7 @@ auto FoMaC::get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t {
   return num_shots;
 }
 
-auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
+auto QDMIClient::get_histogram(IQM_QDMI_Device_Job job)
     -> std::map<std::string, size_t> {
   size_t size = 0;
   const int ret = IQM_QDMI_device_job_get_results(
@@ -627,7 +627,8 @@ auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
   }
   return results;
 }
-auto FoMaC::get_calibration_set_id(IQM_QDMI_Device_Job job) -> std::string {
+auto QDMIClient::get_calibration_set_id(IQM_QDMI_Device_Job job)
+    -> std::string {
   size_t size = 0;
   const int ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1,
                                                   0, nullptr, &size);
