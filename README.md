@@ -9,10 +9,13 @@
 
 # QDMI on IQM
 
+[![PyPI](https://img.shields.io/pypi/v/iqm-qdmi?logo=pypi&style=flat-square)](https://pypi.org/project/iqm-qdmi/)
 [![Core Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=Core&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![SPANK Plugin GPLv3 License](https://img.shields.io/static/v1?logo=gnu&label=SPANK&message=GPLv3&color=informational&style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
+[![CI](https://img.shields.io/github/actions/workflow/status/iqm-finland/QDMI-on-IQM/CI.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/iqm-finland/QDMI-on-IQM/actions/workflows/CI.yml)
+[![codecov](https://img.shields.io/codecov/c/github/iqm-finland/QDMI-on-IQM?style=flat-square&logo=codecov)](https://codecov.io/gh/iqm-finland/QDMI-on-IQM)
 
 **QDMI on IQM** is IQM's official, production-ready implementation of the
 [Quantum Device Management Interface (QDMI)](https://github.com/Munich-Quantum-Software-Stack/qdmi)—a
