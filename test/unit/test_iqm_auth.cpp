@@ -158,6 +158,54 @@ TEST(TokenManagerTest, TimeLeftSecondsHandlesExpiryBeyond2038) {
   EXPECT_GE(expiry - before, time_left);
 }
 
+TEST(TokenManagerTest, TimeLeftSecondsDecodesBase64UrlPayloadWithDash) {
+  // Payload {"exp":4102444800,"role":"iqm>qc"}. The '>' sits at an offset
+  // congruent to 2 (mod 3), which base64url encodes as '-'. Body length is
+  // congruent to 2 (mod 4), so RFC 7515 leaves off two '=' characters.
+  const std::string token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsInJvbGUiOiJpcW0-cWMifQ.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsDecodesBase64UrlPayloadWithUnderscore) {
+  // Payload {"exp":4102444800,"aud":"https://qc.example.com/cb?x=1"}. The '?'
+  // encodes as '_'. Body length is congruent to 3 (mod 4), so RFC 7515 leaves
+  // off one '=' character.
+  const std::string token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsImF1ZCI6Imh0dHBzOi8vcWMuZXhhbXBsZS5jb20vY2I_eD0x"
+      "In0.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsDecodesPaddedStandardBase64Payload) {
+  // The same two payloads in the standard alphabet, where the bytes encode as
+  // '+' and '/', with the '=' padding spelled out.
+  const std::string plus_token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsInJvbGUiOiJpcW0+cWMifQ==.signature";
+  const std::string slash_token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsImF1ZCI6Imh0dHBzOi8vcWMuZXhhbXBsZS5jb20vY2I/eD0x"
+      "In0=.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(plus_token), 0);
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(slash_token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsRejectsPayloadOfUndecodableLength) {
+  // The first 24 characters of the body decode to {"exp":4102444800}; the
+  // stray 25th leaves a length congruent to 1 (mod 4), which no byte sequence
+  // can encode. Padding that out must not yield a token that looks valid.
+  const std::string token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                            "eyJleHAiOjQxMDI0NDQ4MDB9a.signature";
+
+  EXPECT_EQ(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
 TEST(TokenManagerTest, ConstructorWithExplicitToken) {
   const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
