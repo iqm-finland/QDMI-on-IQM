@@ -19,16 +19,23 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
+import numpy as np
 import pytest
-from qiskit.circuit import QuantumCircuit
+from mqt.core.plugins.qiskit.backend import QDMIBackend
+from mqt.core.qdmi import Device, Job, ProgramFormat
+from mqt.core.qdmi.driver import open_device
+from qiskit.circuit import ClassicalRegister, Parameter, QuantumCircuit, QuantumRegister
 from qiskit.compiler import transpile
 from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import qiskit as iqm_qiskit
+from iqm.qdmi._backends import build_estimator  # ruff:ignore[import-private-name]
 from iqm.qdmi.qiskit import IQMBackend
 
 ENVIRONMENT_TOKENS_FILE = Path("/opt/iqm/environment-tokens.json")
@@ -282,11 +289,85 @@ def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> 
     """The bound estimator should execute a simple observable on the live IQM backend."""
     observable = SparsePauliOp("Z" * backend.num_qubits)
     transpiled_circuit = transpile(circuit, backend=backend)
-    job = backend.estimator(default_shots=32).run([(transpiled_circuit, observable)])
+    job = backend.estimator(default_precision=1 / 8).run([(transpiled_circuit, observable)])
     result = job.result()[0]
     expectation_value = float(result.data["evs"][()])
     standard_deviation = float(result.data["stds"][()])
 
     assert -1.0 <= expectation_value <= 1.0
     assert standard_deviation >= 0.0
-    assert result.metadata["shots"] == 32
+    assert result.metadata["shots"] == 64
+
+
+@pytest.fixture
+def iqm_results(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock, Mock]:
+    """Return an IQM adapter with simulator topology and stubbed remote results."""
+    device = open_device("mqt.ddsim.default")
+    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", Mock())
+    monkeypatch.setattr(iqm_qiskit, "open_device", Mock(return_value=device))
+    monkeypatch.setattr(Device, "supported_program_formats", Mock(return_value=[ProgramFormat.IQM_JSON]))
+    job = Mock(spec=Job)
+    job.id = "offline-job"
+    job.check.return_value = Job.Status.DONE
+    submit = Mock(return_value=job)
+    monkeypatch.setattr(Device, "submit_job", submit)
+    return IQMBackend(), job, submit
+
+
+def test_iqm_primitives_preserve_ordered_shots(iqm_results: tuple[IQMBackend, Mock, Mock]) -> None:
+    """Native memory and sampler results preserve shot order across registers."""
+    backend, job, submit = iqm_results
+    circuit = QuantumCircuit(QuantumRegister(3), ClassicalRegister(1, "left"), ClassicalRegister(2, "right"))
+    circuit.measure(range(3), range(3))
+    job.get_shots.return_value = ["101", "000", "110", "101"]
+
+    result = backend.run(circuit, shots=4, memory=True).result()
+    assert result.get_memory() == ["10 1", "00 0", "11 0", "10 1"]
+    assert result.get_counts() == {"10 1": 2, "00 0": 1, "11 0": 1}
+
+    data = backend.sampler(default_shots=4).run([circuit]).result()[0].data
+    assert data["left"].get_bitstrings() == ["1", "0", "0", "1"]
+    assert data["right"].get_bitstrings() == ["10", "00", "11", "10"]
+    job.get_counts.assert_not_called()
+    assert submit.call_count == 2
+    assert submit.call_args.kwargs["program_format"] == ProgramFormat.IQM_JSON
+    program = json.loads(submit.call_args.kwargs["program"])
+    assert [op["args"]["key"] for op in program["instructions"]] == ["left_1_0_0", "right_2_1_0", "right_2_1_1"]
+
+
+def test_iqm_counts_only_support_estimator(iqm_results: tuple[IQMBackend, Mock, Mock]) -> None:
+    """Counts-only jobs support estimation but fail when a sampler collects shots."""
+    backend, job, submit = iqm_results
+    job.get_shots.side_effect = RuntimeError("SHOTS unavailable")
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+    with pytest.raises(RuntimeError, match="SHOTS unavailable"):
+        backend.sampler(default_shots=4).run([circuit]).result()
+
+    job.get_shots.reset_mock()
+    job.get_counts.return_value = {"0": 4096}
+    result = backend.estimator().run([(QuantumCircuit(1), SparsePauliOp("Z"))]).result()[0]
+    assert result.data["evs"] == pytest.approx(1)
+    assert result.data["stds"] == pytest.approx(0)
+    assert result.metadata["shots"] == 4096
+    assert submit.call_args.kwargs["num_shots"] == 4096
+    job.get_shots.assert_not_called()
+
+
+def test_estimator_groups_observables_and_broadcasts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shared estimator groups compatible terms across parameter bindings."""
+    estimator = build_estimator(simulator=True)
+    assert isinstance(estimator.backend, QDMIBackend)
+    submit = Mock(wraps=estimator.backend.device.submit_job)
+    monkeypatch.setattr(Device, "submit_job", submit)
+    theta = Parameter("theta")
+    circuit = QuantumCircuit(2)
+    circuit.ry(theta, 0)
+    observable = SparsePauliOp.from_list([("IZ", 1.0), ("ZI", 2.0)])  # spellchecker:disable-line
+
+    result = estimator.run([(circuit, observable, {theta: [[0], [np.pi]]})], precision=1 / 8).result()[0]
+
+    np.testing.assert_allclose(result.data["evs"], [3, 1])
+    np.testing.assert_allclose(result.data["stds"], [0, 0])
+    assert result.metadata["shots"] == 64
+    assert submit.call_count == 2  # One grouped measurement circuit per parameter binding.
