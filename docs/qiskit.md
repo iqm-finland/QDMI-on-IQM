@@ -60,9 +60,19 @@ endpoint. Every backend opens a fresh device session with its own configuration.
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing
-{py:class}`~qiskit.primitives.BaseSamplerV2` and
-{py:class}`~qiskit.primitives.BaseEstimatorV2` primitives bound to the backend
-instance.
+{py:class}`~qiskit.primitives.BackendSamplerV2` and
+{py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
+backend instance.
+
+MQT Core 3.10 uses native Qiskit primitives. The sampler and
+`backend.run(memory=True)` require genuine QDMI shot results and preserve their
+order. Counts-only results remain usable by the estimator.
+
+The estimator uses positive precision instead of `default_shots`. Its default
+precision is `1/64`, corresponding to 4,096 shots per measurement circuit,
+compared with the previous default of 1,024. Set
+`backend.estimator(default_precision=1/32)` for 1,024 shots. Observable
+grouping, parameter broadcasting, metadata, and standard errors follow Qiskit.
 
 ```{code-cell} ipython3
 sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
