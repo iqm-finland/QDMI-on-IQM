@@ -92,15 +92,22 @@ jobs:
       matrix:
         runs-on: [windows-2025, windows-11-arm]
         config: [Release]
+        compiler: [MSVC]
         iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: windows-2025
             config: Debug
+            compiler: MSVC
+            iqm-qc-alias: "emerald:mock"
+          - runs-on: windows-2025
+            config: Release
+            compiler: ClangCL
             iqm-qc-alias: "emerald:mock"
     uses: ./.github/workflows/cpp-tests-windows.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
+      compiler: ${{ matrix.compiler }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
