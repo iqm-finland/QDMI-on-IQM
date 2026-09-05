@@ -30,6 +30,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Use native Qiskit primitives with MQT Core 3.10, preserving genuine shot
+  order and using estimator precision `1/64` (4,096 shots per measurement
+  circuit) by default ([#246]) ([**@marcelwa**])
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
   ([#220]) ([**@denialhaag**])
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
@@ -40,9 +43,9 @@ releases may include breaking changes.
 
 - 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
   a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
-- ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
-  newer so the supported minimum environments install and run ([#218], [#220])
-  ([**@burgholzer**])
+- ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
+  environments install and run ([#218], [#220], [#246]) ([**@burgholzer**],
+  [**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
 
@@ -245,6 +248,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
