@@ -41,6 +41,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
+  internal object library without DLL import decorations ([#242])
+  ([**@marcelwa**])
 - 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
   a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
 - ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
@@ -248,6 +251,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229

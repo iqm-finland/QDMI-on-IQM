@@ -14,6 +14,12 @@ on:
           This can be any valid CMake build type, such as 'Debug' or 'Release'.
         default: "Release"
         type: string
+      compiler:
+        description: >
+          The Windows compiler toolset to use. Defaults to 'MSVC'.
+          Supported values are 'MSVC' and 'ClangCL'.
+        default: "MSVC"
+        type: string
       iqm-qc-alias:
         description: >
           The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
@@ -33,7 +39,7 @@ permissions:
 
 jobs:
   cpp-tests-windows:
-    name: 🏁 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
+    name: 🏁 ${{ inputs.runs-on }} ${{ inputs.compiler }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
     runs-on: ${{ inputs.runs-on }}
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
@@ -45,10 +51,16 @@ jobs:
           persist-credentials: false
       - name: Configure CMake
         env:
+          COMPILER: ${{ inputs.compiler }}
           CONFIG: ${{ inputs.config }}
-        run: >
-          cmake -S . -B build
-          -DCMAKE_BUILD_TYPE="$env:CONFIG"
+        run: |
+          $cmakeArguments = @("-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=$env:CONFIG")
+          if ($env:COMPILER -eq "ClangCL") {
+            $cmakeArguments += @("-T", "ClangCL")
+          } elseif ($env:COMPILER -ne "MSVC") {
+            throw "Unsupported compiler: $env:COMPILER"
+          }
+          cmake @cmakeArguments
       - name: Build
         env:
           CONFIG: ${{ inputs.config }}
