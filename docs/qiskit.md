@@ -60,9 +60,9 @@ endpoint. Every backend opens a fresh device session with its own configuration.
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing
-{py:class}`~qiskit.primitives.BaseSamplerV2` and
-{py:class}`~qiskit.primitives.BaseEstimatorV2` primitives bound to the backend
-instance.
+{py:class}`~qiskit.primitives.BackendSamplerV2` and
+{py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
+backend instance.
 
 ```{code-cell} ipython3
 sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)

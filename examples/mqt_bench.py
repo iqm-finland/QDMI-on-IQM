@@ -41,7 +41,6 @@ from dataclasses import dataclass
 import numpy as np
 from mqt.bench import BenchmarkLevel, get_benchmark
 from mqt.core.plugins.qiskit.backend import QDMIBackend
-from mqt.core.plugins.qiskit.sampler import QDMISampler
 from qiskit.quantum_info import hellinger_fidelity
 
 from iqm.qdmi.qiskit import IQMBackend
@@ -214,7 +213,7 @@ def main() -> None:
     log.info("Circuit ready: %d qubits, %d gates, depth %d", circuit.num_qubits, circuit.size(), circuit.depth())
 
     log.info("Submitting job to '%s' (%d shots)...", backend.name, shots)
-    sampler = QDMISampler(backend, default_shots=shots)
+    sampler = backend.sampler(default_shots=shots)
     job = sampler.run([(circuit,)])
     counts: dict[str, int] = job.result()[0].data[config.result_register].get_counts()
     total_shots = sum(counts.values())
