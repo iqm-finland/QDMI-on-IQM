@@ -38,9 +38,8 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🔒️ Load an offloaded job's result with an unpickler restricted to the Qiskit
-  result types, so a `sample`/`estimate` payload naming anything else is
-  reported as an error instead of loaded ([#231]) ([**@marcelwa**])
+- 🔒️ Exchange offloaded `sample` and `estimate` results as JSON instead of
+  loading worker-controlled pickle payloads ([#231]) ([**@marcelwa**])
 - ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
   newer so the supported minimum environments install and run ([#218], [#220])
   ([**@burgholzer**])

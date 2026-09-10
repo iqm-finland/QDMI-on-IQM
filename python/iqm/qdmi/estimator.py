@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,6 +30,7 @@ try:
     from qiskit_algorithms.optimizers import L_BFGS_B
 
     from ._backends import build_estimator
+    from .offloader import _encode_vqe_result
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin and VQE requirements. "
@@ -80,8 +80,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
-    pickled = pickle.dumps(result)
-    print(base64.b64encode(pickled).decode("utf-8"))
+    print(_encode_vqe_result(result))
 
 
 if __name__ == "__main__":

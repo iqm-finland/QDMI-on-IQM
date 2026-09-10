@@ -20,9 +20,8 @@
 
 from __future__ import annotations
 
-import base64
 import contextlib
-import io
+import json
 import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
@@ -33,9 +32,10 @@ from typing import TYPE_CHECKING, SupportsInt, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
+    import numpy as np
     from qiskit import QuantumCircuit, qpy, transpile
-    from qiskit_algorithms import VQE
-    from qiskit_algorithms.optimizers import L_BFGS_B
+    from qiskit_algorithms import VQE, VQEResult
+    from qiskit_algorithms.optimizers import L_BFGS_B, OptimizerResult
 
     from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_estimator, build_sampler
 except ImportError as e:
@@ -44,7 +44,6 @@ except ImportError as e:
 if TYPE_CHECKING:
     from qiskit.primitives.containers.pub_result import PubResult
     from qiskit.quantum_info import SparsePauliOp
-    from qiskit_algorithms import VQEResult
 
 _DEFAULT_PARTITION = "quantum"
 _DEFAULT_NODES = 1
@@ -238,126 +237,92 @@ def _run_srun(
     return process
 
 
-def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
-    """Extract and base64-decode the job's stdout payload.
+def _load_json_result(process: subprocess.CompletedProcess[bytes]) -> object:
+    """Parse the job's stdout as JSON.
 
     Returns:
-        The decoded, still-pickled result payload.
+        The parsed result.
 
     Raises:
-        RuntimeError: If the job produced no output.
+        RuntimeError: If the job produced no valid JSON output.
     """
-    stdout = process.stdout.decode().strip()
+    try:
+        stdout = process.stdout.decode().strip()
+    except UnicodeDecodeError as e:
+        msg = f"Error parsing the output: {e}"
+        raise RuntimeError(msg) from e
     if not stdout:
         msg = "No output from the job."
         raise RuntimeError(msg)
-    return base64.b64decode(stdout.encode())
-
-
-_ALLOWED_RESULT_MODULES = frozenset({"qiskit", "qiskit_algorithms"})
-
-#: Qiskit's C API module holds raw function pointers into the native library. A
-#: result is never reconstructed through one, and calling one with arguments a
-#: payload picked would reach the library's memory rather than build a result.
-_DENIED_RESULT_MODULE = "qiskit.capi"
-
-#: A result's arrays, gate factories, parameter identities and (through Qiskit
-#: 2.0) symbolic expressions are rebuilt by helpers outside Qiskit, so their
-#: share of a payload is allowed by exact name instead of by module.
-_ALLOWED_HELPER_NAMES = {
-    "numpy": frozenset({"_frombuffer", "_reconstruct", "dtype", "ndarray", "scalar"}),
-    "functools": frozenset({"partial"}),
-    "uuid": frozenset({"UUID"}),
-    "symengine": frozenset({"load_basic"}),
-}
-
-#: The attribute lookups the result types reduce through: a bit rebuilds from
-#: its owning register or as an anonymous one, and a parameter expression from
-#: the operations recorded on it.
-_ALLOWED_RESULT_ATTRIBUTES = frozenset({"_from_anonymous", "_from_owned", "_reconstruct"})
-
-
-def _is_result_global(module: str, name: str) -> bool:
-    """Decide whether `module.name` is part of the result types the workers send back.
-
-    Returns:
-        True if the global may be resolved while loading a result payload.
-    """
-    root = module.partition(".")[0]
-    if root in _ALLOWED_RESULT_MODULES:
-        return module != _DENIED_RESULT_MODULE and not module.startswith(f"{_DENIED_RESULT_MODULE}.")
-    return name in _ALLOWED_HELPER_NAMES.get(root, frozenset())
-
-
-def _result_getattr(obj: object, name: str) -> object:
-    """Look up *name* on *obj* on behalf of a result payload.
-
-    Qiskit's `Qubit`, `Clbit` and `ParameterExpression` reduce through `getattr`,
-    so a payload carrying a circuit needs it; confining it to their own
-    reconstruction hooks keeps it from reaching arbitrary callables.
-
-    Returns:
-        The requested attribute.
-
-    Raises:
-        RuntimeError: If the lookup is not one the result types make.
-    """
-    if (
-        isinstance(obj, type)
-        and name in _ALLOWED_RESULT_ATTRIBUTES
-        and _is_result_global(obj.__module__, obj.__qualname__)
-    ):
-        return getattr(obj, name)
-    msg = f"Job result payload requested a disallowed attribute: {name}"
-    raise RuntimeError(msg)
-
-
-class _ResultUnpickler(pickle.Unpickler):  # ruff:ignore[suspicious-pickle-usage]
-    """Unpickler restricted to the result types the Slurm workers send back."""
-
-    def find_class(self, module: str, name: str) -> object:
-        """Resolve a global named by a result payload.
-
-        A dotted *name* makes `pickle` walk attributes out of *module*, reaching
-        whatever that module imported, so only a plain module-level global is
-        resolved -- which is all the result types ever name.
-
-        Returns:
-            The resolved global.
-
-        Raises:
-            RuntimeError: If the payload names anything outside the result types.
-        """
-        if "." not in name and _is_result_global(module, name):
-            resolved = super().find_class(module, name)
-            # Every Qiskit global a result rebuilds through is a class, so a
-            # module-level function reached this way is not part of a result.
-            if isinstance(resolved, type) or name in _ALLOWED_HELPER_NAMES.get(module.partition(".")[0], ()):
-                return resolved
-        elif module == "builtins" and name == "getattr":
-            return _result_getattr
-        msg = f"Job result payload named a disallowed class: {module}.{name}"
-        raise RuntimeError(msg)
-
-
-def _load_pickled_result(payload: bytes) -> object:
-    """Unpickle a decoded job result payload.
-
-    The worker runs on a compute node and reaches the submitting process through
-    a stream anything on that node can write to, so the payload is loaded with
-    an unpickler that refuses to instantiate anything but the result types.
-
-    Returns:
-        The unpickled result object.
-
-    Raises:
-        RuntimeError: If the payload cannot be unpickled.
-    """
     try:
-        return _ResultUnpickler(io.BytesIO(payload)).load()
-    except Exception as e:
+        return json.loads(stdout)
+    except json.JSONDecodeError as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
+
+
+_OPTIMIZER_RESULT_FIELDS = ("x", "fun", "jac", "nfev", "njev", "nit")
+
+
+def _encode_vqe_result(result: VQEResult) -> str:
+    """Serialize the VQE fields returned by the offloader as JSON.
+
+    Returns:
+        The serialized result.
+    """
+    optimizer_result = cast("OptimizerResult", result.optimizer_result)
+    payload = {
+        "optimizer_result": {name: getattr(optimizer_result, name) for name in _OPTIMIZER_RESULT_FIELDS},
+        "optimizer_time": result.optimizer_time,
+    }
+    return json.dumps(payload, default=lambda value: value.tolist())
+
+
+def _decode_vqe_result(payload: object, ansatz: QuantumCircuit) -> VQEResult:
+    """Reconstruct a VQE result from its JSON payload and original ansatz.
+
+    Returns:
+        The reconstructed result.
+
+    Raises:
+        RuntimeError: If the payload does not contain the expected fields.
+    """
+    try:
+        data = cast("Mapping[str, object]", payload)
+        optimizer_data = cast("Mapping[str, object]", data["optimizer_result"])
+        point = np.asarray(optimizer_data["x"], dtype=float)
+        fun = float(cast("float", optimizer_data["fun"]))
+        jac_data = optimizer_data["jac"]
+        jac = None if jac_data is None else np.asarray(jac_data, dtype=float)
+        nfev = int(cast("int", optimizer_data["nfev"]))
+        njev_data = optimizer_data["njev"]
+        njev = None if njev_data is None else int(cast("int", njev_data))
+        nit_data = optimizer_data["nit"]
+        nit = None if nit_data is None else int(cast("int", nit_data))
+        optimizer_time = float(cast("float", data["optimizer_time"]))
+        optimal_parameters = dict(zip(ansatz.parameters, point, strict=True))
+    except (KeyError, TypeError, ValueError) as e:
+        msg = f"Error parsing the output: {e}"
+        raise RuntimeError(msg) from e
+
+    optimizer_result = OptimizerResult()
+    optimizer_result.x = point
+    optimizer_result.fun = fun
+    optimizer_result.jac = jac
+    optimizer_result.nfev = nfev
+    optimizer_result.njev = njev
+    optimizer_result.nit = nit
+
+    result = VQEResult()
+    result.optimal_circuit = ansatz.copy()
+    result.eigenvalue = complex(fun)
+    result.cost_function_evals = nfev
+    result.optimal_point = point
+    result.optimal_parameters = optimal_parameters
+    result.optimal_value = fun
+    result.optimizer_time = optimizer_time
+    result.optimizer_result = optimizer_result
+    return result
 
 
 def sample(
@@ -417,7 +382,7 @@ def sample(
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
         RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """  # ruff:ignore[docstring-extraneous-exception]
+    """
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "
@@ -465,10 +430,11 @@ def sample(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    primitive_result = cast("Iterable[PubResult]", _load_pickled_result(payload))
-    first_pub = _first_pub(primitive_result)
-    return extract_counts(first_pub)
+    try:
+        return normalize_counts(_load_json_result(process))
+    except (TypeError, ValueError) as e:
+        msg = f"Error parsing the output: {e}"
+        raise RuntimeError(msg) from e
 
 
 def estimate(
@@ -588,5 +554,4 @@ def estimate(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    return cast("VQEResult", _load_pickled_result(payload))
+    return _decode_vqe_result(_load_json_result(process), ansatz)

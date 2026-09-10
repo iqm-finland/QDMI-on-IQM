@@ -20,15 +20,15 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import pickle  # ruff:ignore[suspicious-pickle-import]
+import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 try:
     from qiskit import qpy, transpile
 
     from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler
+    from .offloader import _first_pub, extract_counts
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -37,7 +37,9 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
+
+    from qiskit.primitives.containers.pub_result import PubResult
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -72,8 +74,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     circuit_for_execution = transpile(circuit, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
-    pickled = pickle.dumps(job.result())
-    print(base64.b64encode(pickled).decode("utf-8"))
+    result = cast("Iterable[PubResult]", job.result())
+    print(json.dumps(extract_counts(_first_pub(result))))
 
 
 if __name__ == "__main__":
