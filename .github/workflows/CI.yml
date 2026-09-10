@@ -17,7 +17,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@063c90c8e7e094bfffb73f8436eb55341c1e820f # v2.3.0
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@ae4c1005796fedc123c3c70cdba94ce643c9fcae # v2.3.1
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -92,15 +92,22 @@ jobs:
       matrix:
         runs-on: [windows-2025, windows-11-arm]
         config: [Release]
+        compiler: [MSVC]
         iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: windows-2025
             config: Debug
+            compiler: MSVC
+            iqm-qc-alias: "emerald:mock"
+          - runs-on: windows-2025
+            config: Release
+            compiler: ClangCL
             iqm-qc-alias: "emerald:mock"
     uses: ./.github/workflows/cpp-tests-windows.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
+      compiler: ${{ matrix.compiler }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
@@ -155,7 +162,7 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@063c90c8e7e094bfffb73f8436eb55341c1e820f # v2.3.0
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@ae4c1005796fedc123c3c70cdba94ce643c9fcae # v2.3.1
     with:
       check-stubs: false
       enable-ty: true

@@ -54,9 +54,8 @@ classifiers = [
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.9.1",
-  "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
-  "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
+  "mqt-core~=3.10.0",
+  "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
@@ -64,6 +63,7 @@ qiskit = [
 
 [project.urls]
 Homepage = "https://github.com/iqm-finland/QDMI-on-IQM"
+Documentation = "https://iqm-finland.github.io/QDMI-on-IQM/"
 Issues = "https://github.com/iqm-finland/QDMI-on-IQM/issues"
 Discussions = "https://github.com/iqm-finland/QDMI-on-IQM/discussions"
 
@@ -78,9 +78,8 @@ IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
 [dependency-groups]
 qiskit = [
-  "mqt-core~=3.9.1",
-  "qiskit[qasm3-import]>=2.0; python_version < '3.14'",
-  "qiskit[qasm3-import]>=2.1; python_version >= '3.14'",
+  "mqt-core~=3.10.0",
+  "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4.0",
   "numpy>=2.1; python_version >= '3.13'",
   "numpy>=2.3.2; python_version >= '3.14'",
@@ -123,6 +122,8 @@ install.components = ["iqm-qdmi-device_Runtime", "iqm-qdmi-device_Development"]
 sdist.include = ["python/iqm/qdmi/_version.py"]
 sdist.exclude = [
   "**/docs",
+  "**/test",
+  "spank/**",
   "sitecustomize.py",
   ".*",
 ]
@@ -286,3 +287,8 @@ cache-keys = [
 # To avoid limiting the usability of the core library, we purposely do not add these packages as dependencies.
 # As a consequence, we need to ignore the unresolved imports from these packages in the type analysis.
 allowed-unresolved-imports = ["mqt.bench.**", "qiskit_nature.**", "qiskit_algorithms.**", "pyscf.**"]
+
+[tool.ty.terminal]
+# Warnings are not surfaced by the exit code unless this is set, so `ty` findings
+# below error level would otherwise pass CI unnoticed.
+error-on-warning = true

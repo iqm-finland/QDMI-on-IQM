@@ -94,6 +94,10 @@ To run a parameter estimation job:
 iqm-estimator ansatz.qpy observable.pkl --maxiter 10
 ```
 
+The estimator CLI and `offloader.estimate` use Qiskit's default precision of
+`1/64`, corresponding to 4,096 shots per measurement circuit. See the
+[primitive options](qiskit.md#sampler-and-estimator-primitives).
+
 ## Programmatic Offloading with the `offloader` Module
 
 For workflows running on a Slurm login node (such as Jupyter notebooks on a

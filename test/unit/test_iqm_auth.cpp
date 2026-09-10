@@ -115,17 +115,16 @@ testing::AssertionResult Is_bearer_for(const std::optional<cpr::Bearer> &actual,
   return testing::AssertionSuccess();
 }
 
-constexpr std::string_view K_FUTURE_TOKEN =
+// The payload contains {"exp":9223372036854775807}, the largest signed
+// 64-bit timestamp, so the fixture cannot expire during the test suite's
+// lifetime.
+constexpr std::string_view K_VALID_TOKEN =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIw"
-    "MCwiaWF0IjoxNjIwNjc1MjAwfQ.signature";
+    "eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzU4MDd9.signature";
 } // namespace
 
 TEST(TokenManagerTest, TimeLeftSeconds) {
-  // A valid token with an expiration time in the future
-  const std::string valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-                                  "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIw"
-                                  "MCwiaWF0IjoxNjIwNjc1MjAwfQ.signature";
+  const auto valid_token = std::string(K_VALID_TOKEN);
   EXPECT_GT(iqm::TokenManager::time_left_seconds(valid_token), 0);
 
   // An expired token
@@ -158,6 +157,54 @@ TEST(TokenManagerTest, TimeLeftSecondsHandlesExpiryBeyond2038) {
   EXPECT_GE(expiry - before, time_left);
 }
 
+TEST(TokenManagerTest, TimeLeftSecondsDecodesBase64UrlPayloadWithDash) {
+  // Payload {"exp":4102444800,"role":"iqm>qc"}. The '>' sits at an offset
+  // congruent to 2 (mod 3), which base64url encodes as '-'. Body length is
+  // congruent to 2 (mod 4), so RFC 7515 leaves off two '=' characters.
+  const std::string token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsInJvbGUiOiJpcW0-cWMifQ.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsDecodesBase64UrlPayloadWithUnderscore) {
+  // Payload {"exp":4102444800,"aud":"https://qc.example.com/cb?x=1"}. The '?'
+  // encodes as '_'. Body length is congruent to 3 (mod 4), so RFC 7515 leaves
+  // off one '=' character.
+  const std::string token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsImF1ZCI6Imh0dHBzOi8vcWMuZXhhbXBsZS5jb20vY2I_eD0x"
+      "In0.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsDecodesPaddedStandardBase64Payload) {
+  // The same two payloads in the standard alphabet, where the bytes encode as
+  // '+' and '/', with the '=' padding spelled out.
+  const std::string plus_token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsInJvbGUiOiJpcW0+cWMifQ==.signature";
+  const std::string slash_token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJleHAiOjQxMDI0NDQ4MDAsImF1ZCI6Imh0dHBzOi8vcWMuZXhhbXBsZS5jb20vY2I/eD0x"
+      "In0=.signature";
+
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(plus_token), 0);
+  EXPECT_GT(iqm::TokenManager::time_left_seconds(slash_token), 0);
+}
+
+TEST(TokenManagerTest, TimeLeftSecondsRejectsPayloadOfUndecodableLength) {
+  // The first 24 characters of the body decode to {"exp":4102444800}; the
+  // stray 25th leaves a length congruent to 1 (mod 4), which no byte sequence
+  // can encode. Padding that out must not yield a token that looks valid.
+  const std::string token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                            "eyJleHAiOjQxMDI0NDQ4MDB9a.signature";
+
+  EXPECT_EQ(iqm::TokenManager::time_left_seconds(token), 0);
+}
+
 TEST(TokenManagerTest, ConstructorWithExplicitToken) {
   const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
@@ -185,35 +232,32 @@ TEST(TokenManagerTest, ConstructorWithExplicitTokenOverridesEnvironment) {
 TEST(TokenManagerTest, ConstructorWithExplicitTokensFile) {
   const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", nullptr);
-  const ScopedTokensFile tokens_file("test_tokens.json",
-                                     std::string(K_FUTURE_TOKEN));
+  const auto valid_token = std::string(K_VALID_TOKEN);
+  const ScopedTokensFile tokens_file("test_tokens.json", valid_token);
 
   iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
-  EXPECT_TRUE(
-      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), valid_token));
 }
 
 TEST(TokenManagerTest, ConstructorWithTokensFileFromEnvironment) {
   const ScopedEnvVar env_token("IQM_TOKEN", nullptr);
-  const ScopedTokensFile tokens_file("test_tokens_env.json",
-                                     std::string(K_FUTURE_TOKEN));
+  const auto valid_token = std::string(K_VALID_TOKEN);
+  const ScopedTokensFile tokens_file("test_tokens_env.json", valid_token);
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE",
                                      tokens_file.path().c_str());
 
   iqm::TokenManager tm(std::nullopt, std::nullopt);
-  EXPECT_TRUE(
-      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), valid_token));
 }
 
 TEST(TokenManagerTest, ConstructorWithExplicitTokensFileOverridesEnvironment) {
   const ScopedEnvVar env_token("IQM_TOKEN", "different_token");
   const ScopedEnvVar env_tokens_file("IQM_TOKENS_FILE", "different_file");
-  const ScopedTokensFile tokens_file("test_tokens_override.json",
-                                     std::string(K_FUTURE_TOKEN));
+  const auto valid_token = std::string(K_VALID_TOKEN);
+  const ScopedTokensFile tokens_file("test_tokens_override.json", valid_token);
 
   iqm::TokenManager tm(std::nullopt, std::make_optional(tokens_file.path()));
-  EXPECT_TRUE(
-      Is_bearer_for(tm.get_bearer_token(), std::string(K_FUTURE_TOKEN)));
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), valid_token));
 }
 
 TEST(TokenManagerTest, ConstructorWithInvalidExplicitParameters) {
@@ -249,21 +293,11 @@ TEST(TokenManagerTest, TimeLeftSecondsInvalidJson) {
 }
 
 TEST(TokenManagerTokensFileTest, GetToken) {
-  // Create a temporary tokens file
-  const std::string filename = "test_tokens.json";
-  std::ofstream file(filename);
-  file
-      << R"({"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIwMCwiaWF0IjoxNjIwNjc1MjAwfQ.signature"})";
-  file.close();
+  const auto valid_token = std::string(K_VALID_TOKEN);
+  const ScopedTokensFile tokens_file("test_tokens.json", valid_token);
 
-  iqm::TokenManager tm(std::nullopt, filename);
-  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(),
-                            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-                            "eyJleHAiOjE3ODg0MDY0MDAsIm5iZiI6MTYyMDY3NTIwMCwia"
-                            "WF0IjoxNjIwNjc1MjAwfQ.signature"));
-
-  // Clean up the temporary file
-  std::remove(filename.c_str());
+  iqm::TokenManager tm(std::nullopt, tokens_file.path());
+  EXPECT_TRUE(Is_bearer_for(tm.get_bearer_token(), valid_token));
 }
 
 TEST(TokenManagerTokensFileTest, GetTokenExpired) {
