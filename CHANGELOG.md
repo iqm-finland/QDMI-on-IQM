@@ -253,15 +253,15 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
-[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
-[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
@@ -281,9 +281,9 @@ Compatible with QDMI `v1.3.0`.
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
+[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
-[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
