@@ -41,9 +41,8 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🔒️ Load an offloaded job's result with an unpickler restricted to the Qiskit
-  result types, so a `sample`/`estimate` payload naming anything else is
-  reported as an error instead of loaded ([#231]) ([**@marcelwa**])
+- 🔒️ Exchange offloaded `sample` and `estimate` results as JSON instead of
+  loading worker-controlled pickle payloads ([#231]) ([**@marcelwa**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
   in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
