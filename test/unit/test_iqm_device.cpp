@@ -46,8 +46,6 @@
 #error "Unit tests must not import QDMI symbols from a separate DLL"
 #endif
 
-using std::string_view_literals::operator""sv;
-
 namespace {
 
 int Set_env_var_raw(const char *key, const char *value) {
