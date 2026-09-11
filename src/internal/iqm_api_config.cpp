@@ -33,11 +33,14 @@ namespace {
 const std::unordered_map<API_ENDPOINT, std::string> URLS = {
     // Job management endpoints
     {API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "api/v1/jobs/%s/circuit"},
+    {API_ENDPOINT::SUBMIT_RUN_JOB, "api/v1/jobs/%s/run"},
     {API_ENDPOINT::GET_JOB_STATUS, "api/v1/jobs/%s"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
      "api/v1/jobs/%s/artifacts/measurement_counts"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,
      "api/v1/jobs/%s/artifacts/measurements"},
+    {API_ENDPOINT::GET_JOB_ARTIFACT_SWEEP_RESULTS,
+     "api/v1/jobs/%s/artifacts/sweep_results"},
     {API_ENDPOINT::CANCEL_JOB, "api/v1/jobs/%s/cancel"},
 
     // Quantum computer endpoints

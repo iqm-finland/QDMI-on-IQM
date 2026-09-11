@@ -36,9 +36,11 @@ namespace iqm {
 enum class API_ENDPOINT : uint8_t {
   // Job management endpoints
   SUBMIT_CIRCUIT_JOB,
+  SUBMIT_RUN_JOB,
   GET_JOB_STATUS,
   GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
   GET_JOB_ARTIFACT_MEASUREMENTS,
+  GET_JOB_ARTIFACT_SWEEP_RESULTS,
   CANCEL_JOB,
 
   // Quantum computer endpoints

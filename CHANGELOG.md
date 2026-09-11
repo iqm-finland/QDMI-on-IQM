@@ -19,6 +19,14 @@ releases may include breaking changes.
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
   ([#214]) ([**@marcelwa**])
+- ✨ Accept pulse-level programs as `QDMI_PROGRAM_FORMAT_CUSTOM1`, submit them
+  to the IQM Server's pulse-level job endpoint, and return the raw sweep results
+  as `QDMI_JOB_RESULT_CUSTOM2`, including after reopening a run by ID. The
+  device reports channel-level pulse support and rejects QDMI shot parameters,
+  because repetitions live in the pulse payload ([#200]) ([**@marcelwa**])
+- ✨ Add a `pulla` extra and an `iqm.qdmi.pulse` module that compiles circuits
+  through a caller-owned reusable compiler and decodes its results ([#200])
+  ([**@marcelwa**])
 - ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
   environment variables for IQM Server and quantum computer selection, while
   keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])

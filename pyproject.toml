@@ -52,6 +52,10 @@ name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
 [project.optional-dependencies]
+# 14.0.1 is the oldest Pulla release supported by this integration.
+pulla = [
+  "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
+]
 qiskit = [
   "mqt-core~=3.10.0",
   "numpy>=2.1; python_version>='3.13'",
@@ -88,6 +92,7 @@ test = [
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8",
   { include-group = "qiskit" },
+  { include-group = "pulla" },
 ]
 docs = [
   "breathe>=4.36",
@@ -98,6 +103,11 @@ docs = [
   "sphinx-copybutton>=0.5.2",
   "sphinx-design>=0.7",
   "sphinx-llm>=1",
+]
+# The marker leaves this out where iqm-pulla cannot install, and
+# `test/python/test_pulse.py` skips itself there.
+pulla = [
+  "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
 ]
 qiskit = [
   "mqt-core~=3.10.0",
