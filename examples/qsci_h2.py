@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # /// script
-# requires-python = ">=3.10,<3.14"
+# requires-python = ">=3.11,<3.14"
 # dependencies = [
 #   "iqm-qdmi[qiskit]",
 #   "qiskit-nature[pyscf]>=0.7.2",
@@ -43,8 +43,6 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 import scipy.linalg as sla
 from mqt.core.plugins.qiskit.backend import QDMIBackend
-from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-from mqt.core.plugins.qiskit.sampler import QDMISampler
 from pyscf import ao2mo, gto, scf
 from qiskit.compiler import transpile
 from qiskit_algorithms.minimum_eigensolvers.vqe import VQE
@@ -84,6 +82,8 @@ def main() -> None:
     parser.add_argument("--maxiter", type=int, default=30)
     parser.add_argument("--cutoff", type=int, default=10)
     args = parser.parse_args()
+    if args.shots <= 0:
+        parser.error("--shots must be positive")
     log.info(
         "Starting QSCI/H2 example (backend=%s, shots=%d, maxiter=%d, cutoff=%d)",
         args.backend,
@@ -141,7 +141,7 @@ def main() -> None:
     )
 
     log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", args.maxiter, args.shots)
-    estimator = QDMIEstimator(backend, default_shots=args.shots)
+    estimator = backend.estimator(default_precision=1 / np.sqrt(args.shots))
     vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
     result = vqe.compute_minimum_eigenvalue(operator=observable)
     optimal_parameters = result.optimal_parameters
@@ -158,7 +158,7 @@ def main() -> None:
     ansatz.measure_active()
 
     log.info("Submitting sampling job to '%s' (%d shots)...", backend.name, args.shots)
-    sampler = QDMISampler(backend, default_shots=args.shots)
+    sampler = backend.sampler(default_shots=args.shots)
     job = sampler.run([(ansatz,)])
     counts = job.result()[0].data["meas"].get_counts()
     log.info("Job completed. Collected %d shots across %d distinct bitstrings.", sum(counts.values()), len(counts))

@@ -93,6 +93,12 @@ The QSCI example depends on PySCF for classical chemistry calculations, and
 [PySCF is not supported on Windows](https://pyscf.org/user/install.html).
 :::
 
+The QSCI example uses native Qiskit sampler and estimator primitives. Its
+positive `--shots` value sets the sampler shot count and the estimator precision
+to `1 / sqrt(shots)`. Qiskit rounds the estimator shot count up from
+`1 / precision**2` for each measurement circuit and groups compatible
+observables, so this value is not a total VQE shot budget.
+
 ## MQT Bench Programs
 
 To understand how the backend behaves on standard programs, we move on to
@@ -100,8 +106,8 @@ To understand how the backend behaves on standard programs, we move on to
 collects representative quantum algorithms across several abstraction levels. In
 this repository, the benchmark scripts show how to generate those programs,
 transpile them for the selected target, execute them through
-{py:class}`~mqt.core.plugins.qiskit.sampler.QDMISampler`, and inspect the
-resulting bitstring distributions.
+{py:class}`~qiskit.primitives.BackendSamplerV2`, and inspect the resulting
+bitstring distributions.
 
 The `examples/mqt_bench.py` entrypoint currently covers the following
 algorithms:

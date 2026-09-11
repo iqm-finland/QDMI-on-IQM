@@ -12,6 +12,13 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
+  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
+  asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
+  out the quota window instead of taking a 30-second block.
+  `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
+  ([#214]) ([**@marcelwa**])
 - ✨ Accept pulse-level programs as `QDMI_PROGRAM_FORMAT_CUSTOM1`, submit them
   to the IQM Server's pulse-level job endpoint, and return the raw sweep results
   as `QDMI_JOB_RESULT_CUSTOM2`, including after reopening a run by ID. The
@@ -29,11 +36,27 @@ releases may include breaking changes.
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
   `quantum` can use the offloader ([#202]) ([**@marcelwa**])
 
+### Changed
+
+- 💥 Use native Qiskit primitives with MQT Core 3.10, preserving genuine shot
+  order and using estimator precision `1/64` (4,096 shots per measurement
+  circuit) by default ([#246]) ([**@marcelwa**])
+- 💥 Drop support for x86 macOS and stop publishing the respective wheels
+  ([#220]) ([**@denialhaag**])
+- ⬆️ Raise the macOS deployment target to 13.3 ([#220])
+  ([**@denialhaag**])
+- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
+
 ### Fixed
 
-- ⬆️ Require Qiskit 2.0 on Python 3.10–3.13 and Qiskit 2.1 on Python 3.14 and
-  newer so the supported minimum environments install and run ([#218])
-  ([**@burgholzer**])
+- 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
+  internal object library without DLL import decorations ([#242])
+  ([**@marcelwa**])
+- 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
+  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
+- ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
+  environments install and run ([#218], [#220], [#246]) ([**@burgholzer**],
+  [**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
 
@@ -236,13 +259,18 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
+[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
+[#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
+[#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
-[#200]: https://github.com/iqm-finland/QDMI-on-IQM/pull/200
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190

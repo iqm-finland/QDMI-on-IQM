@@ -61,7 +61,8 @@ target_compile_definitions(
   PUBLIC $<$<PLATFORM_ID:Windows>:NOMINMAX>
   PRIVATE QDMI_VERSION="${QDMI_VERSION}"
           IQM_QDMI_DEVICE_VERSION="${CMAKE_PROJECT_VERSION}"
-          IQM_QDMI_device_EXPORTS)
+          IQM_QDMI_device_EXPORTS
+  INTERFACE $<$<PLATFORM_ID:Windows>:IQM_QDMI_STATIC_DEFINE>)
 target_link_libraries(
   ${QDMI_INTERNAL_TARGET_NAME}
   PUBLIC cpr::cpr

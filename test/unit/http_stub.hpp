@@ -69,6 +69,9 @@ struct Scripted_response {
  * caught reliably. The retry backoff delay is stubbed out (counted, not
  * slept), so tests that exercise HTTP 429 retries run instantly.
  *
+ * Time is stubbed with it: the clock hook reads a counter only the stubbed
+ * sleep and advance() move, so waits are exact rather than racing the clock.
+ *
  * The default hooks are restored on destruction (RAII), so each test that
  * owns an instance of this class gets an isolated, self-cleaning stub.
  */
@@ -121,6 +124,8 @@ public:
   [[nodiscard]] size_t sleep_call_count() const;
   /// Retry-delay durations requested by HTTP 429 handling, in call order.
   [[nodiscard]] const std::vector<int> &sleep_durations() const;
+  /// Move the stubbed clock forward without issuing a request.
+  void advance(std::chrono::milliseconds elapsed);
 
 private:
   std::deque<Scripted_response> get_responses_;
@@ -135,6 +140,9 @@ private:
   std::vector<std::chrono::milliseconds> post_timeouts_;
   std::vector<const cpr::ConnectionPool *> post_connection_pools_;
   std::vector<int> sleep_durations_;
+  /// Time the stubbed clock reports, moved only by sleeps and advance().
+  std::chrono::steady_clock::time_point now_{
+      std::chrono::steady_clock::time_point{} + std::chrono::hours{1}};
 };
 
 } // namespace iqm::test_support

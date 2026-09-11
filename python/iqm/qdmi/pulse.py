@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -131,7 +131,7 @@ def decode_sweep_results(program: PulseProgram, sweep_results: bytes) -> Circuit
     sweep_definition = run_definition.sweep_definition
     # Post-processing reads the run metadata alongside the results. The
     # timestamps are not part of that, so they are filled in as of now.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run_data = RunData(
         run_id=run_definition.run_id,
         username=run_definition.username,

@@ -35,7 +35,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       - name: Install Doxygen
-        uses: ssciwr/doxygen-install@b5b80f5a60852f72d3c33f47fee9ddfb84a25929 # v2.0.2
+        uses: ssciwr/doxygen-install@fa3e94d34131d3990b6b8ba939ab982964aa3758 # v2.0.3
         with:
           version: "1.16.1"
 
