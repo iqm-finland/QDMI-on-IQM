@@ -25,42 +25,26 @@ import pickle  # ruff:ignore[suspicious-pickle-import]
 import re
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
+from qiskit.circuit import Parameter, ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import offloader
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-class FakeBitArray:
-    """Mock for Qiskit's BitArray."""
+#: The stdout a worker produces for a sampling job returning a single `0` shot.
+SAMPLE_STDOUT = b'{"0": 1}'
 
-    def __init__(self, counts: dict[str, int]) -> None:
-        """Initialize counts."""
-        self.counts = counts
-
-    def get_counts(self) -> dict[str, int]:
-        """Return counts."""
-        return self.counts
-
-
-class FakePubResult:
-    """Mock for PubResult."""
-
-    def __init__(self, data: dict[str, FakeBitArray]) -> None:
-        """Initialize data."""
-        self.data = data
-        self.metadata: dict[str, object] = {}
-
-
-class FakeVQEResult:
-    """Mock for VQEResult."""
-
-    def __init__(self, optimal_parameters: dict[str, float]) -> None:
-        """Initialize optimal parameters."""
-        self.optimal_parameters = optimal_parameters
+#: The stdout a worker produces for an estimation job converging on `theta`.
+ESTIMATE_STDOUT = (
+    b'{"optimizer_result": {"x": [], "fun": -1.0, "jac": null, '
+    b'"nfev": 3, "njev": null, "nit": 2}, "optimizer_time": 0.5}'
+)
 
 
 def test_sample_local_simulator() -> None:
@@ -97,7 +81,7 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -133,7 +117,7 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -153,7 +137,7 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
     result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
-    assert result.optimal_parameters == {"theta": 0.125}
+    assert result.optimal_parameters == {}
     assert "srun" in captured_command
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
@@ -178,7 +162,7 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -223,7 +207,7 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -244,11 +228,10 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     qc_id = "12345678-1234-1234-1234-123456789abc"
-    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
 
     worker_index = captured_command.index("iqm-estimator")
     worker_command = captured_command[worker_index : worker_index + 5]
-    assert result.optimal_parameters == {"theta": 0.125}
     assert "https://resonance.example" not in captured_command
     assert "tokens_path" not in captured_command
     for flag in ("--base-url", "--tokens-file", "--token", "--qc-id", "--qc-alias"):
@@ -268,7 +251,7 @@ def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -302,7 +285,7 @@ def test_sample_slurm_omits_licenses_by_default(monkeypatch: pytest.MonkeyPatch,
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -331,7 +314,7 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -349,7 +332,7 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     ansatz = QuantumCircuit(1)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
-    result = offloader.estimate(
+    offloader.estimate(
         ansatz,
         operator,
         maxiter=3,
@@ -360,7 +343,6 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     )
 
     worker_index = captured_command.index("iqm-estimator")
-    assert result.optimal_parameters == {"theta": 0.125}
     assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
     assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
 
@@ -385,7 +367,7 @@ def test_sample_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -419,7 +401,7 @@ def test_sample_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -470,7 +452,7 @@ def test_estimate_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -504,7 +486,7 @@ def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -590,3 +572,71 @@ def test_first_pub_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
         offloader._first_pub([])  # ruff:ignore[private-member-access]
+
+
+_EXECUTED_MARKERS: list[str] = []
+
+
+def _record_execution(marker: str) -> str:
+    """Record that a result payload got this module to run code of its choosing.
+
+    Returns:
+        The marker it was called with.
+    """
+    _EXECUTED_MARKERS.append(marker)
+    return marker
+
+
+class _CallingPayload:
+    """A result payload that calls a function of its own choosing while being loaded."""
+
+    def __reduce__(self) -> tuple[Callable[[str], str], tuple[str]]:
+        """Reduce to the call the loading process is asked to make.
+
+        Returns:
+            The callable and its arguments.
+        """
+        return (_record_execution, ("executed",))
+
+
+def test_load_json_result_does_not_execute_a_pickled_payload() -> None:
+    """A worker-controlled pickle is rejected as JSON without executing it."""
+    stdout = base64.b64encode(pickle.dumps(_CallingPayload()))
+    process = subprocess.CompletedProcess([], 0, stdout, b"")
+
+    with pytest.raises(RuntimeError, match="Error parsing"):
+        offloader._load_json_result(process)  # ruff:ignore[private-member-access]
+    assert _EXECUTED_MARKERS == []
+
+
+def test_vqe_result_json_round_trip() -> None:
+    """A genuine VQE result retains its public fields across the JSON boundary."""
+    theta = ParameterVector("theta", 2)
+    ansatz = QuantumCircuit(2)
+    ansatz.ry(theta[0], 0)
+    ansatz.cx(0, 1)
+    ansatz.ry(theta[1], 1)
+    operator = SparsePauliOp.from_list([("ZZ", 1.0)])
+    expected = offloader.estimate(ansatz, operator, maxiter=3, local=True, simulator=True)
+
+    encoded = offloader._encode_vqe_result(expected)  # ruff:ignore[private-member-access]
+    process = subprocess.CompletedProcess([], 0, encoded.encode(), b"")
+    payload = offloader._load_json_result(process)  # ruff:ignore[private-member-access]
+    result = offloader._decode_vqe_result(payload, ansatz)  # ruff:ignore[private-member-access]
+
+    assert result.optimal_parameters == expected.optimal_parameters
+    assert result.optimal_circuit == expected.optimal_circuit
+    assert result.eigenvalue == expected.eigenvalue
+    assert result.cost_function_evals == expected.cost_function_evals
+    assert result.optimal_point == pytest.approx(expected.optimal_point)
+    assert result.optimal_value == expected.optimal_value
+    assert result.optimizer_time == pytest.approx(expected.optimizer_time)
+    assert result.aux_operators_evaluated == expected.aux_operators_evaluated
+    assert result.optimizer_result is not None
+    assert expected.optimizer_result is not None
+    assert result.optimizer_result.x == pytest.approx(expected.optimizer_result.x)
+    assert result.optimizer_result.fun == expected.optimizer_result.fun
+    assert result.optimizer_result.jac == pytest.approx(expected.optimizer_result.jac)
+    assert result.optimizer_result.nfev == expected.optimizer_result.nfev
+    assert result.optimizer_result.njev == expected.optimizer_result.njev
+    assert result.optimizer_result.nit == expected.optimizer_result.nit

@@ -19,8 +19,7 @@
 
 from __future__ import annotations
 
-import base64
-import pickle  # ruff:ignore[suspicious-pickle-import]
+import json
 from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qpy
@@ -45,10 +44,7 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
     result = script_runner.run(["iqm-sampler", str(circuit_path), "--shots", "256", "--simulator"])
     assert result.success
 
-    decoded = base64.b64decode(result.stdout.strip().encode())
-    res = pickle.loads(decoded)  # ruff:ignore[suspicious-pickle-usage]
-    first_pub = next(iter(res))
-    counts = first_pub.data.meas.get_counts()
+    counts = json.loads(result.stdout)
     assert sum(counts.values()) == 256
     assert set(counts) <= {"00", "11"}
     assert counts

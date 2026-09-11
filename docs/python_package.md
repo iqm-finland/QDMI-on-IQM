@@ -108,12 +108,13 @@ queue.
 The module provides two primary functions:
 
 - {py:func}`~iqm.qdmi.offloader.sample`: Serializes the given circuit to QPY,
-  submits a Slurm job using `srun iqm-sampler`, and parses the base64-encoded
-  pickled result back to a python dictionary of counts.
+  submits a Slurm job using `srun iqm-sampler`, and parses its JSON counts.
 - {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable,
-  submits a Slurm job using `srun iqm-estimator`, and parses the base64-encoded
-  pickled `VQEResult` to return it, matching the semantics of running `VQE`
-  directly against the regular (non-offloaded) estimator.
+  submits a Slurm job using `srun iqm-estimator`, and reconstructs a `VQEResult`
+  from its JSON optimizer data and the original ansatz.
+
+The submitting process therefore does not execute Python reconstruction code
+from a worker-controlled result.
 
 Both functions support a `local=True` argument for running simulation/hardware
 compilation locally (useful for debugging) and a `simulator=True` argument when
