@@ -156,7 +156,7 @@ def examples(session: nox.Session) -> None:
     )
 
 
-@nox.session(reuse_venv=True)
+@nox.session(python="3.14", reuse_venv=True)
 def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
     parser = argparse.ArgumentParser()
