@@ -53,7 +53,7 @@ jobs:
           - runs-on: ubuntu-24.04
             config: Release
             iqm-qc-alias: "sirius:mock"
-    uses: ./.github/workflows/cpp-tests-ubuntu.yml
+    uses: $/.github/workflows/cpp-tests-ubuntu.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
@@ -75,7 +75,7 @@ jobs:
           - runs-on: macos-26
             config: Debug
             iqm-qc-alias: "emerald:mock"
-    uses: ./.github/workflows/cpp-tests-macos.yml
+    uses: $/.github/workflows/cpp-tests-macos.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
@@ -103,7 +103,7 @@ jobs:
             config: Release
             compiler: ClangCL
             iqm-qc-alias: "emerald:mock"
-    uses: ./.github/workflows/cpp-tests-windows.yml
+    uses: $/.github/workflows/cpp-tests-windows.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
@@ -120,7 +120,7 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [ubuntu-24.04, macos-26, windows-2025]
-    uses: ./.github/workflows/cpp-install-tests.yml
+    uses: $/.github/workflows/cpp-install-tests.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
@@ -130,7 +130,7 @@ jobs:
     name: 🇨 Sanitizers
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: ./.github/workflows/cpp-sanitizers.yml
+    uses: $/.github/workflows/cpp-sanitizers.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
@@ -138,7 +138,7 @@ jobs:
     name: 🇨 Coverage
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: ./.github/workflows/cpp-coverage.yml
+    uses: $/.github/workflows/cpp-coverage.yml
     permissions:
       contents: read
       id-token: write
@@ -149,7 +149,7 @@ jobs:
     name: 🇨 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-linter)
-    uses: ./.github/workflows/cpp-linter.yml
+    uses: $/.github/workflows/cpp-linter.yml
     with:
       clang-version: 22
       files-changed-only: true
@@ -172,13 +172,13 @@ jobs:
     name: 🐍 End-to-End Examples
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
-    uses: ./.github/workflows/python-examples.yml
+    uses: $/.github/workflows/python-examples.yml
 
   build-sdist:
     name: 🚀 CD
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: ./.github/workflows/python-packaging-sdist.yml
+    uses: $/.github/workflows/python-packaging-sdist.yml
 
   build-wheel:
     name: 🚀 CD
@@ -195,7 +195,7 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
-    uses: ./.github/workflows/python-packaging-cibuildwheel.yml
+    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
@@ -205,7 +205,7 @@ jobs:
     name: 🇸 Test SPANK
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: ./.github/workflows/spank-tests.yml
+    uses: $/.github/workflows/spank-tests.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
