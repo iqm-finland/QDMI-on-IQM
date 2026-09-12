@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   build-sdist:
     name: 🐍 Packaging
-    uses: ./.github/workflows/python-packaging-sdist.yml
+    uses: $/.github/workflows/python-packaging-sdist.yml
     permissions:
       contents: read
 
@@ -29,7 +29,7 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
-    uses: ./.github/workflows/python-packaging-cibuildwheel.yml
+    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
