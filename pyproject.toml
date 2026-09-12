@@ -53,7 +53,7 @@ email = "developers@iqm.tech"
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=3.10.0",
+  "mqt-core~=4.0.0",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "qiskit[qasm3-import]>=2.1",
@@ -100,7 +100,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core~=3.10.0",
+  "mqt-core~=4.0.0",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
