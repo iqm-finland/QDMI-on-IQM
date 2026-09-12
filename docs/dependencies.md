@@ -44,7 +44,7 @@ These are installed when users request the `qiskit` extra via
 | Dependency | Version | License     | Purpose                                                                  |
 | :--------- | :------ | :---------- | :----------------------------------------------------------------------- |
 | [MQT Core] | ~=4.0.0 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
-| [Qiskit]   | ≥1.1    | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
+| [Qiskit]   | ≥2.1    | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
 
 ## End-to-End Example Dependencies
 
