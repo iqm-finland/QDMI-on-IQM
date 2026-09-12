@@ -202,14 +202,14 @@ in the Contributing guide.
 The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
 symbol prefix. Applications that link the MQT Core driver statically can use its
 runtime-copy helper to synthesize a relocatable manifest and colocate it with
-the device library beside the executable:
+the device library beside the executable. This requires CMake 3.28 or newer:
 
 ```cmake
-find_package(mqt-core 3.9 CONFIG REQUIRED)
+find_package(mqt-core 4.0.0 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my-application main.cpp)
-target_link_libraries(my-application PRIVATE MQT::CoreFoMaC)
+target_link_libraries(my-application PRIVATE MQT::CoreQDMI)
 mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
 ```
 
