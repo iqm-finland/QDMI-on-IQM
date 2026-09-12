@@ -30,9 +30,9 @@ releases may include breaking changes.
 
 ### Changed
 
-- 💥 Use native Qiskit primitives with MQT Core 3.10, preserving genuine shot
-  order and using estimator precision `1/64` (4,096 shots per measurement
-  circuit) by default ([#246]) ([**@marcelwa**])
+- 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
+  and using estimator precision `1/64` (4,096 shots per measurement circuit) by
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
   ([#220]) ([**@denialhaag**])
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
@@ -251,6 +251,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
