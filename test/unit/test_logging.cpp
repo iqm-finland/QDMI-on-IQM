@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <sstream>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
@@ -103,6 +104,47 @@ TEST(LoggingTest, DefaultLogLevel) {
 
   // Restore original output stream
   logger.set_output(std::cerr);
+}
+
+TEST(LoggingTest, DisabledMessagesAreNotEvaluated) {
+  std::stringstream log_stream;
+  auto &logger = iqm::Logger::get_instance();
+  const auto original_level = logger.get_level();
+  logger.set_output(log_stream);
+
+  const auto check_level =
+      [&](const iqm::LOG_LEVEL level, const int expected_errors,
+          const int expected_info, const int expected_debug) {
+        logger.set_level(level);
+        int error_calls = 0;
+        int info_calls = 0;
+        int debug_calls = 0;
+        LOG_ERROR(std::to_string(++error_calls));
+        LOG_INFO(std::to_string(++info_calls));
+        LOG_DEBUG(std::to_string(++debug_calls));
+        EXPECT_EQ(error_calls, expected_errors);
+        EXPECT_EQ(info_calls, expected_info);
+        EXPECT_EQ(debug_calls, expected_debug);
+      };
+  check_level(iqm::LOG_LEVEL::NONE, 0, 0, 0);
+  check_level(iqm::LOG_LEVEL::ERROR, 1, 0, 0);
+  check_level(iqm::LOG_LEVEL::INFO, 1, 1, 0);
+  check_level(iqm::LOG_LEVEL::DEBUG, 1, 1, 1);
+
+  logger.set_output(std::cerr);
+  logger.set_level(original_level);
+}
+
+TEST(LoggingTest, DisabledDebugDoesNotSerializeInvalidUtf8) {
+  auto &logger = iqm::Logger::get_instance();
+  const auto original_level = logger.get_level();
+  logger.set_level(iqm::LOG_LEVEL::ERROR);
+
+  const nlohmann::json message = std::string(1515, 'a') + '\x96';
+  EXPECT_THROW(message.dump(), nlohmann::json::type_error);
+  EXPECT_NO_THROW(LOG_DEBUG(message.dump()));
+
+  logger.set_level(original_level);
 }
 
 TEST(LoggingTest, LogLevelIsReadFromTheEnvironment) {

@@ -709,10 +709,14 @@ environment variable. The following logging levels are available:
 - `DEBUG`: Log errors, info, and debug messages.
 
 By default, the logging level is set to `ERROR`. Any other value disables
-logging entirely.
+logging entirely. Messages at disabled levels are not constructed.
+
+Logs are written to standard error. Set `IQM_LOG_LEVEL` before starting the
+application; the logger reads it once, on first use.
 
 `DEBUG` logs raw request and response bodies, including the bodies of failed
-requests. Treat that output as sensitive and avoid it in shared logs.
+requests and malformed JSON responses, preserving their original formatting.
+Treat that output as sensitive and avoid it in shared logs.
 
 :::{note}
 `IQM_CPP_API_LOG_LEVEL` is a deprecated alias for `IQM_LOG_LEVEL`. It is only
