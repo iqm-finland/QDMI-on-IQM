@@ -41,6 +41,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Skip disabled log message formatting and use original HTTP response bodies
+  in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
   internal object library without DLL import decorations ([#242])
   ([**@marcelwa**])
@@ -251,6 +253,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246

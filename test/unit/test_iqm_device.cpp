@@ -2512,6 +2512,33 @@ private:
   iqm::LOG_LEVEL previous_level_;
 };
 
+TEST_F(DeviceIntegrationMockTest, DebugLogsPreserveResponseBodies) {
+  const ScopedLogCapture logs;
+  iqm::Logger::get_instance().set_level(iqm::LOG_LEVEL::DEBUG);
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  for (const auto &body : {list_quantum_computers_response,
+                           get_static_quantum_architectures_response,
+                           get_dynamic_quantum_architectures_response,
+                           get_calibration_set_quality_metrics_response}) {
+    EXPECT_NE(logs.str().find(body), std::string::npos);
+  }
+}
+
+TEST_F(DeviceIntegrationMockTest, InvalidUtf8ResponseIsLoggedOnlyAtDebug) {
+  const std::string body = std::string{R"({"message":")"} + '\x96' + R"("})";
+  for (const auto level : {iqm::LOG_LEVEL::ERROR, iqm::LOG_LEVEL::DEBUG}) {
+    const ScopedLogCapture logs;
+    iqm::Logger::get_instance().set_level(level);
+    http_stub.queue_get(200, body);
+
+    EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
+    EXPECT_EQ(logs.str().find(body) != std::string::npos,
+              level == iqm::LOG_LEVEL::DEBUG);
+  }
+}
+
 /// The site handles an initialized session reports, in device order.
 std::vector<IQM_QDMI_Site> Query_sites(IQM_QDMI_Device_Session session) {
   size_t sites_size = 0;
