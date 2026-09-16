@@ -2527,7 +2527,7 @@ TEST_F(DeviceIntegrationMockTest, DebugLogsPreserveResponseBodies) {
 }
 
 TEST_F(DeviceIntegrationMockTest, InvalidUtf8ResponseIsLoggedOnlyAtDebug) {
-  const std::string body = std::string{"{\"message\":\""} + '\x96' + "\"}";
+  const std::string body = std::string{R"({"message":")"} + '\x96' + R"("})";
   for (const auto level : {iqm::LOG_LEVEL::ERROR, iqm::LOG_LEVEL::DEBUG}) {
     const ScopedLogCapture logs;
     iqm::Logger::get_instance().set_level(level);
