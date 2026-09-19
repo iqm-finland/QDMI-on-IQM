@@ -42,24 +42,13 @@ jobs:
       matrix:
         runs-on: [ubuntu-26.04, ubuntu-26.04-arm]
         config: [Release]
-        iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: ubuntu-26.04
             config: Debug
-            iqm-qc-alias: "emerald:mock"
-          - runs-on: ubuntu-26.04
-            config: Release
-            iqm-qc-alias: "garnet:mock"
-          - runs-on: ubuntu-26.04
-            config: Release
-            iqm-qc-alias: "sirius:mock"
     uses: $/.github/workflows/cpp-tests-ubuntu.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-macos:
     name: 🇨 Test 🍎
@@ -70,18 +59,13 @@ jobs:
       matrix:
         runs-on: [macos-26]
         config: [Release]
-        iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: macos-26
             config: Debug
-            iqm-qc-alias: "emerald:mock"
     uses: $/.github/workflows/cpp-tests-macos.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-tests-windows:
     name: 🇨 Test 🏁
@@ -93,24 +77,18 @@ jobs:
         runs-on: [windows-2025, windows-11-arm]
         config: [Release]
         compiler: [MSVC]
-        iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: windows-2025
             config: Debug
             compiler: MSVC
-            iqm-qc-alias: "emerald:mock"
           - runs-on: windows-2025
             config: Release
             compiler: ClangCL
-            iqm-qc-alias: "emerald:mock"
     uses: $/.github/workflows/cpp-tests-windows.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
       compiler: ${{ matrix.compiler }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-install-tests:
     name: 📦 Install
@@ -123,16 +101,12 @@ jobs:
     uses: $/.github/workflows/cpp-install-tests.yml
     with:
       runs-on: ${{ matrix.runs-on }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-sanitizers:
     name: 🇨 Sanitizers
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: $/.github/workflows/cpp-sanitizers.yml
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-coverage:
     name: 🇨 Coverage
@@ -142,6 +116,20 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+  cpp-integration:
+    name: 🇨 Resonance
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    strategy:
+      fail-fast: false
+      matrix:
+        iqm-qc-alias: ["emerald:mock", "garnet:mock", "sirius:mock"]
+    uses: $/.github/workflows/cpp-tests-ubuntu.yml
+    with:
+      runs-on: ubuntu-24.04
+      config: Release
+      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
@@ -181,7 +169,7 @@ jobs:
     uses: $/.github/workflows/python-packaging-sdist.yml
 
   iqm-tests:
-    name: 🐍 Resonance (emerald:mock)
+    name: 🐍 Resonance (garnet:mock)
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     runs-on: ubuntu-24.04
@@ -196,7 +184,7 @@ jobs:
         run: uvx nox --non-interactive -s tests-3.14 -- -m iqm -n 0 -x
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
-          IQM_QC_ALIAS: "emerald:mock"
+          IQM_QC_ALIAS: "garnet:mock"
           IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   build-wheel:
@@ -233,6 +221,7 @@ jobs:
     needs:
       - change-detection
       - cpp-tests-ubuntu
+      - cpp-integration
       - cpp-tests-macos
       - cpp-tests-windows
       - cpp-install-tests
@@ -253,7 +242,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
+              && 'cpp-integration,cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)

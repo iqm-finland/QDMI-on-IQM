@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from qiskit.circuit import QuantumCircuit
@@ -30,6 +30,11 @@ from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import qiskit as iqm_qiskit
 from iqm.qdmi.qiskit import IQMBackend
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from mqt.core.plugins.qiskit.job import QDMIJob
 
 ENVIRONMENT_TOKENS_FILE = Path("/opt/iqm/environment-tokens.json")
 EXPLICIT_TOKENS_FILE = Path("/opt/iqm/explicit-tokens.json")
@@ -245,10 +250,20 @@ def _skip_without_iqm_access() -> None:
 
 
 @pytest.fixture
-def backend() -> IQMBackend:
-    """Returns the IQM backend."""
+def backend(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> IQMBackend:
+    """Return a live backend with bounded waits and cleanup, including primitive jobs."""
     _skip_without_iqm_access()
-    return IQMBackend()
+    backend = IQMBackend()
+    run = backend.run
+
+    def run_with_timeout(run_input: QuantumCircuit | Sequence[QuantumCircuit], **options: int | bool | None) -> QDMIJob:
+        job = run(run_input, None, **options)
+        request.addfinalizer(job.cancel)
+        job.wait_for_final_state(timeout=120, wait=1)
+        return job
+
+    monkeypatch.setattr(backend, "run", run_with_timeout)
+    return backend
 
 
 @pytest.fixture

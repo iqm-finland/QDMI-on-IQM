@@ -29,7 +29,7 @@ from qiskit.compiler import transpile
 
 backend = IQMBackend(
   base_url="https://resonance.iqm.tech",
-  qc_alias="emerald:mock",
+  qc_alias="garnet:mock",
 )
 ```
 

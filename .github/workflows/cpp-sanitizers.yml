@@ -1,16 +1,6 @@
 name: 🇨 • Sanitizers
 on:
   workflow_call:
-    inputs:
-      iqm-qc-alias:
-        description: >
-          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
-          This can be any valid IQM quantum computer alias.
-        default: "emerald:mock"
-        type: string
-    secrets:
-      IQM_TOKEN:
-        required: true
 
 permissions:
   contents: read
@@ -47,14 +37,9 @@ jobs:
             -DIQM_QDMI_SANITIZERS="address;undefined"
       - name: Build
         run: cmake --build build
-      # No --repeat here, unlike the regular test workflows: a sanitizer
-      # diagnostic is deterministic, and retrying until pass would hide it.
       - name: Test
         env:
-          IQM_BASE_URL: "https://resonance.iqm.tech"
-          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
-          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
           ASAN_OPTIONS: "detect_leaks=1:detect_stack_use_after_return=1:strict_string_checks=1"
           UBSAN_OPTIONS: "print_stacktrace=1"
-        run: ctest --output-on-failure --test-dir build --timeout 900
+        run: ctest --output-on-failure --test-dir build -LE integration --timeout 900

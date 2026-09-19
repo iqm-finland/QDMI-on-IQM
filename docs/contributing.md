@@ -263,6 +263,12 @@ The integration tests also carry the `integration` CTest label, so
 `ctest -C Release --test-dir build -LE integration --output-on-failure` selects
 the same offline subset from the top-level build directory.
 
+CI uses this offline subset for the platform, installation, sanitizer, and
+coverage checks. A separate required C++ integration matrix targets
+`emerald:mock`, `garnet:mock`, and `sirius:mock` without retrying failed tests.
+Its live-test steps have a ten-minute limit, so a mock outage is reported by the
+integration checks without blocking the offline checks.
+
 **Running integration tests (requires IQM access):**
 
 Before running the integration tests, make sure you have set the necessary
@@ -301,7 +307,7 @@ list:
 ```console
 cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DIQM_QDMI_SANITIZERS="address;undefined"
 cmake --build build-sanitizers
-ctest --test-dir build-sanitizers --output-on-failure
+ctest --test-dir build-sanitizers -LE integration --output-on-failure
 ```
 
 Use a build directory separate from your regular one: the flags apply to the
@@ -388,10 +394,11 @@ uvx nox -s tests-3.14
 ```
 
 Tests marked `iqm` require a live backend and credentials. Wheel tests exclude
-them; CI runs them separately against `emerald:mock` with a ten-minute step
+them; CI runs them separately against `garnet:mock` with a ten-minute step
 limit. Use `-- -m "not iqm"` for offline tests, or select `-- -m iqm -n 0 -x`
-with `IQM_QC_ALIAS=emerald:mock` and credentials configured. The C++ integration
-matrix covers Emerald, Garnet, and Sirius.
+with `IQM_QC_ALIAS=garnet:mock` and credentials configured. These tests bound
+job waits and cancel unfinished jobs during cleanup. The executed Qiskit
+documentation uses the same mock.
 
 **Running minimum-dependency tests:**
 

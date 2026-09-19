@@ -16,13 +16,12 @@ on:
         type: string
       iqm-qc-alias:
         description: >
-          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
-          This can be any valid IQM quantum computer alias.
-        default: "emerald:mock"
+          Run only live integration tests against this alias. Leave empty to run offline tests.
+        default: ""
         type: string
     secrets:
       IQM_TOKEN:
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -31,6 +30,7 @@ jobs:
   cpp-tests-ubuntu:
     name: 🐧 ${{ inputs.runs-on }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
     runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 15
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       CTEST_PARALLEL_LEVEL: 4
@@ -58,10 +58,15 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$CONFIG"
       - name: Build
         run: cmake --build build
-      - name: Test
+      - name: Test offline
+        if: inputs.iqm-qc-alias == ''
+        run: ctest --output-on-failure --test-dir build -LE integration --timeout 600
+      - name: Test the Resonance mock
+        if: inputs.iqm-qc-alias != ''
+        timeout-minutes: 10
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
+        run: ctest --output-on-failure --test-dir build -L integration --timeout 360 --stop-on-failure

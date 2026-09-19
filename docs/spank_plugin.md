@@ -240,7 +240,7 @@ that pressure itself, ahead of the QC's own queue.
 
 3. The plugin derives the expected license name as `<iqm_license_prefix><alias>`
    (default prefix `iqm_qc_`). Since QC aliases may themselves contain a colon
-   (e.g. `emerald:mock`, as seen in the [Qiskit Integration](qiskit.md)
+   (e.g. `garnet:mock`, as seen in the [Qiskit Integration](qiskit.md)
    examples), and Slurm's `name:count` license syntax reserves `:` as a
    separator, the plugin replaces `:` and `,` in the alias with `_` when
    deriving the name (e.g. alias `emerald:mock` → license

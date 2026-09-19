@@ -51,6 +51,8 @@ class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
   FoMaC fomac{};
+  /// TearDown owns cleanup, including fatal assertions and skipped tests.
+  std::vector<IQM_QDMI_Device_Job> jobs;
   std::optional<std::string> requested_qc_alias = std::nullopt;
 
   void SetUp() override {
@@ -91,6 +93,21 @@ protected:
   }
 
   void TearDown() override {
+    for (auto *job : jobs) {
+      if (job == nullptr) {
+        continue;
+      }
+      QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+      if (IQM_QDMI_device_job_check(job, &status) != QDMI_SUCCESS ||
+          status == QDMI_JOB_STATUS_SUBMITTED ||
+          status == QDMI_JOB_STATUS_QUEUED ||
+          status == QDMI_JOB_STATUS_RUNNING) {
+        /// Best effort: a timeout must not leave a job queued remotely.
+        (void)IQM_QDMI_device_job_cancel(job);
+      }
+      IQM_QDMI_device_job_free(job);
+    }
+    jobs.clear();
     IQM_QDMI_device_session_free(session);
     EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
   }
@@ -432,7 +449,6 @@ TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
   constexpr size_t max_queue_position_queries = 10;
   constexpr auto query_interval = std::chrono::milliseconds{200};
   const auto circuit = build_iqm_json_test_circuit();
-  std::vector<IQM_QDMI_Device_Job> jobs;
   jobs.reserve(jobs_num);
   for (size_t i = 0; i < jobs_num; ++i) {
     jobs.emplace_back(
@@ -480,7 +496,6 @@ TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
   }
   for (auto *job : jobs) {
     EXPECT_EQ(wait_for_done(job), QDMI_JOB_STATUS_DONE);
-    IQM_QDMI_device_job_free(job);
   }
 }
 
@@ -770,11 +785,11 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
 TEST_F(QDMIIntegrationTest, JobCycle) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
-  auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
   const auto job_id = FoMaC::get_job_id(job);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -866,9 +881,8 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
 
-  IQM_QDMI_device_job_free(job);
-
-  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  IQM_QDMI_device_job_free(std::exchange(job, nullptr));
+  auto &retrieved_job = jobs.emplace_back();
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, job_id.c_str(), &retrieved_job),
             QDMI_SUCCESS);
@@ -896,13 +910,13 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
             QDMI_SUCCESS);
   EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
             shots_num);
-  IQM_QDMI_device_job_free(retrieved_job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCancellation) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
-  auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
 
   // A mock job of this size can reach a terminal status before the cancellation
   // request lands, and a job that is no longer running can no longer be
@@ -924,11 +938,10 @@ TEST_F(QDMIIntegrationTest, JobCancellation) {
            "status is "
         << status;
   }
-  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   EXPECT_EQ(IQM_QDMI_device_session_create_device_job(session, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_session_create_device_job(nullptr, &job),
@@ -994,7 +1007,6 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
             QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_job_cancel(nullptr), QDMI_ERROR_INVALIDARGUMENT);
-  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
@@ -1047,14 +1059,14 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
       pos += key.length();
     }
   }
-  auto *job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
-                               heralding_mode, move_validation_mode,
-                               move_gate_frame_tracking_mode, dd_mode,
-                               qubit_mapping, max_circuit_duration_over_t2,
-                               num_active_reset_cycles, dd_strategy);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
+                         heralding_mode, move_validation_mode,
+                         move_gate_frame_tracking_mode, dd_mode, qubit_mapping,
+                         max_circuit_duration_over_t2, num_active_reset_cycles,
+                         dd_strategy);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -1063,7 +1075,6 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
 
   const auto counts = FoMaC::get_histogram(job);
-  IQM_QDMI_device_job_free(job);
   size_t sum = 0;
   std::cout << "Counts: {\n";
   for (const auto &[key, count] : counts) {
@@ -1080,11 +1091,11 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
 TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   constexpr size_t shots_num = 64;
   const auto qir_program = build_qir_test_circuit();
-  auto *job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
-                               shots_num);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+                         shots_num);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -1106,7 +1117,7 @@ TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
 
 TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   testing::internal::CaptureStderr();
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   auto ret = IQM_QDMI_device_session_create_device_job(session, &job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
@@ -1138,14 +1149,12 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
 
   const auto captured_output = testing::internal::GetCapturedStderr();
   std::cout << captured_output << '\n';
-
-  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, CalibrationJob) {
   // Calibration endpoints are optional in unified API
   // Legacy cocos endpoints may not be available on all servers
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_SUCCESS);
 
@@ -1174,6 +1183,4 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
   const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
   EXPECT_FALSE(calibration_set_id.empty())
       << "Calibration job must return a valid calibration set ID";
-
-  IQM_QDMI_device_job_free(job);
 }
