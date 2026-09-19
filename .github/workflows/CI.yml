@@ -180,6 +180,29 @@ jobs:
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     uses: $/.github/workflows/python-packaging-sdist.yml
 
+  iqm-tests:
+    name: 🐍 Resonance (${{ matrix.qc }})
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        qc: ["emerald:mock", "garnet:mock", "sirius:mock"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Test the Resonance mock
+        timeout-minutes: 10
+        run: uvx nox --non-interactive -s tests-3.14 -- -m iqm -n 0 -x
+        env:
+          IQM_BASE_URL: "https://resonance.iqm.tech"
+          IQM_QC_ALIAS: ${{ matrix.qc }}
+          IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+
   build-wheel:
     name: 🚀 CD
     needs: change-detection
@@ -198,8 +221,6 @@ jobs:
     uses: $/.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   spank-tests:
     name: 🇸 Test SPANK
@@ -224,6 +245,7 @@ jobs:
       - cpp-linter
       - python-linter
       - examples
+      - iqm-tests
       - build-sdist
       - build-wheel
       - spank-tests
@@ -252,6 +274,10 @@ jobs:
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
               && 'build-sdist,build-wheel,' || ''
+            }}
+            ${{
+              !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
+              && 'iqm-tests,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-cd)

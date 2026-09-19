@@ -175,16 +175,9 @@ test-skip = [
 ]
 archs = "auto64"
 build-frontend = "uv"
-environment-pass = [
-  "IQM_BASE_URL",
-  "IQM_QC_ALIAS",
-  "IQM_TOKEN",
-  "IQM_LOG_LEVEL",
-  "IQM_CPP_API_LOG_LEVEL",
-]
-test-command = "pytest test/python"
+test-command = 'pytest test/python -m "not iqm"'
 test-groups = [ "test" ]
-test-sources = [ "test/python" ]
+test-sources = [ "pyproject.toml", "test/python" ]
 overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 
 [tool.cibuildwheel.linux]
@@ -289,6 +282,7 @@ filterwarnings = [
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
+markers = [ "iqm: requires access to a live IQM backend" ]
 minversion = "9.0"
 strict = true
 testpaths = [ "test/python" ]

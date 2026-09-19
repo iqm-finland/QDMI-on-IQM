@@ -508,8 +508,8 @@ protected:
             "QB1"
           ],
           "args": {
-            "angle_t": 0.25,
-            "phase_t": 0.75
+            "angle": 1.5707963267948966,
+            "phase": 4.71238898038469
           }
         },
         {
@@ -2511,6 +2511,32 @@ private:
   std::stringstream stream_;
   iqm::LOG_LEVEL previous_level_;
 };
+
+TEST_F(DeviceJobMockTest,
+       BackendFailureMessagesAreLoggedWhenRetrievingOrPolling) {
+  const auto failed_response = R"({"id":"job-123","status":"failed",
+    "errors":[null,{}, {"message":42},
+      {"message":"Could not send job to the QC"}]})";
+  for (const auto poll : {false, true}) {
+    const ScopedLogCapture log_capture;
+    http_stub.queue_get(200, poll ? R"({"id":"job-123","status":"waiting"})"
+                                  : failed_response);
+    IQM_QDMI_Device_Job retrieved_job = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                  session, "job-123", &retrieved_job),
+              QDMI_SUCCESS);
+    if (poll) {
+      http_stub.queue_get(200, failed_response);
+    }
+    QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+    EXPECT_EQ(IQM_QDMI_device_job_check(retrieved_job, &status), QDMI_SUCCESS);
+    EXPECT_EQ(status, QDMI_JOB_STATUS_FAILED);
+    EXPECT_NE(log_capture.str().find(
+                  "Job job-123 failed: Could not send job to the QC"),
+              std::string::npos);
+    IQM_QDMI_device_job_free(retrieved_job);
+  }
+}
 
 TEST_F(DeviceIntegrationMockTest, DebugLogsPreserveResponseBodies) {
   const ScopedLogCapture logs;

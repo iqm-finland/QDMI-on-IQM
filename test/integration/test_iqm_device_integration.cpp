@@ -138,8 +138,9 @@ protected:
     auto build_single_qubit = [&] {
       std::ostringstream circuit;
       circuit << R"({"name":"test_circuit","instructions":[)";
-      circuit << R"({"name":"prx","locus":[")" << q1_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << q1_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
       circuit << R"({"name":"measure","locus":[")" << q1_name
               << R"("],"args":{"key":"meas_1_0_0"}})";
       circuit << R"(],"metadata":{}})";
@@ -172,14 +173,17 @@ protected:
 
       std::ostringstream circuit;
       circuit << R"({"name":"test_circuit","instructions":[)";
-      circuit << R"({"name":"prx","locus":[")" << a_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-      circuit << R"({"name":"prx","locus":[")" << b_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << a_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << b_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
       circuit << R"({"name":"cz","locus":[")" << a_name << R"(",")" << b_name
               << R"("],"args":{}},)";
-      circuit << R"({"name":"prx","locus":[")" << b_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":1.25}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << b_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":7.853981633974483}},)";
       circuit << R"({"name":"measure","locus":[")" << a_name
               << R"("],"args":{"key":"meas_2_0_0"}},)";
       circuit << R"({"name":"measure","locus":[")" << b_name
@@ -237,18 +241,21 @@ protected:
           const auto resonator_name = fomac.get_site_name(resonator);
           std::ostringstream circuit;
           circuit << R"({"name":"test_circuit","instructions":[)";
-          circuit << R"({"name":"prx","locus":[")" << qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-          circuit << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << second_qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
           circuit << R"({"name":"move","locus":[")" << second_qubit_name
                   << R"(",")" << resonator_name << R"("],"args":{}},)";
           circuit << R"({"name":"cz","locus":[")" << qubit_name << R"(",")"
                   << resonator_name << R"("],"args":{}},)";
           circuit << R"({"name":"move","locus":[")" << second_qubit_name
                   << R"(",")" << resonator_name << R"("],"args":{}},)";
-          circuit << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":1.25}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << second_qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":7.853981633974483}},)";
           circuit << R"({"name":"measure","locus":[")" << qubit_name
                   << R"("],"args":{"key":"meas_2_0_0"}},)";
           circuit << R"({"name":"measure","locus":[")" << second_qubit_name
@@ -1020,10 +1027,12 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
   mapping_program << R"({"name":"test_circuit","instructions":[)";
-  mapping_program << R"({"name":"prx","locus":[")" << first_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-  mapping_program << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+  mapping_program
+      << R"({"name":"prx","locus":[")" << first_qubit_name
+      << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+  mapping_program
+      << R"({"name":"prx","locus":[")" << second_qubit_name
+      << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
   mapping_program << R"({"name":"measure","locus":[")" << first_qubit_name
                   << R"("],"args":{"key":"meas_2_0_0"}},)";
   mapping_program << R"({"name":"measure","locus":[")" << second_qubit_name

@@ -41,6 +41,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Send PRX rotation and phase angles in radians using the current IQM JSON
+  fields, and report backend job failure messages at the default log level
+  ([#231]) ([**@burgholzer**])
 - 🔒️ Exchange offloaded `sample` and `estimate` results as JSON instead of
   loading worker-controlled pickle payloads. Validate result types, shapes, and
   finite numbers, preserve all sampling registers, and remove the obsolete

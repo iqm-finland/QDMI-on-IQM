@@ -387,6 +387,11 @@ uvx nox -s tests
 uvx nox -s tests-3.14
 ```
 
+Tests marked `iqm` require a live backend and credentials. Wheel tests exclude
+them; CI runs them separately against the Resonance mocks with a ten-minute step
+limit. Use `-- -m "not iqm"` for offline tests, or select `-- -m iqm -n 0 -x`
+with `IQM_QC_ALIAS` set to the intended mock and credentials configured.
+
 **Running minimum-dependency tests:**
 
 The `minimums` session runs the test suite against the minimum supported
