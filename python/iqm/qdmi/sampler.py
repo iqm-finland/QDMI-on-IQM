@@ -22,13 +22,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 try:
     from qiskit import qpy, transpile
 
     from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler
-    from .offloader import _first_pub, extract_counts
+    from .offloader import extract_counts
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -37,9 +37,7 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
-
-    from qiskit.primitives.containers.pub_result import PubResult
+    from collections.abc import Sequence
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -74,8 +72,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     circuit_for_execution = transpile(circuit, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
-    result = cast("Iterable[PubResult]", job.result())
-    print(json.dumps(extract_counts(_first_pub(result))))
+    print(json.dumps(extract_counts(job.result())))
 
 
 if __name__ == "__main__":

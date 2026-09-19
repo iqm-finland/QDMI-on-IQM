@@ -22,7 +22,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from qiskit import QuantumCircuit, qpy
+import pytest
+from qiskit import ClassicalRegister, QuantumCircuit, qpy
+
+from iqm.qdmi import offloader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,12 +33,15 @@ if TYPE_CHECKING:
     from pytest_console_scripts import ScriptRunner
 
 
-def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> None:
-    """The sampler CLI should execute a serialized circuit on the simulator."""
-    circuit = QuantumCircuit(2)
+@pytest.mark.parametrize("register_sizes", [(3,), (2, 1)])
+def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner, register_sizes: tuple[int, ...]) -> None:
+    """The CLI and local sampler preserve all registers in Qiskit's bit order."""
+    circuit = QuantumCircuit(3)
+    circuit.add_register(*(ClassicalRegister(size, f"readout_{i}") for i, size in enumerate(register_sizes)))
     circuit.h(0)
     circuit.cx(0, 1)
-    circuit.measure_all()
+    circuit.x(2)
+    circuit.measure(range(3), range(3))
 
     circuit_path = tmp_path / "bell.qpy"
     with circuit_path.open("wb") as file_obj:
@@ -46,8 +52,12 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) -> N
 
     counts = json.loads(result.stdout)
     assert sum(counts.values()) == 256
-    assert set(counts) <= {"00", "11"}
+    assert set(counts) <= {"100", "111"}
     assert counts
+
+    local_counts = offloader.sample(circuit, shots=16, local=True, simulator=True)
+    assert sum(local_counts.values()) == 16
+    assert set(local_counts) <= {"100", "111"}
 
 
 def test_sampler_cli_help(script_runner: ScriptRunner) -> None:

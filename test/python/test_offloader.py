@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import math
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import re
@@ -30,6 +31,7 @@ from typing import TYPE_CHECKING
 import pytest
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter, ParameterVector
+from qiskit.primitives.containers import PrimitiveResult
 from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import offloader
@@ -42,7 +44,7 @@ SAMPLE_STDOUT = b'{"0": 1}'
 
 #: The stdout a worker produces for an estimation job converging on `theta`.
 ESTIMATE_STDOUT = (
-    b'{"optimizer_result": {"x": [], "fun": -1.0, "jac": null, '
+    b'{"optimizer_result": {"x": [0.125], "fun": -1.0, "jac": null, '
     b'"nfev": 3, "njev": null, "nit": 2}, "optimizer_time": 0.5}'
 )
 
@@ -133,11 +135,12 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
-    assert result.optimal_parameters == {}
+    assert result.optimal_parameters == {ansatz.parameters[0]: 0.125}
     assert "srun" in captured_command
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
@@ -225,6 +228,7 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     qc_id = "12345678-1234-1234-1234-123456789abc"
@@ -330,6 +334,7 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     offloader.estimate(
@@ -472,6 +477,7 @@ def test_estimate_slurm_resolves_partition(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, partition=partition)
@@ -502,6 +508,7 @@ def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
@@ -568,10 +575,84 @@ def test_sample_slurm_timeout_raises_runtime_error(monkeypatch: pytest.MonkeyPat
         offloader.sample(circuit, shots=7, local=False, simulator=True, timeout=5)
 
 
-def test_first_pub_raises_on_empty_result() -> None:
+def test_extract_counts_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
-        offloader._first_pub([])  # ruff:ignore[private-member-access]
+        offloader.extract_counts(PrimitiveResult([]))
+
+
+@pytest.mark.parametrize("stdout", [b"", b"\xff", b"not JSON", b'{"0":' + b"9" * 4301 + b"}"])
+def test_invalid_json_result(stdout: bytes) -> None:
+    """Malformed output, including JSON integer limits, uses the public error type."""
+    process = subprocess.CompletedProcess([], 0, stdout, b"")
+    with pytest.raises(RuntimeError, match=r"No output|Error parsing"):
+        offloader._load_json_result(process)  # ruff:ignore[private-member-access]
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        b'""',
+        b'["01"]',
+        b"null",
+        b'{"garbage": 1}',
+        b'{"": 1}',
+        b'{"0": -1}',
+        b'{"0": 3.75}',
+        b'{"0": true}',
+        b'{"0": "1"}',
+        b'{"0": 1e309}',
+    ],
+)
+def test_sample_rejects_invalid_counts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stdout: bytes) -> None:
+    """The JSON boundary rejects malformed counts instead of coercing them."""
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    process = subprocess.CompletedProcess([], 0, stdout, b"")
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    with pytest.raises(RuntimeError, match="Error parsing"):
+        offloader.sample(QuantumCircuit(1), simulator=True)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("x", [[0.125, 0.25]]),
+        ("x", []),
+        ("x", [None]),
+        ("x", [True]),
+        ("x", ["0.125"]),
+        ("x", [float("nan")]),
+        ("jac", [[0.0]]),
+        ("jac", []),
+        ("jac", [float("inf")]),
+        ("fun", True),
+        ("fun", "-1.0"),
+        ("fun", float("nan")),
+        ("fun", 10**400),
+        ("nfev", 3.75),
+        ("nfev", -1),
+        ("nfev", True),
+        ("nfev", None),
+        ("njev", "1"),
+        ("nit", float("inf")),
+        ("optimizer_time", -0.5),
+        ("optimizer_time", float("inf")),
+    ],
+)
+def test_estimate_rejects_invalid_optimizer_data(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, field: str, value: object
+) -> None:
+    """Only correctly shaped vectors and finite, appropriately typed numbers are accepted."""
+    data = json.loads(ESTIMATE_STDOUT)
+    target = data if field == "optimizer_time" else data["optimizer_result"]
+    target[field] = value
+    process = subprocess.CompletedProcess([], 0, json.dumps(data).encode(), b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
+    with pytest.raises(RuntimeError, match="Error parsing"):
+        offloader.estimate(ansatz, SparsePauliOp.from_list([("Z", 1.0)]), simulator=True)
 
 
 _EXECUTED_MARKERS: list[str] = []
@@ -599,17 +680,19 @@ class _CallingPayload:
         return (_record_execution, ("executed",))
 
 
-def test_load_json_result_does_not_execute_a_pickled_payload() -> None:
+def test_sample_does_not_execute_a_pickled_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A worker-controlled pickle is rejected as JSON without executing it."""
     stdout = base64.b64encode(pickle.dumps(_CallingPayload()))
     process = subprocess.CompletedProcess([], 0, stdout, b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
 
     with pytest.raises(RuntimeError, match="Error parsing"):
-        offloader._load_json_result(process)  # ruff:ignore[private-member-access]
+        offloader.sample(QuantumCircuit(1), simulator=True)
     assert _EXECUTED_MARKERS == []
 
 
-def test_vqe_result_json_round_trip() -> None:
+def test_vqe_result_json_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A genuine VQE result retains its public fields across the JSON boundary."""
     theta = ParameterVector("theta", 2)
     ansatz = QuantumCircuit(2)
@@ -621,8 +704,9 @@ def test_vqe_result_json_round_trip() -> None:
 
     encoded = offloader._encode_vqe_result(expected)  # ruff:ignore[private-member-access]
     process = subprocess.CompletedProcess([], 0, encoded.encode(), b"")
-    payload = offloader._load_json_result(process)  # ruff:ignore[private-member-access]
-    result = offloader._decode_vqe_result(payload, ansatz)  # ruff:ignore[private-member-access]
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    result = offloader.estimate(ansatz, operator, simulator=True)
 
     assert result.optimal_parameters == expected.optimal_parameters
     assert result.optimal_circuit == expected.optimal_circuit
@@ -640,3 +724,7 @@ def test_vqe_result_json_round_trip() -> None:
     assert result.optimizer_result.nfev == expected.optimizer_result.nfev
     assert result.optimizer_result.njev == expected.optimizer_result.njev
     assert result.optimizer_result.nit == expected.optimizer_result.nit
+
+    expected.optimizer_result.fun = float("nan")
+    with pytest.raises(ValueError, match="JSON"):
+        offloader._encode_vqe_result(expected)  # ruff:ignore[private-member-access]

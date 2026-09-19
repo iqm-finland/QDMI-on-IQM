@@ -42,7 +42,9 @@ releases may include breaking changes.
 ### Fixed
 
 - 🔒️ Exchange offloaded `sample` and `estimate` results as JSON instead of
-  loading worker-controlled pickle payloads ([#231]) ([**@marcelwa**])
+  loading worker-controlled pickle payloads. Validate result types, shapes, and
+  finite numbers, preserve all sampling registers, and remove the obsolete
+  Qiskit pickle workaround ([#231]) ([**@marcelwa**], [**@burgholzer**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
   in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
@@ -257,15 +259,15 @@ Compatible with QDMI `v1.3.0`.
 
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
-[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
+[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
-[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
@@ -285,9 +287,9 @@ Compatible with QDMI `v1.3.0`.
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
-[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
+[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136

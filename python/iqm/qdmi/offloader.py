@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
 import uuid
-from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, SupportsInt, cast
+from typing import TYPE_CHECKING, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
@@ -42,82 +42,48 @@ except ImportError as e:
     _IMPORT_ERROR = e
 
 if TYPE_CHECKING:
-    from qiskit.primitives.containers.pub_result import PubResult
+    from collections.abc import Mapping
+
+    from numpy.typing import NDArray
+    from qiskit.primitives.containers import BitArray, PrimitiveResult, SamplerPubResult
     from qiskit.quantum_info import SparsePauliOp
 
 _DEFAULT_PARTITION = "quantum"
 _DEFAULT_NODES = 1
 
 
-def _count_to_int(count: object) -> int:
-    """Convert an external count payload to a plain integer.
+def _nonnegative_int(value: object) -> int:
+    """Validate an integer count from JSON.
 
     Returns:
-        The converted count value.
-    """
-    return int(cast("SupportsInt | str | bytes | bytearray", count))
-
-
-def normalize_counts(raw_counts: object) -> dict[str, int]:
-    """Convert backend count payloads into a plain typed dictionary.
-
-    Returns:
-        A normalized mapping from bitstrings to integer counts.
-    """
-    if isinstance(raw_counts, Mapping):
-        return {str(bitstring): _count_to_int(count) for bitstring, count in raw_counts.items()}
-
-    pairs = cast("Iterable[tuple[object, object]]", raw_counts)
-    return {str(bitstring): _count_to_int(count) for bitstring, count in pairs}
-
-
-def extract_counts(pub_result: PubResult) -> dict[str, int]:
-    """Extract counts from the first classical register exposed by a primitive result.
-
-    Returns:
-        A normalized mapping from measured bitstrings to shot counts.
+        The count unchanged.
 
     Raises:
-        RuntimeError: If no classical register with counts is present in the result.
+        ValueError: If the value is not a nonnegative integer.
     """
-    data = pub_result.data
-
-    if isinstance(data, dict):
-        values: Iterable[object] = data.values()
-    else:
-        keys = getattr(data, "keys", None)
-        values = (data[key] for key in keys()) if callable(keys) else ()
-
-    for value in values:
-        get_counts = getattr(value, "get_counts", None)
-        if callable(get_counts):
-            return normalize_counts(get_counts())
-
-    for key in ("meas", "c"):
-        with contextlib.suppress(AttributeError, KeyError, TypeError):
-            value = data[key]
-            get_counts = getattr(value, "get_counts", None)
-            if callable(get_counts):
-                return normalize_counts(get_counts())
-
-    msg = "Could not find a classical register with counts in the primitive result."
-    raise RuntimeError(msg)
+    if type(value) is not int or value < 0:
+        msg = "Expected a nonnegative JSON integer."
+        raise ValueError(msg)
+    return value
 
 
-def _first_pub(primitive_result: Iterable[PubResult]) -> PubResult:
-    """Return the first pub result from a primitive result.
+def extract_counts(primitive_result: PrimitiveResult[SamplerPubResult]) -> dict[str, int]:
+    """Extract joint counts from the native sampler's single submitted circuit.
 
     Returns:
-        The first pub result.
+        Joint bitstrings in Qiskit's register order, mapped to shot counts.
 
     Raises:
-        RuntimeError: If the primitive result contains no pubs.
+        RuntimeError: If the result is empty or has no classical registers with counts.
     """
-    first_pub = next(iter(primitive_result), None)
-    if first_pub is None:
+    if not primitive_result:
         msg = "Primitive result contained no pubs."
         raise RuntimeError(msg)
-    return first_pub
+    try:
+        return cast("BitArray", primitive_result[0].join_data()).get_counts()
+    except (TypeError, ValueError) as e:
+        msg = f"Could not extract measurement counts: {e}"
+        raise RuntimeError(msg) from e
 
 
 def _get_jobs_dir() -> Path:
@@ -246,22 +212,14 @@ def _load_json_result(process: subprocess.CompletedProcess[bytes]) -> object:
     Raises:
         RuntimeError: If the job produced no valid JSON output.
     """
-    try:
-        stdout = process.stdout.decode().strip()
-    except UnicodeDecodeError as e:
-        msg = f"Error parsing the output: {e}"
-        raise RuntimeError(msg) from e
-    if not stdout:
+    if not process.stdout.strip():
         msg = "No output from the job."
         raise RuntimeError(msg)
     try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as e:
+        return json.loads(process.stdout)
+    except ValueError as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
-
-
-_OPTIMIZER_RESULT_FIELDS = ("x", "fun", "jac", "nfev", "njev", "nit")
 
 
 def _encode_vqe_result(result: VQEResult) -> str:
@@ -270,12 +228,42 @@ def _encode_vqe_result(result: VQEResult) -> str:
     Returns:
         The serialized result.
     """
-    optimizer_result = cast("OptimizerResult", result.optimizer_result)
+    optimizer = cast("OptimizerResult", result.optimizer_result)
     payload = {
-        "optimizer_result": {name: getattr(optimizer_result, name) for name in _OPTIMIZER_RESULT_FIELDS},
+        "optimizer_result": {name: getattr(optimizer, name) for name in ("x", "fun", "jac", "nfev", "njev", "nit")},
         "optimizer_time": result.optimizer_time,
     }
-    return json.dumps(payload, default=lambda value: value.tolist())
+    return json.dumps(payload, default=lambda value: value.tolist(), allow_nan=False)
+
+
+def _finite_float(value: object) -> float:
+    """Validate a real number from JSON.
+
+    Returns:
+        The finite value as a float.
+
+    Raises:
+        ValueError: If the value is not a finite JSON number.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        msg = "Expected a finite JSON number."
+        raise ValueError(msg)
+    return float(value)
+
+
+def _parameter_vector(value: object, size: int) -> NDArray[np.float64]:
+    """Validate a flat JSON array with one finite value per ansatz parameter.
+
+    Returns:
+        The parameter vector as a NumPy array.
+
+    Raises:
+        ValueError: If the vector has an incompatible shape or value.
+    """
+    if not isinstance(value, list) or len(value) != size:
+        msg = f"Expected {size} parameter values."
+        raise ValueError(msg)
+    return np.asarray([_finite_float(item) for item in value], dtype=float)
 
 
 def _decode_vqe_result(payload: object, ansatz: QuantumCircuit) -> VQEResult:
@@ -290,20 +278,24 @@ def _decode_vqe_result(payload: object, ansatz: QuantumCircuit) -> VQEResult:
     try:
         data = cast("Mapping[str, object]", payload)
         optimizer_data = cast("Mapping[str, object]", data["optimizer_result"])
-        point = np.asarray(optimizer_data["x"], dtype=float)
-        fun = float(cast("float", optimizer_data["fun"]))
+        point = _parameter_vector(optimizer_data["x"], ansatz.num_parameters)
+        fun = _finite_float(optimizer_data["fun"])
         jac_data = optimizer_data["jac"]
-        jac = None if jac_data is None else np.asarray(jac_data, dtype=float)
-        nfev = int(cast("int", optimizer_data["nfev"]))
+        jac = None if jac_data is None else _parameter_vector(jac_data, ansatz.num_parameters)
+        nfev = _nonnegative_int(optimizer_data["nfev"])
         njev_data = optimizer_data["njev"]
-        njev = None if njev_data is None else int(cast("int", njev_data))
+        njev = None if njev_data is None else _nonnegative_int(njev_data)
         nit_data = optimizer_data["nit"]
-        nit = None if nit_data is None else int(cast("int", nit_data))
-        optimizer_time = float(cast("float", data["optimizer_time"]))
+        nit = None if nit_data is None else _nonnegative_int(nit_data)
+        optimizer_time = _finite_float(data["optimizer_time"])
         optimal_parameters = dict(zip(ansatz.parameters, point, strict=True))
-    except (KeyError, TypeError, ValueError) as e:
+    except (KeyError, TypeError, ValueError, OverflowError) as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
+
+    if optimizer_time < 0:
+        msg = "Error parsing the output: optimizer time must be nonnegative."
+        raise RuntimeError(msg)
 
     optimizer_result = OptimizerResult()
     optimizer_result.x = point
@@ -315,7 +307,7 @@ def _decode_vqe_result(payload: object, ansatz: QuantumCircuit) -> VQEResult:
 
     result = VQEResult()
     result.optimal_circuit = ansatz.copy()
-    result.eigenvalue = complex(fun)
+    result.eigenvalue = fun
     result.cost_function_evals = nfev
     result.optimal_point = point
     result.optimal_parameters = optimal_parameters
@@ -344,15 +336,14 @@ def sample(
     and submits it to the Slurm workload manager using the `srun` command.
     After completion, the counts are parsed and returned as a dictionary.
 
-    When `local=True`, runs the circuit locally using the MQT Core DDSIM simulator backend.
+    When `local=True`, runs the circuit in this process on the selected backend.
 
     Args:
         qc: The quantum circuit to run.
         shots: The number of shots to run. Default is 1024.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
@@ -393,8 +384,7 @@ def sample(
         sampler = build_sampler(simulator=simulator)
         qc_for_execution = transpile(qc, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
-        first_pub = _first_pub(cast("Iterable[PubResult]", job.result()))
-        return extract_counts(first_pub)
+        return extract_counts(job.result())
 
     # Make sure the `jobs` directory exists on the shared filesystem
     job_dir = _new_job_dir()
@@ -430,9 +420,13 @@ def sample(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
+    counts = _load_json_result(process)
+    if not isinstance(counts, dict) or any(not bits or set(bits) - {"0", "1"} for bits in counts):
+        msg = "Error parsing the output: expected a JSON object mapping binary strings to counts."
+        raise RuntimeError(msg)
     try:
-        return normalize_counts(_load_json_result(process))
-    except (TypeError, ValueError) as e:
+        return {bits: _nonnegative_int(count) for bits, count in counts.items()}
+    except ValueError as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
 
@@ -460,19 +454,17 @@ def estimate(
     When `local=True`, runs the VQE algorithm locally using either the MQT Core
     DDSIM simulator backend or the packaged IQM backend.
 
-    The returned result has the same semantics as calling
-    `VQE(...).compute_minimum_eigenvalue(...)` directly against the regular
-    (non-offloaded) estimator.
+    Both paths run `VQE` with `L_BFGS_B` and no auxiliary operators, returning
+    the optimal circuit, parameter values, and optimizer state.
 
     Args:
         ansatz: The ansatz circuit to run.
         operator: The operator to run.
         maxiter: The maximum number of iterations for the optimization.
             Default is 80.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
