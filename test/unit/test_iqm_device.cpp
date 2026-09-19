@@ -2514,7 +2514,7 @@ private:
 
 TEST_F(DeviceJobMockTest,
        BackendFailureMessagesAreLoggedWhenRetrievingOrPolling) {
-  const auto failed_response = R"({"id":"job-123","status":"failed",
+  const auto *const failed_response = R"({"id":"job-123","status":"failed",
     "errors":[null,{}, {"message":42},
       {"message":"Could not send job to the QC"}]})";
   for (const auto poll : {false, true}) {

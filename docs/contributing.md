@@ -388,9 +388,10 @@ uvx nox -s tests-3.14
 ```
 
 Tests marked `iqm` require a live backend and credentials. Wheel tests exclude
-them; CI runs them separately against the Resonance mocks with a ten-minute step
+them; CI runs them separately against `emerald:mock` with a ten-minute step
 limit. Use `-- -m "not iqm"` for offline tests, or select `-- -m iqm -n 0 -x`
-with `IQM_QC_ALIAS` set to the intended mock and credentials configured.
+with `IQM_QC_ALIAS=emerald:mock` and credentials configured. The C++ integration
+matrix covers Emerald, Garnet, and Sirius.
 
 **Running minimum-dependency tests:**
 
