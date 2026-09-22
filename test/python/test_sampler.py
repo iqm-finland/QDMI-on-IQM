@@ -19,7 +19,8 @@
 
 from __future__ import annotations
 
-import json
+import base64
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
 
 import pytest
@@ -50,7 +51,8 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner, regi
     result = script_runner.run(["iqm-sampler", str(circuit_path), "--shots", "256", "--simulator"])
     assert result.success
 
-    counts = json.loads(result.stdout)
+    primitive_result = pickle.loads(base64.b64decode(result.stdout))  # ruff:ignore[suspicious-pickle-usage]
+    counts = offloader.extract_counts(primitive_result)
     assert sum(counts.values()) == 256
     assert set(counts) <= {"100", "111"}
     assert counts

@@ -20,9 +20,8 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
-import json
-import math
 import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
@@ -32,39 +31,21 @@ from typing import TYPE_CHECKING, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
-    import numpy as np
     from qiskit import QuantumCircuit, qpy, transpile
-    from qiskit_algorithms import VQE, VQEResult
-    from qiskit_algorithms.optimizers import L_BFGS_B, OptimizerResult
+    from qiskit_algorithms import VQE
+    from qiskit_algorithms.optimizers import L_BFGS_B
 
     from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_estimator, build_sampler
 except ImportError as e:
     _IMPORT_ERROR = e
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from numpy.typing import NDArray
     from qiskit.primitives.containers import BitArray, PrimitiveResult, SamplerPubResult
     from qiskit.quantum_info import SparsePauliOp
+    from qiskit_algorithms import VQEResult
 
 _DEFAULT_PARTITION = "quantum"
 _DEFAULT_NODES = 1
-
-
-def _nonnegative_int(value: object) -> int:
-    """Validate an integer count from JSON.
-
-    Returns:
-        The count unchanged.
-
-    Raises:
-        ValueError: If the value is not a nonnegative integer.
-    """
-    if type(value) is not int or value < 0:
-        msg = "Expected a nonnegative JSON integer."
-        raise ValueError(msg)
-    return value
 
 
 def extract_counts(primitive_result: PrimitiveResult[SamplerPubResult]) -> dict[str, int]:
@@ -203,118 +184,26 @@ def _run_srun(
     return process
 
 
-def _load_json_result(process: subprocess.CompletedProcess[bytes]) -> object:
-    """Parse the job's stdout as JSON.
+def _load_pickled_result(process: subprocess.CompletedProcess[bytes]) -> object:
+    """Load a base64-encoded pickle from a trusted Slurm worker.
+
+    The submitting process and worker must use compatible environments.
 
     Returns:
-        The parsed result.
+        The worker's native Qiskit result.
 
     Raises:
-        RuntimeError: If the job produced no valid JSON output.
+        RuntimeError: If the worker output is empty or cannot be decoded.
     """
-    if not process.stdout.strip():
+    stdout = process.stdout.strip()
+    if not stdout:
         msg = "No output from the job."
         raise RuntimeError(msg)
     try:
-        return json.loads(process.stdout)
-    except ValueError as e:
+        return pickle.loads(base64.b64decode(stdout, validate=True))  # ruff:ignore[suspicious-pickle-usage]
+    except Exception as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
-
-
-def _encode_vqe_result(result: VQEResult) -> str:
-    """Serialize the VQE fields returned by the offloader as JSON.
-
-    Returns:
-        The serialized result.
-    """
-    optimizer = cast("OptimizerResult", result.optimizer_result)
-    payload = {
-        "optimizer_result": {name: getattr(optimizer, name) for name in ("x", "fun", "jac", "nfev", "njev", "nit")},
-        "optimizer_time": result.optimizer_time,
-    }
-    return json.dumps(payload, default=lambda value: value.tolist(), allow_nan=False)
-
-
-def _finite_float(value: object) -> float:
-    """Validate a real number from JSON.
-
-    Returns:
-        The finite value as a float.
-
-    Raises:
-        ValueError: If the value is not a finite JSON number.
-    """
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        msg = "Expected a finite JSON number."
-        raise ValueError(msg)
-    return float(value)
-
-
-def _parameter_vector(value: object, size: int) -> NDArray[np.float64]:
-    """Validate a flat JSON array with one finite value per ansatz parameter.
-
-    Returns:
-        The parameter vector as a NumPy array.
-
-    Raises:
-        ValueError: If the vector has an incompatible shape or value.
-    """
-    if not isinstance(value, list) or len(value) != size:
-        msg = f"Expected {size} parameter values."
-        raise ValueError(msg)
-    return np.asarray([_finite_float(item) for item in value], dtype=float)
-
-
-def _decode_vqe_result(payload: object, ansatz: QuantumCircuit) -> VQEResult:
-    """Reconstruct a VQE result from its JSON payload and original ansatz.
-
-    Returns:
-        The reconstructed result.
-
-    Raises:
-        RuntimeError: If the payload does not contain the expected fields.
-    """
-    try:
-        data = cast("Mapping[str, object]", payload)
-        optimizer_data = cast("Mapping[str, object]", data["optimizer_result"])
-        point = _parameter_vector(optimizer_data["x"], ansatz.num_parameters)
-        fun = _finite_float(optimizer_data["fun"])
-        jac_data = optimizer_data["jac"]
-        jac = None if jac_data is None else _parameter_vector(jac_data, ansatz.num_parameters)
-        nfev = _nonnegative_int(optimizer_data["nfev"])
-        njev_data = optimizer_data["njev"]
-        njev = None if njev_data is None else _nonnegative_int(njev_data)
-        nit_data = optimizer_data["nit"]
-        nit = None if nit_data is None else _nonnegative_int(nit_data)
-        optimizer_time = _finite_float(data["optimizer_time"])
-        optimal_parameters = dict(zip(ansatz.parameters, point, strict=True))
-    except (KeyError, TypeError, ValueError, OverflowError) as e:
-        msg = f"Error parsing the output: {e}"
-        raise RuntimeError(msg) from e
-
-    if optimizer_time < 0:
-        msg = "Error parsing the output: optimizer time must be nonnegative."
-        raise RuntimeError(msg)
-
-    optimizer_result = OptimizerResult()
-    optimizer_result.x = point
-    optimizer_result.fun = fun
-    optimizer_result.jac = jac
-    optimizer_result.nfev = nfev
-    optimizer_result.njev = njev
-    optimizer_result.nit = nit
-
-    result = VQEResult()
-    result.optimal_circuit = ansatz.copy()
-    result.eigenvalue = fun
-    result.cost_function_evals = nfev
-    result.optimal_point = point
-    result.optimal_parameters = optimal_parameters
-    result.optimal_value = fun
-    result.optimizer_time = optimizer_time
-    result.optimizer_result = optimizer_result
-    return result
 
 
 def sample(
@@ -372,8 +261,8 @@ def sample(
 
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
-        RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
-    """
+        RuntimeError: Propagated from job submission or result decoding.
+    """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
             "Failed to import Qiskit and QDMI backend plugins. "
@@ -420,15 +309,8 @@ def sample(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    counts = _load_json_result(process)
-    if not isinstance(counts, dict) or any(not bits or set(bits) - {"0", "1"} for bits in counts):
-        msg = "Error parsing the output: expected a JSON object mapping binary strings to counts."
-        raise RuntimeError(msg)
-    try:
-        return {bits: _nonnegative_int(count) for bits, count in counts.items()}
-    except ValueError as e:
-        msg = f"Error parsing the output: {e}"
-        raise RuntimeError(msg) from e
+    result = cast("PrimitiveResult[SamplerPubResult]", _load_pickled_result(process))
+    return extract_counts(result)
 
 
 def estimate(
@@ -454,8 +336,9 @@ def estimate(
     When `local=True`, runs the VQE algorithm locally using either the MQT Core
     DDSIM simulator backend or the packaged IQM backend.
 
-    Both paths run `VQE` with `L_BFGS_B` and no auxiliary operators, returning
-    the optimal circuit, parameter values, and optimizer state.
+    The returned result has the same semantics as calling
+    `VQE(...).compute_minimum_eigenvalue(...)` directly against the regular
+    (non-offloaded) estimator.
 
     Args:
         ansatz: The ansatz circuit to run.
@@ -546,4 +429,4 @@ def estimate(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    return _decode_vqe_result(_load_json_result(process), ansatz)
+    return cast("VQEResult", _load_pickled_result(process))

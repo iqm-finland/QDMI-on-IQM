@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-import json
+import base64
 import math
 import pickle  # ruff:ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 from qiskit import QuantumCircuit, qpy
 from qiskit.circuit import Parameter
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms import VQEResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -59,8 +60,12 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     ])
     assert result.success
 
-    res = json.loads(result.stdout)
-    params = res["optimizer_result"]["x"]
+    res = pickle.loads(base64.b64decode(result.stdout))  # ruff:ignore[suspicious-pickle-usage]
+    assert isinstance(res, VQEResult)
+    assert res.optimal_parameters is not None
+    assert set(res.optimal_parameters) == {theta}
+    assert res.optimal_circuit == ansatz
+    params = list(res.optimal_parameters.values())
     assert len(params) == 1
     assert math.isfinite(float(params[0]))
 

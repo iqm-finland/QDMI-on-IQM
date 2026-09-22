@@ -20,7 +20,8 @@
 from __future__ import annotations
 
 import argparse
-import json
+import base64
+import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -28,7 +29,6 @@ try:
     from qiskit import qpy, transpile
 
     from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler
-    from .offloader import extract_counts
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -72,7 +72,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     circuit_for_execution = transpile(circuit, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
-    print(json.dumps(extract_counts(job.result())))
+    pickled = pickle.dumps(job.result())
+    print(base64.b64encode(pickled).decode("utf-8"))
 
 
 if __name__ == "__main__":

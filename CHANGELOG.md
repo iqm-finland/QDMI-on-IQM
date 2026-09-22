@@ -45,8 +45,6 @@ releases may include breaking changes.
   JSON fields ([#231]) ([**@burgholzer**])
 - 🩹 Report backend job failure messages at the default log level ([#231])
   ([**@burgholzer**])
-- 🔒️ Use validated JSON instead of pickle for offloaded sampling and estimation
-  results ([#231]) ([**@marcelwa**], [**@burgholzer**])
 - 🩹 Preserve joint sampling counts across all classical registers in offloaded
   results ([#231]) ([**@burgholzer**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies

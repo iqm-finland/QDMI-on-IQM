@@ -107,32 +107,19 @@ queue.
 
 The module provides two primary functions:
 
-- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the given circuit to QPY,
-  submits a Slurm job using `srun iqm-sampler`, and parses its JSON counts,
-  joining all classical registers in Qiskit's bit order.
+- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the circuit to QPY and
+  submits a Slurm job using `srun iqm-sampler`. The returned sampler result is
+  converted to joint counts across all classical registers in Qiskit's bit
+  order.
 - {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable,
-  submits a Slurm job using `srun iqm-estimator`, and reconstructs a `VQEResult`
-  from its JSON optimizer data and the original ansatz.
+  submits a Slurm job using `srun iqm-estimator`, and returns the complete
+  `VQEResult` produced by the worker.
 
-The submitting process therefore does not execute Python reconstruction code
-from a worker-controlled result.
-
-Both worker CLIs reserve stdout for one JSON result; diagnostics belong on
-stderr. Upgrade the submitting and worker environments together when moving from
-pickle results to JSON. The caller rejects malformed results with `RuntimeError`
-and does not fall back to loading pickle.
-
-Counts are a JSON object mapping nonempty binary strings to nonnegative
-integers. Estimation runs one `L_BFGS_B` optimization without auxiliary
-operators. Its result contains finite numeric parameter and gradient vectors
-matching the original ansatz, a finite objective and nonnegative duration, and
-nonnegative integer evaluation/iteration counts. The gradient and optional
-evaluation/iteration counts may be `null`. Boolean and string coercions, `NaN`,
-and infinities are rejected; additional object fields are ignored.
-
-The ansatz must already have the required qubit count and parameters before
-submission. The observable input still uses pickle and must come from a trusted
-source in the shared jobs directory.
+Both worker CLIs reserve stdout for one base64-encoded pickle containing the
+native Qiskit result; diagnostics belong on stderr. The offloader is intended
+for controlled Slurm deployments with trusted workers and serialized inputs. Use
+compatible Python and dependency environments on the submitting and worker
+nodes. Result loading uses standard pickle without a restricted unpickler.
 
 Both functions support `local=True` to execute in the submitting process instead
 of Slurm, and `simulator=True` to select the simulator in either mode.
