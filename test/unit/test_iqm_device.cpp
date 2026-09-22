@@ -920,18 +920,19 @@ TEST_F(DeviceIntegrationMockTest, QubitCountMatchesSiteCountWithoutResonators) {
   EXPECT_EQ(sites_size / sizeof(IQM_QDMI_Site), 2U);
 }
 
-TEST_F(DeviceIntegrationMockTest, ReportsNoCalibrationRequirement) {
+TEST_F(DeviceIntegrationMockTest, RemovedDevicePropertiesUnsupported) {
   queue_successful_initialization();
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
   const auto requests_before = http_stub.get_urls().size();
 
-  size_t needs_calibration = 1;
-  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
-                session, QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION,
-                sizeof(needs_calibration), &needs_calibration, nullptr),
-            QDMI_SUCCESS);
-  EXPECT_EQ(needs_calibration, 0U);
-  // No IQM Server signal backs the answer, so no request is issued for it.
+  for (const auto property : {8, 9}) {
+    /// Old binaries can query reserved values without a named enumerator.
+    /// NOLINTNEXTLINE(clang-analyzer-*EnumCastOutOfRange)
+    const auto removed_property = static_cast<QDMI_Device_Property>(property);
+    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
+                  session, removed_property, 0, nullptr, nullptr),
+              QDMI_ERROR_NOTSUPPORTED);
+  }
   EXPECT_EQ(http_stub.get_urls().size(), requests_before);
 }
 
