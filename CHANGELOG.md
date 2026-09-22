@@ -12,9 +12,6 @@ releases may include breaking changes.
 
 ### Added
 
-- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
-  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
-  asks a client to trigger one ([#229]) ([**@marcelwa**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -30,6 +27,10 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
+  pulse-support properties. Preserve the remaining property values for binary
+  compatibility with existing MQT Core clients ([#229], [#266])
+  ([**@marcelwa**], [**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
@@ -269,6 +270,7 @@ Compatible with QDMI `v1.3.0`.
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
+[#266]: https://github.com/iqm-finland/QDMI-on-IQM/pull/266
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
