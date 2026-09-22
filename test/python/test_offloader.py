@@ -163,16 +163,15 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert "--base-url" not in captured_command
 
 
-def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
+def test_sample_slurm_uses_worker_qc_alias_and_no_cli_credentials(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The Slurm path must never put credentials on the `srun` command line.
 
     Backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`) reach the job
     purely through the environment -- either plain Slurm propagation or the
-    QDMI-on-IQM SPANK plugin's own injection -- never as CLI arguments. Only
-    the explicit `qc_alias` selection is forwarded, as a SPANK `--iqm-*`
-    option on `srun` itself (not a worker CLI flag).
+    shared injection -- never as CLI arguments. Only the explicit `qc_alias`
+    selection is forwarded to the IQM worker.
     """
     captured_command: list[str] = []
 
@@ -205,20 +204,21 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
     assert counts == {"0": 1}
     assert "https://resonance.example" not in captured_command
     assert "tokens_path" not in captured_command
-    for flag in ("--base-url", "--tokens-file", "--token", "--qc-alias"):
+    for flag in ("--base-url", "--tokens-file", "--token"):
         assert flag not in captured_command
-    assert "--iqm-qc-alias=emerald:mock" in captured_command
-    assert captured_command.index("--iqm-qc-alias=emerald:mock") < worker_index
+    assert not any(arg.startswith("--iqm-") for arg in captured_command)
+    assert "--qc-alias=emerald:mock" in captured_command
+    assert captured_command.index("--qc-alias=emerald:mock") > worker_index
     assert worker_command[0] == "iqm-sampler"
     assert Path(worker_command[1]).name == "qc.qpy"
     assert worker_command[2] == "--shots"
     assert worker_command[3] == "7"
 
 
-def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
+def test_estimate_slurm_uses_worker_qc_id_and_no_cli_credentials(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Mirrors `test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials` for `estimate()`."""
+    """Mirrors `test_sample_slurm_uses_worker_qc_alias_and_no_cli_credentials` for `estimate()`."""
     captured_command: list[str] = []
 
     class FakeCompletedProcess:
@@ -251,10 +251,11 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     assert result.optimal_parameters == {"theta": 0.125}
     assert "https://resonance.example" not in captured_command
     assert "tokens_path" not in captured_command
-    for flag in ("--base-url", "--tokens-file", "--token", "--qc-id", "--qc-alias"):
+    for flag in ("--base-url", "--tokens-file", "--token"):
         assert flag not in captured_command
-    assert f"--iqm-qc-id={qc_id}" in captured_command
-    assert captured_command.index(f"--iqm-qc-id={qc_id}") < worker_index
+    assert not any(arg.startswith("--iqm-") for arg in captured_command)
+    assert f"--qc-id={qc_id}" in captured_command
+    assert captured_command.index(f"--qc-id={qc_id}") > worker_index
     assert worker_command[0] == "iqm-estimator"
     assert Path(worker_command[1]).name == "ansatz.qpy"
     assert Path(worker_command[2]).name == "operator.pkl"

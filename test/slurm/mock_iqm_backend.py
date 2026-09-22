@@ -30,6 +30,7 @@ import contextlib
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Lock
 from typing import ClassVar
 
 
@@ -37,12 +38,17 @@ class IQMRequestHandler(BaseHTTPRequestHandler):
     """Serve the IQM endpoints required by QDMI session initialization."""
 
     request_count: ClassVar[int] = 0
+    jobs: ClassVar[dict[str, tuple[int, list[str]]]] = {}
+    lock: ClassVar[Lock] = Lock()
 
     def do_GET(self) -> None:
         """Return a minimal successful response for a supported IQM endpoint."""
         path = self.path
         if path == "/request-count":
             self._send_json(self.request_count)
+            return
+        if not self.headers.get("Authorization", "").startswith("Bearer fixture."):
+            self.send_error(401)
             return
 
         type(self).request_count += 1
@@ -62,16 +68,29 @@ class IQMRequestHandler(BaseHTTPRequestHandler):
         if path.endswith("/artifacts/static-quantum-architectures"):
             self._send_json([
                 {
-                    "qubits": ["QB1"],
+                    "qubits": ["QB1", "QB2"],
                     "computational_resonators": [],
-                    "connectivity": [],
+                    "connectivity": [["QB1", "QB2"]],
                 }
             ])
             return
         if path.endswith("/dynamic-quantum-architecture"):
             self._send_json({
                 "calibration_set_id": "00000000-0000-0000-0000-000000000000",
-                "gates": {},
+                "qubits": ["QB1", "QB2"],
+                "computational_resonators": [],
+                "gates": {
+                    name: {
+                        "implementations": {"fixture": {"loci": loci}},
+                        "default_implementation": "fixture",
+                        "override_default_implementation": {},
+                    }
+                    for name, loci in {
+                        "prx": [["QB1"], ["QB2"]],
+                        "cz": [["QB1", "QB2"]],
+                        "measure": [["QB1"], ["QB2"]],
+                    }.items()
+                },
             })
             return
         if path.endswith("/metrics"):
@@ -80,8 +99,50 @@ class IQMRequestHandler(BaseHTTPRequestHandler):
         if path == "/cocos/health":
             self._send_json({"services": [], "warnings": []})
             return
+        if path.endswith("/health"):
+            self._send_json({"healthy": True})
+            return
+        if path.endswith("/queue-availability"):
+            self._send_json({"queue_length": 0, "available": ["normal"]})
+            return
+        if path.startswith("/api/v1/jobs/"):
+            job_id = path.split("/")[4]
+            with self.lock:
+                shots, keys = self.jobs[job_id]
+            if path.endswith("/measurement_counts"):
+                self._send_json([
+                    {
+                        "measurement_keys": keys,
+                        "counts": {"00": shots // 2, "11": shots // 2},
+                    }
+                ])
+            elif path.endswith("/measurements"):
+                self._send_json([{key: [[index % 2] for index in range(shots)] for key in keys}])
+            else:
+                self._send_json({"status": "ready"})
+            return
 
         self.send_error(404)
+
+    def do_POST(self) -> None:
+        """Accept an IQM JSON circuit and retain its measurement-key order."""
+        if not self.headers.get("Authorization", "").startswith("Bearer fixture."):
+            self.send_error(401)
+            return
+        if self.path != "/api/v1/jobs/emerald/circuit":
+            self.send_error(404)
+            return
+        payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        circuit = payload["circuits"][0]
+        keys = [
+            instruction["args"]["key"] for instruction in circuit["instructions"] if instruction["name"] == "measure"
+        ]
+        assert len(keys) == 2
+        assert any(instruction["name"] == "cz" for instruction in circuit["instructions"])
+        with self.lock:
+            job_id = str(len(self.jobs) + 1)
+            self.jobs[job_id] = (payload["shots"], keys)
+        self._send_json({"id": job_id})
 
     def log_message(self, format: str, *args: object) -> None:  # ruff:ignore[builtin-argument-shadowing]
         """Suppress routine request logs in the test container."""

@@ -6,27 +6,49 @@ on:
         description: "The ubuntu runner image to use."
         default: "ubuntu-26.04"
         type: string
-    secrets:
-      IQM_TOKEN:
-        required: false
 
 permissions:
   contents: read
 
 jobs:
   spank-tests:
-    name: 🐧 ${{ inputs.runs-on }}
+    name: 🐧 Slurm 25.11 • ${{ matrix.install-mode }}
     runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        install-mode: [native, wheel]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          path: provider
 
-      - name: Build Docker image
-        run: docker build -t qdmi-spank-tests -f spank/Dockerfile .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: munich-quantum-toolkit/core
+          ref: 1b9e27a65161c13988eeae1b7b2f799a190681ff
+          persist-credentials: false
+          path: core
 
-      - name: Run SPANK tests in Docker
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
+
+      - name: Download released Core runtime
+        run: >-
+          uvx pip download --only-binary=:all: --no-deps --dest dist mqt-core==4.0.0
+
+      - name: Run provider workload with the shared Slurm fixture
         env:
-          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-        run: |
-          docker run --rm qdmi-spank-tests
+          PROVIDER_INSTALL_MODE: ${{ matrix.install-mode }}
+        run: >-
+          uv run --no-project core/test/slurm/run_integration.py
+          --workload provider --dist dist
+          --setup-script test/slurm/setup.sh
+          --compose-file provider/test/slurm/compose.yml
+          --device-license iqm.fixture.emerald
+          --qdmi-config-file /opt/provider-catalogue.json
+          --reference IQM_TOKENS_FILE=/opt/iqm-fixture-tokens.json
+          -- python3 /workload/test/slurm/probe.py

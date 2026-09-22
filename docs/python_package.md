@@ -121,16 +121,13 @@ submitting Slurm jobs to target simulated devices instead of real QPU hardware.
 
 ### Selecting the Slurm Partition
 
-Both functions submit their `srun` jobs to the partition gating the nodes that
-expose the quantum computer as a Slurm GRES resource. Its name is a per-site
-choice, resolved in this order:
+Both functions submit their `srun` jobs to a site-defined partition. Its name is
+resolved in this order:
 
 1. The `partition` keyword argument.
 2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
    set the site's name once for every user. An empty value counts as unset.
-3. `quantum`, the name used throughout the
-   [SPANK plugin documentation](spank_plugin.md) and the
-   [Administrator Guide](admin_guide.md).
+3. `quantum`.
 
 ```python
 counts = sample(qc, shots=512, partition="qc-nodes")
@@ -140,11 +137,9 @@ Slurm's own `SLURM_PARTITION` has no effect here, because the resolved name is
 always passed as an explicit `--partition`, which takes precedence over it.
 
 :::{important}
-Renaming the partition is not enough on its own. The SPANK plugin only runs on
-the partitions its `partitions=` option lists, so that list has to carry the new
-name too — see [Configuration](spank_plugin.md#configuration). Otherwise the
-plugin silently skips the job and never injects `IQM_BASE_URL`, `IQM_QC_ID`, or
-`IQM_QC_ALIAS`.
+Use the
+[Core Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+for scheduler setup. Provider-specific partition gating has been removed.
 :::
 
 ### Sizing the Slurm Allocation
@@ -172,27 +167,19 @@ accessible by both the login node and all Slurm compute nodes.
 
 ### Selecting a Quantum Computer per Job
 
-Both functions accept optional `qc_id` and `qc_alias` keyword arguments to pin a
-specific quantum computer for a single job, without changing the process's
-default backend configuration. When set, they are passed as `--iqm-qc-id` and
-`--iqm-qc-alias` options on the `srun` command itself, which the QDMI-on-IQM
-[SPANK plugin](spank_plugin.md) resolves into the job's `IQM_QC_ID` and
-`IQM_QC_ALIAS` environment variables. Only used when `local=False`.
+Both functions accept optional `qc_id` and `qc_alias` arguments for a remote
+job. These non-secret selectors are passed to the existing `iqm-sampler` and
+`iqm-estimator` worker options `--qc-id` and `--qc-alias`. They do not require a
+provider SPANK plugin. Credentials remain in the submitted job environment or
+shared-injection references.
 
 ### Requesting a Slurm License
 
-Both functions accept an optional `licenses` keyword argument, forwarded
-verbatim as a `--licenses` option on the `srun` command (Slurm's own
-`name[:count][,name[:count]...]` syntax). This is unrelated to QC selection: a
-site administrator can configure a Slurm license per QC to cap concurrent jobs
-against it -- see the SPANK plugin's
-[Limiting Concurrent Access with Slurm Licenses](spank_plugin.md#limiting-concurrent-access-with-slurm-licenses)
-docs -- and `licenses` is how a caller requests it. Only used when
-`local=False`.
-
-```python
-counts = sample(qc, shots=512, simulator=True, qc_alias="emerald", licenses="iqm_qc_emerald:1")
-```
+The optional `licenses` argument is forwarded to `srun` unchanged. Existing
+offloader calls keep their explicit target-selection behavior. For the canonical
+catalogue-based workflow, run an application using
+`IQMBackend(device=slurm.open_device_from_license())`, as shown in
+[IQM on Slurm](spank_plugin.md#run-a-qiskit-job).
 
 ### Programmatic Sampling Example
 

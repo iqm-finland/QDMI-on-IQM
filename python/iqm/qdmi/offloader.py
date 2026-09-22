@@ -150,34 +150,25 @@ def _new_job_dir() -> Path:
     return job_dir
 
 
-def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[str]:
-    """Build `srun` options for an explicit per-job quantum computer selection.
-
-    Unlike backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`), which reach
-    the job purely through the environment -- either plain Slurm propagation
-    from the submitting shell, or the QDMI-on-IQM SPANK plugin's own
-    plugstack.conf.d defaults on whichever partitions it is configured for --
-    QC selection is a per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
-    `srun` itself, which the SPANK plugin resolves into the job's
-    `IQM_QC_ID`/`IQM_QC_ALIAS` environment variable.
+def _qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[str]:
+    """Build worker options for an explicit per-job quantum computer selection.
 
     Returns:
-        List of `srun` options for the requested quantum computer selection.
+        Non-secret target options understood by the existing IQM CLI workers.
     """
     args = []
     if qc_id:
-        args.append(f"--iqm-qc-id={qc_id}")
+        args.append(f"--qc-id={qc_id}")
     if qc_alias:
-        args.append(f"--iqm-qc-alias={qc_alias}")
+        args.append(f"--qc-alias={qc_alias}")
     return args
 
 
 def _licenses_arg(licenses: str | None) -> list[str]:
     """Build `srun` options for an optional Slurm license request.
 
-    Slurm licenses are a cluster admin's own capacity-limiting mechanism (see
-    the SPANK plugin's "Limiting Concurrent Access with Slurm Licenses" docs)
-    and are unrelated to QC selection: the caller passes whatever license
+    Slurm licenses are a cluster admin's own capacity-limiting mechanism
+    and are independent of this offloader's explicit QC selection: the caller passes whatever license
     name(s)/count(s) their site has configured for the target QC, verbatim,
     as Slurm's own `name[:count][,name[:count]...]` syntax.
 
@@ -194,9 +185,7 @@ def _resolve_partition(partition: str | None) -> str:
     The partition holding the QC nodes carries whatever name its administrator
     gave it, so an explicit *partition* takes precedence over the
     `IQM_SLURM_PARTITION` environment variable, which in turn takes precedence
-    over the `quantum` name the administrator guide provisions. This mirrors how
-    the QDMI-on-IQM SPANK plugin's `IQM_BASE_URL`/`IQM_QC_ID`/`IQM_QC_ALIAS`
-    variables let a site set a default once for every user. Slurm's own
+    over the default `quantum` name. Slurm's own
     `SLURM_PARTITION` cannot serve that role here, because the resolved name is
     always passed as an explicit `--partition`, which overrides it.
 
@@ -299,18 +288,13 @@ def sample(
             Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
-        qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
-            SPANK plugin resolves into the `IQM_QC_ID` job environment variable.
+        qc_id: If given, passed as `--qc-id` to the IQM CLI worker.
             Only used when `local=False`.
-        qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
-            QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
-            environment variable. Only used when `local=False`.
+        qc_alias: If given, passed as `--qc-alias` to the IQM CLI worker. Only used when `local=False`.
         licenses: If given, passed as `--licenses` to `srun`, requesting the
             named Slurm license(s) (Slurm's own `name[:count][,name[:count]
             ...]` syntax) that a site administrator may have configured to
-            cap concurrent jobs against a QC -- e.g. required by the SPANK
-            plugin's `iqm_require_license` option. Only used when
-            `local=False`.
+            cap concurrent jobs against a QC. Only used when `local=False`.
         partition: The Slurm partition to submit to, passed as `--partition`
             to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
             variable, and to `quantum` when that is unset. Only used when
@@ -357,12 +341,12 @@ def sample(
         f"--nodes={nodes}",
         "--ntasks=1",
         f"--partition={_resolve_partition(partition)}",
-        *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
         "iqm-sampler",
         str(qc_path.absolute()),
         "--shots",
         str(shots),
+        *_qc_selection_args(qc_id, qc_alias),
     ]
     if simulator:
         command.append("--simulator")
@@ -418,18 +402,13 @@ def estimate(
             Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
-        qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
-            SPANK plugin resolves into the `IQM_QC_ID` job environment variable.
+        qc_id: If given, passed as `--qc-id` to the IQM CLI worker.
             Only used when `local=False`.
-        qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
-            QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
-            environment variable. Only used when `local=False`.
+        qc_alias: If given, passed as `--qc-alias` to the IQM CLI worker. Only used when `local=False`.
         licenses: If given, passed as `--licenses` to `srun`, requesting the
             named Slurm license(s) (Slurm's own `name[:count][,name[:count]
             ...]` syntax) that a site administrator may have configured to
-            cap concurrent jobs against a QC -- e.g. required by the SPANK
-            plugin's `iqm_require_license` option. Only used when
-            `local=False`.
+            cap concurrent jobs against a QC. Only used when `local=False`.
         partition: The Slurm partition to submit to, passed as `--partition`
             to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
             variable, and to `quantum` when that is unset. Only used when
@@ -478,13 +457,13 @@ def estimate(
         f"--nodes={nodes}",
         "--ntasks=1",
         f"--partition={_resolve_partition(partition)}",
-        *_spank_qc_selection_args(qc_id, qc_alias),
         *_licenses_arg(licenses),
         "iqm-estimator",
         str(qc_path.absolute()),
         str(operator_path.absolute()),
         "--maxiter",
         str(maxiter),
+        *_qc_selection_args(qc_id, qc_alias),
     ]
     if simulator:
         command.append("--simulator")
