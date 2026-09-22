@@ -32,6 +32,8 @@ jobs:
     uses: $/.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
     permissions:
       contents: read
 

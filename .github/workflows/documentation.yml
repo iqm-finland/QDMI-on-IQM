@@ -21,7 +21,6 @@ permissions:
 jobs:
   build-documentation:
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
 
     steps:
       - name: Clone Repository

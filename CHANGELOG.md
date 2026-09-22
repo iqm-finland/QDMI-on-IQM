@@ -41,14 +41,14 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🩹 Send PRX rotation and phase angles in radians using the current IQM JSON
-  fields, and report backend job failure messages at the default log level.
-  Isolate live-backend CI checks and clean up unfinished test jobs on failures
-  ([#231]) ([**@burgholzer**])
-- 🔒️ Exchange offloaded `sample` and `estimate` results as JSON instead of
-  loading worker-controlled pickle payloads. Validate result types, shapes, and
-  finite numbers, preserve all sampling registers, and remove the obsolete
-  Qiskit pickle workaround ([#231]) ([**@marcelwa**], [**@burgholzer**])
+- 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
+  JSON fields ([#231]) ([**@burgholzer**])
+- 🩹 Report backend job failure messages at the default log level ([#231])
+  ([**@burgholzer**])
+- 🔒️ Use validated JSON instead of pickle for offloaded sampling and estimation
+  results ([#231]) ([**@marcelwa**], [**@burgholzer**])
+- 🩹 Preserve joint sampling counts across all classical registers in offloaded
+  results ([#231]) ([**@burgholzer**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
   in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the

@@ -20,6 +20,15 @@ on:
           Supported values are 'MSVC' and 'ClangCL'.
         default: "MSVC"
         type: string
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: true
 
 defaults:
   run:
@@ -30,7 +39,7 @@ permissions:
 
 jobs:
   cpp-tests-windows:
-    name: 🏁 ${{ inputs.runs-on }} ${{ inputs.compiler }} ${{ inputs.config }}
+    name: 🏁 ${{ inputs.runs-on }} ${{ inputs.compiler }} ${{ inputs.config }} ${{ inputs.iqm-qc-alias }}
     runs-on: ${{ inputs.runs-on }}
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
@@ -59,5 +68,8 @@ jobs:
       - name: Test
         env:
           CONFIG: ${{ inputs.config }}
+          IQM_BASE_URL: "https://resonance.iqm.tech"
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest -C $env:CONFIG --output-on-failure --test-dir build -LE integration --timeout 600
+        run: ctest -C $env:CONFIG --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

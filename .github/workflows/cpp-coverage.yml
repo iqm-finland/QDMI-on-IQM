@@ -1,6 +1,16 @@
 name: 🇨 • Coverage
 on:
   workflow_call:
+    inputs:
+      iqm-qc-alias:
+        description: >
+          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
+          This can be any valid IQM quantum computer alias.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-cpp-coverage
@@ -62,8 +72,11 @@ jobs:
 
       - name: Test
         env:
+          IQM_BASE_URL: "https://resonance.iqm.tech"
+          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest -C Debug --output-on-failure --test-dir build -LE integration --timeout 600
+        run: ctest -C Debug --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0

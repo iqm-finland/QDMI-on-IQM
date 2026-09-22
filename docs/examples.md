@@ -50,10 +50,6 @@ the following variables are set as needed:
 
 `IQM_BASE_URL` and `IQM_QC_ALIAS` remain supported as legacy aliases.
 
-For a small mock-backed example, the [Qiskit tutorial](qiskit.md) explicitly
-selects `garnet:mock`; use `IQM_QUANTUM_COMPUTER=garnet:mock` to target that
-mock from the example scripts.
-
 For the full set of authentication options available when configuring C++
 sessions directly, see [Authentication Methods](usage.md#authentication-methods)
 in the Usage Guide.

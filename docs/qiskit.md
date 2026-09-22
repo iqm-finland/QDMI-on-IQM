@@ -29,7 +29,7 @@ from qiskit.compiler import transpile
 
 backend = IQMBackend(
   base_url="https://resonance.iqm.tech",
-  qc_alias="garnet:mock",
+  qc_alias="emerald:mock",
 )
 ```
 
@@ -56,9 +56,10 @@ existing configured definition with that ID is preserved, including its
 endpoint. Every backend opens a fresh device session with its own configuration.
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
-and `phase` fields. The Qiskit serializer preserves these units. Applications
-submitting IQM JSON directly must use the same format; the legacy `angle_t` and
-`phase_t` fields expressed angles in turns.
+and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
+Qiskit serializer preserves these units. Applications submitting IQM JSON
+directly must use the same format; the legacy `angle_t` and `phase_t` fields
+expressed angles in turns.
 
 ## Sampler and Estimator Primitives
 

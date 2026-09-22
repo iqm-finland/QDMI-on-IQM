@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 from qiskit.circuit import QuantumCircuit
@@ -30,11 +30,6 @@ from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import qiskit as iqm_qiskit
 from iqm.qdmi.qiskit import IQMBackend
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from mqt.core.plugins.qiskit.job import QDMIJob
 
 ENVIRONMENT_TOKENS_FILE = Path("/opt/iqm/environment-tokens.json")
 EXPLICIT_TOKENS_FILE = Path("/opt/iqm/explicit-tokens.json")
@@ -250,20 +245,10 @@ def _skip_without_iqm_access() -> None:
 
 
 @pytest.fixture
-def backend(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> IQMBackend:
-    """Return a live backend with bounded waits and cleanup, including primitive jobs."""
+def backend() -> IQMBackend:
+    """Returns the IQM backend."""
     _skip_without_iqm_access()
-    backend = IQMBackend()
-    run = backend.run
-
-    def run_with_timeout(run_input: QuantumCircuit | Sequence[QuantumCircuit], **options: int | bool | None) -> QDMIJob:
-        job = run(run_input, None, **options)
-        request.addfinalizer(job.cancel)
-        job.wait_for_final_state(timeout=120, wait=1)
-        return job
-
-    monkeypatch.setattr(backend, "run", run_with_timeout)
-    return backend
+    return IQMBackend()
 
 
 @pytest.fixture
@@ -275,7 +260,6 @@ def circuit() -> QuantumCircuit:
     return circuit
 
 
-@pytest.mark.iqm
 def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """Test the execution of a simple Bell state circuit."""
     circuit.measure_all()
@@ -285,7 +269,6 @@ def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     assert sum(counts.values()) == 8
 
 
-@pytest.mark.iqm
 def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound sampler should execute a simple circuit on the live IQM backend."""
     circuit.measure_all()
@@ -295,7 +278,6 @@ def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> No
     assert sum(counts.values()) == 8
 
 
-@pytest.mark.iqm
 def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound estimator should execute a simple observable on the live IQM backend."""
     observable = SparsePauliOp("Z" * backend.num_qubits)
