@@ -5,7 +5,7 @@ on:
     inputs:
       runs-on:
         description: "The runner image to test on"
-        default: "ubuntu-24.04"
+        default: "ubuntu-26.04"
         type: string
     secrets:
       IQM_TOKEN:

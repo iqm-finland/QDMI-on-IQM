@@ -40,17 +40,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+        runs-on: [ubuntu-26.04, ubuntu-26.04-arm]
         config: [Release]
         iqm-qc-alias: ["emerald:mock"]
         include:
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Debug
             iqm-qc-alias: "emerald:mock"
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Release
             iqm-qc-alias: "garnet:mock"
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Release
             iqm-qc-alias: "sirius:mock"
     uses: $/.github/workflows/cpp-tests-ubuntu.yml
@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, macos-26, windows-2025]
+        runs-on: [ubuntu-26.04, macos-26, windows-2025]
     uses: $/.github/workflows/cpp-install-tests.yml
     with:
       runs-on: ${{ matrix.runs-on }}
@@ -189,8 +189,8 @@ jobs:
       matrix:
         runs-on:
           [
-            ubuntu-24.04,
-            ubuntu-24.04-arm,
+            ubuntu-26.04,
+            ubuntu-26.04-arm,
             macos-26,
             windows-2025,
             windows-11-arm,
