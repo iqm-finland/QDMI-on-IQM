@@ -55,6 +55,21 @@ stable ID `iqm.default` with the standard Resonance endpoint as its default. An
 existing configured definition with that ID is preserved, including its
 endpoint. Every backend opens a fresh device session with its own configuration.
 
+## Circuit Metadata
+
+The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
+program's `metadata` field without modifying the circuit. Empty metadata remains
+`{}`. Values follow Python's JSON encoding: dictionaries, lists, tuples (encoded
+as arrays), strings, booleans, `None`, integers, and finite floating-point
+numbers are supported. Object keys must be strings at every nesting level;
+non-string keys are rejected to prevent collisions after conversion to JSON.
+
+Unsupported values (such as NumPy arrays or custom Python objects), circular
+references, and nonfinite numbers raise `TranslationError` with metadata context
+before submission. Convert such values explicitly before submitting a circuit.
+This preserves metadata in the submitted IQM program; it does not add a metadata
+retrieval API or guarantee that a remote service returns it in results.
+
 ## Sampler and Estimator Primitives
 
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
