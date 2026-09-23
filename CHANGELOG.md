@@ -41,6 +41,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Preserve circuit metadata in IQM JSON serialization and reject metadata
+  that cannot be represented safely as JSON ([#273]) ([**@marcelwa**])
 - 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
   and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
   ([**@burgholzer**])
@@ -256,6 +258,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
