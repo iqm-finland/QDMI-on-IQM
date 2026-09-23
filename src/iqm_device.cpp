@@ -1173,8 +1173,9 @@ int Set_execution_options(IQM_QDMI_Device_Job job,
     }
     if (options.contains("active_reset_cycles")) {
       const auto &value = options.at("active_reset_cycles");
-      if (!value.is_number_integer() || value < 0 ||
-          value > std::numeric_limits<size_t>::max()) {
+      // Nonnegative JSON integers parse as unsigned; negatives are signed.
+      if (!value.is_number_unsigned() ||
+          value.get<std::uint64_t>() > std::numeric_limits<size_t>::max()) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
       cycles = value.get<size_t>();

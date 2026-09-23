@@ -1660,8 +1660,9 @@ TEST_F(DeviceJobMockTest,
 }
 
 TEST_F(DeviceJobMockTest, LastSuccessfulOptionSetterWins) {
+  // Values above INT64_MAX still fit size_t on 64-bit hosts.
   constexpr auto options =
-      R"({"iqm_execution_options":1,"dd_mode":"enabled","active_reset_cycles":2})";
+      R"({"iqm_execution_options":1,"dd_mode":"enabled","active_reset_cycles":9223372036854775808})";
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
                                               QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
                                               strlen(options) + 1, options),
