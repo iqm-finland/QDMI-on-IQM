@@ -127,7 +127,6 @@ make-fallback = true
 exclude = [
   "**/docs",
   "**/test",
-  "spank/**",
   "sitecustomize.py",
   ".*",
 ]
@@ -225,6 +224,7 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
+per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true

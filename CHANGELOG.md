@@ -30,6 +30,10 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Use MQT Core's shared Slurm 25.11+ setup and remove the provider SPANK
+  plugin. `IQMBackend(device=...)` accepts the licensed handle; offloader QC
+  selection uses existing worker options. See the Slurm guide for catalogue and
+  option migration ([#265]) ([**@flowerthrower**])
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
@@ -257,6 +261,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
+[#265]: https://github.com/iqm-finland/QDMI-on-IQM/pull/265
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
@@ -316,6 +321,8 @@ Compatible with QDMI `v1.3.0`.
 [#37]: https://github.com/iqm-finland/QDMI-on-IQM/pull/37
 
 <!-- Contributor -->
+
+[**@flowerthrower**]: https://github.com/flowerthrower
 
 [**@burgholzer**]: https://github.com/burgholzer
 [**@marcelwa**]: https://github.com/marcelwa

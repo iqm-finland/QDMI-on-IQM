@@ -11,7 +11,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/iqm-qdmi?logo=pypi&style=flat-square)](https://pypi.org/project/iqm-qdmi/)
 [![Core Apache 2.0 License](https://img.shields.io/static/v1?logo=Apache&label=Core&message=Apache%202.0&color=informational&style=flat-square)](https://opensource.org/licenses/Apache-2.0)
-[![SPANK Plugin GPLv3 License](https://img.shields.io/static/v1?logo=gnu&label=SPANK&message=GPLv3&color=informational&style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/iqm-finland/QDMI-on-IQM/CI.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/iqm-finland/QDMI-on-IQM/actions/workflows/CI.yml)
@@ -70,7 +69,7 @@ The components of this repository are licensed under two separate licenses:
   Python wrapper) is licensed under the
   **Apache License 2.0 with LLVM exception**. See [LICENSE](LICENSE) for the
   license text.
-- The **Slurm SPANK plugin** (located in the [spank/](spank/) directory) is
-  licensed under the **GNU General Public License v3 (GPLv3)** because it links
-  against GPL-licensed Slurm libraries. See [spank/LICENSE.md](spank/LICENSE.md)
-  for the plugin license text.
+- Provider integration fixtures in [test/slurm/](test/slurm/) retain their
+  **GPL-3.0-or-later** license; see
+  [test/slurm/LICENSE.md](test/slurm/LICENSE.md). The optional shared SPANK
+  component is maintained by MQT Core.

@@ -38,6 +38,7 @@
     "uv\\.lock",
     "py\\.typed",
     ".*build.*",
+    "test/slurm/.*",
     "LICENSE"
   ]
 }
