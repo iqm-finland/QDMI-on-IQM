@@ -85,8 +85,10 @@ print(f"Standard deviations: {data['stds']}")
 ## IQM execution options
 
 Configure defaults with `backend.set_options(...)`, or override them for one
-`backend.run(...)` call. `None` leaves the native IQM default unchanged. Unknown
-names and invalid values raise `CircuitValidationError` before submission.
+`backend.run(...)` call. `None` leaves the native IQM default unchanged. `run`
+raises `CircuitValidationError` for unknown names or invalid values before
+submission. `set_options` rejects unknown names with Qiskit's `AttributeError`;
+its values are validated when a run starts.
 
 ```python
 backend.set_options(heralding_mode="zeros", active_reset_cycles=2)
