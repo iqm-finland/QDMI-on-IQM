@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
+from uuid import UUID
 
 import pytest
 from qiskit.circuit import QuantumCircuit
@@ -300,6 +301,8 @@ def test_iqm_backend_selects_calibration_before_target_creation(monkeypatch: pyt
     captured = _stub_backend_construction(monkeypatch)
     calibration_id = "f0fb4be5-e913-4a04-8c94-18d1bd842def"
     IQMBackend(calibration_set_id=calibration_id.upper())
+    assert captured["session"]["custom4"] == calibration_id
+    IQMBackend(calibration_set_id=UUID(calibration_id))
     assert captured["session"]["custom4"] == calibration_id
 
 

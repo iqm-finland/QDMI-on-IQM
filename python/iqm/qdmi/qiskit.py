@@ -80,10 +80,10 @@ class IQMBackend(QDMIBackend):
         tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
-        calibration_set_id: str | None = None,
+        calibration_set_id: str | UUID | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
-        calibration_id = str(UUID(calibration_set_id)) if calibration_set_id is not None else None
+        calibration_id = str(UUID(str(calibration_set_id))) if calibration_set_id is not None else None
         resolved_base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
         tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
