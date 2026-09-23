@@ -1121,6 +1121,74 @@ void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   delete job;
 }
 
+namespace {
+/// Apply a versioned options object only after validating every field.
+int Set_execution_options(IQM_QDMI_Device_Job job,
+                          const std::string_view text) {
+  try {
+    const auto options = nlohmann::json::parse(text, nullptr, false);
+    if (!options.is_object() || !options.contains("iqm_execution_options") ||
+        !options.at("iqm_execution_options").is_number_integer() ||
+        options.at("iqm_execution_options") != 1) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    for (const auto &[key, unused] : options.items()) {
+      if (key != "iqm_execution_options" && key != "dd_mode" &&
+          key != "max_circuit_duration_over_t2" &&
+          key != "active_reset_cycles" && key != "dd_strategy") {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+    }
+    auto mode = job->dd_mode_;
+    auto duration = job->max_circuit_duration_over_t2_;
+    auto cycles = job->active_reset_cycles_;
+    auto strategy = job->dd_strategy_;
+    if (options.contains("dd_mode")) {
+      const auto &value = options.at("dd_mode");
+      if (!value.is_string() || (value != "enabled" && value != "disabled")) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      mode = value.get<std::string>();
+    }
+    if (options.contains("max_circuit_duration_over_t2")) {
+      const auto &value = options.at("max_circuit_duration_over_t2");
+      if (!value.is_number()) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      const auto number = value.get<double>();
+      if (!std::isfinite(number) || number <= 0) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      duration = number;
+    }
+    if (options.contains("active_reset_cycles")) {
+      const auto &value = options.at("active_reset_cycles");
+      if (!value.is_number_integer() || value < 0 ||
+          value > std::numeric_limits<size_t>::max()) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      cycles = value.get<size_t>();
+    }
+    if (options.contains("dd_strategy")) {
+      const auto &value = options.at("dd_strategy");
+      if (!value.is_object()) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      strategy = value.dump();
+    }
+    job->dd_mode_ = std::move(mode);
+    job->max_circuit_duration_over_t2_ = duration;
+    job->active_reset_cycles_ = cycles;
+    job->dd_strategy_ = std::move(strategy);
+    return QDMI_SUCCESS;
+  } catch (const std::bad_alloc &) {
+    return QDMI_ERROR_OUTOFMEM;
+  } catch (const nlohmann::json::exception &) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+}
+} // namespace
+
 int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
                                       const QDMI_Device_Job_Parameter param,
                                       const size_t size, const void *value) {
@@ -1207,13 +1275,18 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM4:
     if (value != nullptr) {
-      const std::string dynamic_decoupling_mode(
-          static_cast<const char *>(value));
-      if (dynamic_decoupling_mode != "disabled" &&
-          dynamic_decoupling_mode != "enabled") {
+      const auto *text = static_cast<const char *>(value);
+      const auto *end =
+          static_cast<const char *>(std::memchr(text, '\0', size));
+      if (end == nullptr) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->dd_mode_ = dynamic_decoupling_mode;
+      const std::string_view mode(text, static_cast<size_t>(end - text));
+      if (mode == "disabled" || mode == "enabled") {
+        job->dd_mode_ = mode;
+        return QDMI_SUCCESS;
+      }
+      return Set_execution_options(job, mode);
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM5:

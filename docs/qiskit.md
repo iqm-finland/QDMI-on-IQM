@@ -82,6 +82,43 @@ print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
 
+## IQM execution options
+
+Configure defaults with `backend.set_options(...)`, or override them for one
+`backend.run(...)` call. `None` leaves the native IQM default unchanged. Unknown
+names and invalid values raise `CircuitValidationError` before submission.
+
+```python
+backend.set_options(heralding_mode="zeros", active_reset_cycles=2)
+job = backend.run(transpiled_qc, shots=128, dd_mode="enabled")
+sampler = backend.sampler(run_options={"heralding_mode": "none"})
+estimator = backend.estimator()  # Uses the backend's execution-option defaults.
+```
+
+| Option                         | Accepted values                                | Native default |
+| ------------------------------ | ---------------------------------------------- | -------------- |
+| `heralding_mode`               | `"none"`, `"zeros"`                            | `"none"`       |
+| `move_gate_validation`         | `"strict"`, `"allow_prx"`, `"none"`            | `"strict"`     |
+| `move_gate_frame_tracking`     | `"full"`, `"no_detuning_correction"`, `"none"` | `"full"`       |
+| `dd_mode`                      | `"disabled"`, `"enabled"`                      | `"disabled"`   |
+| `qubit_mapping`                | Mapping of logical to physical qubit names     | Omitted        |
+| `max_circuit_duration_over_t2` | Finite positive number                         | Omitted        |
+| `active_reset_cycles`          | Nonnegative integer representable as `size_t`  | Omitted        |
+| `dd_strategy`                  | Finite JSON-compatible dictionary              | Omitted        |
+
+Qubit mapping names must be nonempty strings without commas, colons, or NUL
+characters. They refer to names in the submitted program; the IQM JSON
+serializer already uses physical device site names. The IQM server validates the
+contents of `dd_strategy` against its supported strategy schema.
+
+This feature requires MQT Core's `QDMIBackend._job_parameters` extension hook.
+With older MQT Core versions, ordinary runs remain supported and the new options
+are rejected. Install a version containing the companion MQT Core change to use
+them; the package dependency will be raised when that version is released.
+Native estimators use backend defaults because Qiskit's estimator does not offer
+a `run_options` field. These settings do not add CLI/offloader option
+forwarding.
+
 ## CLI Scripts
 
 The package also exposes the `iqm-sampler` and `iqm-estimator` CLI scripts for

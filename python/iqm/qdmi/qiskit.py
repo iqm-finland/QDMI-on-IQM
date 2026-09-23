@@ -33,11 +33,21 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
+from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
+
 from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 from .gates import MoveGate
+from .options import execution_parameters
 
 if TYPE_CHECKING:
-    from qiskit.circuit import Instruction
+    from collections.abc import Mapping, Sequence
+    from typing import Any
+
+    from mqt.core.plugins.qiskit.backend import ParametersType
+    from mqt.core.plugins.qiskit.job import QDMIJob
+    from mqt.core.typing import QDMIJobParameters
+    from qiskit.circuit import Instruction, QuantumCircuit
+    from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
 
@@ -67,6 +77,63 @@ class IQMBackend(QDMIBackend):
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
     #: standard gate library, so the Target needs it supplied here.
     _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
+
+    @classmethod
+    def _default_options(cls) -> Options:
+        """Return shot options and optional IQM execution settings.
+
+        Older MQT Core versions reject the new settings instead of accepting
+        them without forwarding them to the device.
+
+        Returns:
+            Backend defaults; ``None`` leaves the native IQM default unchanged.
+        """
+        options = super()._default_options()
+        if hasattr(QDMIBackend, "_job_parameters"):
+            options.update_options(
+                heralding_mode=None,
+                move_gate_validation=None,
+                move_gate_frame_tracking=None,
+                dd_mode=None,
+                qubit_mapping=None,
+                max_circuit_duration_over_t2=None,
+                active_reset_cycles=None,
+                dd_strategy=None,
+            )
+        return options
+
+    @staticmethod
+    def _job_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
+        """Validate and encode IQM options for every circuit in a run.
+
+        Returns:
+            IQM custom job parameters for MQT Core's submission hook.
+        """
+        return execution_parameters(options)
+
+    def run(
+        self,
+        run_input: QuantumCircuit | Sequence[QuantumCircuit],
+        parameter_values: Sequence[ParametersType] | None = None,
+        **options: Any,  # ruff:ignore[any-type]
+    ) -> QDMIJob:
+        """Submit circuits with validated IQM execution options.
+
+        Returns:
+            A job aggregating the submitted circuits.
+
+        Raises:
+            CircuitValidationError: An option is unknown or needs newer MQT Core.
+        """
+        allowed = set(self.options)
+        if options.get("seed_simulator") is None:
+            allowed.add("seed_simulator")
+        if unsupported := options.keys() - allowed:
+            msg = f"Unsupported execution options: {', '.join(sorted(unsupported))}"
+            if not hasattr(QDMIBackend, "_job_parameters"):
+                msg += ". IQM execution options require MQT Core with the job-option hook."
+            raise CircuitValidationError(msg)
+        return super().run(run_input, parameter_values=parameter_values, **options)
 
     def __init__(
         self,
