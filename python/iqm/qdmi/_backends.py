@@ -26,8 +26,7 @@ from mqt.core.plugins.qiskit.backend import QDMIBackend
 from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
-    from mqt.core.plugins.qiskit.estimator import QDMIEstimator
-    from mqt.core.plugins.qiskit.sampler import QDMISampler
+    from qiskit.primitives import BackendEstimatorV2, BackendSamplerV2
 
 _SIMULATOR_DEVICE_ID = "mqt.ddsim.default"
 
@@ -44,7 +43,7 @@ def build_sampler(
     tokens_file: str | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
-) -> QDMISampler:
+) -> BackendSamplerV2:
     """Build the Sampler primitive to use for a sampling job.
 
     Returns:
@@ -65,7 +64,7 @@ def build_estimator(
     tokens_file: str | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
-) -> QDMIEstimator:
+) -> BackendEstimatorV2:
     """Build the Estimator primitive to use for a VQE estimation job.
 
     Returns:

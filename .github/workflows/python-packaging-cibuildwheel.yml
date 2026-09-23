@@ -5,7 +5,7 @@ on:
     inputs:
       runs-on:
         description: "The runner image to test on"
-        default: "ubuntu-24.04"
+        default: "ubuntu-26.04"
         type: string
     secrets:
       IQM_TOKEN:
@@ -30,13 +30,13 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: ${{ !startsWith(inputs.runs-on, 'ubuntu') }}
           save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       # run cibuildwheel to build wheels for the specified Python version
-      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+      - uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"

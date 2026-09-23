@@ -12,6 +12,13 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
+  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
+  asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
+  out the quota window instead of taking a 30-second block.
+  `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
+  ([#214]) ([**@marcelwa**])
 - ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
   environment variables for IQM Server and quantum computer selection, while
   keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
@@ -23,6 +30,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
+  and using estimator precision `1/64` (4,096 shots per measurement circuit) by
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
   ([#220]) ([**@denialhaag**])
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
@@ -31,9 +41,19 @@ releases may include breaking changes.
 
 ### Fixed
 
-- ⬆️ Require Qiskit 2.0 on Python 3.11–3.13 and Qiskit 2.1 on Python 3.14 and
-  newer so the supported minimum environments install and run ([#218], [#220])
+- 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
+  and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
   ([**@burgholzer**])
+- 🩹 Skip disabled log message formatting and use original HTTP response bodies
+  in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
+- 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
+  internal object library without DLL import decorations ([#242])
+  ([**@marcelwa**])
+- 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
+  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
+- ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
+  environments install and run ([#218], [#220], [#246]) ([**@burgholzer**],
+  [**@marcelwa**])
 
 ## [1.4.0] - 2026-08-25
 
@@ -236,6 +256,14 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
+[#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
+[#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
+[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
+[#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217

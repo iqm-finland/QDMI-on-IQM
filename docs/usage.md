@@ -33,6 +33,19 @@ Examples guide.
 - If both environment variables and explicit parameters are set simultaneously,
   the explicit parameters will take precedence.
 
+### TLS Certificates
+
+Linux wheels use the host's CA trust store, discovering the standard CA bundle
+on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
+distribution's `ca-certificates` package if it is missing. Other platforms keep
+libcurl's native defaults.
+
+For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
+bundle before making requests. `SSL_CERT_FILE` is also supported when
+`CURL_CA_BUNDLE` is unset or empty. Invalid explicit paths cause requests to
+fail; certificate and hostname verification remain enabled. This applies to both
+native and Python clients.
+
 ### Session Configuration
 
 To initiate a session with a particular endpoint and authentication method, the
@@ -202,14 +215,14 @@ in the Contributing guide.
 The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
 symbol prefix. Applications that link the MQT Core driver statically can use its
 runtime-copy helper to synthesize a relocatable manifest and colocate it with
-the device library beside the executable:
+the device library beside the executable. This requires CMake 3.28 or newer:
 
 ```cmake
-find_package(mqt-core 3.9 CONFIG REQUIRED)
+find_package(mqt-core 4.0.0 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my-application main.cpp)
-target_link_libraries(my-application PRIVATE MQT::CoreFoMaC)
+target_link_libraries(my-application PRIVATE MQT::CoreQDMI)
 mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
 ```
 
@@ -311,6 +324,12 @@ The following properties about the device can be queried via the
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION`:
+  Whether the device needs calibration. IQM schedules recalibration itself and
+  the IQM Server publishes no signal asking a client to trigger one, so this is
+  always zero. A quantum computer that is unfit to run reports itself as under
+  maintenance through
+  {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
 
@@ -709,13 +728,34 @@ environment variable. The following logging levels are available:
 - `DEBUG`: Log errors, info, and debug messages.
 
 By default, the logging level is set to `ERROR`. Any other value disables
-logging entirely.
+logging entirely. Messages at disabled levels are not constructed.
+
+Logs are written to standard error. Set `IQM_LOG_LEVEL` before starting the
+application; the logger reads it once, on first use.
 
 `DEBUG` logs raw request and response bodies, including the bodies of failed
-requests. Treat that output as sensitive and avoid it in shared logs.
+requests and malformed JSON responses, preserving their original formatting.
+Treat that output as sensitive and avoid it in shared logs.
 
 :::{note}
 `IQM_CPP_API_LOG_LEVEL` is a deprecated alias for `IQM_LOG_LEVEL`. It is only
 read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
 `ERROR` level. It will be removed in a future release.
 :::
+
+## Rate limiting
+
+The IQM Server API meters requests against a per-account quota of 2000 units
+over a rolling ten-second window, and blocks the account for 30 seconds once
+that quota is exhausted. Submitting or cancelling a job costs 100 units and a
+read costs 10, so twenty submissions inside one window run the quota out.
+
+Every successful response reports `RateLimit-Limit` and `RateLimit-Remaining`. A
+session follows what its own requests were told and waits out the rest of the
+window once the remaining quota falls below ten percent of the limit, which is
+far cheaper than the block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to
+another whole percentage to move that point, or to `0` to take the block
+instead. The wait comes out of the timeout of the request that triggered it; a
+request with less time than that left proceeds without waiting. Other clients
+using the same token spend from the same quota, so the device still honors the
+`Retry-After` header of an HTTP 429 response.

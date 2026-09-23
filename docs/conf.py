@@ -95,7 +95,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
     "qiskit": ("https://docs.quantum.ibm.com/api/qiskit", None),
-    "core": ("https://mqt.readthedocs.io/projects/core/en/latest", None),
+    "core": ("https://mqt.readthedocs.io/projects/core/en/stable", None),
 }
 
 myst_enable_extensions = [

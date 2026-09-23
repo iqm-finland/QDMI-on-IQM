@@ -17,7 +17,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@063c90c8e7e094bfffb73f8436eb55341c1e820f # v2.3.0
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -40,20 +40,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+        runs-on: [ubuntu-26.04, ubuntu-26.04-arm]
         config: [Release]
         iqm-qc-alias: ["emerald:mock"]
         include:
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Debug
             iqm-qc-alias: "emerald:mock"
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Release
             iqm-qc-alias: "garnet:mock"
-          - runs-on: ubuntu-24.04
+          - runs-on: ubuntu-26.04
             config: Release
             iqm-qc-alias: "sirius:mock"
-    uses: ./.github/workflows/cpp-tests-ubuntu.yml
+    uses: $/.github/workflows/cpp-tests-ubuntu.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
@@ -75,7 +75,7 @@ jobs:
           - runs-on: macos-26
             config: Debug
             iqm-qc-alias: "emerald:mock"
-    uses: ./.github/workflows/cpp-tests-macos.yml
+    uses: $/.github/workflows/cpp-tests-macos.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
@@ -92,15 +92,22 @@ jobs:
       matrix:
         runs-on: [windows-2025, windows-11-arm]
         config: [Release]
+        compiler: [MSVC]
         iqm-qc-alias: ["emerald:mock"]
         include:
           - runs-on: windows-2025
             config: Debug
+            compiler: MSVC
             iqm-qc-alias: "emerald:mock"
-    uses: ./.github/workflows/cpp-tests-windows.yml
+          - runs-on: windows-2025
+            config: Release
+            compiler: ClangCL
+            iqm-qc-alias: "emerald:mock"
+    uses: $/.github/workflows/cpp-tests-windows.yml
     with:
       runs-on: ${{ matrix.runs-on }}
       config: ${{ matrix.config }}
+      compiler: ${{ matrix.compiler }}
       iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
@@ -112,8 +119,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, macos-26, windows-2025]
-    uses: ./.github/workflows/cpp-install-tests.yml
+        runs-on: [ubuntu-26.04, macos-26, windows-2025]
+    uses: $/.github/workflows/cpp-install-tests.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
@@ -123,7 +130,7 @@ jobs:
     name: 🇨 Sanitizers
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: ./.github/workflows/cpp-sanitizers.yml
+    uses: $/.github/workflows/cpp-sanitizers.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
@@ -131,7 +138,7 @@ jobs:
     name: 🇨 Coverage
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: ./.github/workflows/cpp-coverage.yml
+    uses: $/.github/workflows/cpp-coverage.yml
     permissions:
       contents: read
       id-token: write
@@ -142,7 +149,7 @@ jobs:
     name: 🇨 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-linter)
-    uses: ./.github/workflows/cpp-linter.yml
+    uses: $/.github/workflows/cpp-linter.yml
     with:
       clang-version: 22
       files-changed-only: true
@@ -155,7 +162,7 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@063c90c8e7e094bfffb73f8436eb55341c1e820f # v2.3.0
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
     with:
       check-stubs: false
       enable-ty: true
@@ -165,13 +172,13 @@ jobs:
     name: 🐍 End-to-End Examples
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
-    uses: ./.github/workflows/python-examples.yml
+    uses: $/.github/workflows/python-examples.yml
 
   build-sdist:
     name: 🚀 CD
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: ./.github/workflows/python-packaging-sdist.yml
+    uses: $/.github/workflows/python-packaging-sdist.yml
 
   build-wheel:
     name: 🚀 CD
@@ -182,13 +189,13 @@ jobs:
       matrix:
         runs-on:
           [
-            ubuntu-24.04,
-            ubuntu-24.04-arm,
+            ubuntu-26.04,
+            ubuntu-26.04-arm,
             macos-26,
             windows-2025,
             windows-11-arm,
           ]
-    uses: ./.github/workflows/python-packaging-cibuildwheel.yml
+    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
@@ -198,7 +205,7 @@ jobs:
     name: 🇸 Test SPANK
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: ./.github/workflows/spank-tests.yml
+    uses: $/.github/workflows/spank-tests.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 

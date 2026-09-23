@@ -135,3 +135,10 @@ endif()
 
 # Make all declared dependencies available.
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
+
+# CPR 1.14.2 treats clang-cl like Unix Clang and combines /Wall with -Werror.
+# Keep its diagnostics visible without failing the dependency build.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL
+                                              "MSVC")
+  target_compile_options(cpr PRIVATE -Wno-error)
+endif()
