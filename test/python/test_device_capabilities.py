@@ -93,7 +93,7 @@ def test_device_advertises_exactly_its_supported_formats(device: Device) -> None
     """
     formats = set(device.supported_program_formats())
 
-    assert formats in (BASE_PROGRAM_FORMATS, BASE_PROGRAM_FORMATS | {ProgramFormat.CALIBRATION})
+    assert formats == BASE_PROGRAM_FORMATS
 
 
 def test_device_reports_queue_length(device: Device) -> None:
