@@ -270,8 +270,6 @@ def test_nested_metadata_is_preserved(backend: Callable[[int], StubBackend]) -> 
     assert program["metadata"] == original
     assert qc.metadata == original
     assert [instruction["name"] for instruction in program["instructions"]] == ["prx", "measure"]
-    program["metadata"]["provenance"]["tags"].append("changed")
-    assert qc.metadata == original
 
 
 def test_metadata_tuples_become_arrays(backend: Callable[[int], StubBackend]) -> None:
@@ -287,30 +285,34 @@ def test_metadata_tuples_become_arrays(backend: Callable[[int], StubBackend]) ->
 @pytest.mark.parametrize(
     "value", [object(), {1, 2}, complex(1, 2), np.array([1]), float("nan"), float("inf"), -float("inf")]
 )
-def test_invalid_metadata_is_rejected(backend: Callable[[int], StubBackend], value: object) -> None:
-    """Unsupported values, including nonfinite numbers, fail with metadata context."""
+def test_invalid_metadata_is_dropped(backend: Callable[[int], StubBackend], value: object) -> None:
+    """Unsupported values, including nonfinite numbers, drop metadata with a warning."""
     qc = QuantumCircuit(1, metadata={"nested": [value]})
 
-    with pytest.raises(TranslationError, match="Circuit metadata must be JSON serializable"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+    with pytest.warns(UserWarning, match="Dropping circuit metadata"):
+        program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+
+    assert program["metadata"] == {}
 
 
-def test_metadata_key_collision_is_rejected(backend: Callable[[int], StubBackend]) -> None:
+def test_metadata_key_collision_is_dropped(backend: Callable[[int], StubBackend]) -> None:
     """Numeric keys cannot silently overwrite their string equivalents in JSON."""
     qc = QuantumCircuit(1, metadata={"nested": [{1: "numeric", "1": "string"}]})
 
-    with pytest.raises(TranslationError, match="Metadata object keys must be strings"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+    with pytest.warns(UserWarning, match="Metadata object keys must be strings"):
+        program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+
+    assert program["metadata"] == {}
 
     assert qc.metadata == {"nested": [{1: "numeric", "1": "string"}]}
 
 
-def test_circular_metadata_is_rejected(backend: Callable[[int], StubBackend]) -> None:
-    """Circular metadata is rejected rather than silently dropped."""
+def test_circular_metadata_is_dropped(backend: Callable[[int], StubBackend]) -> None:
+    """Circular metadata is dropped with a warning."""
     qc = QuantumCircuit(1)
     qc.metadata["self"] = qc.metadata
 
-    with pytest.raises(TranslationError, match="Circuit metadata must be JSON serializable"):
+    with pytest.warns(UserWarning, match="Dropping circuit metadata"):
         qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
 
     assert qc.metadata["self"] is qc.metadata

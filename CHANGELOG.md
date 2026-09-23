@@ -41,8 +41,8 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🐛 Preserve circuit metadata in IQM JSON serialization and reject metadata
-  that cannot be represented safely as JSON ([#273]) ([**@marcelwa**])
+- 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
+  warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
 - 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
   JSON fields ([#231]) ([**@burgholzer**])
 - 🩹 Report backend job failure messages at the default log level ([#231])
