@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Expose IQM execution options such as heralding, dynamical decoupling, and
+  active reset on `IQMBackend` through `set_options` and per-run overrides
+  ([#272]) ([**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
@@ -32,9 +35,7 @@ releases may include breaking changes.
 
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
-  default; expose validated IQM execution options through backend runs and
-  native primitives ([#246], [#254], [#272]) ([**@marcelwa**],
-  [**@denialhaag**])
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
   ([#220]) ([**@denialhaag**])
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
@@ -264,6 +265,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
@@ -337,5 +339,3 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-
-[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
