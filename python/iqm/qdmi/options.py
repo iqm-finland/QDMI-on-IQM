@@ -66,12 +66,16 @@ def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
 
     mapping = options.get("qubit_mapping")
     if mapping is not None:
-        if not isinstance(mapping, Mapping) or not all(
-            isinstance(name, str) and name and not any(char in name for char in ",:\0")
-            for pair in mapping.items()
-            for name in pair
+        if (
+            not isinstance(mapping, Mapping)
+            or not mapping
+            or not all(
+                isinstance(name, str) and name and not any(char in name for char in ",:\0")
+                for pair in mapping.items()
+                for name in pair
+            )
         ):
-            msg = "'qubit_mapping' must map nonempty names without commas, colons, or NUL characters"
+            msg = "'qubit_mapping' must be nonempty and map nonempty names without commas, colons, or NUL characters"
             raise CircuitValidationError(msg)
         values["custom5"] = ",".join(f"{logical}:{physical}" for logical, physical in mapping.items())
 

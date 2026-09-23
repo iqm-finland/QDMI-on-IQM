@@ -65,6 +65,7 @@ def test_encode_all_execution_options() -> None:
         ("dd_mode", True),
         ("move_gate_validation", []),
         ("move_gate_frame_tracking", "disabled"),
+        ("qubit_mapping", {}),
         ("qubit_mapping", {"q:0": "QB1"}),
         ("qubit_mapping", {"q0": "QB1,other"}),
         ("qubit_mapping", {"q0": ""}),
@@ -107,10 +108,8 @@ def test_older_mqt_rejects_new_options(monkeypatch: pytest.MonkeyPatch) -> None:
     assert set(options) == {"shots", "memory"}
     backend = IQMBackend.__new__(IQMBackend)
     backend._options = options  # ruff:ignore[private-member-access]
-    with pytest.raises(CircuitValidationError, match="require MQT Core"):
+    with pytest.raises(CircuitValidationError, match="heralding_mode"):
         backend.run(QuantumCircuit(1), heralding_mode="zeros")
-    with pytest.raises(CircuitValidationError, match="seed_simulator"):
-        backend.run(QuantumCircuit(1), seed_simulator=42)
     with pytest.raises(AttributeError):
         backend.set_options(heralding_mode="zeros")
 

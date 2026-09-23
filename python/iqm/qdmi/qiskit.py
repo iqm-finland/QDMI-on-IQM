@@ -33,20 +33,15 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
-
 from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 from .gates import MoveGate
 from .options import execution_parameters
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-    from typing import Any
+    from collections.abc import Mapping
 
-    from mqt.core.plugins.qiskit.backend import ParametersType
-    from mqt.core.plugins.qiskit.job import QDMIJob
     from mqt.core.typing import QDMIJobParameters
-    from qiskit.circuit import Instruction, QuantumCircuit
+    from qiskit.circuit import Instruction
     from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
@@ -102,38 +97,13 @@ class IQMBackend(QDMIBackend):
             )
         return options
 
-    @staticmethod
-    def _job_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
+    def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
         """Validate and encode IQM options for every circuit in a run.
 
         Returns:
             IQM custom job parameters for MQT Core's submission hook.
         """
         return execution_parameters(options)
-
-    def run(
-        self,
-        run_input: QuantumCircuit | Sequence[QuantumCircuit],
-        parameter_values: Sequence[ParametersType] | None = None,
-        **options: Any,  # ruff:ignore[any-type]
-    ) -> QDMIJob:
-        """Submit circuits with validated IQM execution options.
-
-        Returns:
-            A job aggregating the submitted circuits.
-
-        Raises:
-            CircuitValidationError: An option is unknown or needs newer MQT Core.
-        """
-        allowed = set(self.options)
-        if options.get("seed_simulator") is None:
-            allowed.add("seed_simulator")
-        if unsupported := options.keys() - allowed:
-            msg = f"Unsupported execution options: {', '.join(sorted(unsupported))}"
-            if not hasattr(QDMIBackend, "_job_parameters"):
-                msg += ". IQM execution options require MQT Core with the job-option hook."
-            raise CircuitValidationError(msg)
-        return super().run(run_input, parameter_values=parameter_values, **options)
 
     def __init__(
         self,
