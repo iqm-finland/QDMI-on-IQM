@@ -22,6 +22,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from qiskit.circuit import QuantumCircuit
@@ -113,6 +114,7 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
         "auth_file": ENVIRONMENT_TOKENS_FILE,
         "custom1": "environment-qc-id",
         "custom2": "canonical-qc-alias",
+        "custom4": None,
     }
 
 
@@ -158,6 +160,7 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
         "auth_file": EXPLICIT_TOKENS_FILE,
         "custom1": "explicit-qc-id",
         "custom2": "explicit-qc-alias",
+        "custom4": None,
     }
 
 
@@ -290,3 +293,34 @@ def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> 
     assert -1.0 <= expectation_value <= 1.0
     assert standard_deviation >= 0.0
     assert result.metadata["shots"] == 64
+
+
+def test_iqm_backend_selects_calibration_before_target_creation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use the existing MQT session hook before constructing the backend target."""
+    captured = _stub_backend_construction(monkeypatch)
+    calibration_id = "f0fb4be5-e913-4a04-8c94-18d1bd842def"
+    IQMBackend(calibration_set_id=calibration_id.upper())
+    assert captured["session"]["custom4"] == calibration_id
+
+
+@pytest.mark.parametrize("calibration_id", ["", "default", "../default", "not-a-uuid"])
+def test_iqm_backend_rejects_invalid_calibration(monkeypatch: pytest.MonkeyPatch, calibration_id: str) -> None:
+    """Invalid selectors fail before opening a device."""
+    captured = _stub_backend_construction(monkeypatch)
+    with pytest.raises(ValueError, match="UUID"):
+        IQMBackend(calibration_set_id=calibration_id)
+    assert "opened_id" not in captured
+
+
+def test_iqm_backend_reports_effective_calibration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Expose the resolved device calibration for cross-process submissions."""
+    _stub_backend_construction(monkeypatch)
+    backend = IQMBackend()
+    device = Mock()
+    device.query_custom_property.return_value = "f0fb4be5-e913-4a04-8c94-18d1bd842def"
+    monkeypatch.setattr(IQMBackend, "device", property(lambda _: device))
+    assert backend.calibration_set_id == "f0fb4be5-e913-4a04-8c94-18d1bd842def"
+    device.query_custom_property.assert_called_once_with(iqm_qiskit.CustomProperty.CUSTOM1, str)
+    device.query_custom_property.return_value = None
+    with pytest.raises(RuntimeError, match="did not report"):
+        _ = backend.calibration_set_id

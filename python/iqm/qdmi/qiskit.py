@@ -22,9 +22,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
+from uuid import UUID
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
+    from mqt.core.qdmi import CustomProperty
     from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
 except ImportError as e:
     msg = (
@@ -62,6 +64,8 @@ class IQMBackend(QDMIBackend):
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
         qc_alias: Optional IQM quantum computer alias. Defaults to
             `IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias.
+        calibration_set_id: Optional calibration UUID to use for target construction
+            and execution. When omitted, resolve the server default at initialization.
     """
 
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
@@ -76,8 +80,10 @@ class IQMBackend(QDMIBackend):
         tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
+        calibration_set_id: str | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend."""
+        calibration_id = str(UUID(calibration_set_id)) if calibration_set_id is not None else None
         resolved_base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
         tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
@@ -100,5 +106,19 @@ class IQMBackend(QDMIBackend):
             auth_file=resolved_tokens_file,
             custom1=resolved_qc_id,
             custom2=resolved_qc_alias,
+            custom4=calibration_id,
         )
         super().__init__(device=device)
+
+    @property
+    def calibration_set_id(self) -> str:
+        """Effective calibration UUID to share with execution clients.
+
+        Raises:
+            RuntimeError: If the device does not report a calibration UUID.
+        """
+        calibration_id = self.device.query_custom_property(CustomProperty.CUSTOM1, str)
+        if calibration_id is None:
+            msg = "The IQM device did not report its calibration set ID."
+            raise RuntimeError(msg)
+        return calibration_id

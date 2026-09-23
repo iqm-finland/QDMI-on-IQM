@@ -87,3 +87,30 @@ print(f"Standard deviations: {data['stds']}")
 The package also exposes the `iqm-sampler` and `iqm-estimator` CLI scripts for
 executing serialized circuits directly from the shell. For more details on these
 utilities and their usage, see the [Python Package Guide](python_package.md).
+
+## Pinning a calibration
+
+Select the calibration before constructing the backend so that the Qiskit target
+and submitted jobs use the same calibrated architecture and metrics:
+
+```python
+backend = IQMBackend(
+    qc_alias="your-device",
+    calibration_set_id="f0fb4be5-e913-4a04-8c94-18d1bd842def",
+)
+```
+
+`backend.calibration_set_id` exposes the effective UUID, including when the
+server default was resolved during initialization. Pass that UUID to a separate
+execution client's `IQMBackend` constructor to preserve the compilation
+calibration across processes. Keep the quantum computer selection the same. The
+driver rejects invalid UUIDs, unavailable calibration sets, and a server
+response that names a different set instead of silently using the default.
+
+Explicit selection pins the session for its lifetime. Retrieving the result of a
+calibration job does not replace its target or calibration; construct a new
+backend with the returned UUID to adopt the new set. With no explicit selector,
+legacy calibration-job refresh remains enabled: recreate the backend after such
+a refresh to avoid reusing a cached target. The driver cannot determine which
+calibration an arbitrary externally compiled circuit used; its producer and
+consumer must carry and agree on the UUID.
