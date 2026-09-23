@@ -107,17 +107,22 @@ queue.
 
 The module provides two primary functions:
 
-- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the given circuit to QPY,
-  submits a Slurm job using `srun iqm-sampler`, and parses the base64-encoded
-  pickled result back to a python dictionary of counts.
+- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the circuit to QPY and
+  submits a Slurm job using `srun iqm-sampler`. The returned sampler result is
+  converted to joint counts across all classical registers in Qiskit's bit
+  order.
 - {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable,
-  submits a Slurm job using `srun iqm-estimator`, and parses the base64-encoded
-  pickled `VQEResult` to return it, matching the semantics of running `VQE`
-  directly against the regular (non-offloaded) estimator.
+  submits a Slurm job using `srun iqm-estimator`, and returns the complete
+  `VQEResult` produced by the worker.
 
-Both functions support a `local=True` argument for running simulation/hardware
-compilation locally (useful for debugging) and a `simulator=True` argument when
-submitting Slurm jobs to target simulated devices instead of real QPU hardware.
+Both worker CLIs reserve stdout for one base64-encoded pickle containing the
+native Qiskit result; diagnostics belong on stderr. The offloader is intended
+for controlled Slurm deployments with trusted workers and serialized inputs. Use
+compatible Python and dependency environments on the submitting and worker
+nodes. Result loading uses standard pickle without a restricted unpickler.
+
+Both functions support `local=True` to execute in the submitting process instead
+of Slurm, and `simulator=True` to select the simulator in either mode.
 
 ### Selecting the Slurm Partition
 

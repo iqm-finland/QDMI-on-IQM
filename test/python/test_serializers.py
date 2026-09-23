@@ -106,18 +106,21 @@ def test_simple_circuit(backend: Callable[[int], StubBackend]) -> None:
     assert program["metadata"] == {}
 
 
-def test_prx_parameters(backend: Callable[[int], StubBackend]) -> None:
-    """An R gate becomes a prx instruction with angles in turns."""
+@pytest.mark.parametrize(
+    ("angle", "phase"),
+    [(0.0, 0.0), (np.pi, np.pi / 2), (-np.pi / 3, -np.pi / 4), (5 * np.pi, -7 * np.pi), (0.123, 0.456)],
+)
+def test_prx_parameters(backend: Callable[[int], StubBackend], angle: float, phase: float) -> None:
+    """An R gate preserves radians in the current IQM circuit format."""
     qc = QuantumCircuit(1)
-    qc.r(np.pi, np.pi / 2, 0)
+    qc.r(angle, phase, 0)
 
     program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
 
     prx = program["instructions"][0]
     assert prx["name"] == "prx"
     assert prx["locus"] == ["QB1"]
-    assert prx["args"]["angle_t"] == pytest.approx(0.5)
-    assert prx["args"]["phase_t"] == pytest.approx(0.25)
+    assert prx["args"] == pytest.approx({"angle": angle, "phase": phase})
 
 
 def test_barrier(backend: Callable[[int], StubBackend]) -> None:
@@ -190,7 +193,7 @@ def test_bound_parameters(backend: Callable[[int], StubBackend]) -> None:
 
     program = json.loads(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
 
-    assert program["instructions"][0]["args"]["angle_t"] == pytest.approx(0.5)
+    assert program["instructions"][0]["args"]["angle"] == pytest.approx(np.pi)
 
 
 def test_unbound_parameters_are_rejected(backend: Callable[[int], StubBackend]) -> None:
