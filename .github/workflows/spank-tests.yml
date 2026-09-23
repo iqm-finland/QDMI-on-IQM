@@ -14,7 +14,6 @@ jobs:
   spank-tests:
     name: 🐧 Slurm 25.11 • ${{ matrix.install-mode }}
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: munich-quantum-toolkit/core
-          ref: e21369508e177ae672a561f5b7b29c86089399f2
+          ref: a4d416e7b301c58a6e41a347ade26dd503766f18
           persist-credentials: false
           path: core
 
