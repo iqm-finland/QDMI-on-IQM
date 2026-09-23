@@ -41,6 +41,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
+  and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
+  ([**@burgholzer**])
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
   in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
@@ -253,6 +256,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
