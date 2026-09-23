@@ -15,6 +15,9 @@ releases may include breaking changes.
 - ✨ Submit ordered circuit lists as one native IQM job, with indexed results,
   recoverable program counts, and indexed program queries ([#277])
   ([**@burgholzer**]).
+- ✨ Expose IQM execution options such as heralding, dynamical decoupling, and
+  active reset on `IQMBackend` through `set_options` and per-run overrides
+  ([#272]) ([**@marcelwa**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -43,9 +46,7 @@ releases may include breaking changes.
   `IQM_QDMI_device_job_submit_calibration` function ([#229]) ([**@marcelwa**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
-  default; expose validated IQM execution options through backend runs and
-  native primitives ([#246], [#254], [#272]) ([**@marcelwa**],
-  [**@denialhaag**])
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
   ([#220]) ([**@denialhaag**])
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
@@ -280,6 +281,7 @@ Compatible with QDMI `v1.3.0`.
 [#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
 [#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
+[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
@@ -354,5 +356,3 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-
-[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
