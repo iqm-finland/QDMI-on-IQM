@@ -1107,6 +1107,11 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
             QDMI_SUCCESS);
   EXPECT_STREQ(id.c_str(), "job-123");
 
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
+                                               QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,
+                                               0, nullptr, &id_size),
+            QDMI_ERROR_NOTSUPPORTED);
+
   QDMI_Program_Format program_format = QDMI_PROGRAM_FORMAT_IQMJSON;
   EXPECT_EQ(IQM_QDMI_device_job_query_property(
                 retrieved_job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,

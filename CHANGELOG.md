@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Select and pin an IQM calibration before target construction through
+  session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
+  effective UUID, and retain each job's calibration snapshot across session
+  refreshes ([#271]) ([**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
@@ -328,3 +332,5 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
+
+[#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
