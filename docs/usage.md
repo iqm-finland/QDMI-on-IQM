@@ -199,9 +199,7 @@ occur:
 6. **Calibration Job Support Check**:
    - The system checks if the server supports calibration jobs by querying the
      COCOS health endpoint.
-   - This determines whether
-     {cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION`
-     jobs can be submitted.
+   - This determines whether the IQM calibration extension is available.
 
 After initialization, the session is ready to submit jobs and query device
 information.
@@ -318,12 +316,6 @@ The following properties about the device can be queried via the
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
-- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION`:
-  Whether the device needs calibration. IQM schedules recalibration itself and
-  the IQM Server publishes no signal asking a client to trigger one, so this is
-  always zero. A quantum computer that is unfit to run reports itself as under
-  maintenance through
-  {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
 
@@ -505,9 +497,6 @@ The QDMI device currently supports the following program formats:
 - **IQM JSON**
   ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's
   native JSON circuit format.
-- **Calibration Configurations**
-  ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION`):
-  Calibration job configurations (only if server supports calibration jobs).
 
 For QIR and JSON formats, the program should be provided as a string via the
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
@@ -647,12 +636,18 @@ Attempting to retrieve these formats will return
 
 ## Triggering Calibration Jobs
 
-Calibrations can be triggered using the
-{cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CALIBRATION`
-program format. This feature is only available if the IQM server supports
-calibration jobs (checked during session initialization). The payload should
-contain the calibration configuration as a JSON string according to the IQM
-Server API specification.
+Use {cpp:func}`IQM_QDMI_device_job_submit_calibration` from
+`iqm_qdmi/calibration.h`. This IQM extension replaces the removed QDMI
+calibration program format. It returns `QDMI_ERROR_NOTSUPPORTED` if the server
+does not support calibration jobs, as checked during session initialization.
+
+Create a regular IQM job and set `QDMI_DEVICE_JOB_PARAMETER_PROGRAM` to a
+calibration configuration encoded as a JSON string according to the IQM Server
+API. Call the extension instead of `IQM_QDMI_device_job_submit`. The extension
+ignores the program format, shot count, and circuit-specific parameters. After
+submission, program-format and shot-count queries return
+`QDMI_ERROR_NOTSUPPORTED`. The usual job check, wait, cancel, and free functions
+remain available.
 
 The results can be retrieved via the
 {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM1` job result
@@ -673,13 +668,32 @@ calibration job completes.
 Here's an example of submitting a calibration job:
 
 ```cpp
-auto *job = fomac.submit_job(TEST_CALIBRATION_CONFIG,
-                               QDMI_PROGRAM_FORMAT_CALIBRATION);
-IQM_QDMI_device_job_wait(job, 0);
+#include "iqm_qdmi/calibration.h"
 
-// Get the new calibration set ID
-const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
-// The session is now updated with the new calibration data
+int calibrate(IQM_QDMI_Device_Session session, const char *config,
+              size_t config_size) {
+  IQM_QDMI_Device_Job job = nullptr;
+  auto status = IQM_QDMI_device_session_create_device_job(session, &job);
+  if (status != QDMI_SUCCESS) {
+    return status;
+  }
+  status = IQM_QDMI_device_job_set_parameter(
+      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, config_size, config);
+  if (status == QDMI_SUCCESS) {
+    status = IQM_QDMI_device_job_submit_calibration(job);
+  }
+  if (status == QDMI_SUCCESS) {
+    status = IQM_QDMI_device_job_wait(job, 0);
+  }
+  if (status == QDMI_SUCCESS) {
+    /// Refresh the session's calibration data.
+    size_t size = 0;
+    status = IQM_QDMI_device_job_get_results(
+        job, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
+  }
+  IQM_QDMI_device_job_free(job);
+  return status;
+}
 ```
 
 **Note:** Calibration jobs use different API endpoints than regular circuit

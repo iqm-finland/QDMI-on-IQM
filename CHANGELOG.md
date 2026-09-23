@@ -28,9 +28,10 @@ releases may include breaking changes.
 ### Changed
 
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
-  pulse-support properties. Preserve the remaining property values for binary
-  compatibility with existing MQT Core clients ([#229], [#266])
-  ([**@marcelwa**], [**@burgholzer**]).
+  pulse-support properties. Expose calibration submission through the
+  IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the
+  remaining QDMI IDs for binary compatibility with existing MQT Core clients
+  ([#229], [#266]) ([**@marcelwa**], [**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])

@@ -20,6 +20,7 @@
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
+#include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
 
@@ -918,22 +919,6 @@ TEST_F(DeviceIntegrationMockTest, QubitCountMatchesSiteCountWithoutResonators) {
                 session, QDMI_DEVICE_PROPERTY_SITES, 0, nullptr, &sites_size),
             QDMI_SUCCESS);
   EXPECT_EQ(sites_size / sizeof(IQM_QDMI_Site), 2U);
-}
-
-TEST_F(DeviceIntegrationMockTest, RemovedDevicePropertiesUnsupported) {
-  queue_successful_initialization();
-  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  const auto requests_before = http_stub.get_urls().size();
-
-  for (const auto property : {8, 9}) {
-    /// Old binaries can query reserved values without a named enumerator.
-    /// NOLINTNEXTLINE(clang-analyzer-*EnumCastOutOfRange)
-    const auto removed_property = static_cast<QDMI_Device_Property>(property);
-    EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
-                  session, removed_property, 0, nullptr, nullptr),
-              QDMI_ERROR_NOTSUPPORTED);
-  }
-  EXPECT_EQ(http_stub.get_urls().size(), requests_before);
 }
 
 TEST_F(DeviceTest, SessionAllocation) {
@@ -2079,15 +2064,10 @@ TEST_F(DeviceJobMockTest,
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
-  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
-                &format),
-            QDMI_SUCCESS);
 
   http_stub.queue_post(
       200, R"({"id": "cal-queue", "status": "waiting", "queue_position": 6})");
-  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_SUCCESS);
 
   const auto gets_after_submission = http_stub.get_urls().size();
 
@@ -2101,25 +2081,50 @@ TEST_F(DeviceJobMockTest,
   EXPECT_EQ(http_stub.get_urls().size(), gets_after_submission + 1);
 }
 
+TEST_F(DeviceJobMockTest, CancelCalibration) {
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id": "cal-cancel"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_SUCCESS);
+  http_stub.queue_post(200);
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_SUCCESS);
+  EXPECT_TRUE(http_stub.post_urls().back().ends_with(
+      "/calibration/runs/cal-cancel/abort"));
+}
+
 TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job),
+            QDMI_ERROR_INVALIDARGUMENT);
   // Job submission
   auto ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
       strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG);
   ASSERT_EQ(ret, QDMI_SUCCESS);
-  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format), &format);
-  ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_submission_response = R"({"id": "job-123"})";
   http_stub.queue_post(200, job_submission_response);
-  ret = IQM_QDMI_device_job_submit(job);
+  ret = IQM_QDMI_device_job_submit_calibration(job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_BADSTATE);
+  EXPECT_TRUE(http_stub.post_urls().back().ends_with("/calibration/runs"));
+  for (const auto property : {
+           QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
+           QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM,
+       }) {
+    EXPECT_EQ(
+        IQM_QDMI_device_job_query_property(job, property, 0, nullptr, nullptr),
+        QDMI_ERROR_NOTSUPPORTED);
+  }
 
   const std::string job_status_response = R"({"status": "ready"})";
   http_stub.queue_get(200, job_status_response);
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  EXPECT_TRUE(http_stub.get_urls().back().ends_with(
+      "/calibration/runs/job-123/status"));
 
   const std::string job_results_response = R"({
     "status": "ready",
@@ -2226,10 +2231,7 @@ TEST_F(DeviceIntegrationMockTest,
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_SUCCESS);
 
-  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                sizeof(QDMI_Program_Format), &format),
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job),
             QDMI_ERROR_NOTSUPPORTED);
 
   const auto logs = log_stream.str();
@@ -3123,6 +3125,7 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
   for (const auto &[exception, expected_status] : mappings) {
     throw_from_transport(exception);
     EXPECT_EQ(IQM_QDMI_device_job_submit(job), expected_status);
+    EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), expected_status);
   }
 
   restore_transport();
@@ -3156,15 +3159,10 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
-  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
-                &format),
-            QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": )");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_FATAL);
   http_stub.queue_post(200, R"({"id": "job-123"})");
-  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_SUCCESS);
   http_stub.queue_get(200, R"({"status": "ready"})");
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
