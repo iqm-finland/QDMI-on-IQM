@@ -266,6 +266,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
@@ -339,5 +340,3 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-
-[#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
