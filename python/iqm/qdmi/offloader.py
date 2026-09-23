@@ -26,9 +26,8 @@ import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
 import uuid
-from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, SupportsInt, cast
+from typing import TYPE_CHECKING, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
@@ -41,7 +40,7 @@ except ImportError as e:
     _IMPORT_ERROR = e
 
 if TYPE_CHECKING:
-    from qiskit.primitives.containers.pub_result import PubResult
+    from qiskit.primitives.containers import BitArray, PrimitiveResult, SamplerPubResult
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_algorithms import VQEResult
 
@@ -49,75 +48,23 @@ _DEFAULT_PARTITION = "quantum"
 _DEFAULT_NODES = 1
 
 
-def _count_to_int(count: object) -> int:
-    """Convert an external count payload to a plain integer.
+def extract_counts(primitive_result: PrimitiveResult[SamplerPubResult]) -> dict[str, int]:
+    """Extract joint counts from the native sampler's single submitted circuit.
 
     Returns:
-        The converted count value.
-    """
-    return int(cast("SupportsInt | str | bytes | bytearray", count))
-
-
-def normalize_counts(raw_counts: object) -> dict[str, int]:
-    """Convert backend count payloads into a plain typed dictionary.
-
-    Returns:
-        A normalized mapping from bitstrings to integer counts.
-    """
-    if isinstance(raw_counts, Mapping):
-        return {str(bitstring): _count_to_int(count) for bitstring, count in raw_counts.items()}
-
-    pairs = cast("Iterable[tuple[object, object]]", raw_counts)
-    return {str(bitstring): _count_to_int(count) for bitstring, count in pairs}
-
-
-def extract_counts(pub_result: PubResult) -> dict[str, int]:
-    """Extract counts from the first classical register exposed by a primitive result.
-
-    Returns:
-        A normalized mapping from measured bitstrings to shot counts.
+        Joint bitstrings in Qiskit's register order, mapped to shot counts.
 
     Raises:
-        RuntimeError: If no classical register with counts is present in the result.
+        RuntimeError: If the result is empty or has no classical registers with counts.
     """
-    data = pub_result.data
-
-    if isinstance(data, dict):
-        values: Iterable[object] = data.values()
-    else:
-        keys = getattr(data, "keys", None)
-        values = (data[key] for key in keys()) if callable(keys) else ()
-
-    for value in values:
-        get_counts = getattr(value, "get_counts", None)
-        if callable(get_counts):
-            return normalize_counts(get_counts())
-
-    for key in ("meas", "c"):
-        with contextlib.suppress(AttributeError, KeyError, TypeError):
-            value = data[key]
-            get_counts = getattr(value, "get_counts", None)
-            if callable(get_counts):
-                return normalize_counts(get_counts())
-
-    msg = "Could not find a classical register with counts in the primitive result."
-    raise RuntimeError(msg)
-
-
-def _first_pub(primitive_result: Iterable[PubResult]) -> PubResult:
-    """Return the first pub result from a primitive result.
-
-    Returns:
-        The first pub result.
-
-    Raises:
-        RuntimeError: If the primitive result contains no pubs.
-    """
-    first_pub = next(iter(primitive_result), None)
-    if first_pub is None:
+    if not primitive_result:
         msg = "Primitive result contained no pubs."
         raise RuntimeError(msg)
-    return first_pub
+    try:
+        return cast("BitArray", primitive_result[0].join_data()).get_counts()
+    except (TypeError, ValueError) as e:
+        msg = f"Could not extract measurement counts: {e}"
+        raise RuntimeError(msg) from e
 
 
 def _get_jobs_dir() -> Path:
@@ -237,33 +184,23 @@ def _run_srun(
     return process
 
 
-def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
-    """Extract and base64-decode the job's stdout payload.
+def _load_pickled_result(process: subprocess.CompletedProcess[bytes]) -> object:
+    """Load a base64-encoded pickle from a trusted Slurm worker.
+
+    The submitting process and worker must use compatible environments.
 
     Returns:
-        The decoded, still-pickled result payload.
+        The worker's native Qiskit result.
 
     Raises:
-        RuntimeError: If the job produced no output.
+        RuntimeError: If the worker output is empty or cannot be decoded.
     """
-    stdout = process.stdout.decode().strip()
+    stdout = process.stdout.strip()
     if not stdout:
         msg = "No output from the job."
         raise RuntimeError(msg)
-    return base64.b64decode(stdout.encode())
-
-
-def _load_pickled_result(payload: bytes) -> object:
-    """Unpickle a decoded job result payload.
-
-    Returns:
-        The unpickled result object.
-
-    Raises:
-        RuntimeError: If the payload cannot be unpickled.
-    """
     try:
-        return pickle.loads(payload)  # ruff:ignore[suspicious-pickle-usage]
+        return pickle.loads(base64.b64decode(stdout, validate=True))  # ruff:ignore[suspicious-pickle-usage]
     except Exception as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
@@ -288,15 +225,14 @@ def sample(
     and submits it to the Slurm workload manager using the `srun` command.
     After completion, the counts are parsed and returned as a dictionary.
 
-    When `local=True`, runs the circuit locally using the MQT Core DDSIM simulator backend.
+    When `local=True`, runs the circuit in this process on the selected backend.
 
     Args:
         qc: The quantum circuit to run.
         shots: The number of shots to run. Default is 1024.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
@@ -325,7 +261,7 @@ def sample(
 
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
-        RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
+        RuntimeError: Propagated from job submission or result decoding.
     """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
@@ -337,8 +273,7 @@ def sample(
         sampler = build_sampler(simulator=simulator)
         qc_for_execution = transpile(qc, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
-        first_pub = _first_pub(cast("Iterable[PubResult]", job.result()))
-        return extract_counts(first_pub)
+        return extract_counts(job.result())
 
     # Make sure the `jobs` directory exists on the shared filesystem
     job_dir = _new_job_dir()
@@ -374,10 +309,8 @@ def sample(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    primitive_result = cast("Iterable[PubResult]", _load_pickled_result(payload))
-    first_pub = _first_pub(primitive_result)
-    return extract_counts(first_pub)
+    result = cast("PrimitiveResult[SamplerPubResult]", _load_pickled_result(process))
+    return extract_counts(result)
 
 
 def estimate(
@@ -412,10 +345,9 @@ def estimate(
         operator: The operator to run.
         maxiter: The maximum number of iterations for the optimization.
             Default is 80.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
@@ -497,5 +429,4 @@ def estimate(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    return cast("VQEResult", _load_pickled_result(payload))
+    return cast("VQEResult", _load_pickled_result(process))
