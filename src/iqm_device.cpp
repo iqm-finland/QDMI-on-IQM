@@ -991,8 +991,8 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
         if (character != '-') {
           return QDMI_ERROR_INVALIDARGUMENT;
         }
-      } else if (!((character >= '0' && character <= '9') ||
-                   (character >= 'a' && character <= 'f'))) {
+      } else if ((character < '0' || character > '9') &&
+                 (character < 'a' || character > 'f')) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
     }
@@ -1045,7 +1045,8 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
 }
 
 namespace {
-int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
+int Set_job_status(IQM_QDMI_Device_Job job, const nlohmann::json &response) {
+  const auto native_status = response.at("status").get<std::string>();
   if (native_status == "received") {
     job->status_ = QDMI_JOB_STATUS_SUBMITTED;
   } else if (native_status == "queued" || native_status == "waiting") {
@@ -1077,6 +1078,16 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
     job->status_ = QDMI_JOB_STATUS_CANCELED;
   } else if (native_status == "failed") {
     job->status_ = QDMI_JOB_STATUS_FAILED;
+    if (const auto errors = response.find("errors");
+        errors != response.end() && errors->is_array()) {
+      for (const auto &error : *errors) {
+        if (const auto message = error.find("message");
+            message != error.end() && message->is_string()) {
+          LOG_ERROR("Job " + job->job_id_ +
+                    " failed: " + message->get<std::string>());
+        }
+      }
+    }
   } else {
     LOG_ERROR("Unknown job status: " + native_status);
     return QDMI_ERROR_FATAL;
@@ -1135,8 +1146,7 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
     retrieved_job->job_id_ = job_id;
     retrieved_job->retrieved_ = true;
     if (const auto status =
-            Set_job_status(retrieved_job.get(),
-                           job_status_json.at("status").get<std::string>());
+            Set_job_status(retrieved_job.get(), job_status_json);
         status != QDMI_SUCCESS) {
       return status;
     }
@@ -1632,7 +1642,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
 
   const auto job_status =
       job_status_json_response.at("status").get<std::string>();
-  if (const auto update_status = Set_job_status(job, job_status);
+  if (const auto update_status = Set_job_status(job, job_status_json_response);
       update_status != QDMI_SUCCESS) {
     return update_status;
   }

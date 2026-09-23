@@ -45,6 +45,12 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
+  JSON fields ([#231]) ([**@burgholzer**])
+- 🩹 Report backend job failure messages at the default log level ([#231])
+  ([**@burgholzer**])
+- 🩹 Preserve joint sampling counts across all classical registers in offloaded
+  results ([#231]) ([**@burgholzer**])
 - 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
   and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
   ([**@burgholzer**])
@@ -266,6 +272,7 @@ Compatible with QDMI `v1.3.0`.
 [#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
