@@ -34,7 +34,7 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           version=$(sed -n 's/^[[:space:]]*VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt | head -n 1)
           test "$RELEASE_TAG" = "v$version"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = true
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'The draft tag must not exist before assets are staged' >&2
             exit 1
@@ -67,7 +67,7 @@ jobs:
           SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
         run: |
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = true
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'The draft tag was created while assets were building' >&2
             exit 1
@@ -83,7 +83,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.release-tag }}
           SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
         run: |
-          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)
+          release_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\" and .draft) | .id")
+          test -n "$release_id"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
           gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --clobber
