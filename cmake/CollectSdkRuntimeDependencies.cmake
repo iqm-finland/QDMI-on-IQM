@@ -19,11 +19,19 @@ if(NOT DEFINED SDK_LIBRARY OR NOT DEFINED SDK_OUTPUT)
   message(FATAL_ERROR "SDK_LIBRARY and SDK_OUTPUT are required")
 endif()
 
+if(POLICY CMP0207)
+  cmake_policy(SET CMP0207 NEW)
+endif()
+
 # CMake uses the platform's native binary inspection tool. The build directory
 # helps Windows find DLLs supplied by the build rather than the operating
 # system.
 set(search_directories "${SDK_BUILD_DIR}")
+set(system_excludes "^$")
 if(CMAKE_HOST_WIN32)
+  # System DLLs can import optional Windows components absent from the runner.
+  # Stop before recursing into them while still scanning all third-party DLLs.
+  set(system_excludes "^[A-Za-z]:/[Ww]indows/")
   file(GLOB_RECURSE built_dlls "${SDK_BUILD_DIR}/*.dll")
   foreach(dll IN LISTS built_dlls)
     get_filename_component(DIRECTORY "${dll}" DIRECTORY)
@@ -44,6 +52,8 @@ file(
   conflicts
   DIRECTORIES
   ${search_directories}
+  POST_EXCLUDE_REGEXES
+  ${system_excludes}
   PRE_EXCLUDE_REGEXES
   "^api-ms-win-"
   "^ext-ms-")
