@@ -1,0 +1,95 @@
+name: 📦 Prepare C++ SDK release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Tag of the Release Drafter draft, such as v1.5.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-sdk-release-${{ inputs.release-tag }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check draft and source commit
+    runs-on: ubuntu-slim
+    outputs:
+      source-sha: ${{ steps.check.outputs.source-sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release draft and version
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          version=$(sed -n 's/^[[:space:]]*VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt | head -n 1)
+          test "$RELEASE_TAG" = "v$version"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = true
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'The draft tag must not exist before assets are staged' >&2
+            exit 1
+          fi
+          echo "source-sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and smoke-test SDK archives
+    needs: preflight
+    uses: $/.github/workflows/cpp-sdk-build.yml
+    with:
+      source-sha: ${{ needs.preflight.outputs.source-sha }}
+    permissions:
+      contents: read
+
+  stage:
+    name: Attach verified archives to draft
+    needs: [preflight, build]
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: cpp-sdk-*
+          path: dist
+          merge-multiple: true
+      - name: Verify full matrix and unchanged source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = true
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'The draft tag was created while assets were building' >&2
+            exit 1
+          fi
+          for triple in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu arm64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc; do
+            test -f "dist/iqm-qdmi-device_${RELEASE_TAG}_${triple}.tar.gz"
+          done
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 5
+          (cd dist && cat ./*.sha256 > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - name: Pin draft target and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+        run: |
+          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --clobber
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort > staged-assets.txt
+          for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS; do
+            grep -Fqx "$name" staged-assets.txt
+          done

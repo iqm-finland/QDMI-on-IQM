@@ -23,7 +23,10 @@ etc.) are automatically bundled by platform-specific repair tools:
 [`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux,
 the exact bundled versions correspond to those available in the
 [`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by
-[cibuildwheel](https://cibuildwheel.pypa.io/).
+[cibuildwheel](https://cibuildwheel.pypa.io/). The C++ SDK archives likewise
+bundle non-system native dependencies and include the corresponding available
+license texts under `licenses/`. They continue to use the operating system's
+C/C++ runtime and CA trust store.
 ```
 
 ## Build Dependencies
