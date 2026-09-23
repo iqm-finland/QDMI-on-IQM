@@ -49,8 +49,15 @@ def run(*args: str) -> str:
 
     Returns:
         The tool's standard output.
+
+    Raises:
+        RuntimeError: If the packaging tool fails.
     """
-    return subprocess.run(args, check=True, capture_output=True, text=True).stdout  # ruff: ignore[subprocess-without-shell-equals-true]
+    result = subprocess.run(args, capture_output=True, text=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
+    if result.returncode != 0:
+        msg = f"Command failed: {args!r}\n{result.stdout}\n{result.stderr}"
+        raise RuntimeError(msg)
+    return result.stdout
 
 
 def is_system_dependency(path: Path, platform: str) -> bool:

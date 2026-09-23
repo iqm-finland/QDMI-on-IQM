@@ -45,8 +45,6 @@ jobs:
     name: Build and smoke-test SDK archives
     needs: preflight
     uses: $/.github/workflows/cpp-sdk-build.yml
-    with:
-      source-sha: ${{ needs.preflight.outputs.source-sha }}
     permissions:
       contents: read
 
@@ -89,6 +87,7 @@ jobs:
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
           gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --clobber
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort > staged-assets.txt
           for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS; do
             grep -Fqx "$name" staged-assets.txt

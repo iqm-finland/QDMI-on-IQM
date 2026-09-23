@@ -37,8 +37,14 @@ def run(*command: str, env: dict[str, str] | None = None) -> str:
 
     Returns:
         The command's standard output.
+
+    Raises:
+        RuntimeError: If the smoke-test command fails.
     """
-    result = subprocess.run(command, check=True, capture_output=True, text=True, env=env)  # ruff: ignore[subprocess-without-shell-equals-true]
+    result = subprocess.run(command, check=False, capture_output=True, text=True, env=env)  # ruff: ignore[subprocess-without-shell-equals-true]
+    if result.returncode != 0:
+        msg = f"Command failed: {command!r}\n{result.stdout}\n{result.stderr}"
+        raise RuntimeError(msg)
     return result.stdout
 
 
@@ -102,8 +108,8 @@ def main(archive_path: Path) -> None:
                         raise RuntimeError(msg)
         elif sys.platform == "darwin":
             for library in (prefix / "lib").glob("*.dylib"):
-                linked = run("otool", "-L", str(library))
-                if temporary in linked or "/opt/homebrew/" in linked or "/usr/local/" in linked:
+                linked = run("otool", "-L", str(library)).splitlines()[1:]
+                if any(temporary in line or "/opt/homebrew/" in line or "/usr/local/" in line for line in linked):
                     msg = f"macOS SDK has a machine-specific library path: {library}"
                     raise RuntimeError(msg)
                 run("codesign", "--verify", str(library))

@@ -2,11 +2,6 @@ name: 📦 Build C++ SDK archives
 
 on:
   workflow_call:
-    inputs:
-      source-sha:
-        description: Commit to package; defaults to the caller's commit
-        type: string
-        required: false
 
 permissions:
   contents: read
@@ -25,12 +20,13 @@ jobs:
             arch: aarch64
             triple: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runs-on }}
+    env:
+      SDK_TARGET_TRIPLE: ${{ matrix.triple }}
     container:
       image: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}:2026.05.07-2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source-sha || github.sha }}
           persist-credentials: false
       - name: Install native build tools
         run: |
@@ -49,7 +45,7 @@ jobs:
         run: |
           /opt/python/cp311-cp311/bin/python scripts/package_cpp_sdk.py \
             --build-dir sdk-build --install-root sdk-prefix --platform linux \
-            --target-triple '${{ matrix.triple }}' --output-dir dist
+            --target-triple "$SDK_TARGET_TRIPLE" --output-dir dist
           /opt/python/cp311-cp311/bin/python test/sdk/smoke_archive.py dist/*.tar.gz
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -65,7 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source-sha || github.sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -104,10 +99,11 @@ jobs:
           - runs-on: windows-11-arm
             triple: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.runs-on }}
+    env:
+      SDK_TARGET_TRIPLE: ${{ matrix.triple }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source-sha || github.sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -123,7 +119,8 @@ jobs:
       - name: Package and test extracted archive
         shell: pwsh
         run: |
-          python scripts/package_cpp_sdk.py --build-dir sdk-build --install-root sdk-prefix --platform windows --target-triple '${{ matrix.triple }}' --output-dir dist
+          python scripts/package_cpp_sdk.py --build-dir sdk-build --install-root sdk-prefix --platform windows --target-triple "$env:SDK_TARGET_TRIPLE" --output-dir dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python test/sdk/smoke_archive.py (Get-ChildItem dist/*.tar.gz).FullName
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
