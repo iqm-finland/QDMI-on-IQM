@@ -28,39 +28,23 @@ from pathlib import Path
 
 import pytest
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
+from qiskit.circuit import Parameter, ParameterVector
+from qiskit.primitives.containers import BitArray, DataBin, PrimitiveResult, SamplerPubResult
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms import VQEResult
 
 from iqm.qdmi import offloader
 
+#: The stdout a worker produces for a sampling job returning a single `0` shot.
+SAMPLE_STDOUT = base64.b64encode(
+    pickle.dumps(PrimitiveResult([SamplerPubResult(DataBin(meas=BitArray.from_samples(["0"])), metadata={})]))
+)
 
-class FakeBitArray:
-    """Mock for Qiskit's BitArray."""
-
-    def __init__(self, counts: dict[str, int]) -> None:
-        """Initialize counts."""
-        self.counts = counts
-
-    def get_counts(self) -> dict[str, int]:
-        """Return counts."""
-        return self.counts
-
-
-class FakePubResult:
-    """Mock for PubResult."""
-
-    def __init__(self, data: dict[str, FakeBitArray]) -> None:
-        """Initialize data."""
-        self.data = data
-        self.metadata: dict[str, object] = {}
-
-
-class FakeVQEResult:
-    """Mock for VQEResult."""
-
-    def __init__(self, optimal_parameters: dict[str, float]) -> None:
-        """Initialize optimal parameters."""
-        self.optimal_parameters = optimal_parameters
+ESTIMATE_PARAMETER = Parameter("theta")
+_ESTIMATE_RESULT = VQEResult()
+_ESTIMATE_RESULT.optimal_parameters = {ESTIMATE_PARAMETER: 0.125}
+#: The stdout a worker produces for an estimation job converging on `theta`.
+ESTIMATE_STDOUT = base64.b64encode(pickle.dumps(_ESTIMATE_RESULT))
 
 
 def test_sample_local_simulator() -> None:
@@ -97,7 +81,7 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -133,7 +117,7 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -149,11 +133,12 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
-    assert result.optimal_parameters == {"theta": 0.125}
+    assert result.optimal_parameters == {ansatz.parameters[0]: 0.125}
     assert "srun" in captured_command
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
@@ -178,7 +163,7 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -223,7 +208,7 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -241,14 +226,14 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     qc_id = "12345678-1234-1234-1234-123456789abc"
-    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
 
     worker_index = captured_command.index("iqm-estimator")
     worker_command = captured_command[worker_index : worker_index + 5]
-    assert result.optimal_parameters == {"theta": 0.125}
     assert "https://resonance.example" not in captured_command
     assert "tokens_path" not in captured_command
     for flag in ("--base-url", "--tokens-file", "--token", "--qc-id", "--qc-alias"):
@@ -268,7 +253,7 @@ def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -302,7 +287,7 @@ def test_sample_slurm_omits_licenses_by_default(monkeypatch: pytest.MonkeyPatch,
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -331,7 +316,7 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -347,9 +332,10 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
-    result = offloader.estimate(
+    offloader.estimate(
         ansatz,
         operator,
         maxiter=3,
@@ -360,7 +346,6 @@ def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_p
     )
 
     worker_index = captured_command.index("iqm-estimator")
-    assert result.optimal_parameters == {"theta": 0.125}
     assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
     assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
 
@@ -385,7 +370,7 @@ def test_sample_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -419,7 +404,7 @@ def test_sample_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -470,7 +455,7 @@ def test_estimate_slurm_resolves_partition(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -490,6 +475,7 @@ def test_estimate_slurm_resolves_partition(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, partition=partition)
@@ -504,7 +490,7 @@ def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -520,6 +506,7 @@ def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
@@ -586,7 +573,53 @@ def test_sample_slurm_timeout_raises_runtime_error(monkeypatch: pytest.MonkeyPat
         offloader.sample(circuit, shots=7, local=False, simulator=True, timeout=5)
 
 
-def test_first_pub_raises_on_empty_result() -> None:
+def test_extract_counts_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
-        offloader._first_pub([])  # ruff:ignore[private-member-access]
+        offloader.extract_counts(PrimitiveResult([]))
+
+
+@pytest.mark.parametrize("stdout", [b"", b"\xff", b"not base64", base64.b64encode(b"not pickle")])
+def test_invalid_pickled_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stdout: bytes) -> None:
+    """Malformed worker output raises the public error type."""
+    process = subprocess.CompletedProcess([], 0, stdout, b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    with pytest.raises(RuntimeError, match=r"No output|Error parsing"):
+        offloader.estimate(QuantumCircuit(1), SparsePauliOp.from_list([("Z", 1.0)]), simulator=True)
+
+
+def test_vqe_result_pickle_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A genuine VQE result retains its full state across the pickle transport."""
+    theta = ParameterVector("theta", 2)
+    ansatz = QuantumCircuit(2)
+    ansatz.ry(theta[0], 0)
+    ansatz.cx(0, 1)
+    ansatz.ry(theta[1], 1)
+    operator = SparsePauliOp.from_list([("ZZ", 1.0)])
+    expected = offloader.estimate(ansatz, operator, maxiter=3, local=True, simulator=True)
+
+    expected.optimizer_evals = 7
+    encoded = base64.b64encode(pickle.dumps(expected)) + b"\n"
+    process = subprocess.CompletedProcess([], 0, encoded, b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    result = offloader.estimate(ansatz, operator, simulator=True)
+
+    assert result.optimal_parameters == expected.optimal_parameters
+    assert result.optimal_circuit == expected.optimal_circuit
+    assert result.eigenvalue == expected.eigenvalue
+    assert result.cost_function_evals == expected.cost_function_evals
+    assert result.optimal_point == pytest.approx(expected.optimal_point)
+    assert result.optimal_value == expected.optimal_value
+    assert result.optimizer_time == pytest.approx(expected.optimizer_time)
+    assert result.optimizer_evals == expected.optimizer_evals
+    assert result.aux_operators_evaluated == expected.aux_operators_evaluated
+    assert result.optimizer_result is not None
+    assert expected.optimizer_result is not None
+    assert result.optimizer_result.x == pytest.approx(expected.optimizer_result.x)
+    assert result.optimizer_result.fun == expected.optimizer_result.fun
+    assert result.optimizer_result.jac == pytest.approx(expected.optimizer_result.jac)
+    assert result.optimizer_result.nfev == expected.optimizer_result.nfev
+    assert result.optimizer_result.njev == expected.optimizer_result.njev
+    assert result.optimizer_result.nit == expected.optimizer_result.nit

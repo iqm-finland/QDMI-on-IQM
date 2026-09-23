@@ -55,6 +55,12 @@ stable ID `iqm.default` with the standard Resonance endpoint as its default. An
 existing configured definition with that ID is preserved, including its
 endpoint. Every backend opens a fresh device session with its own configuration.
 
+IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
+and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
+Qiskit serializer preserves these units. Applications submitting IQM JSON
+directly must use the same format; the legacy `angle_t` and `phase_t` fields
+expressed angles in turns.
+
 ## Circuit Metadata
 
 The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
