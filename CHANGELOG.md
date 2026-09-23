@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Expose IQM execution options such as heralding, dynamical decoupling, and
+  active reset on `IQMBackend` through `set_options` and per-run overrides
+  ([#272]) ([**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
@@ -262,6 +265,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254

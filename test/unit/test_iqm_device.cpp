@@ -1589,6 +1589,107 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
   EXPECT_FALSE(request.contains("num_active_reset_cycles"));
 }
 
+TEST_F(DeviceJobMockTest, StructuredExecutionOptionsReachRequest) {
+  http_stub.queue_post(200, R"({"id":"options-job"})");
+  constexpr auto options =
+      R"({"iqm_execution_options":1,"dd_mode":"enabled","max_circuit_duration_over_t2":0.5,"active_reset_cycles":2,"dd_strategy":{"merge_contiguous_waits":true}})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
+                                              strlen(options) + 1, options),
+            QDMI_SUCCESS);
+  constexpr auto mapping = "{unusual}:QB1,bob:QB2";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM5,
+                                              strlen(mapping) + 1, mapping),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("dd_mode"), "enabled");
+  EXPECT_EQ(request.at("max_circuit_duration_over_t2"), 0.5);
+  EXPECT_EQ(request.at("active_reset_cycles"), 2);
+  EXPECT_EQ(request.at("dd_strategy"),
+            nlohmann::json({{"merge_contiguous_waits", true}}));
+  EXPECT_EQ(request.at("qubit_mapping").at(0).at("logical_name"), "{unusual}");
+}
+
+TEST_F(DeviceJobMockTest,
+       StructuredExecutionOptionsRejectInvalidFieldsAtomically) {
+  const std::vector<std::string> invalid_options = {
+      R"({})",
+      R"({"iqm_execution_options":2})",
+      R"({"iqm_execution_options":1.0})",
+      R"({"iqm_execution_options":1,"unknown":true})",
+      R"({"iqm_execution_options":1,"dd_mode":"bad"})",
+      R"({"iqm_execution_options":1,"max_circuit_duration_over_t2":0})",
+      R"({"iqm_execution_options":1,"max_circuit_duration_over_t2":true})",
+      R"({"iqm_execution_options":1,"max_circuit_duration_over_t2":1e400})",
+      R"({"iqm_execution_options":1,"active_reset_cycles":-1})",
+      R"({"iqm_execution_options":1,"active_reset_cycles":1.5})",
+      R"({"iqm_execution_options":1,"active_reset_cycles":true})",
+      R"({"iqm_execution_options":1,"active_reset_cycles":18446744073709551616})",
+      R"({"iqm_execution_options":1,"dd_mode":"enabled","dd_strategy":[]})",
+      "{invalid",
+      "enabled-with-typo"};
+  for (const auto &options : invalid_options) {
+    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                  job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4, options.size() + 1,
+                  options.c_str()),
+              QDMI_ERROR_INVALIDARGUMENT)
+        << options;
+  }
+  const std::array<char, 3> unterminated{'a', 'b', 'c'};
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4, unterminated.size(),
+                unterminated.data()),
+            QDMI_ERROR_INVALIDARGUMENT);
+  http_stub.queue_post(200, R"({"id":"unchanged-options"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("dd_mode"), "disabled");
+  EXPECT_FALSE(request.contains("active_reset_cycles"));
+  EXPECT_FALSE(request.contains("max_circuit_duration_over_t2"));
+  EXPECT_FALSE(request.contains("dd_strategy"));
+}
+
+TEST_F(DeviceJobMockTest, LastSuccessfulOptionSetterWins) {
+  // Values above INT64_MAX still fit size_t on 64-bit hosts.
+  constexpr auto options =
+      R"({"iqm_execution_options":1,"dd_mode":"enabled","active_reset_cycles":9223372036854775808})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
+                                              strlen(options) + 1, options),
+            QDMI_SUCCESS);
+  constexpr auto mode = "disabled";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4, strlen(mode) + 1, mode),
+            QDMI_SUCCESS);
+  constexpr size_t cycles = 4;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job,
+                static_cast<QDMI_Device_Job_Parameter>(
+                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
+                sizeof(cycles), &cycles),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"options-precedence"})");
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("dd_mode"), "disabled");
+  EXPECT_EQ(request.at("active_reset_cycles"), 4);
+}
+
 TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
   constexpr auto replacement_program =
       R"({"name":"replacement","instructions":[],"metadata":{}})";

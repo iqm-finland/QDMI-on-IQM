@@ -400,6 +400,29 @@ including the
   [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791),
   set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
 
+`CUSTOM4` also accepts a NUL-terminated JSON options object. This carries the
+extended settings through clients that expose only QDMI's five named custom
+parameters:
+
+```json
+{
+  "iqm_execution_options": 1,
+  "dd_mode": "enabled",
+  "max_circuit_duration_over_t2": 0.5,
+  "active_reset_cycles": 2,
+  "dd_strategy": {"merge_contiguous_waits": true}
+}
+```
+
+The integer version marker is required. Other fields are optional. Unknown
+fields, invalid types, nonpositive/nonfinite duration ratios, negative reset
+counts, and non-object strategies return `QDMI_ERROR_INVALIDARGUMENT` without
+changing the job. Strategy contents are validated by the IQM server. Legacy
+`"enabled"`/`"disabled"` values and all `CUSTOM5` qubit mapping strings retain
+their existing meanings. If both this object and the standalone extended slots
+set the same field, the last successful setter wins. Omitted fields retain their
+previous values; setting the legacy mode changes only `dd_mode`.
+
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
 reports the number of jobs ahead of the job while it is queued. Every property

@@ -35,9 +35,14 @@ except ImportError as e:
 
 from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 from .gates import MoveGate
+from .options import execution_parameters
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from mqt.core.typing import QDMIJobParameters
     from qiskit.circuit import Instruction
+    from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
 
@@ -67,6 +72,38 @@ class IQMBackend(QDMIBackend):
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
     #: standard gate library, so the Target needs it supplied here.
     _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
+
+    @classmethod
+    def _default_options(cls) -> Options:
+        """Return shot options and optional IQM execution settings.
+
+        Older MQT Core versions reject the new settings instead of accepting
+        them without forwarding them to the device.
+
+        Returns:
+            Backend defaults; ``None`` leaves the native IQM default unchanged.
+        """
+        options = super()._default_options()
+        if hasattr(QDMIBackend, "_job_parameters"):
+            options.update_options(
+                heralding_mode=None,
+                move_gate_validation=None,
+                move_gate_frame_tracking=None,
+                dd_mode=None,
+                qubit_mapping=None,
+                max_circuit_duration_over_t2=None,
+                active_reset_cycles=None,
+                dd_strategy=None,
+            )
+        return options
+
+    def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
+        """Validate and encode IQM options for every circuit in a run.
+
+        Returns:
+            IQM custom job parameters for MQT Core's submission hook.
+        """
+        return execution_parameters(options)
 
     def __init__(
         self,
