@@ -34,7 +34,7 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           version=$(sed -n 's/^[[:space:]]*VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt | head -n 1)
           test "$RELEASE_TAG" = "v$version"
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'The draft tag must not exist before assets are staged' >&2
             exit 1
@@ -67,7 +67,7 @@ jobs:
           SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
         run: |
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'The draft tag was created while assets were building' >&2
             exit 1
@@ -87,9 +87,9 @@ jobs:
           test -n "$release_id"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
-          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --clobber
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort > staged-assets.txt
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort > staged-assets.txt
           for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS; do
             grep -Fqx "$name" staged-assets.txt
           done
