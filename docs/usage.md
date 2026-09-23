@@ -33,6 +33,19 @@ Examples guide.
 - If both environment variables and explicit parameters are set simultaneously,
   the explicit parameters will take precedence.
 
+### TLS Certificates
+
+Linux wheels use the host's CA trust store, discovering the standard CA bundle
+on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
+distribution's `ca-certificates` package if it is missing. Other platforms keep
+libcurl's native defaults.
+
+For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
+bundle before making requests. `SSL_CERT_FILE` is also supported when
+`CURL_CA_BUNDLE` is unset or empty. Invalid explicit paths cause requests to
+fail; certificate and hostname verification remain enabled. This applies to both
+native and Python clients.
+
 ### Session Configuration
 
 To initiate a session with a particular endpoint and authentication method, the
