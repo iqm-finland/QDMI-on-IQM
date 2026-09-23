@@ -40,8 +40,10 @@ target_sources(
          HEADERS
          BASE_DIRS
          ${CMAKE_CURRENT_BINARY_DIR}/include
+         ${PROJECT_SOURCE_DIR}/include
          FILES
-         ${PUBLIC_HEADER_FILES})
+         ${PUBLIC_HEADER_FILES}
+         ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/calibration.h)
 
 target_link_libraries(
   ${QDMI_TARGET_NAME}
