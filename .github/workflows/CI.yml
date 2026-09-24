@@ -133,7 +133,7 @@ jobs:
   cpp-sdk:
     name: 📦 SDK
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: $/.github/workflows/cpp-sdk-build.yml
 
   cpp-sanitizers:
@@ -246,11 +246,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
-            }}
-            ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'cpp-sdk,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sdk,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
