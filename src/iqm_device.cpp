@@ -1878,20 +1878,20 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     job->new_calibration_set_id_ =
         calibration_result.at("calibration_set_id").get<std::string>();
 
-    // Explicitly pinned sessions retain their architecture and metrics.
-    if (!job->session_->requested_calibration_set_id_.has_value()) {
-      // Update the dynamic quantum architecture with the new calibration set ID
-      auto ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
+    // Update the dynamic quantum architecture with the new calibration set ID,
+    // unless the session is pinned to an explicitly selected one.
+    auto ret = job->session_->requested_calibration_set_id_.has_value()
+                   ? QDMI_SUCCESS
+                   : IQM_QDMI_device_update_dynamic_quantum_architecture(
+                         job->session_, job->new_calibration_set_id_);
+    if (ret != QDMI_SUCCESS) {
+      LOG_INFO("Failed to update dynamic quantum architecture after "
+               "calibration request. Retrying in 120 seconds...");
+      std::this_thread::sleep_for(std::chrono::seconds(120));
+      ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
           job->session_, job->new_calibration_set_id_);
       if (ret != QDMI_SUCCESS) {
-        LOG_INFO("Failed to update dynamic quantum architecture after "
-                 "calibration request. Retrying in 120 seconds...");
-        std::this_thread::sleep_for(std::chrono::seconds(120));
-        ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
-            job->session_, job->new_calibration_set_id_);
-        if (ret != QDMI_SUCCESS) {
-          return ret;
-        }
+        return ret;
       }
     }
   }
