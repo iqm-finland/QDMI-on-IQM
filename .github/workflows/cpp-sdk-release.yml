@@ -19,6 +19,8 @@ jobs:
   preflight:
     name: Check draft and source commit
     runs-on: ubuntu-slim
+    permissions:
+      contents: write # Draft releases are hidden from read-only tokens
     outputs:
       source-sha: ${{ steps.check.outputs.source-sha }}
     steps:
