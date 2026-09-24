@@ -55,6 +55,36 @@ target_link_libraries(
 configure_qdmi_device_target(TARGET ${QDMI_TARGET_NAME} ID iqm.default PREFIX
                              ${QDMI_PREFIX})
 
+# Install metadata beside the device so discovery does not load native code.
+set(IQM_QDMI_MANIFEST
+    "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/iqm-qdmi-device.qdmi.json")
+file(
+  GENERATE
+  OUTPUT "${IQM_QDMI_MANIFEST}"
+  CONTENT
+    "{\n  \"schema-version\": 1,\n  \"qdmi\": {\n    \"devices\": [{\"id\": \"iqm.default\", \"library\": \"$<TARGET_FILE_NAME:${QDMI_TARGET_NAME}>\", \"prefix\": \"${QDMI_PREFIX}\", \"session\": {\"base-url\": \"https://resonance.iqm.tech\"}}]\n  }\n}\n"
+)
+add_custom_command(
+  TARGET ${QDMI_TARGET_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${IQM_QDMI_MANIFEST}"
+          "$<TARGET_FILE_DIR:${QDMI_TARGET_NAME}>/iqm-qdmi-device.qdmi.json")
+set_target_properties(${QDMI_TARGET_NAME}
+                      PROPERTIES QDMI_MANIFEST_NAME "iqm-qdmi-device.qdmi.json")
+set_property(
+  TARGET ${QDMI_TARGET_NAME}
+  APPEND
+  PROPERTY EXPORT_PROPERTIES QDMI_MANIFEST_NAME)
+if(WIN32)
+  set(IQM_QDMI_MANIFEST_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}")
+else()
+  set(IQM_QDMI_MANIFEST_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
+endif()
+install(
+  FILES "${IQM_QDMI_MANIFEST}"
+  DESTINATION "${IQM_QDMI_MANIFEST_INSTALL_DIR}"
+  COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+
 set(IQM_QDMI_CONFIG_INSTALL_DIR
     "${CMAKE_INSTALL_DATADIR}/cmake/${QDMI_TARGET_NAME}"
     CACHE INTERNAL "Config install directory")

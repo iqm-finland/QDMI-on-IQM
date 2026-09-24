@@ -27,6 +27,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- ✨ Discover installed QDMI device manifests and open independent sessions
+  through MQT Core's default driver. Use temporary source pins and LLVM/MLIR CI
+  setup until a suitable Core release is available ([**@burgholzer**]).
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
   pulse-support properties. Expose calibration submission through the
   IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the

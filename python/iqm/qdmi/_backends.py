@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mqt.core.plugins.qiskit.backend import QDMIBackend
+from mqt.core.qdmi.default_driver import open_device
 
 from iqm.qdmi.qiskit import IQMBackend
 
@@ -51,7 +52,7 @@ def build_sampler(
         its `backend` property.
     """
     if simulator:
-        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).sampler()
+        return QDMIBackend(device=open_device(_SIMULATOR_DEVICE_ID), device_id=_SIMULATOR_DEVICE_ID).sampler()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.sampler()
@@ -72,7 +73,7 @@ def build_estimator(
         as its `backend` property.
     """
     if simulator:
-        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).estimator()
+        return QDMIBackend(device=open_device(_SIMULATOR_DEVICE_ID), device_id=_SIMULATOR_DEVICE_ID).estimator()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.estimator()
