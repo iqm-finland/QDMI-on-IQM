@@ -220,10 +220,10 @@ print("Counts:", counts)
 The Qiskit backend covers circuit execution, but a QDMI device also answers
 questions about itself. MQT Core discovers the installed device manifest without
 importing provider code or loading the device library. Open its stable ID
-{py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the default driver:
+{py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the MQT Core QDMI driver:
 
 ```python
-from mqt.core.qdmi.default_driver import open_device
+from mqt.core.qdmi.builtin_driver import open_device
 
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 
