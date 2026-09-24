@@ -39,7 +39,7 @@ releases may include breaking changes.
 ### Changed
 
 - ✨ Discover installed QDMI device manifests and open independent sessions
-  through MQT Core's default driver. Use temporary source pins and LLVM/MLIR CI
+  through the MQT Core QDMI driver. Use temporary source pins and LLVM/MLIR CI
   setup until a suitable Core release is available ([#274]) ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
@@ -286,6 +286,7 @@ Compatible with QDMI `v1.3.0`.
 
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
 [#284]: https://github.com/iqm-finland/QDMI-on-IQM/pull/284
+[#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
@@ -362,5 +363,3 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-
-[#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 from mqt.core.qdmi import Device, Job, ProgramFormat
-from mqt.core.qdmi.default_driver import open_device
+from mqt.core.qdmi.builtin_driver import open_device
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
