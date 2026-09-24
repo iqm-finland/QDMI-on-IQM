@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.qdmi.default_driver import open_device
+    from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "

@@ -54,7 +54,7 @@ email = "developers@iqm.tech"
 # Temporary Core #2231 source pin: replace with a release before publishing.
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5bd2dfb3e7676f6bb4c00ff06d8952e2547cc5aa",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@7b0218a755478b42ca4ce69e408e9370f536c356",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "qiskit[qasm3-import]>=2.1",
@@ -73,7 +73,7 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 iqm-sampler = "iqm.qdmi.sampler:main"
 
 [project.entry-points]
-"mqt.core.qdmi.manifests"."iqm-qdmi-device.qdmi.json" = "iqm.qdmi"
+"mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
 # Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
 "mqt.core.qiskit.program_serializers".IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
@@ -102,7 +102,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5bd2dfb3e7676f6bb4c00ff06d8952e2547cc5aa",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@7b0218a755478b42ca4ce69e408e9370f536c356",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
