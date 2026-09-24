@@ -104,11 +104,12 @@ def test_device_reports_queue_length(device: Device) -> None:
 
 
 def test_retrieve_job_by_id_reaches_a_job_from_another_session(
-    circuit: QuantumCircuit, backend: IQMBackend, device: Device
+    circuit: QuantumCircuit, backend: IQMBackend, device: Device, request: pytest.FixtureRequest
 ) -> None:
     """A submitted job should be retrievable by ID from a separate session."""
     transpiled_circuit = transpile(circuit, backend=backend)
     submitted = backend.run(transpiled_circuit, shots=8)
+    request.addfinalizer(submitted.cancel)
     job_id = submitted.job_id()
 
     retrieved = device.retrieve_job_by_id(job_id)
@@ -120,11 +121,12 @@ def test_retrieve_job_by_id_reaches_a_job_from_another_session(
 
 
 def test_queue_position_is_reported_only_while_a_job_is_queued(
-    circuit: QuantumCircuit, backend: IQMBackend, device: Device
+    circuit: QuantumCircuit, backend: IQMBackend, device: Device, request: pytest.FixtureRequest
 ) -> None:
     """Querying a job's queue position should never raise, queued or not."""
     transpiled_circuit = transpile(circuit, backend=backend)
     submitted = backend.run(transpiled_circuit, shots=8)
+    request.addfinalizer(submitted.cancel)
 
     retrieved = device.retrieve_job_by_id(submitted.job_id())
     queue_position = retrieved.queue_position

@@ -28,7 +28,6 @@ import json
 from typing import TYPE_CHECKING, Any
 
 try:
-    import numpy as np
     from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
     from qiskit.circuit.library import Barrier, CZGate, Measure, RGate
 except ImportError as e:
@@ -114,15 +113,13 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
 
             # R gate (PRX in IQM terminology)
             if isinstance(operation, RGate):
-                angle_t = float(operation.params[0] / (2 * np.pi))
-                phase_t = float(operation.params[1] / (2 * np.pi))
                 qubit_index = circuit.find_bit(qargs[0]).index
                 instructions.append({
                     "name": "prx",
                     "locus": [sites[qubit_index].name()],
                     "args": {
-                        "angle_t": angle_t,
-                        "phase_t": phase_t,
+                        "angle": float(operation.params[0]),
+                        "phase": float(operation.params[1]),
                     },
                 })
 
