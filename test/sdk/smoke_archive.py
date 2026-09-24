@@ -30,6 +30,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# The operating system's C and C++ runtime, which the archive must not bundle.
+LINUX_SYSTEM_LIBRARIES = re.compile(r"(?:linux-vdso|ld-linux[^/]*|lib(?:c|m|pthread|dl|rt|stdc\+\+|gcc_s))\.so[.\d]*")
 
 
 def run(*command: str, env: dict[str, str] | None = None) -> str:
@@ -95,12 +97,17 @@ def main(archive_path: Path) -> None:
         if sys.platform.startswith("linux"):
             for library in (prefix / "lib").glob("*.so*"):
                 dynamic = run("readelf", "-d", str(library))
-                if "$ORIGIN" not in dynamic or temporary in dynamic:
+                if "$ORIGIN" not in dynamic or str(ROOT) in dynamic:
                     msg = f"Linux SDK has a nonrelocatable RPATH: {library}"
                     raise RuntimeError(msg)
-                if "not found" in run("ldd", str(library)):
-                    msg = f"Linux SDK has unresolved runtime dependencies: {library}"
-                    raise RuntimeError(msg)
+                # The build host still has every original library, so a
+                # dependency missing from the archive would resolve silently.
+                for line in run("ldd", str(library)).splitlines():
+                    name, _, resolved = line.strip().partition(" => ")
+                    system = LINUX_SYSTEM_LIBRARIES.fullmatch(Path(name.split()[0]).name)
+                    if not system and not resolved.startswith(str(prefix / "lib")):
+                        msg = f"Linux SDK does not bundle {name} for {library}: {resolved}"
+                        raise RuntimeError(msg)
                 versions = run("readelf", "--version-info", str(library))
                 for major, minor in re.findall(r"\bGLIBC_(\d+)\.(\d+)\b", versions):
                     if (int(major), int(minor)) > (2, 28):
@@ -108,8 +115,8 @@ def main(archive_path: Path) -> None:
                         raise RuntimeError(msg)
         elif sys.platform == "darwin":
             for library in (prefix / "lib").glob("*.dylib"):
-                linked = run("otool", "-L", str(library)).splitlines()[1:]
-                if any(temporary in line or "/opt/homebrew/" in line or "/usr/local/" in line for line in linked):
+                load_commands = run("otool", "-l", str(library))
+                if any(path in load_commands for path in (str(ROOT), "/opt/homebrew/", "/usr/local/")):
                     msg = f"macOS SDK has a machine-specific library path: {library}"
                     raise RuntimeError(msg)
                 run("codesign", "--verify", str(library))
