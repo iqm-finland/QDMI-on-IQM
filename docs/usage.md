@@ -34,7 +34,7 @@ target_link_libraries(my-application PRIVATE iqm-qdmi-device)
 ```
 
 For MQT Core integration, see
-[Using the Device with MQT Core](#using-the-device-with-mqt-core).
+[Using the Device with MQT Core](usage.md#using-the-device-with-mqt-core).
 On Windows, keep the archive's `bin/` directory on `PATH` when running such an
 application so the device DLL and its companion DLLs can be found.
 

@@ -177,27 +177,6 @@ perfect. We will guide you through the process.
 Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer.
 
-### Preparing C++ SDK Release Assets
-
-GitHub Releases for this repository are immutable. Build and attach the five C++
-SDK archives to the Release Drafter draft **before** publishing it:
-
-1. Finish merging release changes to `main`, and avoid further merges until the
-   release is published. Ensure the draft's `vX.Y.Z` tag matches the version in
-   `CMakeLists.txt`; do not create the tag separately.
-2. Run the **Prepare C++ SDK release assets** workflow from `main`, supplying
-   the draft tag. It builds Linux x86-64 and arm64, macOS arm64, and Windows
-   x86-64 and arm64 archives, then extracts and tests each one. The workflow
-   fails if `main` moves before upload.
-3. Confirm that the draft has all five archives and `SHA256SUMS`. Check that its
-   target commit is the commit recorded by the workflow. If `main` moved after
-   upload, rerun the workflow before publishing.
-4. Publish the draft. The existing CD workflow then builds and publishes the
-   Python distributions to PyPI.
-
-The SDK archives are also built as temporary artifacts on relevant PRs. They are
-not uploaded to a Release until the manual preparation workflow succeeds.
-
 ### Configure and Build
 
 This project uses CMake as the main build configuration tool. Building a project
@@ -467,6 +446,28 @@ uvx nox -s docs
 ```
 
 The generated HTML site is written to `docs/_build/html/`.
+
+## Preparing C++ SDK Release Assets
+
+GitHub Releases for this repository are immutable. Build and attach the five C++
+SDK archives to the Release Drafter draft **before** publishing it:
+
+1. Finish merging release changes to `main`, and avoid further merges until the
+   release is published. Ensure the draft's `vX.Y.Z` tag matches the version in
+   `CMakeLists.txt`; do not create the tag separately.
+2. Run the **Prepare C++ SDK release assets** workflow from `main`, supplying
+   the draft tag. It builds Linux x86-64 and arm64, macOS arm64, and Windows
+   x86-64 and arm64 archives, then extracts and tests each one. The workflow
+   fails if `main` moves before upload.
+3. Confirm that the draft has all five archives, `SHA256SUMS`, and `SOURCE_SHA`.
+   If `main` moved after upload, rerun the workflow before publishing: Release
+   Drafter retargets the draft on every push to `main`.
+4. Publish the draft. The existing CD workflow then builds and publishes the
+   Python distributions to PyPI. It refuses to publish when the release commit
+   differs from `SOURCE_SHA`.
+
+The SDK archives are also built as temporary artifacts on relevant PRs. They are
+not uploaded to a Release until the manual preparation workflow succeeds.
 
 ## Tips for Development
 
