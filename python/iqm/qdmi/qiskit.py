@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
+    from mqt.core.qdmi.default_driver import open_device
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -33,15 +33,13 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
+from . import IQM_QDMI_DEVICE_ID
 from .gates import MoveGate
 
 if TYPE_CHECKING:
     from qiskit.circuit import Instruction
 
 __all__ = ["IQMBackend"]
-
-IQM_DEFAULT_BASE_URL = "https://resonance.iqm.tech"
 
 
 def __dir__() -> list[str]:
@@ -56,7 +54,7 @@ class IQMBackend(QDMIBackend):
 
     Args:
         base_url: Base URL of the IQM service. Overrides `IQM_SERVER_URL`, its
-            `IQM_BASE_URL` alias, and the registered device default when provided.
+            `IQM_BASE_URL` alias, and the manifest default when provided.
         token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
@@ -85,14 +83,6 @@ class IQMBackend(QDMIBackend):
         resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
         resolved_qc_alias = qc_alias or os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS")
 
-        register_device_if_absent(
-            DeviceDefinition(
-                IQM_QDMI_DEVICE_ID,
-                IQM_QDMI_LIBRARY_PATH,
-                IQM_QDMI_PREFIX,
-                base_url=IQM_DEFAULT_BASE_URL,
-            )
-        )
         device = open_device(
             IQM_QDMI_DEVICE_ID,
             base_url=resolved_base_url,

@@ -164,6 +164,9 @@ jobs:
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@17f5c58e46c51027501e7d8d38dc182654ed035c # v2.5.0
     with:
+      # Temporary while MQT Core is pinned to PR #2231.
+      setup-mlir: true
+      llvm-version: 23.1.1
       check-stubs: false
       enable-ty: true
       enable-mypy: false
