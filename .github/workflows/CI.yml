@@ -162,14 +162,20 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
-    with:
-      # Temporary while MQT Core is pinned to PR #2231.
-      setup-mlir: true
-      llvm-version: 23.1.1
-      check-stubs: false
-      enable-ty: true
-      enable-mypy: false
+    # Temporary local setup while Core PR #2231 requires a source build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: munich-quantum-software/setup-mlir@3f32263ce571a8b745068980f30f188b6e800763 # v1.4.2
+        with:
+          llvm-version: 23.1.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uvx prek run -a ty
+      - run: uvx check-sdist --inject-junk
 
   examples:
     name: 🐍 End-to-End Examples
