@@ -79,6 +79,7 @@ jobs:
           done
           test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 5
           (cd dist && cat ./*.sha256 > SHA256SUMS && sha256sum -c SHA256SUMS)
+          echo "$SOURCE_SHA" > dist/SOURCE_SHA
       - name: Pin draft target and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,9 +90,9 @@ jobs:
           test -n "$release_id"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
-          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS dist/SOURCE_SHA --repo "$GITHUB_REPOSITORY" --clobber
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort > staged-assets.txt
-          for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS; do
+          for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS SOURCE_SHA; do
             grep -Fqx "$name" staged-assets.txt
           done
