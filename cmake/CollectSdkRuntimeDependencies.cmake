@@ -23,21 +23,12 @@ if(POLICY CMP0207)
   cmake_policy(SET CMP0207 NEW)
 endif()
 
-# CMake uses the platform's native binary inspection tool. The build directory
-# helps Windows find DLLs supplied by the build rather than the operating
-# system.
-set(search_directories "${SDK_BUILD_DIR}")
+# CMake uses the platform's native binary inspection tool.
 set(system_excludes "^$")
 if(CMAKE_HOST_WIN32)
   # System DLLs can import optional Windows components absent from the runner.
   # Stop before recursing into them while still scanning all third-party DLLs.
   set(system_excludes "^[A-Za-z]:/[Ww]indows/")
-  file(GLOB_RECURSE built_dlls "${SDK_BUILD_DIR}/*.dll")
-  foreach(dll IN LISTS built_dlls)
-    get_filename_component(DIRECTORY "${dll}" DIRECTORY)
-    list(APPEND search_directories "${directory}")
-  endforeach()
-  list(REMOVE_DUPLICATES search_directories)
 endif()
 
 file(
@@ -50,8 +41,6 @@ file(
   unresolved
   CONFLICTING_DEPENDENCIES_PREFIX
   conflicts
-  DIRECTORIES
-  ${search_directories}
   POST_EXCLUDE_REGEXES
   ${system_excludes}
   PRE_EXCLUDE_REGEXES

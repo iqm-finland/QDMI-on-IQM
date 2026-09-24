@@ -94,7 +94,7 @@ def find_device_library(prefix: Path, platform: str) -> Path:
     return matches[0]
 
 
-def scan_dependencies(library: Path, build_dir: Path, output: Path) -> list[Path]:
+def scan_dependencies(library: Path, output: Path) -> list[Path]:
     """Collect direct and transitive native dependencies with CMake.
 
     Returns:
@@ -103,7 +103,6 @@ def scan_dependencies(library: Path, build_dir: Path, output: Path) -> list[Path
     run(
         "cmake",
         f"-DSDK_LIBRARY={library}",
-        f"-DSDK_BUILD_DIR={build_dir}",
         f"-DSDK_OUTPUT={output}",
         "-P",
         str(ROOT / "cmake/CollectSdkRuntimeDependencies.cmake"),
@@ -260,7 +259,7 @@ def main() -> None:
         msg = "Incomplete CMake development installation"
         raise RuntimeError(msg)
     scan_file = build_dir / "sdk-runtime-dependencies.txt"
-    dependencies = scan_dependencies(library, build_dir, scan_file)
+    dependencies = scan_dependencies(library, scan_file)
     bundled = copy_dependencies(dependencies, library.parent, args.platform)
     if args.platform == "linux":
         fix_linux_paths(library, bundled)
