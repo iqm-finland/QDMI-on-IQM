@@ -35,13 +35,6 @@ WINDOWS_SYSTEM_LIBRARIES = re.compile(
     r"^(?:api-ms-win-.*|ext-ms-.*|ucrtbase|vcruntime\d*|msvcp\d*|concrt\d*)\.dll$",
     re.IGNORECASE,
 )
-SOURCE_LICENSES = {
-    "QDMI": ("qdmi-src", "LICENSE"),
-    "nlohmann-json": ("nlohmann_json-src", "LICENSE.MIT"),
-    "CPR": ("cpr-src", "LICENSE"),
-    "curl": ("curl-src", "COPYING"),
-    "zlib": ("zlib-src", "LICENSE.md"),
-}
 
 
 def run(*args: str) -> str:
@@ -170,18 +163,21 @@ def copy_licenses(prefix: Path, build_dir: Path, dependencies: dict[str, Path], 
     """Preserve project and dependency license texts in the archive.
 
     Raises:
-        RuntimeError: If a bundled dependency has no available license text.
+        RuntimeError: If a fetched or bundled dependency has no available license text.
     """
     licenses = prefix / "licenses"
     licenses.mkdir(exist_ok=True)
     shutil.copy2(ROOT / "LICENSE", licenses / "QDMI-on-IQM.txt")
-    for name, (source, filename) in SOURCE_LICENSES.items():
-        license_file = build_dir / "_deps" / source / filename
-        if license_file.exists():
-            shutil.copy2(license_file, licenses / f"{name}.txt")
-        elif name in {"QDMI", "nlohmann-json", "CPR"} or (name == "curl" and platform != "macos"):
-            msg = f"Missing license text for {name}: {license_file}"
+    # Every FetchContent dependency is compiled or linked into the device library.
+    for source in sorted((build_dir / "_deps").glob("*-src")):
+        license_files = [
+            file for pattern in ("LICENSE*", "COPYING*") for file in source.glob(pattern) if file.is_file()
+        ]
+        if not license_files:
+            msg = f"No license text in fetched dependency {source}"
             raise RuntimeError(msg)
+        for license_file in license_files:
+            shutil.copy2(license_file, licenses / f"{source.name.removesuffix('-src')}-{license_file.name}")
 
     if platform == "linux":
         for name, source in dependencies.items():
