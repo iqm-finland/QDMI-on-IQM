@@ -218,13 +218,12 @@ print("Counts:", counts)
 ## Querying the Device Directly
 
 The Qiskit backend covers circuit execution, but a QDMI device also answers
-questions about itself. Open a session with MQT Core's driver to reach them.
-Constructing an {py:class}`~iqm.qdmi.qiskit.IQMBackend` registers the device
-under the stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID`, after which
-`open_device` resolves it:
+questions about itself. MQT Core discovers the installed device manifest without
+importing provider code or loading the device library. Open its stable ID
+{py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the default driver:
 
 ```python
-from mqt.core.qdmi.driver import open_device
+from mqt.core.qdmi.default_driver import open_device
 
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 
@@ -262,3 +261,12 @@ print(job.check())
 ```
 
 A retrieved job cannot be resubmitted, and its parameters cannot be changed.
+
+## Temporary driver-stack validation
+
+This development branch pins unreleased QDMI #511 and MQT Core #2231 commits to
+exercise installed driver and device discovery. It is not ready for release
+publication. Replace both pins with suitable releases and regenerate `uv.lock`
+before publishing. Remove the temporary LLVM/MLIR setup from Python CI and Linux
+wheel-test containers once Core wheels are available for these APIs. Native-only
+device builds do not require LLVM/MLIR.

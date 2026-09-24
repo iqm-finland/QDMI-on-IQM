@@ -38,6 +38,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- ✨ Discover installed QDMI device manifests and open independent sessions
+  through MQT Core's default driver. Use temporary source pins and LLVM/MLIR CI
+  setup until a suitable Core release is available ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
   itself and does not require clients to trigger it ([#229], [#266])
