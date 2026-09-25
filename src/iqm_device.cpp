@@ -208,7 +208,7 @@ struct IQM_QDMI_Device_Job_impl_d {
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 parameter.
   std::string dd_mode_ = "disabled";
   /// @brief Stores a mapping of logical qubit names to physical qubit names.
-  /// @details This mapping can be important for the execution of QIR programs.
+  /// @details Placement does not change classical output positions.
   ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 parameter.
   ///          This is transferred as a comma-separated list of pairs of
   ///          logical and physical qubit names, for example,
@@ -227,6 +227,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   ///          defined at
   ///          https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791
   std::optional<std::string> dd_strategy_ = std::nullopt;
+  /// IQM JSON measurement keys and widths in instruction/locus order.
+  std::optional<std::vector<std::pair<std::string, size_t>>> output_layout_;
   /// The dictionary of results (histogram counts).
   std::map<std::string, size_t> counts_;
   /// Measurement keys in the order used by IQM's histogram bitstrings.
@@ -1337,14 +1339,125 @@ std::string_view Program_contents(const std::string &stored_program) {
   return program;
 }
 
+/// @brief Retain output positions from a single circuit before placement.
+/// @param job The circuit job.
+/// @param circuit The IQM JSON circuit.
+/// @return Whether the circuit provides an unambiguous measurement layout.
+bool Set_output_layout(IQM_QDMI_Device_Job job, const nlohmann::json &circuit) {
+  if (!circuit.is_object() || circuit.contains("circuits") ||
+      !circuit.contains("instructions") ||
+      !circuit.at("instructions").is_array()) {
+    return false;
+  }
+  std::vector<std::pair<std::string, size_t>> layout;
+  for (const auto &instruction : circuit.at("instructions")) {
+    if (instruction.at("name") != "measure") {
+      continue;
+    }
+    const auto key = instruction.at("args").at("key").get<std::string>();
+    const auto &locus = instruction.at("locus");
+    if (key.empty() || !locus.is_array() || locus.empty() ||
+        !std::ranges::all_of(
+            locus, [](const auto &site) { return site.is_string(); }) ||
+        std::ranges::any_of(
+            layout, [&](const auto &field) { return field.first == key; })) {
+      return false;
+    }
+    layout.emplace_back(key, locus.size());
+  }
+  job->output_layout_ = std::move(layout);
+  return true;
+}
+
+/// @brief Recover source output positions for a reopened job.
+/// @param job The retrieved circuit job.
+/// @return The QDMI status of loading the original request.
+int Ensure_output_layout(IQM_QDMI_Device_Job job) {
+  if (!job->retrieved_ || job->program_set_) {
+    return QDMI_SUCCESS;
+  }
+  const auto response = iqm::http::Get(
+      job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_PAYLOAD,
+                                      job->job_id_),
+      job->session_->token_manager_->get_bearer_token(),
+      *job->session_->connection_pool_, job->session_->request_timeout_,
+      &job->session_->rate_limit_);
+  if (const auto status = iqm::http::Handle_response(response);
+      status != QDMI_SUCCESS) {
+    return status;
+  }
+  const auto payload = nlohmann::json::parse(response.text);
+  const auto &circuits = payload.at("circuits");
+  if (!circuits.is_array() || circuits.size() != 1) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  const auto &circuit = circuits.at(0);
+  if (circuit.is_string()) {
+    job->program_format_ = QDMI_PROGRAM_FORMAT_QIRBASESTRING;
+    job->program_ = circuit.get<std::string>();
+  } else {
+    if (!Set_output_layout(job, circuit)) {
+      return QDMI_ERROR_FATAL;
+    }
+    job->program_ = circuit.dump();
+  }
+  job->num_shots_ = payload.at("shots").get<size_t>();
+  job->program_set_ = true;
+  return QDMI_SUCCESS;
+}
+
+/// @brief Reorder a backend outcome into QDMI output positions.
+/// @param job The job with circuit and backend column metadata.
+/// @param outcome The backend outcome in measurement-key/locus order.
+/// @return The normalized bitstring, or no value for invalid metadata/results.
+std::optional<std::string> Normalize_outcome(IQM_QDMI_Device_Job job,
+                                             const std::string &outcome) {
+  if (!std::ranges::all_of(
+          outcome, [](const char bit) { return bit == '0' || bit == '1'; })) {
+    return std::nullopt;
+  }
+  std::string normalized;
+  if (job->output_layout_) {
+    std::map<std::string, std::pair<size_t, size_t>> columns;
+    size_t offset = 0;
+    for (const auto &key : *job->measurement_keys_) {
+      const auto field =
+          std::ranges::find_if(*job->output_layout_, [&](const auto &entry) {
+            return entry.first == key;
+          });
+      if (field == job->output_layout_->end() || columns.contains(key) ||
+          field->second > outcome.size() - offset) {
+        return std::nullopt;
+      }
+      columns.emplace(key, std::pair{offset, field->second});
+      offset += field->second;
+    }
+    if (offset != outcome.size() ||
+        columns.size() != job->output_layout_->size()) {
+      return std::nullopt;
+    }
+    for (const auto &[key, width] : *job->output_layout_) {
+      normalized.append(outcome, columns.at(key).first, width);
+    }
+  } else {
+    /// The legacy QIR service only exposes measurement-key order.
+    normalized = outcome;
+  }
+  std::ranges::reverse(normalized);
+  return normalized;
+}
+
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
   auto json_program = nlohmann::json();
   json_program["circuits"] = nlohmann::json::array();
   const auto program = Program_contents(job->program_);
   if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON) {
-    json_program["circuits"].emplace_back(
-        nlohmann::json::parse(program.begin(), program.end()));
+    const auto circuit = nlohmann::json::parse(program.begin(), program.end());
+    if (!Set_output_layout(job, circuit)) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    json_program["circuits"].push_back(circuit);
   } else {
     json_program["circuits"].emplace_back(std::string{program});
   }
@@ -1709,7 +1822,10 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
                                          const QDMI_Job_Result result,
                                          const size_t size, void *data,
                                          size_t *size_ret) {
-  // Fetch the remote results, if not already fetched
+  if (const auto status = Ensure_output_layout(job); status != QDMI_SUCCESS) {
+    return status;
+  }
+  /// Fetch the remote results, if not already fetched.
   if (job->counts_.empty()) {
     // Optimization: if we already have shots, compute counts from them
     if (job->shots_.has_value() && !job->shots_->empty()) {
@@ -1745,7 +1861,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
 
       // Response is an array with one result for the submitted circuit.
       if (!job_results_json_response.is_array() ||
-          job_results_json_response.empty()) {
+          job_results_json_response.size() != 1) {
         LOG_ERROR("Expected a non-empty array of results for job " +
                   job->job_id_);
         return QDMI_ERROR_FATAL;
@@ -1753,10 +1869,19 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       const auto &counts_result = job_results_json_response.at(0);
       job->measurement_keys_ =
           counts_result.at("measurement_keys").get<std::vector<std::string>>();
-      for (const auto &counts = counts_result.at("counts");
-           const auto &[bitstring, count] : counts.items()) {
-        job->counts_[bitstring] = count.get<size_t>();
+      const auto &counts = counts_result.at("counts");
+      if (!counts.is_object()) {
+        return QDMI_ERROR_FATAL;
       }
+      std::map<std::string, size_t> normalized_counts;
+      for (const auto &[bitstring, count] : counts.items()) {
+        const auto normalized = Normalize_outcome(job, bitstring);
+        if (!normalized || !count.is_number_unsigned()) {
+          return QDMI_ERROR_FATAL;
+        }
+        normalized_counts[*normalized] = count.get<size_t>();
+      }
+      job->counts_ = std::move(normalized_counts);
     }
   }
   if (result == QDMI_JOB_RESULT_HIST_KEYS) {
@@ -2032,6 +2157,16 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
             }
 
             if (!key_result_width.has_value()) {
+              if (job->output_layout_) {
+                const auto field = std::ranges::find_if(
+                    *job->output_layout_,
+                    [&](const auto &entry) { return entry.first == key; });
+                if (field == job->output_layout_->end() ||
+                    field->second != qubit_result.size()) {
+                  job->shots_.reset();
+                  return QDMI_ERROR_FATAL;
+                }
+              }
               key_result_width = qubit_result.size();
             } else if (qubit_result.size() != *key_result_width) {
               LOG_ERROR(
@@ -2069,6 +2204,14 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
           }
         }
       }
+    }
+    for (auto &shot : *job->shots_) {
+      const auto normalized = Normalize_outcome(job, shot);
+      if (!normalized) {
+        job->shots_.reset();
+        return QDMI_ERROR_FATAL;
+      }
+      shot = *normalized;
     }
   }
 

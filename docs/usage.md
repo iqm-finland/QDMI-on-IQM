@@ -767,3 +767,51 @@ instead. The wait comes out of the timeout of the request that triggered it; a
 request with less time than that left proceeds without waiting. Other clients
 using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
+
+## Program output and result ordering
+
+`QDMI_PROGRAM_FORMAT_IQMJSON` contains one circuit. Execution options and the
+optional logical-to-physical qubit mapping are separate job parameters. Without
+a mapping, instruction locus names identify physical sites. Placement does not
+change output positions: measurements contribute bits in instruction order, then
+in locus order. QDMI serializes output bit zero on the right and preserves
+leading zeros.
+
+The device matches backend measurement keys and their columns to the submitted
+circuit before returning shots or histogram keys. It neither sorts keys to
+choose output positions nor interprets Qiskit register names embedded in keys.
+Reopened jobs retrieve their original payload to recover the same ordering.
+Malformed keys or widths are rejected instead of producing a partial result.
+
+For example, a circuit measuring `alice` under `a_result` and then
+`[bob, alice]` under `z_result` has output positions `[alice, bob, alice]`.
+Backend columns `z_result = [0, 1]`, `a_result = [0]` become QDMI `100`,
+regardless of the placement mapping or response-member order. Source classical
+registers, unwritten initialized bits, and overwritten destinations are
+reconstructed by the compiler or frontend above this circuit-level interface.
+
+Direct QIR submission remains available through the IQM service for standard
+programs with terminal measurements. Its output-recording semantics are not
+fully QIR-compliant; arbitrary recording order, repeated recordings, and typed
+program outputs are outside this path's supported contract. It does not provide
+`QDMI_JOB_RESULT_QIR_OUTPUT`. Frontend integrations use IQM JSON.
+
+### Migrating result consumers
+
+Raw IQM JSON results now follow QDMI output order instead of the backend's
+measurement-key concatenation order. Remove client-side backend-key sorting and
+bit reversal. Keep source-level classical reconstruction in the frontend.
+`QDMI_JOB_RESULT_QIR_OUTPUT` and `QDMI_JOB_RESULT_QASM3_OUTPUT` are recognized
+result IDs and return `QDMI_ERROR_NOTSUPPORTED` on this device.
+
+The Qiskit serializer returns a Core `SerializedProgram` with one mapping entry
+per source classical bit. This preserves separate registers, initial zeros, and
+the final write to each destination, independently of measurement-key names.
+With Core versions predating this API, only identity layouts are accepted; other
+layouts raise an upgrade error before submission. Complete mapping support is
+introduced in
+[Core #2626](https://github.com/munich-quantum-toolkit/core/pull/2626).
+
+PennyLane uses Core's IQM JSON converter when the device advertises `prx` and
+`cz`. It measures in wire order and reconstructs requested wire subsets through
+the regular QDMI plugin. Both integrations use IQM JSON.

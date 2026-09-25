@@ -27,6 +27,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Normalize IQM JSON shots and histogram keys to circuit measurement/locus
+  order with output bit zero on the right. Recover the original circuit when
+  reopening jobs and reject mismatched response keys or widths.
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
   pulse-support properties. Expose calibration submission through the
   IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the

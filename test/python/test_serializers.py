@@ -20,18 +20,33 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from mqt.core.plugins.qiskit import serializers as core_serializers
 from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
+from mqt.core.plugins.qiskit.job import QDMIJob
+from mqt.core.qdmi import Job
+from qiskit import transpile
 from qiskit.circuit import ClassicalRegister, Clbit, Parameter, QuantumCircuit, QuantumRegister
+from qiskit.providers.basic_provider import BasicSimulator
 
 from iqm.qdmi.gates import MoveGate
 from iqm.qdmi.serializers import qiskit_to_iqm_json
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def _program(serialized: str | core_serializers.SerializedProgram) -> dict[str, Any]:  # ty: ignore[unresolved-attribute]
+    """Read the circuit from either supported Core serializer representation.
+
+    Returns:
+        The decoded circuit payload.
+    """
+    return json.loads(serialized if isinstance(serialized, str) else serialized.payload)
 
 
 class StubSite:
@@ -44,6 +59,10 @@ class StubSite:
             index: Position of the site on the device.
         """
         self._index = index
+
+    def index(self) -> int:
+        """Return the program index."""
+        return self._index
 
     def name(self) -> str:
         """Returns the site name the IQM JSON format uses as a locus entry."""
@@ -100,7 +119,7 @@ def test_simple_circuit(backend: Callable[[int], StubBackend]) -> None:
     qc.cz(0, 1)
     qc.measure([0, 1], [0, 1])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
 
     assert [instr["name"] for instr in program["instructions"]] == ["prx", "cz", "measure", "measure"]
     assert program["metadata"] == {}
@@ -115,7 +134,7 @@ def test_prx_parameters(backend: Callable[[int], StubBackend], angle: float, pha
     qc = QuantumCircuit(1)
     qc.r(angle, phase, 0)
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
 
     prx = program["instructions"][0]
     assert prx["name"] == "prx"
@@ -128,7 +147,7 @@ def test_barrier(backend: Callable[[int], StubBackend]) -> None:
     qc = QuantumCircuit(3)
     qc.barrier([0, 2])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(3)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(3)))  # ty: ignore[invalid-argument-type]
 
     barrier = program["instructions"][0]
     assert barrier["name"] == "barrier"
@@ -141,7 +160,7 @@ def test_cz_gate(backend: Callable[[int], StubBackend]) -> None:
     qc = QuantumCircuit(2)
     qc.cz(0, 1)
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
 
     cz = program["instructions"][0]
     assert cz["name"] == "cz"
@@ -154,7 +173,7 @@ def test_move_gate(backend: Callable[[int], StubBackend]) -> None:
     qc = QuantumCircuit(2)
     qc.append(MoveGate(), [0, 1])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
 
     move = program["instructions"][0]
     assert move["name"] == "move"
@@ -163,12 +182,12 @@ def test_move_gate(backend: Callable[[int], StubBackend]) -> None:
 
 
 def test_measure_keys_are_unique(backend: Callable[[int], StubBackend]) -> None:
-    """Each measurement carries a key derived from its classical register position."""
+    """Each measurement carries a unique instruction key."""
     qc = QuantumCircuit(2, 2)
     qc.cz(0, 1)
     qc.measure([0, 1], [0, 1])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
 
     keys = [instr["args"]["key"] for instr in program["instructions"] if instr["name"] == "measure"]
     assert len(keys) == 2
@@ -180,7 +199,7 @@ def test_circuit_name_is_preserved(backend: Callable[[int], StubBackend]) -> Non
     qc = QuantumCircuit(1, name="my_circuit")
     qc.r(0.0, 0.0, 0)
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
 
     assert program["name"] == "my_circuit"
 
@@ -191,7 +210,7 @@ def test_bound_parameters(backend: Callable[[int], StubBackend]) -> None:
     qc = QuantumCircuit(1)
     qc.r(theta, 0.0, 0)
 
-    program = json.loads(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
 
     assert program["instructions"][0]["args"]["angle"] == pytest.approx(np.pi)
 
@@ -215,24 +234,23 @@ def test_unsupported_operation_is_rejected(backend: Callable[[int], StubBackend]
         qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
 
 
-def test_unregistered_classical_bit_is_rejected(backend: Callable[[int], StubBackend]) -> None:
-    """Measuring into a loose classical bit fails the conversion."""
+def test_unregistered_classical_bit(backend: Callable[[int], StubBackend]) -> None:
+    """Loose classical bits have the same identity mapping as registered bits."""
     qc = QuantumCircuit(QuantumRegister(1), [Clbit()])
     qc.measure(0, 0)
-
-    with pytest.raises(TranslationError, match="unregistered classical bit"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+    assert program["instructions"][0]["args"]["key"] == "m0"
 
 
 def test_registered_classical_bit(backend: Callable[[int], StubBackend]) -> None:
-    """Measuring into a named register encodes the register in the key."""
+    """Measurement keys identify instructions independently of register names."""
     creg = ClassicalRegister(1, "result")
     qc = QuantumCircuit(QuantumRegister(1), creg)
     qc.measure(0, 0)
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
+    program = _program(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
 
-    assert program["instructions"][0]["args"]["key"] == "result_1_0_0"
+    assert program["instructions"][0]["args"]["key"] == "m0"
 
 
 def test_serialization_failure_becomes_translation_error(backend: Callable[[int], StubBackend]) -> None:
@@ -250,3 +268,54 @@ def test_serializer_is_advertised_to_mqt_core() -> None:
     from mqt.core.qdmi import ProgramFormat  # ruff:ignore[import-outside-top-level]
 
     assert program_serializer(ProgramFormat.IQM_JSON) is qiskit_to_iqm_json
+
+
+def test_source_classical_layout(backend: Callable[[int], StubBackend]) -> None:
+    """Keep register widths, initialized holes, and the last write to each bit."""
+    qc = QuantumCircuit(QuantumRegister(2), ClassicalRegister(3, "a"), ClassicalRegister(2, "b"))
+    qc.measure(0, 2)
+    qc.measure(1, 4)
+    qc.measure(1, 2)
+    if not hasattr(core_serializers, "SerializedProgram"):
+        with pytest.raises(TranslationError, match="Upgrade MQT Core"):
+            qiskit_to_iqm_json(qc, backend(2))  # ty: ignore[invalid-argument-type]
+        return
+    serialized = qiskit_to_iqm_json(qc, backend(2))  # ty: ignore[invalid-argument-type]
+    assert not isinstance(serialized, str)
+    assert serialized.output_width == 3
+    assert serialized.clbit_indices == (None, None, 2, None, 1)
+    keys = [i["args"]["key"] for i in _program(serialized)["instructions"]]
+    assert keys == ["m0", "m1", "m2"]
+
+
+@pytest.mark.skipif(not hasattr(core_serializers, "SerializedProgram"), reason="Requires Core output-mapping API")
+@pytest.mark.parametrize("memory", [False, True])
+def test_qiskit_result_matches_basic_simulator(backend: Callable[[int], StubBackend], *, memory: bool) -> None:
+    """Reconstruct IQM raw outputs into the same source result as native Qiskit."""
+    circuit = QuantumCircuit(QuantumRegister(2), ClassicalRegister(3, "a"), ClassicalRegister(2, "b"))
+    circuit.r(np.pi, 0, 0)
+    circuit.measure(0, 2)
+    circuit.measure(0, 4)
+    circuit.measure(1, 2)
+    serialized = qiskit_to_iqm_json(circuit, backend(2))  # ty: ignore[invalid-argument-type]
+    handle = Mock(spec=Job)
+    handle.id = "local-result"
+    handle.check.return_value = Job.Status.DONE
+    handle.get_shots.return_value = ["011"] * 8
+    handle.get_counts.return_value = {"011": 8}
+    provider = Mock(name="iqm")
+    provider.name = "iqm"
+    provider.backend_version = "test"
+    actual = QDMIJob(
+        provider,
+        [handle],
+        [circuit],
+        shots=8,
+        memory=memory,
+        output_mappings=[serialized],  # ty: ignore[unknown-argument]
+    ).result()
+    simulator = BasicSimulator()
+    expected = simulator.run(transpile(circuit, simulator), shots=8, memory=memory).result()
+    assert actual.get_counts() == expected.get_counts() == {"10 000": 8}
+    if memory:
+        assert actual.get_memory() == expected.get_memory()
