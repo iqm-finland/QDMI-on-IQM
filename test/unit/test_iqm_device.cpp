@@ -1668,11 +1668,11 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
   const auto gets_before_results = http_stub.get_urls().size();
   http_stub.queue_get(200, R"([
     {"measurement_keys":["b","a"],"counts":{"01":2,"10":1}},
-    {"measurement_keys":["c"],"counts":{"1":3}}
+    {"measurement_keys":["c"],"counts":{"1":2}}
   ])");
   http_stub.queue_get(200, R"([
     {"a":[[1],[0],[1]],"b":[[0],[1],[0]]},
-    {"c":[[1],[1],[1]]}
+    {"c":[[1],[1]]}
   ])");
   for (const auto index : {1U, 0U}) {
     size_t size = 0;
@@ -1685,7 +1685,7 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
                   retrieved_job, index, QDMI_JOB_RESULT_SHOTS, samples.size(),
                   samples.data(), nullptr),
               QDMI_SUCCESS);
-    EXPECT_STREQ(samples.c_str(), index == 0 ? "01,10,01" : "1,1,1");
+    EXPECT_STREQ(samples.c_str(), index == 0 ? "01,10,01" : "1,1");
     ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, index,
                                               QDMI_JOB_RESULT_HIST_KEYS, 0,
                                               nullptr, &size),
@@ -1702,6 +1702,9 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
 }
 
 TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, 0, nullptr, nullptr),
+            QDMI_ERROR_BADSTATE);
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
   ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
                         TEST_CIRCUIT_IQM_JSON),
@@ -3381,6 +3384,14 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
                 retrieved_program.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_TRUE(std::ranges::equal(retrieved_program, latest_program));
+  constexpr auto format = QDMI_PROGRAM_FORMAT_QIRBASESTRING;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
+                &format),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, 0, nullptr, nullptr),
+            QDMI_ERROR_BADSTATE);
 }
 
 TEST_F(DeviceJobMockTest, JobSubmissionWithoutRequiredParameters) {

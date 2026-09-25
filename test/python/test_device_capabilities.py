@@ -84,12 +84,7 @@ def circuit() -> QuantumCircuit:
 
 
 def test_device_advertises_exactly_its_supported_formats(device: Device) -> None:
-    """The device should advertise QIR and IQM JSON, and calibration where supported.
-
-    Calibration is the only optional format; the device advertises it when the
-    quantum computer's API reports calibration support. No test submits one,
-    because a calibration run is a real operation on shared hardware.
-    """
+    """The device advertises QIR and IQM JSON; calibration has a separate API."""
     formats = set(device.supported_program_formats())
 
     assert formats == BASE_PROGRAM_FORMATS
