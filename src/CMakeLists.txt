@@ -53,12 +53,13 @@ target_link_libraries(
 # Install metadata beside the device so discovery does not load native code.
 set(IQM_QDMI_MANIFEST
     "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/iqm-qdmi-device.qdmi.json")
+set(IQM_QDMI_LIBRARY_FILE "$<TARGET_FILE_NAME:${QDMI_TARGET_NAME}>")
+configure_file("${PROJECT_SOURCE_DIR}/cmake/iqm-qdmi-device.qdmi.json.in"
+               "${CMAKE_CURRENT_BINARY_DIR}/iqm-qdmi-device.qdmi.json.in" @ONLY)
 file(
   GENERATE
   OUTPUT "${IQM_QDMI_MANIFEST}"
-  CONTENT
-    "{\n  \"schema-version\": 1,\n  \"qdmi\": {\n    \"devices\": [{\"id\": \"iqm.default\", \"library\": \"$<TARGET_FILE_NAME:${QDMI_TARGET_NAME}>\", \"prefix\": \"${QDMI_PREFIX}\", \"session\": {\"base-url\": \"https://resonance.iqm.tech\"}}]\n  }\n}\n"
-)
+  INPUT "${CMAKE_CURRENT_BINARY_DIR}/iqm-qdmi-device.qdmi.json.in")
 add_custom_command(
   TARGET ${QDMI_TARGET_NAME}
   POST_BUILD

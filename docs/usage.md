@@ -211,10 +211,10 @@ in the Contributing guide.
 ## Using the Device with MQT Core
 
 The installed CMake target identifies its device manifest through
-`QDMI_MANIFEST_NAME`. The manifest contains the stable device ID, symbol prefix,
-and relative library path. An application using MQT Core can copy the device
-library and manifest beside its executable. This integration requires CMake 3.28
-or later:
+`QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
+the symbol prefix and relative library path. An application using MQT Core can
+copy the device library and manifest beside its executable. This integration
+requires CMake 3.28 or later:
 
 ```cmake
 find_package(mqt-core 4.0.0 CONFIG REQUIRED)
@@ -238,17 +238,33 @@ package advertises its manifest with:
 "mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
 ```
 
-Open a device session with the MQT Core QDMI driver:
+The catalogue defines the following Resonance connections:
+
+| System  | Hardware stable ID | Mock stable ID     |
+| ------- | ------------------ | ------------------ |
+| Garnet  | `iqm.garnet`       | `iqm.garnet.mock`  |
+| Emerald | `iqm.emerald`      | `iqm.emerald.mock` |
+| Sirius  | `iqm.sirius`       | `iqm.sirius.mock`  |
+
+These definitions use `https://resonance.iqm.tech` and select the corresponding
+alias, such as `emerald` or `emerald:mock`. Mocks also run on Resonance and use
+its authentication. `iqm.default` remains available for custom connections and
+environment-based selection.
+
+List configured IDs offline, then open only the selected device:
 
 ```python
 from mqt.core.qdmi import builtin_driver
 
-device = builtin_driver.open_device("iqm.default", token="…", custom2="emerald")
+print(builtin_driver.registered_device_ids())
+device = builtin_driver.open_device("iqm.emerald.mock", token="…")
 ```
 
 An explicit configuration augments built-in and installed device definitions and
 overrides definitions with the same stable ID. See
 [Python Package](python_package.md) for Qiskit integration and device queries.
+An explicitly configured quantum computer ID or alias takes precedence over both
+`IQM_QC_ID` and `IQM_QUANTUM_COMPUTER` environment defaults.
 
 ## Running Jobs via Slurm
 
