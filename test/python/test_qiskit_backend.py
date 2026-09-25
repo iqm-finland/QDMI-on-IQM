@@ -49,10 +49,12 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
         captured["session"] = session
         return fake_device
 
-    def fake_qdmi_backend_init(_self: IQMBackend, device: object) -> None:
+    def fake_qdmi_backend_init(_self: IQMBackend, device: object, **metadata: object) -> None:
         captured["device"] = device
+        captured["metadata"] = metadata
 
     monkeypatch.setattr(iqm_qiskit, "open_device", fake_open_device)
+    monkeypatch.setattr("mqt.core.plugins.qiskit.backend.open_device", fake_open_device)
     monkeypatch.setattr(iqm_qiskit.QDMIBackend, "__init__", fake_qdmi_backend_init)
     return captured
 
@@ -137,6 +139,36 @@ def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyP
 
     assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"]["base_url"] is None
+
+
+@pytest.mark.parametrize("device_id", ["iqm.default", "iqm.garnet.mock"])
+def test_iqm_backend_explicit_selection_ignores_environment(monkeypatch: pytest.MonkeyPatch, device_id: str) -> None:
+    """A named preset or explicit alias must not inherit another device's ID."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.setenv("IQM_QC_ID", "other-device")
+    monkeypatch.setenv("IQM_QUANTUM_COMPUTER", "other-alias")
+    monkeypatch.setenv("IQM_SERVER_URL", "https://other.example")
+
+    IQMBackend(device_id, qc_alias="garnet:mock" if device_id == "iqm.default" else None)
+
+    assert captured["opened_id"] == device_id
+    assert captured["session"]["custom1"] is None
+    assert captured["session"]["custom2"] == ("garnet:mock" if device_id == "iqm.default" else None)
+    if device_id != "iqm.default":
+        assert captured["session"]["base_url"] is None
+
+
+def test_iqm_backend_from_device_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Core's factory retains the IQM adapter and the selected stable ID."""
+    captured = _stub_backend_construction(monkeypatch)
+
+    backend = IQMBackend.from_device_id("iqm.emerald.mock")
+
+    assert isinstance(backend, IQMBackend)
+    assert captured["opened_id"] == "iqm.emerald.mock"
+    assert captured["metadata"]["device_id"] == "iqm.emerald.mock"
+    with pytest.raises(ValueError, match="already-open device"):
+        IQMBackend(device=captured["device"], qc_alias="garnet")
 
 
 @pytest.mark.parametrize(

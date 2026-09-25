@@ -349,10 +349,15 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
     session->base_url_ = *env_base_url;
   }
 
+  if (session->quantum_computer_id_.has_value() ||
+      session->quantum_computer_alias_.has_value()) {
+    return;
+  }
+
   const auto env_qc_id = Get_nonempty_env_var("IQM_QC_ID");
   LOG_DEBUG(std::string("IQM_QC_ID environment default is ") +
             (env_qc_id.has_value() ? "set" : "unset"));
-  if (!session->quantum_computer_id_.has_value() && env_qc_id.has_value()) {
+  if (env_qc_id.has_value()) {
     session->quantum_computer_id_ = env_qc_id;
   }
 
@@ -363,9 +368,8 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
   LOG_DEBUG(
       std::string("IQM_QUANTUM_COMPUTER/IQM_QC_ALIAS environment default is ") +
       (env_qc_alias.has_value() ? "set" : "unset"));
-  if (!session->quantum_computer_alias_.has_value() &&
-      env_qc_alias.has_value()) {
-    session->quantum_computer_alias_ = env_qc_alias;
+  if (env_qc_alias.has_value()) {
+    session->quantum_computer_alias_ = std::move(env_qc_alias);
   }
 }
 
