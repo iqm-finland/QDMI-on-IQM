@@ -41,6 +41,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
+  warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
 - 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
   JSON fields ([#231]) ([**@burgholzer**])
 - 🩹 Report backend job failure messages at the default log level ([#231])
@@ -262,6 +264,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
