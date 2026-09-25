@@ -54,7 +54,7 @@ email = "developers@iqm.tech"
 # Temporary Core #2373 source pin: replace with a release before publishing.
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@9117c4f6a5508359037da4e8594cbc22125341d2",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@2c0e6061e687a6bfbc0de99cc38d06a111ee8ad8",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "qiskit[qasm3-import]>=2.1",
@@ -102,7 +102,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@9117c4f6a5508359037da4e8594cbc22125341d2",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@2c0e6061e687a6bfbc0de99cc38d06a111ee8ad8",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
