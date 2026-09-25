@@ -34,6 +34,7 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
     // Job management endpoints
     {API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "api/v1/jobs/%s/circuit"},
     {API_ENDPOINT::GET_JOB_STATUS, "api/v1/jobs/%s"},
+    {API_ENDPOINT::GET_JOB_PAYLOAD, "api/v1/jobs/%s/payload"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
      "api/v1/jobs/%s/artifacts/measurement_counts"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,

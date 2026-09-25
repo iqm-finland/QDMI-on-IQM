@@ -49,6 +49,19 @@
 
 namespace {
 
+int Set_program(IQM_QDMI_Device_Job job, const size_t size,
+                const void *program) {
+  QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  const auto status = IQM_QDMI_device_job_query_property(
+      job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT, sizeof(format), &format,
+      nullptr);
+  if (status != QDMI_SUCCESS) {
+    return status;
+  }
+  return IQM_QDMI_device_job_set_programs(
+      job, &format, 1, &size, program == nullptr ? nullptr : &program);
+}
+
 int Set_env_var_raw(const char *key, const char *value) {
 #ifdef _WIN32
   return _putenv_s(key, value);
@@ -767,9 +780,8 @@ TEST_F(DeviceIntegrationMockTest, StatusFollowsTheQueueRatherThanSubmissions) {
   IQM_QDMI_Device_Job job = nullptr;
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": "job-123"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
@@ -1094,6 +1106,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
   http_stub.queue_get(200, job_status_response);
 
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1119,7 +1132,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobById) {
   EXPECT_EQ(IQM_QDMI_device_job_query_property(
                 retrieved_job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                 sizeof(program_format), &program_format, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
+            QDMI_SUCCESS);
 
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                 retrieved_job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
@@ -1138,6 +1151,7 @@ TEST_F(DeviceJobMockTest, RetrievedQueuedJobReportsFreshQueuePosition) {
       R"({"id":"job-123","status":"waiting","type":"circuit","queue_position":9})");
 
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1154,7 +1168,7 @@ TEST_F(DeviceJobMockTest, RetrievedQueuedJobReportsFreshQueuePosition) {
 
   const auto &get_urls = http_stub.get_urls();
   ASSERT_GE(get_urls.size(), 2U);
-  EXPECT_EQ(get_urls[get_urls.size() - 2],
+  EXPECT_EQ(get_urls[get_urls.size() - 3],
             "https://localhost/api/v1/jobs/job-123");
   EXPECT_EQ(get_urls.back(), "https://localhost/api/v1/jobs/job-123");
   IQM_QDMI_device_job_free(retrieved_job);
@@ -1173,6 +1187,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobRestoresRemoteStatus) {
                           native_status + R"(","type":"circuit"})";
     http_stub.queue_get(200, response);
     IQM_QDMI_Device_Job retrieved_job = nullptr;
+    http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
     ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                   session, "job-123", &retrieved_job),
               QDMI_SUCCESS);
@@ -1287,6 +1302,7 @@ TEST_F(DeviceJobMockTest, RetrievedJobReturnsShotsWithoutSubmissionMetadata) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "ready", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1298,11 +1314,12 @@ TEST_F(DeviceJobMockTest, RetrievedJobReturnsShotsWithoutSubmissionMetadata) {
       200,
       R"([{"meas_2_0_0": [[0], [1], [0]], "meas_2_0_1": [[1], [0], [1]]}])");
   size_t shots_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(
-                retrieved_job, QDMI_JOB_RESULT_SHOTS, 0, nullptr, &shots_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, 0,
+                                            QDMI_JOB_RESULT_SHOTS, 0, nullptr,
+                                            &shots_size),
             QDMI_SUCCESS);
   std::vector<char> shots(shots_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, 0,
                                             QDMI_JOB_RESULT_SHOTS, shots.size(),
                                             shots.data(), nullptr),
             QDMI_SUCCESS);
@@ -1314,6 +1331,7 @@ TEST_F(DeviceJobMockTest, RetrievedJobPreservesPermissionFailures) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1338,6 +1356,7 @@ TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnTransportFailure) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1362,6 +1381,7 @@ TEST_F(DeviceJobMockTest, JobCheckPreservesStatusOnServerError) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "queued", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1384,6 +1404,7 @@ TEST_F(DeviceJobMockTest, CancelingAJobThatAlreadyFinishedIsAnInvalidArgument) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1419,6 +1440,7 @@ TEST_F(DeviceJobMockTest,
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1436,6 +1458,7 @@ TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
   http_stub.queue_get(
       200, R"({"id": "job-123", "status": "running", "type": "circuit"})");
   IQM_QDMI_Device_Job retrieved_job = nullptr;
+  http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_SUCCESS);
@@ -1457,9 +1480,8 @@ TEST_F(DeviceJobMockTest, JobCancelPreservesStatusOnServerError) {
 
 TEST_F(DeviceJobMockTest, JobWaitRemainsRetryableAfterTransportFailure) {
   http_stub.queue_post(200, R"({"id": "job-flaky"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 
@@ -1488,9 +1510,8 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
   http_stub.queue_get(200, job_results_response);
 
   // Job submission
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 100;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1503,21 +1524,21 @@ TEST_F(DeviceJobMockTest, FullLifecycle) {
 
   // Check results
   size_t hist_keys_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &hist_keys_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &hist_keys_size),
             QDMI_SUCCESS);
   std::string hist_keys(hist_keys_size, '\0');
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             hist_keys_size, hist_keys.data(),
                                             nullptr),
             QDMI_SUCCESS);
 
   size_t hist_values_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES, 0,
-                                            nullptr, &hist_values_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
+                                            0, nullptr, &hist_values_size),
             QDMI_SUCCESS);
   std::vector<size_t> hist_values(hist_values_size / sizeof(size_t));
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                             hist_values_size,
                                             hist_values.data(), nullptr),
             QDMI_SUCCESS);
@@ -1531,9 +1552,8 @@ TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
   http_stub.queue_get(
       200, R"([{"measurement_keys": ["m"], "counts": {"00": 5, "111": 3}}])");
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 8;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1543,15 +1563,15 @@ TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   size_t hist_keys_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &hist_keys_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &hist_keys_size),
             QDMI_SUCCESS);
   // "00" + ',' + "111" + '\0'
   EXPECT_EQ(hist_keys_size, 7U);
 
   // Allocate exactly what the API asked for.
   std::vector<char> hist_keys(hist_keys_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             hist_keys_size, hist_keys.data(),
                                             nullptr),
             QDMI_SUCCESS);
@@ -1561,9 +1581,8 @@ TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
 TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
   http_stub.queue_post(200, R"({"id": "job-canonical-fields"})");
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr auto move_validation = "allow_prx";
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1597,6 +1616,124 @@ TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
   EXPECT_FALSE(request.contains("num_active_reset_cycles"));
 }
 
+TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  constexpr auto first = R"({"name":"first","instructions":[]})";
+  constexpr auto second = R"({"name":"second","instructions":[]})";
+  const std::array<const void *, 2> programs{first, second};
+  const std::array sizes{strlen(first) + 1, strlen(second) + 1};
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, &format, programs.size(),
+                                             sizes.data(), programs.data()),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_TRUE(http_stub.post_bodies().empty());
+  constexpr size_t shots = 3;
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"multi-job"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("circuits").size(), 2U);
+  EXPECT_EQ(request.at("circuits").at(0).at("name"), "first");
+  EXPECT_EQ(request.at("circuits").at(1).at("name"), "second");
+  EXPECT_EQ(request.at("shots"), shots);
+
+  http_stub.queue_get(200, R"({"type":"circuit","status":"waiting"})");
+  http_stub.queue_get(200, request.dump());
+  IQM_QDMI_Device_Job retrieved_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "multi-job", &retrieved_job),
+            QDMI_SUCCESS);
+  EXPECT_TRUE(http_stub.get_urls().back().ends_with("/multi-job/payload"));
+  size_t num_programs = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                retrieved_job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM,
+                sizeof(num_programs), &num_programs, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(num_programs, 2U);
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                retrieved_job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES, 0,
+                nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
+                                               QDMI_DEVICE_JOB_PROPERTY_PROGRAM,
+                                               0, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, 0, QDMI_JOB_RESULT_SHOTS, 0, nullptr, nullptr),
+            QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, 2, QDMI_JOB_RESULT_SHOTS, 0, nullptr, nullptr),
+            QDMI_ERROR_OUTOFRANGE);
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  ASSERT_EQ(IQM_QDMI_device_job_wait(retrieved_job, 0), QDMI_SUCCESS);
+  const auto gets_before_results = http_stub.get_urls().size();
+  http_stub.queue_get(200, R"([
+    {"measurement_keys":["b","a"],"counts":{"01":2,"10":1}},
+    {"measurement_keys":["c"],"counts":{"1":3}}
+  ])");
+  http_stub.queue_get(200, R"([
+    {"a":[[1],[0],[1]],"b":[[0],[1],[0]]},
+    {"c":[[1],[1],[1]]}
+  ])");
+  for (const auto index : {1U, 0U}) {
+    size_t size = 0;
+    ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, index,
+                                              QDMI_JOB_RESULT_SHOTS, 0, nullptr,
+                                              &size),
+              QDMI_SUCCESS);
+    std::string samples(size, '\0');
+    ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                  retrieved_job, index, QDMI_JOB_RESULT_SHOTS, samples.size(),
+                  samples.data(), nullptr),
+              QDMI_SUCCESS);
+    EXPECT_STREQ(samples.c_str(), index == 0 ? "01,10,01" : "1,1,1");
+    ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, index,
+                                              QDMI_JOB_RESULT_HIST_KEYS, 0,
+                                              nullptr, &size),
+              QDMI_SUCCESS);
+    std::string keys(size, '\0');
+    ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                  retrieved_job, index, QDMI_JOB_RESULT_HIST_KEYS, keys.size(),
+                  keys.data(), nullptr),
+              QDMI_SUCCESS);
+    EXPECT_STREQ(keys.c_str(), index == 0 ? "01,10" : "1");
+  }
+  EXPECT_EQ(http_stub.get_urls().size(), gets_before_results + 2);
+  IQM_QDMI_device_job_free(retrieved_job);
+}
+
+TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  const std::array<const void *, 2> invalid_programs{
+      "replacement",
+      "bad\0tail",
+  };
+  const std::array<size_t, 2> sizes{12, 9};
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, &format, 2, sizes.data(),
+                                             invalid_programs.data()),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, &format, 2, nullptr, nullptr),
+            QDMI_SUCCESS);
+  size_t num_programs = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, sizeof(num_programs),
+                &num_programs, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(num_programs, 1U);
+  http_stub.queue_post(200, R"({"id":"unchanged"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("circuits").at(0),
+            nlohmann::json::parse(TEST_CIRCUIT_IQM_JSON));
+}
+
 TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
   constexpr auto replacement_program =
       R"({"name":"replacement","instructions":[],"metadata":{}})";
@@ -1608,17 +1745,13 @@ TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
                 &format),
             QDMI_SUCCESS);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(replacement_program) + 1, replacement_program),
-            QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, 0, nullptr),
-            QDMI_SUCCESS);
+  ASSERT_EQ(
+      Set_program(job, strlen(replacement_program) + 1, replacement_program),
+      QDMI_SUCCESS);
+  ASSERT_EQ(Set_program(job, 0, nullptr), QDMI_SUCCESS);
 
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   ASSERT_EQ(http_stub.post_bodies().size(), 1U);
@@ -1641,9 +1774,8 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   http_stub.queue_get(200, job_measurements_response);
 
   // Job submission
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 4;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1656,13 +1788,13 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
 
   // Check shot results
   size_t shots_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_SUCCESS);
   ASSERT_GT(shots_size, 0);
 
   std::vector<char> shots_buffer(shots_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                             shots_size, shots_buffer.data(),
                                             nullptr),
             QDMI_SUCCESS);
@@ -1673,7 +1805,7 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
 
   // Test buffer size validation - buffer too small should fail
   std::vector<char> small_buffer(shots_size - 1);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                             small_buffer.size(),
                                             small_buffer.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
@@ -1681,13 +1813,13 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
   // This should NOT trigger another API call (only 3 GET responses were
   // queued above; an unscripted call would fail the test).
   size_t hist_keys_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &hist_keys_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &hist_keys_size),
             QDMI_SUCCESS);
   ASSERT_GT(hist_keys_size, 0);
 
   std::vector<char> hist_keys_buffer(hist_keys_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             hist_keys_size,
                                             hist_keys_buffer.data(), nullptr),
             QDMI_SUCCESS);
@@ -1702,11 +1834,11 @@ TEST_F(DeviceJobMockTest, RetrieveShotMeasurements) {
 
   // Get histogram values (counts)
   size_t hist_values_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES, 0,
-                                            nullptr, &hist_values_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
+                                            0, nullptr, &hist_values_size),
             QDMI_SUCCESS);
   std::vector<size_t> hist_values(hist_values_size / sizeof(size_t));
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                             hist_values_size,
                                             hist_values.data(), nullptr),
             QDMI_SUCCESS);
@@ -1733,9 +1865,8 @@ TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 2;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1745,16 +1876,16 @@ TEST_F(DeviceJobMockTest, ShotOrderMatchesIQMMeasurementCounts) {
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   size_t hist_keys_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &hist_keys_size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &hist_keys_size),
             QDMI_SUCCESS);
 
   size_t shots_size{};
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_SUCCESS);
   std::vector<char> shots_buffer(shots_size);
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                             shots_size, shots_buffer.data(),
                                             nullptr),
             QDMI_SUCCESS);
@@ -1767,9 +1898,8 @@ TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
   http_stub.queue_post(200, job_submission_response);
 
   // Job submission
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 4;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1779,9 +1909,9 @@ TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
 
   // Attempt to retrieve shots before job completion should fail
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
-            QDMI_ERROR_INVALIDARGUMENT);
+            QDMI_ERROR_BADSTATE);
 }
 
 TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
@@ -1796,9 +1926,8 @@ TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 1;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1809,7 +1938,7 @@ TEST_F(DeviceJobMockTest, RejectInvalidMeasurementFormat) {
 
   // Should fail when trying to retrieve results due to invalid format
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_ERROR_FATAL);
 }
@@ -1821,9 +1950,8 @@ TEST_F(DeviceJobMockTest, HandleInvalidQueuePositionTypes) {
 
   // Test with string queue_position - should succeed but ignore queue position
   http_stub.queue_post(200, job_submission_response_string_queue);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 100;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1838,9 +1966,8 @@ TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
   // time is the one that must come back.
   http_stub.queue_post(
       200, R"({"id": "job-queue", "status": "waiting", "queue_position": 3})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 
@@ -1861,9 +1988,8 @@ TEST_F(DeviceJobMockTest, SubmissionQueuePositionDoesNotSkipTheRefresh) {
 
 TEST_F(DeviceJobMockTest, QueryQueuePositionRefreshesJobStatus) {
   http_stub.queue_post(200, R"({"id": "job-queue"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 
@@ -1897,9 +2023,8 @@ TEST_F(DeviceJobMockTest, QueuePositionRequiresQueuedJobAndKnownPosition) {
             QDMI_ERROR_BADSTATE);
 
   http_stub.queue_post(200, R"({"id": "job-queue"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 
@@ -1936,9 +2061,8 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 1;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1949,7 +2073,7 @@ TEST_F(DeviceJobMockTest, RejectNonIntegerMeasurementValues) {
 
   // Should fail when trying to retrieve results due to non-integer value
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_ERROR_FATAL);
 }
@@ -1966,9 +2090,8 @@ TEST_F(DeviceJobMockTest, RejectNonBitMeasurementValues) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 1;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -1978,7 +2101,7 @@ TEST_F(DeviceJobMockTest, RejectNonBitMeasurementValues) {
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
 
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_ERROR_FATAL);
 }
@@ -1995,9 +2118,8 @@ TEST_F(DeviceJobMockTest, RejectInconsistentMeasurementWidths) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 2;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -2010,7 +2132,7 @@ TEST_F(DeviceJobMockTest, RejectInconsistentMeasurementWidths) {
   buffer.fill('x');
   const auto original_buffer = buffer;
   size_t shots_size = 123;
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                             buffer.size(), buffer.data(),
                                             &shots_size),
             QDMI_ERROR_FATAL);
@@ -2031,9 +2153,8 @@ TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
   http_stub.queue_get(200, job_counts_response);
   http_stub.queue_get(200, job_measurements_response);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 1;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -2044,14 +2165,14 @@ TEST_F(DeviceJobMockTest, EmptyShotsReturnsNullTerminator) {
 
   // Should return size 1 (for null terminator) even with no shots
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_SUCCESS);
   EXPECT_EQ(shots_size, 1);
 
   // Should write just a null terminator
   std::vector<char> buffer(1);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 1,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 1,
                                             buffer.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_EQ(buffer[0], '\0');
@@ -2082,9 +2203,8 @@ TEST_F(DeviceJobMockTest,
   // The calibration path reads the submission response the same way the circuit
   // path does, so the position it reports must not stand in for the refresh
   // there either.
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CALIBRATION_CONFIG) + 1,
+                        TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
 
   http_stub.queue_post(
@@ -2104,9 +2224,8 @@ TEST_F(DeviceJobMockTest,
 }
 
 TEST_F(DeviceJobMockTest, CancelCalibration) {
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CALIBRATION_CONFIG) + 1,
+                        TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": "cal-cancel"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_SUCCESS);
@@ -2122,9 +2241,8 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job),
             QDMI_ERROR_INVALIDARGUMENT);
   // Job submission
-  auto ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-      strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG);
+  auto ret = Set_program(job, strlen(TEST_CALIBRATION_CONFIG) + 1,
+                         TEST_CALIBRATION_CONFIG);
   ASSERT_EQ(ret, QDMI_SUCCESS);
 
   const std::string job_submission_response = R"({"id": "job-123"})";
@@ -2164,11 +2282,11 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   http_stub.queue_get(200, job_results_response);
 
   size_t size = 0;
-  ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
+  ret = IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM1, 0,
                                         nullptr, &size);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   std::string calibration_set_id(size - 1, '\0');
-  ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, size,
+  ret = IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM1, size,
                                         calibration_set_id.data(), nullptr);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   EXPECT_EQ(calibration_set_id, "4286b859-30a7-4036-8c25-1e42ddd85c0e");
@@ -2340,9 +2458,8 @@ TEST_F(DeviceJobMockTest, JobSubmissionFailure) {
   // Mock job submission failure (HTTP 500 Internal Server Error)
   http_stub.queue_post(500);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 100;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -2573,6 +2690,7 @@ TEST_F(DeviceJobMockTest,
     http_stub.queue_get(200, poll ? R"({"id":"job-123","status":"waiting"})"
                                   : failed_response);
     IQM_QDMI_Device_Job retrieved_job = nullptr;
+    http_stub.queue_get(200, R"({"circuits":[{}],"shots":3})");
     ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                   session, "job-123", &retrieved_job),
               QDMI_SUCCESS);
@@ -3017,9 +3135,8 @@ TEST_F(DeviceIntegrationMockTest, QueueLengthQueryContainsCxxExceptions) {
 }
 
 TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 100;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -3044,15 +3161,12 @@ TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
 
 TEST_F(DeviceJobMockTest, MalformedProgramSubmissionReturnsAnErrorCode) {
   const auto *const invalid_circuit = R"({"invalid": json})";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(invalid_circuit) + 1, invalid_circuit),
+  ASSERT_EQ(Set_program(job, strlen(invalid_circuit) + 1, invalid_circuit),
             QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   const auto *const invalid_dd_strategy = R"({"strategy": )";
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -3067,9 +3181,8 @@ TEST_F(DeviceJobMockTest, MalformedProgramSubmissionReturnsAnErrorCode) {
 
 TEST_F(DeviceJobMockTest, JobStatusRejectsResponsesWithoutStatus) {
   http_stub.queue_post(200, R"({"id": "job-123"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
 
@@ -3092,9 +3205,8 @@ TEST_F(DeviceJobMockTest, JobStatusRejectsResponsesWithoutStatus) {
 TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
   http_stub.queue_post(200, R"({"id": "job-123"})");
   http_stub.queue_get(200, R"({"status": "ready"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
@@ -3102,8 +3214,8 @@ TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
   const auto expect_rejected = [this](const std::string &counts) {
     http_stub.queue_get(200, counts);
     size_t size = 0;
-    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                              nullptr, &size),
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                              0, nullptr, &size),
               QDMI_ERROR_FATAL);
   };
 
@@ -3120,9 +3232,8 @@ TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
 TEST_F(DeviceJobMockTest, ShotResultsRejectMalformedMeasurementResponses) {
   http_stub.queue_post(200, R"({"id": "job-123"})");
   http_stub.queue_get(200, R"({"status": "ready"})");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   constexpr size_t shots = 1;
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -3134,9 +3245,18 @@ TEST_F(DeviceJobMockTest, ShotResultsRejectMalformedMeasurementResponses) {
   http_stub.queue_get(200, R"([{"measurement_keys":["m"],"counts":{"0":1}}])");
   http_stub.queue_get(200, R"([{"m": [[0)");
   size_t size = 0;
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &size),
             QDMI_ERROR_FATAL);
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+  http_stub.queue_get(200, R"([{"m":[[0]]}])");
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, &size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(size, 2U);
+  EXPECT_EQ(http_stub.post_bodies().size(), 1U);
 }
 
 TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
@@ -3166,9 +3286,8 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
         QDMI_ERROR_FATAL},
        {std::make_exception_ptr(42), QDMI_ERROR_FATAL}}};
 
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   for (const auto &[exception, expected_status] : mappings) {
     throw_from_transport(exception);
@@ -3195,17 +3314,16 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
   for (const auto &[exception, expected_status] : mappings) {
     throw_from_transport(exception);
     size_t size = 0;
-    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                              nullptr, &size),
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                              0, nullptr, &size),
               expected_status);
   }
   restore_transport();
 }
 
 TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
+  ASSERT_EQ(Set_program(job, strlen(TEST_CALIBRATION_CONFIG) + 1,
+                        TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": )");
   EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_FATAL);
@@ -3217,8 +3335,8 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
   const auto expect_rejected = [this](const std::string &calibration_status) {
     http_stub.queue_get(200, calibration_status);
     size_t size = 0;
-    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
-                                              nullptr, &size),
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM1,
+                                              0, nullptr, &size),
               QDMI_ERROR_FATAL);
   };
 
@@ -3235,9 +3353,7 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
 
 TEST_F(DeviceJobMockTest, JobParameterValidation) {
   // Test null job parameter
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                nullptr, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, 1, "test"),
-            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(Set_program(nullptr, 1, "test"), QDMI_ERROR_INVALIDARGUMENT);
 
   // Test invalid parameter enum
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -3246,9 +3362,7 @@ TEST_F(DeviceJobMockTest, JobParameterValidation) {
             QDMI_ERROR_INVALIDARGUMENT);
 
   // Test parameter support checking with null values
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, 0, nullptr),
-            QDMI_SUCCESS);
+  EXPECT_EQ(Set_program(job, 0, nullptr), QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
             QDMI_SUCCESS);
@@ -3262,9 +3376,7 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
 
   constexpr auto first_program_expected = std::to_array("first");
   auto first_program = first_program_expected;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, first_program.size(),
-                first_program.data()),
+  ASSERT_EQ(Set_program(job, first_program.size(), first_program.data()),
             QDMI_SUCCESS);
   first_program.front() = 'X';
 
@@ -3280,9 +3392,7 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
   EXPECT_TRUE(std::ranges::equal(retrieved_program, first_program_expected));
 
   constexpr auto latest_program = std::to_array("latest program");
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, latest_program.size(),
-                latest_program.data()),
+  ASSERT_EQ(Set_program(job, latest_program.size(), latest_program.data()),
             QDMI_SUCCESS);
 
   ASSERT_EQ(IQM_QDMI_device_job_query_property(
@@ -3330,41 +3440,32 @@ TEST_F(DeviceJobMockTest, ResultRetrievalErrorCases) {
   size_t size_ret{};
 
   // Test null job parameter
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(nullptr, QDMI_JOB_RESULT_HIST_KEYS,
-                                            0, nullptr, &size_ret),
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                nullptr, 0, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, &size_ret),
             QDMI_ERROR_INVALIDARGUMENT);
 
   // Test invalid result type
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-                job, static_cast<QDMI_Job_Result>(999), 0, nullptr, &size_ret),
-            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(
+      IQM_QDMI_device_job_get_results(
+          // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+          job, 0, static_cast<QDMI_Job_Result>(999), 0, nullptr, &size_ret),
+      QDMI_ERROR_INVALIDARGUMENT);
 
-  // Test buffer too small using std::array
-  std::array<char, 1> small_buffer{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 1,
-                                            small_buffer.data(), nullptr),
-            QDMI_ERROR_INVALIDARGUMENT);
-
-  // Test getting result size for unfinished jobs
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &size_ret),
-            QDMI_ERROR_INVALIDARGUMENT);
+  /// No programs have been configured, so index zero is out of range.
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &size_ret),
+            QDMI_ERROR_OUTOFRANGE);
 }
 
 TEST_F(DeviceJobMockTest, MalformedCircuitHandling) {
   // Test with invalid JSON circuit
   const auto *const invalid_circuit = R"({"invalid": json})";
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(invalid_circuit) + 1, invalid_circuit),
+  EXPECT_EQ(Set_program(job, strlen(invalid_circuit) + 1, invalid_circuit),
             QDMI_SUCCESS);
 
   // Test with empty circuit
   const auto *const empty_circuit = "";
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(empty_circuit) + 1, empty_circuit),
+  EXPECT_EQ(Set_program(job, strlen(empty_circuit) + 1, empty_circuit),
             QDMI_SUCCESS);
 }
 

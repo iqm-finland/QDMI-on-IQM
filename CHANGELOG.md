@@ -45,12 +45,16 @@ releases may include breaking changes.
   selection takes precedence over environment defaults. Temporary Core source
   pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
   ([**@burgholzer**]).
+- ✨ Submit ordered circuit lists as one native IQM job with indexed results and
+  recoverable program counts ([#277]) ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
   itself and does not require clients to trigger it ([#229], [#266])
   ([**@marcelwa**], [**@burgholzer**]).
 - 💥 Drop the QDMI pulse-support property while preserving surviving enum values
   for binary compatibility ([#266]) ([**@burgholzer**]).
+- 💥 Replace the removed program setter with
+  `IQM_QDMI_device_job_set_programs` ([#277]) ([**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
