@@ -1397,6 +1397,9 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM && job->results_.empty()) {
+    return QDMI_ERROR_BADSTATE;
+  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, size_t,
                             job->results_.size(), prop, size, value, size_ret)
   if ((job->calibration_ || !job->format_known_) &&
@@ -2012,7 +2015,9 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         return QDMI_ERROR_FATAL;
       }
       auto &shots = results[i];
-      shots.resize(job->num_shots_);
+      /// Retrieved IQM jobs may retain fewer shots after heralding.
+      shots.resize(job->retrieved_ ? measurements.at(keys.front()).size()
+                                   : job->num_shots_);
       for (const auto &key : keys) {
         const auto &values = measurements.at(key);
         if (!values.is_array() || values.size() != shots.size()) {
