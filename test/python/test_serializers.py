@@ -292,12 +292,13 @@ def test_source_classical_layout(backend: Callable[[int], StubBackend]) -> None:
 @pytest.mark.parametrize("memory", [False, True])
 def test_qiskit_result_matches_basic_simulator(backend: Callable[[int], StubBackend], *, memory: bool) -> None:
     """Reconstruct IQM raw outputs into the same source result as native Qiskit."""
-    circuit = QuantumCircuit(QuantumRegister(2), ClassicalRegister(3, "a"), ClassicalRegister(2, "b"))
+    circuit = QuantumCircuit(QuantumRegister(3), ClassicalRegister(3, "a"), ClassicalRegister(2, "b"))
     circuit.r(np.pi, 0, 0)
+    circuit.r(np.pi, 0, 1)
     circuit.measure(0, 2)
-    circuit.measure(0, 4)
-    circuit.measure(1, 2)
-    serialized = qiskit_to_iqm_json(circuit, backend(2))  # ty: ignore[invalid-argument-type]
+    circuit.measure(1, 4)
+    circuit.measure(2, 2)
+    serialized = qiskit_to_iqm_json(circuit, backend(3))  # ty: ignore[invalid-argument-type]
     handle = Mock(spec=Job)
     handle.id = "local-result"
     handle.check.return_value = Job.Status.DONE

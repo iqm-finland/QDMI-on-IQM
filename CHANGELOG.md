@@ -29,7 +29,9 @@ releases may include breaking changes.
 
 - 💥 Normalize IQM JSON shots and histogram keys to circuit measurement/locus
   order with output bit zero on the right. Recover the original circuit when
-  reopening jobs and reject mismatched response keys or widths.
+  reopening jobs and reject mismatched response keys or widths. Preserve source
+  classical layouts in Qiskit with the Core output-mapping API ([#276])
+  ([**@burgholzer**]).
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
   pulse-support properties. Expose calibration submission through the
   IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the
@@ -341,3 +343,5 @@ Compatible with QDMI `v1.3.0`.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Common Changelog]: https://common-changelog.org
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
+
+[#276]: https://github.com/iqm-finland/QDMI-on-IQM/pull/276
