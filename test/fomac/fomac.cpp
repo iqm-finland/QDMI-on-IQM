@@ -484,13 +484,10 @@ auto FoMaC::submit_job(
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   throw_if_error(ret, "Failed to create a job");
   JobGuard guard{job};
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  throw_if_error(ret, "Failed to set the program format");
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                                        program.size() + 1, program.c_str());
+  const size_t program_size = program.size() + 1;
+  const void *program_data = program.c_str();
+  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+                                         &program_data);
   throw_if_error(ret, "Failed to set the program");
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
@@ -599,11 +596,11 @@ auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
     -> std::map<std::string, size_t> {
   size_t size = 0;
   const int ret = IQM_QDMI_device_job_get_results(
-      job, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, &size);
+      job, 0, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, &size);
   throw_if_error(ret, "Failed to query the histogram keys size");
   std::vector<char> key_buffer(size);
   const int ret2 = IQM_QDMI_device_job_get_results(
-      job, QDMI_JOB_RESULT_HIST_KEYS, size, key_buffer.data(), nullptr);
+      job, 0, QDMI_JOB_RESULT_HIST_KEYS, size, key_buffer.data(), nullptr);
   throw_if_error(ret2, "Failed to query the histogram keys");
   const std::string key_list(key_buffer.data());
   std::vector<std::string> key_vec;
@@ -615,11 +612,11 @@ auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
 
   size_t val_size = 0;
   const int ret3 = IQM_QDMI_device_job_get_results(
-      job, QDMI_JOB_RESULT_HIST_VALUES, 0, nullptr, &val_size);
+      job, 0, QDMI_JOB_RESULT_HIST_VALUES, 0, nullptr, &val_size);
   throw_if_error(ret3, "Failed to query the histogram values size");
   std::vector<size_t> val_vec(key_vec.size());
   const int ret4 = IQM_QDMI_device_job_get_results(
-      job, QDMI_JOB_RESULT_HIST_VALUES, val_size, val_vec.data(), nullptr);
+      job, 0, QDMI_JOB_RESULT_HIST_VALUES, val_size, val_vec.data(), nullptr);
   throw_if_error(ret4, "Failed to query the histogram values");
   std::map<std::string, size_t> results;
   for (size_t i = 0; i < key_vec.size(); ++i) {
@@ -629,12 +626,13 @@ auto FoMaC::get_histogram(IQM_QDMI_Device_Job job)
 }
 auto FoMaC::get_calibration_set_id(IQM_QDMI_Device_Job job) -> std::string {
   size_t size = 0;
-  const int ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1,
-                                                  0, nullptr, &size);
+  const int ret = IQM_QDMI_device_job_get_results(
+      job, 0, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
   throw_if_error(ret, "Failed to query the calibration set ID size");
   std::string calibration_set_id(size - 1, '\0');
-  const int ret2 = IQM_QDMI_device_job_get_results(
-      job, QDMI_JOB_RESULT_CUSTOM1, size, calibration_set_id.data(), nullptr);
+  const int ret2 =
+      IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM1, size,
+                                      calibration_set_id.data(), nullptr);
   throw_if_error(ret2, "Failed to query the calibration set ID");
   return calibration_set_id;
 }
