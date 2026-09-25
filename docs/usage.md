@@ -8,6 +8,44 @@ with IQM's quantum computing hardware.
 The QDMI device connects to the unified IQM Server API to communicate with IQM's
 quantum computing hardware.
 
+### Prebuilt C++ SDK
+
+Each GitHub Release from the first release containing this feature offers a
+platform-specific `iqm-qdmi-device_*.tar.gz` archive. Download the archive for
+your operating system and CPU from the [Releases page], then extract it. The
+`iqm-qdmi-device/` directory is a relocatable CMake install prefix containing
+the shared device library, public headers, CMake package files, and the runtime
+libraries it needs beyond the operating system's standard runtime. License texts
+are in `licenses/`.
+
+For example, after extracting the archive beside your CMake project:
+
+```console
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/iqm-qdmi-device"
+cmake --build build
+```
+
+Use the installed CMake target in your project:
+
+```cmake
+find_package(iqm-qdmi-device CONFIG REQUIRED)
+add_executable(my-application main.cpp)
+target_link_libraries(my-application PRIVATE iqm-qdmi-device)
+```
+
+For MQT Core integration, see
+[Using the Device with MQT Core](usage.md#using-the-device-with-mqt-core).
+On Windows, keep the archive's `bin/` directory on `PATH` when running such an
+application so the device DLL and its companion DLLs can be found.
+
+The Linux archives target glibc 2.28 or newer and use the host's compatible C++
+runtime and CA trust store. The macOS archive targets Apple Silicon and macOS
+13.3 or newer. Windows archives target MSVC-compatible x86-64 and arm64 systems
+with the Visual C++ runtime installed. Native binaries remain specific to their
+operating system and CPU architecture; use a matching archive.
+
+[Releases page]: https://github.com/iqm-finland/QDMI-on-IQM/releases
+
 ### Authentication Methods
 
 The QDMI device supports multiple authentication methods:

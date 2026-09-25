@@ -1,0 +1,129 @@
+name: 📦 Build C++ SDK archives
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: 🐧 ${{ matrix.triple }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-26.04
+            arch: x86_64
+            triple: x86_64-unknown-linux-gnu
+          - runs-on: ubuntu-26.04-arm
+            arch: aarch64
+            triple: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      SDK_TARGET_TRIPLE: ${{ matrix.triple }}
+    container:
+      image: quay.io/pypa/manylinux_2_28_${{ matrix.arch }}:2026.05.07-2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install native build tools
+        run: |
+          yum install -y openssl-devel patchelf
+          /opt/python/cp311-cp311/bin/python -m pip install 'cmake>=3.24' ninja
+          echo /opt/python/cp311-cp311/bin >> "$GITHUB_PATH"
+      - name: Build and install C++ SDK
+        run: |
+          cmake -S . -B sdk-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=OFF \
+            -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdk-prefix"
+          cmake --build sdk-build --target iqm-qdmi-device --parallel 4
+          cmake --install sdk-build --component iqm-qdmi-device_Runtime
+          cmake --install sdk-build --component iqm-qdmi-device_Development
+      - name: Package and test extracted archive
+        run: |
+          /opt/python/cp311-cp311/bin/python scripts/package_cpp_sdk.py \
+            --build-dir sdk-build --install-root sdk-prefix --platform linux \
+            --target-triple "$SDK_TARGET_TRIPLE" --output-dir dist
+          /opt/python/cp311-cp311/bin/python test/sdk/smoke_archive.py dist/*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cpp-sdk-${{ matrix.triple }}
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: 🍎 arm64-apple-darwin
+    runs-on: macos-26
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.3"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.11"
+          activate-environment: true
+      - name: Build and install C++ SDK
+        run: |
+          cmake -S . -B sdk-build \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=OFF \
+            -DCMAKE_INSTALL_LIBDIR=lib -DCPR_USE_SYSTEM_CURL=ON \
+            '-DCMAKE_IGNORE_PATH=/opt/homebrew;/usr/local' \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdk-prefix"
+          cmake --build sdk-build --config Release --target iqm-qdmi-device --parallel 4
+          cmake --install sdk-build --config Release --component iqm-qdmi-device_Runtime
+          cmake --install sdk-build --config Release --component iqm-qdmi-device_Development
+      - name: Package and test extracted archive
+        run: |
+          python scripts/package_cpp_sdk.py \
+            --build-dir sdk-build --install-root sdk-prefix --platform macos \
+            --target-triple arm64-apple-darwin --output-dir dist
+          python test/sdk/smoke_archive.py dist/*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cpp-sdk-arm64-apple-darwin
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: 🪟 ${{ matrix.triple }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: windows-2025
+            triple: x86_64-pc-windows-msvc
+          - runs-on: windows-11-arm
+            triple: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      SDK_TARGET_TRIPLE: ${{ matrix.triple }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.11"
+          activate-environment: true
+      - name: Build and install C++ SDK
+        shell: pwsh
+        run: |
+          cmake -S . -B sdk-build -DBUILD_IQM_QDMI_TESTS=OFF -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE/sdk-prefix"
+          cmake --build sdk-build --config Release --target iqm-qdmi-device --parallel 4
+          cmake --install sdk-build --config Release --component iqm-qdmi-device_Runtime
+          cmake --install sdk-build --config Release --component iqm-qdmi-device_Development
+      - name: Package and test extracted archive
+        shell: pwsh
+        run: |
+          python scripts/package_cpp_sdk.py --build-dir sdk-build --install-root sdk-prefix --platform windows --target-triple "$env:SDK_TARGET_TRIPLE" --output-dir dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python test/sdk/smoke_archive.py (Get-ChildItem dist/*.tar.gz).FullName
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cpp-sdk-${{ matrix.triple }}
+          path: dist/*
+          if-no-files-found: error
