@@ -25,6 +25,7 @@ IQM device submits IQM JSON without naming this package.
 from __future__ import annotations
 
 import json
+import warnings
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -50,11 +51,54 @@ def __dir__() -> list[str]:
     return __all__
 
 
+def _validate_metadata_keys(value: object) -> None:
+    """Reject object keys that JSON encoding would silently convert to strings.
+
+    Args:
+        value: A metadata value to check recursively.
+
+    Raises:
+        TypeError: If an object key is not a string.
+    """
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if not isinstance(key, str):
+                msg = "Metadata object keys must be strings."
+                raise TypeError(msg)
+            _validate_metadata_keys(child)
+    elif isinstance(value, list | tuple):
+        for child in value:
+            _validate_metadata_keys(child)
+
+
+def _json_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Return metadata that encodes safely as JSON, or drop it with a warning.
+
+    Args:
+        metadata: Circuit metadata to check without mutating it.
+
+    Returns:
+        The metadata itself, or an empty dictionary if it cannot be encoded.
+    """
+    try:
+        # Encode first to reject circular references before traversing the keys.
+        json.dumps(metadata, allow_nan=False)
+        _validate_metadata_keys(metadata)
+    except (TypeError, ValueError, RecursionError) as exc:
+        warnings.warn(f"Dropping circuit metadata that cannot be encoded as JSON: {exc}", stacklevel=3)
+        return {}
+    return metadata
+
+
 def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
     """Serialize a Qiskit :class:`~qiskit.circuit.QuantumCircuit` into IQM JSON.
 
     The IQM JSON format is a device-specific format that encodes quantum operations
-    as JSON objects with site names, operation names, and arguments.
+    as JSON objects with site names, operation names, and arguments. Circuit
+    metadata is preserved using Python's JSON encoding (including tuples as
+    arrays), with string object keys and finite numbers required at every level.
+    Metadata that cannot be encoded is dropped with a warning; the circuit and
+    its metadata are not modified.
 
     Note:
         The serialization currently supports only operations that are natively
@@ -181,7 +225,7 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
 
         program: dict[str, Any] = {
             "name": circuit.name or "circuit",
-            "metadata": {},
+            "metadata": _json_metadata(circuit.metadata),
             "instructions": instructions,
         }
 
