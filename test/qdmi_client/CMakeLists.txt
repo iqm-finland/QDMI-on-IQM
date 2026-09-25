@@ -15,13 +15,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_library(qdmi_iqm_fomac fomac.cpp)
+add_library(qdmi_iqm_client qdmi_client.cpp)
 target_link_libraries(
-  qdmi_iqm_fomac
+  qdmi_iqm_client
   PRIVATE qdmi::qdmi_project_warnings
   PUBLIC ${QDMI_TARGET_NAME})
 target_sources(
-  qdmi_iqm_fomac
+  qdmi_iqm_client
   PUBLIC FILE_SET
          public_headers
          TYPE
@@ -29,7 +29,7 @@ target_sources(
          BASE_DIRS
          ${CMAKE_CURRENT_SOURCE_DIR}
          FILES
-         fomac.hpp)
-set_target_properties(qdmi_iqm_fomac PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(qdmi_iqm_fomac PUBLIC cxx_std_20)
-add_library(qdmi::iqm_fomac ALIAS qdmi_iqm_fomac)
+         qdmi_client.hpp)
+set_target_properties(qdmi_iqm_client PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(qdmi_iqm_client PUBLIC cxx_std_20)
+add_library(qdmi::iqm_client ALIAS qdmi_iqm_client)

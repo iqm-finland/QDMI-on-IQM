@@ -18,7 +18,7 @@
  */
 
 /** @file
- * @brief FoMaC Implementation for testing the IQM QDMI Device.
+ * @brief QDMI client implementation for testing the IQM QDMI Device.
  */
 
 #pragma once
@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-class FoMaC {
+class QDMIClient {
   IQM_QDMI_Device_Session session_;
 
   static auto throw_if_error(int status, const std::string &message) -> void;
@@ -47,8 +47,8 @@ public:
                   const std::optional<std::string> &qc_id = std::nullopt,
                   const std::optional<std::string> &qc_alias = std::nullopt);
 
-  FoMaC() = default;
-  explicit FoMaC(IQM_QDMI_Device_Session session) : session_(session) {
+  QDMIClient() = default;
+  explicit QDMIClient(IQM_QDMI_Device_Session session) : session_(session) {
     assert(session_ != nullptr);
   }
 

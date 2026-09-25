@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(fomac)
+add_subdirectory(qdmi_client)
 add_subdirectory(integration)
 
 set(QDMI_PREFIX "IQM")
