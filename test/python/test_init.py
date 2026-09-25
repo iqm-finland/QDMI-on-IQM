@@ -23,6 +23,8 @@ import json
 from importlib.metadata import distribution
 from pathlib import Path
 
+from mqt.core.qdmi import builtin_driver
+
 from iqm.qdmi import (
     IQM_QDMI_CMAKE_DIR,
     IQM_QDMI_DEVICE_ID,
@@ -89,11 +91,25 @@ def test_paths_are_absolute() -> None:
 
 
 def test_installed_manifest() -> None:
-    """Publish a relocatable default definition for metadata-only discovery."""
+    """Publish each Resonance preset and discover it without opening devices."""
     entries = [entry for entry in distribution("iqm-qdmi").entry_points if entry.group == "mqt.core.qdmi.manifests"]
     assert [(entry.name, entry.value) for entry in entries] == [("iqm", "iqm.qdmi")]
     manifest = IQM_QDMI_LIBRARY_PATH.with_name("iqm-qdmi-device.qdmi.json")
-    (device,) = json.loads(manifest.read_text())["qdmi"]["devices"]
-    assert device["id"] == IQM_QDMI_DEVICE_ID
-    assert device["prefix"] == IQM_QDMI_PREFIX
-    assert (manifest.parent / device["library"]).resolve() == IQM_QDMI_LIBRARY_PATH.resolve()
+    devices = json.loads(manifest.read_text())["qdmi"]["devices"]
+    aliases = {
+        IQM_QDMI_DEVICE_ID: None,
+        "iqm.garnet": "garnet",
+        "iqm.garnet.mock": "garnet:mock",
+        "iqm.emerald": "emerald",
+        "iqm.emerald.mock": "emerald:mock",
+        "iqm.sirius": "sirius",
+        "iqm.sirius.mock": "sirius:mock",
+    }
+    assert len(devices) == len(aliases)
+    assert {device["id"] for device in devices} == set(aliases)
+    assert set(aliases) <= set(builtin_driver.registered_device_ids())
+    for device in devices:
+        assert device["prefix"] == IQM_QDMI_PREFIX
+        assert (manifest.parent / device["library"]).resolve() == IQM_QDMI_LIBRARY_PATH.resolve()
+        assert device["session"]["base-url"] == "https://resonance.iqm.tech"
+        assert device["session"].get("custom2") == aliases[device["id"]]

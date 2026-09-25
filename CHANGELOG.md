@@ -39,8 +39,11 @@ releases may include breaking changes.
 ### Changed
 
 - ✨ Discover installed QDMI device manifests and open independent sessions
-  through the MQT Core QDMI driver. Use temporary source pins and LLVM/MLIR CI
-  setup until a suitable Core release is available ([#274]) ([**@burgholzer**]).
+  through the MQT Core QDMI driver. Include stable IDs for Garnet, Emerald and
+  Sirius and their mocks, preserve explicit selection over environment defaults,
+  and support stable-ID opening through `IQMBackend`. Use temporary source pins
+  and LLVM/MLIR CI setup until a suitable Core release is available ([#274])
+  ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
   itself and does not require clients to trigger it ([#229], [#266])
