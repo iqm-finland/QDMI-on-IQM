@@ -1698,9 +1698,9 @@ TEST_F(DeviceJobMockTest,
   const std::string job_submission_response = R"({"id": "job-ordered"})";
   const std::string job_status_response = R"({"status": "ready"})";
   const std::string job_counts_response =
-      R"([{"measurement_keys": ["z_result", "a_result"], "counts": {"010": 1, "101": 1}}])";
+      R"([{"measurement_keys": ["a_result", "z_result"], "counts": {"010": 1, "101": 1}}])";
   const std::string job_measurements_response =
-      R"([{"a_result": [[0], [1]], "z_result": [[0, 1], [1, 0]]}])";
+      R"([{"z_result": [[0], [1]], "a_result": [[0, 1], [1, 0]]}])";
 
   http_stub.queue_post(200, job_submission_response);
   http_stub.queue_get(200, job_status_response);
@@ -1708,8 +1708,8 @@ TEST_F(DeviceJobMockTest,
   http_stub.queue_get(200, job_measurements_response);
 
   constexpr auto program = R"({"name":"permuted","instructions":[
-    {"name":"measure","locus":["alice"],"args":{"key":"a_result"}},
-    {"name":"measure","locus":["bob","alice"],"args":{"key":"z_result"}}]})";
+    {"name":"measure","locus":["alice"],"args":{"key":"z_result"}},
+    {"name":"measure","locus":["alice","bob"],"args":{"key":"a_result"}}]})";
   constexpr auto placement = "alice:QB2,bob:QB1";
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
                                               QDMI_DEVICE_JOB_PARAMETER_CUSTOM5,
