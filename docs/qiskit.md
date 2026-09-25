@@ -61,6 +61,22 @@ Qiskit serializer preserves these units. Applications submitting IQM JSON
 directly must use the same format; the legacy `angle_t` and `phase_t` fields
 expressed angles in turns.
 
+## Circuit Metadata
+
+The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
+program's `metadata` field without modifying the circuit. Empty metadata remains
+`{}`. Values follow Python's JSON encoding: dictionaries, lists, tuples (encoded
+as arrays), strings, booleans, `None`, integers, and finite floating-point
+numbers are supported. Object keys must be strings at every nesting level, so
+that keys such as `1` and `"1"` cannot collide after conversion to JSON.
+
+If any value is unsupported (such as NumPy arrays or custom Python objects), or
+the metadata has circular references or nonfinite numbers, the serializer drops
+the whole metadata with a warning and submits the circuit. Convert such values
+explicitly to keep them. This preserves metadata in the submitted IQM program;
+it does not add a metadata retrieval API or guarantee that a remote service
+returns it in results.
+
 ## Sampler and Estimator Primitives
 
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
