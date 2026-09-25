@@ -810,38 +810,38 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   ASSERT_EQ(sum, shots_num);
 
   size_t size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &size),
             QDMI_SUCCESS);
   std::vector<char> buffer(size - 1); // Buffer too small
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             buffer.size(), buffer.data(),
                                             nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   size_t size2 = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES, 0,
-                                            nullptr, &size2),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
+                                            0, nullptr, &size2),
             QDMI_SUCCESS);
   std::vector<char> buffer2(size2 - 1); // Buffer too small
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                             buffer2.size(), buffer2.data(),
                                             nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   // The MAX parameter is not a valid value for any device
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_MAX, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_MAX, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_SUCCESS);
   // shots_size > 1 means there's actual data beyond the null terminator
   if (shots_size > 1) {
     std::vector<char> shots_buffer(shots_size);
-    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                               shots_size, shots_buffer.data(),
                                               nullptr),
               QDMI_SUCCESS);
@@ -851,34 +851,35 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
 
   // The IQM device does not support statevector or probability results
   EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_STATEVECTOR_DENSE, 0, nullptr, nullptr),
+                job, 0, QDMI_JOB_RESULT_STATEVECTOR_DENSE, 0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(
       IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS, 0, nullptr, nullptr),
-      QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(
-      IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES, 0, nullptr, nullptr),
+          job, 0, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS, 0, nullptr, nullptr),
       QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_PROBABILITIES_DENSE, 0, nullptr, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(
-      IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS, 0, nullptr, nullptr),
-      QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES, 0, nullptr,
+                job, 0, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES, 0, nullptr,
                 nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM3, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0,
+                                            QDMI_JOB_RESULT_PROBABILITIES_DENSE,
+                                            0, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                job, 0, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS, 0, nullptr,
+                nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                job, 0, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES, 0, nullptr,
+                nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM3, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM4, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM4, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM5, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM5, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
 
@@ -899,14 +900,14 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   EXPECT_EQ(retrieved_sum, shots_num);
 
   size_t retrieved_shots_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, 0,
                                             QDMI_JOB_RESULT_SHOTS, 0, nullptr,
                                             &retrieved_shots_size),
             QDMI_SUCCESS);
   ASSERT_GT(retrieved_shots_size, 1U);
   std::vector<char> retrieved_shots(retrieved_shots_size);
   ASSERT_EQ(IQM_QDMI_device_job_get_results(
-                retrieved_job, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
+                retrieved_job, 0, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
                 retrieved_shots.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
@@ -1127,9 +1128,10 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
       &format);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   const auto failed_job_program = build_iqm_json_test_circuit();
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, failed_job_program.size() + 1,
-      failed_job_program.c_str());
+  const size_t program_size = failed_job_program.size() + 1;
+  const void *program_data = failed_job_program.c_str();
+  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+                                         &program_data);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto num_shots_invalid = static_cast<size_t>(0);
   ret =
@@ -1161,10 +1163,12 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
 
   GTEST_SKIP() << "Skipping calibration job per default to avoid changing"
                   " device calibration state during regular tests.";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
-            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  const size_t config_size = strlen(TEST_CALIBRATION_CONFIG) + 1;
+  const void *config = TEST_CALIBRATION_CONFIG;
+  ASSERT_EQ(
+      IQM_QDMI_device_job_set_programs(job, &format, 1, &config_size, &config),
+      QDMI_SUCCESS);
 
   // Try to submit the calibration job
   const auto submit_result = IQM_QDMI_device_job_submit_calibration(job);

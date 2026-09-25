@@ -502,6 +502,7 @@ Server API:
 - `SUBMIT_CIRCUIT_JOB`: Submits a quantum circuit job (QIR or IQM JSON format)
   for execution.
 - `GET_JOB_STATUS`: Checks the status of a submitted job.
+- `GET_JOB_PAYLOAD`: Recovers circuit count and shots when opening a job by ID.
 - `GET_JOB_ARTIFACT_MEASUREMENT_COUNTS`: Retrieves the measurement results as
   aggregated histogram counts of a completed job.
 - `GET_JOB_ARTIFACT_MEASUREMENTS`: Retrieves the individual shot measurement
@@ -596,13 +597,13 @@ The implementation expects JSON responses in specific formats:
 - **Quality Metrics**: Object with `observations` array containing `dut_field`,
   `value`, and `invalid` fields.
 - **Job Status**: Object with job status, errors, and messages.
-- **Measurement Counts Artifact**: Array with a single object containing
+- **Measurement Counts Artifact**: Array with one object per circuit containing
   `measurement_keys` (the concatenation order for result bitstrings) and
   `counts` (an object mapping bitstrings to count integers).
-- **Measurements Artifact**: Array typically containing a single object where
-  results have the shape `results[measurement_key][shot][qubit_index]`. A
-  measurement key may cover one or more qubits; its result arrays have a
-  constant width across shots and contain integer bits (0 or 1). For example,
+- **Measurements Artifact**: Array with one object per circuit where results
+  have the shape `results[measurement_key][shot][qubit_index]`. A measurement
+  key may cover one or more qubits; its result arrays have a constant width
+  across shots and contain integer bits (0 or 1). For example,
   `[{"m_pair": [[0, 1], [1, 0]], "m_single": [[0], [1]]}]` represents two shots,
   with `m_pair` measuring two qubits and `m_single` one qubit. The
   `measurement_keys` metadata from the corresponding counts artifact determines

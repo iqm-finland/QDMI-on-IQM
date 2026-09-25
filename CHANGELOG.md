@@ -35,9 +35,11 @@ releases may include breaking changes.
   ([**@burgholzer**]).
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
   pulse-support properties. Expose calibration submission through the
-  IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the
-  remaining QDMI IDs for binary compatibility with existing MQT Core clients
-  ([#229], [#266]) ([**@marcelwa**], [**@burgholzer**]).
+  IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Submit ordered
+  circuit lists as one native IQM job, with indexed results and recoverable
+  program counts. Replace the removed program setter with
+  `IQM_QDMI_device_job_set_programs`. Preserve surviving QDMI enum values
+  ([#229], [#266], [#277]) ([**@marcelwa**], [**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
@@ -272,6 +274,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
 [#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
