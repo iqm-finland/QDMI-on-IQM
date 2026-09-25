@@ -396,10 +396,8 @@ The QDMI device allows you to submit jobs to the quantum computing hardware. The
 following code snippet demonstrates how to submit a job with various parameters,
 including the
 
-- **program**: The quantum program to be executed, set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`,
-- **program format**: The format used for the program, set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT`,
+- **programs and format**: One or more quantum programs in a common format, set
+  via {cpp:func}`IQM_QDMI_device_job_set_programs`,
 - **number of shots**: The number of shots to execute for a quantum circuit job,
   set via
   {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`,
@@ -449,12 +447,10 @@ auto FoMaC::submit_job(
     -> IQM_QDMI_Device_Job {
   IQM_QDMI_Device_Job job = nullptr;
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                                        program.size() + 1, program.c_str());
+  const size_t program_size = program.size() + 1;
+  const void *program_data = program.c_str();
+  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+                                      &program_data);
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
   ret = IQM_QDMI_device_job_set_parameter(
@@ -533,9 +529,16 @@ The QDMI device currently supports the following program formats:
   ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's
   native JSON circuit format.
 
-For QIR and JSON formats, the program should be provided as a string via the
-{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
-parameter.
+Pass QIR and JSON programs as strings with exactly one trailing NUL byte. The
+program-list setter copies all programs before returning. They share the format,
+shots per circuit, and other job parameters, and are submitted together in one
+IQM job. Results are indexed in input order, starting at zero. IQM exposes one
+outcome for the entire job; `QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES` returns
+`QDMI_ERROR_NOTSUPPORTED`.
+
+MQT Core's Qiskit adapter groups compatible circuits into native multi-program
+jobs. Different shot counts remain separate jobs. The number of programs is
+available through `QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM`.
 
 ## Retrieving jobs by ID
 
@@ -555,9 +558,11 @@ credentials and initializes the handle with the remote job's current status.
 Retrieving does not clone or submit the job. Parameters cannot be changed and
 the retrieved handle cannot be submitted again. Freeing it only releases the
 local handle; it does not cancel or delete the remote job. Check or wait for
-completion before retrieving results. Since the original submission payload is
-not reconstructed, only the job ID is exposed as a job property on a retrieved
-handle.
+completion before retrieving results. Retrieval reads the IQM job payload to
+restore the program count and shots per circuit. JSON circuit payloads also
+identify the IQM JSON format; other historical format metadata and original
+program bytes are not reconstructed. Their property queries return
+`QDMI_ERROR_NOTSUPPORTED`.
 
 ## Retrieving Job Results
 
@@ -587,20 +592,20 @@ IQM_QDMI_device_job_wait(job, 0);
 
 // Get histogram keys (bitstrings)
 size_t keys_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                 0, nullptr, &keys_size);
 std::vector<char> keys_buffer(keys_size);
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                 keys_size, keys_buffer.data(), nullptr);
 std::string keys(keys_buffer.data());
 // keys contains: "00,01,10,11" (example)
 
 // Get histogram values (counts)
 size_t values_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                 0, nullptr, &values_size);
 std::vector<size_t> values(values_size / sizeof(size_t));
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                 values_size, values.data(), nullptr);
 // values contains: {25, 15, 18, 6} (example counts for each key)
 ```
@@ -639,10 +644,10 @@ IQM_QDMI_device_job_wait(job, 0);
 
 // Get individual shots
 size_t shots_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                 0, nullptr, &shots_size);
 std::vector<char> shots_buffer(shots_size);
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                 shots_size, shots_buffer.data(), nullptr);
 std::string shots(shots_buffer.data());
 // shots contains: "00,10,01,11,00,10,..." (one bitstring per shot)
@@ -672,17 +677,17 @@ Attempting to retrieve these formats will return
 ## Triggering Calibration Jobs
 
 Use {cpp:func}`IQM_QDMI_device_job_submit_calibration` from
-`iqm_qdmi/calibration.h`. This IQM extension replaces the removed QDMI
-calibration program format. It returns `QDMI_ERROR_NOTSUPPORTED` if the server
-does not support calibration jobs, as checked during session initialization.
+`iqm_qdmi/calibration.h`. The extension returns `QDMI_ERROR_NOTSUPPORTED` if the
+server does not support calibration jobs, as checked during session
+initialization.
 
-Create a regular IQM job and set `QDMI_DEVICE_JOB_PARAMETER_PROGRAM` to a
-calibration configuration encoded as a JSON string according to the IQM Server
-API. Call the extension instead of `IQM_QDMI_device_job_submit`. The extension
-ignores the program format, shot count, and circuit-specific parameters. After
-submission, program-format and shot-count queries return
-`QDMI_ERROR_NOTSUPPORTED`. The usual job check, wait, cancel, and free functions
-remain available.
+Create a regular IQM job and use `IQM_QDMI_device_job_set_programs` to set one
+`QDMI_PROGRAM_FORMAT_IQMJSON` program containing the calibration configuration
+as a NUL-terminated JSON string according to the IQM Server API. Call the
+extension instead of `IQM_QDMI_device_job_submit`. The extension ignores the
+program format, shot count, and circuit-specific parameters. After submission,
+program-format and shot-count queries return `QDMI_ERROR_NOTSUPPORTED`. The
+usual job check, wait, cancel, and free functions remain available.
 
 The results can be retrieved via the
 {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM1` job result
@@ -712,8 +717,10 @@ int calibrate(IQM_QDMI_Device_Session session, const char *config,
   if (status != QDMI_SUCCESS) {
     return status;
   }
-  status = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, config_size, config);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  const void *program = config;
+  status = IQM_QDMI_device_job_set_programs(job, &format, 1, &config_size,
+                                        &program);
   if (status == QDMI_SUCCESS) {
     status = IQM_QDMI_device_job_submit_calibration(job);
   }
@@ -724,7 +731,7 @@ int calibrate(IQM_QDMI_Device_Session session, const char *config,
     /// Refresh the session's calibration data.
     size_t size = 0;
     status = IQM_QDMI_device_job_get_results(
-        job, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
+        job, 0, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
   }
   IQM_QDMI_device_job_free(job);
   return status;
