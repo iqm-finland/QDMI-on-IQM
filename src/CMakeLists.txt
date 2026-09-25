@@ -50,11 +50,6 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json
           iqm::qdmi_device_internals)
 
-# Publish the metadata consumers need to identify this separately built QDMI
-# device target and synthesize a relocatable manifest.
-configure_qdmi_device_target(TARGET ${QDMI_TARGET_NAME} ID iqm.default PREFIX
-                             ${QDMI_PREFIX})
-
 # Install metadata beside the device so discovery does not load native code.
 set(IQM_QDMI_MANIFEST
     "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/iqm-qdmi-device.qdmi.json")

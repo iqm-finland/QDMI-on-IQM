@@ -210,9 +210,11 @@ in the Contributing guide.
 
 ## Using the Device with MQT Core
 
-The installed CMake target exports the stable ID `iqm.default` and the `IQM`
-symbol prefix. An application using MQT Core can copy the device library and
-manifest beside its executable. This integration requires CMake 3.28 or later:
+The installed CMake target identifies its device manifest through
+`QDMI_MANIFEST_NAME`. The manifest contains the stable device ID, symbol prefix,
+and relative library path. An application using MQT Core can copy the device
+library and manifest beside its executable. This integration requires CMake 3.28
+or later:
 
 ```cmake
 find_package(mqt-core 4.0.0 CONFIG REQUIRED)
