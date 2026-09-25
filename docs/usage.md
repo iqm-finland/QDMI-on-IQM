@@ -210,26 +210,43 @@ in the Contributing guide.
 
 ## Using the Device with MQT Core
 
-The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
-symbol prefix. Applications that link the MQT Core driver statically can use its
-runtime-copy helper to synthesize a relocatable manifest and colocate it with
-the device library beside the executable. This requires CMake 3.28 or newer:
+The installed CMake target exports the stable ID `iqm.default` and the `IQM`
+symbol prefix. An application using MQT Core can copy the device library and
+manifest beside its executable. This integration requires CMake 3.28 or later:
 
 ```cmake
 find_package(mqt-core 4.0.0 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
-add_executable(my-application main.cpp)
-target_link_libraries(my-application PRIVATE MQT::CoreQDMI)
-mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE MQT::CoreQDMI)
+mqt_copy_qdmi_runtime(my_app iqm-qdmi-device)
 ```
 
-For dynamically linked consumers, automatic discovery searches beside the driver
-library rather than the executable. Such consumers must place the generated
-manifest in a discovered location or select a complete configuration with
-`MQT_CORE_QDMI_CONFIG_FILE`. Python integrations instead register the same
-stable ID directly from the packaged library path and open a fresh device
-session for each backend.
+The helper copies the MQT Core QDMI driver, device library, and manifest beside
+the application. The driver resolves relative library paths from the manifest
+directory.
+
+Python consumers use installed entry-point metadata to discover the manifest
+without importing provider code or loading the native library. The Python
+package advertises its manifest with:
+
+```toml
+[project.entry-points]
+"mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
+```
+
+Open a device session with the MQT Core QDMI driver:
+
+```python
+from mqt.core.qdmi import builtin_driver
+
+device = builtin_driver.open_device("iqm.default", token="…", custom2="emerald")
+```
+
+An explicit configuration augments built-in and installed device definitions and
+overrides definitions with the same stable ID. See
+[Python Package](python_package.md) for Qiskit integration and device queries.
 
 ## Running Jobs via Slurm
 
