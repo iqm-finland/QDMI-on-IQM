@@ -44,49 +44,19 @@ def _stub_backend_construction(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any
     captured: dict[str, Any] = {}
     fake_device = object()
 
-    class FakeDeviceDefinition:
-        def __init__(
-            self,
-            device_id: str,
-            library_path: str | os.PathLike[str],
-            prefix: str,
-            *,
-            base_url: str | None = None,
-        ) -> None:
-            captured["definition"] = self
-            captured["definition_kwargs"] = {
-                "device_id": device_id,
-                "library_path": library_path,
-                "prefix": prefix,
-                "base_url": base_url,
-            }
-
-    def fake_register_device_if_absent(definition: object) -> bool:
-        captured["registered"] = definition
-        return True
-
     def fake_open_device(device_id: str, **session: str | Path | None) -> object:
         captured["opened_id"] = device_id
         captured["session"] = session
         return fake_device
 
-    def fake_qdmi_backend_init(_self: IQMBackend, device: object) -> None:
+    def fake_qdmi_backend_init(_self: IQMBackend, device: object, **metadata: object) -> None:
         captured["device"] = device
+        captured["metadata"] = metadata
 
-    monkeypatch.setattr(iqm_qiskit, "DeviceDefinition", FakeDeviceDefinition)
-    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", fake_register_device_if_absent)
     monkeypatch.setattr(iqm_qiskit, "open_device", fake_open_device)
+    monkeypatch.setattr("mqt.core.plugins.qiskit.backend.open_device", fake_open_device)
     monkeypatch.setattr(iqm_qiskit.QDMIBackend, "__init__", fake_qdmi_backend_init)
     return captured
-
-
-def _expected_definition() -> dict[str, str | os.PathLike[str]]:
-    return {
-        "device_id": iqm_qiskit.IQM_QDMI_DEVICE_ID,
-        "library_path": iqm_qiskit.IQM_QDMI_LIBRARY_PATH,
-        "prefix": iqm_qiskit.IQM_QDMI_PREFIX,
-        "base_url": "https://resonance.iqm.tech",
-    }
 
 
 def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -104,8 +74,6 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
     IQMBackend()
 
     assert captured["device"] is not None
-    assert captured["registered"] is captured["definition"]
-    assert captured["definition_kwargs"] == _expected_definition()
     assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"] == {
         "base_url": "https://canonical.example",
@@ -167,15 +135,40 @@ def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyP
     monkeypatch.delenv("IQM_SERVER_URL", raising=False)
     monkeypatch.delenv("IQM_BASE_URL", raising=False)
 
-    def existing_registration(_definition: object) -> bool:
-        return False
-
-    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", existing_registration)
-
     IQMBackend()
 
     assert captured["opened_id"] == iqm_qiskit.IQM_QDMI_DEVICE_ID
     assert captured["session"]["base_url"] is None
+
+
+@pytest.mark.parametrize("device_id", ["iqm.default", "iqm.garnet.mock"])
+def test_iqm_backend_explicit_selection_ignores_environment(monkeypatch: pytest.MonkeyPatch, device_id: str) -> None:
+    """A named preset or explicit alias must not inherit another device's ID."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.setenv("IQM_QC_ID", "other-device")
+    monkeypatch.setenv("IQM_QUANTUM_COMPUTER", "other-alias")
+    monkeypatch.setenv("IQM_SERVER_URL", "https://other.example")
+
+    IQMBackend(device_id, qc_alias="garnet:mock" if device_id == "iqm.default" else None)
+
+    assert captured["opened_id"] == device_id
+    assert captured["session"]["custom1"] is None
+    assert captured["session"]["custom2"] == ("garnet:mock" if device_id == "iqm.default" else None)
+    if device_id != "iqm.default":
+        assert captured["session"]["base_url"] is None
+
+
+def test_iqm_backend_from_device_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Core's factory retains the IQM adapter and the selected stable ID."""
+    captured = _stub_backend_construction(monkeypatch)
+
+    backend = IQMBackend.from_device_id("iqm.emerald.mock")
+
+    assert isinstance(backend, IQMBackend)
+    assert captured["opened_id"] == "iqm.emerald.mock"
+    assert captured["metadata"]["device_id"] == "iqm.emerald.mock"
+    with pytest.raises(ValueError, match="already-open device"):
+        IQMBackend(device=captured["device"], qc_alias="garnet")
 
 
 @pytest.mark.parametrize(
@@ -190,7 +183,7 @@ def test_iqm_backend_treats_empty_base_url_as_unset(
     base_url: str | None,
     environment_base_url: str | None,
 ) -> None:
-    """An empty endpoint should not override the registered device default."""
+    """An empty endpoint should not override the manifest default."""
     captured = _stub_backend_construction(monkeypatch)
     if environment_base_url is None:
         monkeypatch.delenv("IQM_SERVER_URL", raising=False)
@@ -200,7 +193,6 @@ def test_iqm_backend_treats_empty_base_url_as_unset(
 
     IQMBackend(base_url=base_url)
 
-    assert captured["definition_kwargs"] == _expected_definition()
     assert captured["session"]["base_url"] is None
 
 
@@ -208,31 +200,13 @@ def test_iqm_backend_propagates_disabled_device(monkeypatch: pytest.MonkeyPatch)
     """A disabled stable ID should not be re-enabled by the packaged fallback."""
     _stub_backend_construction(monkeypatch)
 
-    def disabled_registration(_definition: object) -> bool:
-        return False
-
     def disabled_open(_device_id: str, **_session: str | Path | None) -> object:
         msg = "QDMI device ID 'iqm.default' is disabled by configuration"
         raise RuntimeError(msg)
 
-    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", disabled_registration)
     monkeypatch.setattr(iqm_qiskit, "open_device", disabled_open)
 
     with pytest.raises(RuntimeError, match="disabled by configuration"):
-        IQMBackend()
-
-
-def test_iqm_backend_propagates_invalid_registration(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invalid packaged definitions should not be mistaken for existing IDs."""
-    _stub_backend_construction(monkeypatch)
-
-    def invalid_registration(_definition: object) -> bool:
-        msg = "invalid device definition"
-        raise ValueError(msg)
-
-    monkeypatch.setattr(iqm_qiskit, "register_device_if_absent", invalid_registration)
-
-    with pytest.raises(ValueError, match="invalid device definition"):
         IQMBackend()
 
 

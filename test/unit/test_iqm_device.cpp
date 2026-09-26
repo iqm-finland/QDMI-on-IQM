@@ -627,6 +627,23 @@ TEST_F(DeviceIntegrationEnvMockTest,
 }
 
 TEST_F(DeviceIntegrationMockTest,
+       SessionInitializationPreservesExplicitAliasOverEnvironmentId) {
+  const ScopedEnvVar qc_id_env("IQM_QC_ID");
+  const ScopedEnvVar quantum_computer_env("IQM_QUANTUM_COMPUTER");
+  ASSERT_EQ(Set_env_var_raw("IQM_QC_ID", "missing"), 0);
+  ASSERT_EQ(Set_env_var_raw("IQM_QUANTUM_COMPUTER", "missing"), 0);
+  const std::string alias = "default";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+                alias.size() + 1, alias.c_str()),
+            QDMI_SUCCESS);
+
+  queue_successful_initialization();
+
+  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+}
+
+TEST_F(DeviceIntegrationMockTest,
        SessionInitializationPrefersExplicitBaseUrlOverEnvironment) {
   const ScopedEnvVar server_url_env("IQM_SERVER_URL");
   const ScopedEnvVar base_url_env("IQM_BASE_URL");

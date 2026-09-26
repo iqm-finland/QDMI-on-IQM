@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 from mqt.core.qdmi import Device, Job, ProgramFormat
-from mqt.core.qdmi.driver import open_device
+from mqt.core.qdmi.builtin_driver import open_device
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
@@ -50,17 +50,16 @@ def _skip_without_iqm_access() -> None:
 
 @pytest.fixture
 def backend() -> IQMBackend:
-    """Returns the IQM backend, which also registers the device."""
+    """Returns an IQM backend from the installed device manifest."""
     _skip_without_iqm_access()
     return IQMBackend()
 
 
 @pytest.fixture
 def device(backend: IQMBackend) -> Device:
-    """Returns a fresh device session over the registration the backend made.
+    """Returns a fresh device session from the installed manifest.
 
-    Constructing the backend registers `iqm.default`, so opening it here needs
-    only the credentials. It resolves the same environment the backend resolves.
+    It resolves the same environment the backend resolves.
     """
     tokens_file = os.getenv("IQM_TOKENS_FILE")
     del backend

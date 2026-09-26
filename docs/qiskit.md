@@ -27,10 +27,7 @@ from iqm.qdmi.qiskit import IQMBackend
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
-backend = IQMBackend(
-  base_url="https://resonance.iqm.tech",
-  qc_alias="emerald:mock",
-)
+backend = IQMBackend("iqm.emerald.mock")
 ```
 
 ```{code-cell} ipython3
@@ -44,16 +41,23 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-Explicit arguments to `IQMBackend(...)` take precedence over `IQM_SERVER_URL`,
-`IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QUANTUM_COMPUTER` from the
-environment. `IQM_BASE_URL` and `IQM_QC_ALIAS` remain supported as legacy
-aliases. Canonical variables take precedence over their legacy aliases, which
-take precedence over the registered device default.
+Select any stable ID from the
+[installed catalogue](usage.md#using-the-device-with-mqt-core).
+`IQMBackend.from_device_id("iqm.emerald.mock", token="…")` provides the same IQM
+adapter through Core's factory API. Every backend opens an independent device
+session.
 
-The wrapper registers the packaged IQM QDMI device as a fallback under the
-stable ID `iqm.default` with the standard Resonance endpoint as its default. An
-existing configured definition with that ID is preserved, including its
-endpoint. Every backend opens a fresh device session with its own configuration.
+`IQMBackend()` keeps the configurable `iqm.default` connection. Explicit
+arguments override environment defaults: `IQM_SERVER_URL`, `IQM_TOKEN`,
+`IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QUANTUM_COMPUTER`. `IQM_BASE_URL` and
+`IQM_QC_ALIAS` remain legacy aliases, with canonical variables taking
+precedence. An explicit quantum computer ID or alias suppresses both environment
+selectors.
+
+Named presets use their configured endpoint and quantum computer; routing
+environment variables cannot redirect them. Authentication still uses the usual
+token or token-file defaults. Explicit arguments and driver configuration can
+override manifest values.
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
