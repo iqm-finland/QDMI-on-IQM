@@ -536,8 +536,9 @@ These steps correspond to the initialization sequence described in the
 
 **During Job Submission and Management:**
 
-- `SUBMIT_CIRCUIT_JOB` or `SUBMIT_CALIBRATION_JOB`: Called when
-  `IQM_QDMI_device_job_submit` is invoked.
+- `SUBMIT_CIRCUIT_JOB`: Called by `IQM_QDMI_device_job_submit`.
+- `SUBMIT_CALIBRATION_JOB`: Called by the IQM extension
+  `IQM_QDMI_device_job_submit_calibration`.
 - `GET_JOB_STATUS` or `GET_CALIBRATION_JOB_STATUS`: Polled when
   `IQM_QDMI_device_job_check` or `IQM_QDMI_device_job_wait` is called.
 - `GET_JOB_ARTIFACT_MEASUREMENT_COUNTS`: Fetched when histogram results are
