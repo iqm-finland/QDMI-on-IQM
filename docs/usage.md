@@ -407,12 +407,12 @@ const auto status = IQM_QDMI_device_job_set_parameter(
     options.c_str());
 ```
 
-Check `status` before submitting the job. The object applies to every program
-in the job and replaces any previously set object. It may be omitted; the
-server supplies defaults for omitted optional fields. The device rejects
-malformed JSON and overrides of `circuits`, `shots`, or `calibration_set_id`,
-then forwards other fields without a local schema. Use the RunRequest fields
-accepted by your IQM server. Calibration jobs use a separate request format.
+Check `status` before submitting the job. The object applies to every program in
+the job and replaces any previously set object. It may be omitted; the server
+supplies defaults for omitted optional fields. The device rejects malformed JSON
+and overrides of `circuits`, `shots`, or `calibration_set_id`, then forwards
+other fields without a local schema. Use the RunRequest fields accepted by your
+IQM server. Calibration jobs use a separate request format.
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
@@ -421,11 +421,6 @@ refreshes the job status and queue position from the IQM server. The query
 returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
 `QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
 position.
-
-**Important:** When submitting circuit jobs (QIR or IQM JSON), the
-implementation automatically includes the current calibration set ID in the job
-submission. This ensures that the job uses the same calibrated gates that were
-available when the session was initialized or last updated.
 
 The QDMI device currently supports the following program formats:
 

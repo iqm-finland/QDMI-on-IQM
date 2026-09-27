@@ -1361,7 +1361,7 @@ std::string_view Program_contents(const std::string &stored_program) {
 
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
-  auto json_program = nlohmann::json();
+  auto json_program = job->run_request_options_;
   json_program["circuits"] = nlohmann::json::array();
   for (const auto &stored_program : job->programs_) {
     const auto program = Program_contents(stored_program);
@@ -1374,7 +1374,6 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   }
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
-  json_program.update(job->run_request_options_);
 
   const auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,

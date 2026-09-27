@@ -110,46 +110,30 @@ print(f"Standard deviations: {data['stds']}")
 
 ## IQM run-request options
 
-Use one optional `run_request_options` mapping to supply IQM RunRequest fields.
-Set a backend default with `backend.set_options(...)`, or replace it for one
-`backend.run(...)` call. The mapping is serialized as a JSON object and sent
-through one standard QDMI custom job parameter. The same fields are used for
-every circuit in a batch.
+Pass optional IQM RunRequest fields through one `run_request_options` mapping:
 
 ```python
 backend.set_options(run_request_options={"heralding_mode": "zeros"})
 job = backend.run(
-    transpiled_qc,
+    transpile(qc, backend),
     shots=128,
     run_request_options={"dd_mode": "enabled", "active_reset_cycles": 2},
 )
-sampler = backend.sampler(run_options={"run_request_options": {"heralding_mode": "none"}})
 ```
 
-The per-run mapping replaces the backend default mapping; entries are not
-merged. When unset or `None`, the device sends only the circuit, shot count, and
-session calibration set ID. The IQM server supplies defaults for omitted
-execution fields. `circuits`, `shots`, and `calibration_set_id` cannot be set
-inside `run_request_options` because QDMI owns them. Qubit mappings and other
-optional fields must use the JSON format accepted by the target IQM server. For
-example, current servers represent `qubit_mapping` as an array of
-`{"logical_name": ..., "physical_name": ...}` objects.
+The mapping on `run` replaces the backend default for that run. It applies to
+all circuits submitted together. When unset or `None`, the device sends the
+circuits, shot count, and session calibration set ID; the server supplies
+defaults for omitted optional fields. The mapping cannot override those three
+QDMI-owned fields.
 
-The backend checks that the mapping is JSON-compatible. It does not keep an
-allowlist of server fields or validate their values; the accepted fields and
-defaults vary by server version. An unknown field may be ignored by some IQM
-servers. Consult the
-[IQM RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html)
-for the server you use. `backend.run` rejects an invalid JSON mapping before
-submitting any circuit. `backend.set_options` rejects unknown top-level names,
-with value validation when a run starts.
-
-This feature requires MQT Core's `QDMIBackend._job_parameters` extension hook.
-With older MQT Core versions, ordinary runs remain supported and the new option
-is rejected. Install a version containing the companion MQT Core change to use
-it; the package dependency will be raised when that version is released. Native
-estimators use backend defaults because Qiskit's estimator does not offer a
-`run_options` field. These settings do not add CLI/offloader option forwarding.
+The backend checks that the mapping is a JSON object with finite values. It
+forwards other fields without a local allowlist, so use the names and values
+accepted by your server's
+[IQM RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
+Sampler `run_options` can carry the same mapping. Estimators use backend
+defaults because Qiskit's estimator has no `run_options` field. CLI and
+offloader calls do not forward this mapping.
 
 ## CLI Scripts
 

@@ -1742,8 +1742,12 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReachServerWithoutLocalSchema) {
                                               QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
                                               strlen(options) + 1, options),
             QDMI_SUCCESS);
-  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
-                        TEST_CIRCUIT_IQM_JSON),
+  constexpr auto second = R"({"name":"second","instructions":[]})";
+  const std::array<const void *, 2> programs{TEST_CIRCUIT_IQM_JSON, second};
+  const std::array sizes{strlen(TEST_CIRCUIT_IQM_JSON) + 1, strlen(second) + 1};
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             programs.size(), sizes.data(),
+                                             programs.data()),
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id":"options-job"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
@@ -1752,6 +1756,7 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReachServerWithoutLocalSchema) {
   for (const auto &[key, value] : supplied_options.items()) {
     EXPECT_EQ(request.at(key), value);
   }
+  EXPECT_EQ(request.at("circuits").size(), 2U);
   EXPECT_EQ(request.at("shots"), 1);
 }
 
