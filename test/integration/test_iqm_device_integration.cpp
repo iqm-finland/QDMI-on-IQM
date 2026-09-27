@@ -1133,10 +1133,10 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
                                          &program_data);
   ASSERT_EQ(ret, QDMI_SUCCESS);
-  constexpr auto num_shots_invalid = static_cast<size_t>(0);
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
-                                        sizeof(size_t), &num_shots_invalid);
+  constexpr auto invalid_options = R"({"dd_mode":"invalid"})";
+  ret = IQM_QDMI_device_job_set_parameter(
+      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, strlen(invalid_options) + 1,
+      invalid_options);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   ret = IQM_QDMI_device_job_submit(job);
   ASSERT_EQ(ret, QDMI_ERROR_FATAL);
