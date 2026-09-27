@@ -1022,18 +1022,13 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   const auto second_qubit_name = fomac.get_site_name(qubit_sites[1]);
   const auto qubit_mapping = std::map<std::string, std::string>{
       {"alice", first_qubit_name}, {"bob", second_qubit_name}};
-  const std::string dd_strategy = R"({
-    "merge_contiguous_waits": true,
-    "target_qubits": [")" + first_qubit_name +
-                                  "\",\n\"" + second_qubit_name + "\"\n]," +
-                                  R"("skip_leading_wait": true,
-    "skip_trailing_wait": true,
-    "gate_sequences": [
-      [9, "XYXYYXYX", "asap"],
-      [5, "YXYX", "asap"],
-      [2, "XX", "center"]
-    ]
-  })";
+  const auto dd_strategy = nlohmann::json{
+      {"merge_contiguous_waits", true},
+      {"target_qubits", {first_qubit_name, second_qubit_name}},
+      {"skip_leading_wait", true},
+      {"skip_trailing_wait", true},
+      {"gate_sequences",
+       {{9, "XYXYYXYX", "asap"}, {5, "YXYX", "asap"}, {2, "XX", "center"}}}};
 
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
@@ -1071,7 +1066,7 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
                                    {"physical_name", second_qubit_name}}})},
           {"max_circuit_duration_over_t2", 0.0},
           {"active_reset_cycles", 1},
-          {"dd_strategy", nlohmann::json::parse(dd_strategy)},
+          {"dd_strategy", dd_strategy},
       }
           .dump();
   auto &job = jobs.emplace_back();
