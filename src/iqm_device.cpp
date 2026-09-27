@@ -1134,7 +1134,7 @@ int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
                             const void *value) {
   try {
     const auto *text = static_cast<const char *>(value);
-    if (size == 0 || text[size - 1] != '\0') {
+    if (text[size - 1] != '\0') {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     auto options = nlohmann::json::parse(text, text + size - 1, nullptr, false);
@@ -1146,8 +1146,6 @@ int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
     return QDMI_SUCCESS;
   } catch (const std::bad_alloc &) {
     return QDMI_ERROR_OUTOFMEM;
-  } catch (const nlohmann::json::exception &) {
-    return QDMI_ERROR_INVALIDARGUMENT;
   }
 }
 } // namespace

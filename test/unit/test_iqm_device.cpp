@@ -1768,7 +1768,8 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsRejectInvalidObjectsAtomically) {
       R"({"circuits":[]})",
       R"({"shots":2})",
       R"({"calibration_set_id":null})",
-      R"({"dd_mode":"enabled","shots":2})"};
+      R"({"dd_mode":"enabled","shots":2})",
+      R"({"max_circuit_duration_over_t2":1e400})"};
   for (const auto &options : invalid_options) {
     EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                   job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, options.size() + 1,
