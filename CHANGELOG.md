@@ -25,6 +25,10 @@ releases may include breaking changes.
 - ✨ Expose calibration submission through the IQM-specific
   `IQM_QDMI_device_job_submit_calibration` function ([#266])
   ([**@burgholzer**]).
+- ✨ Submit ordered circuit lists as one native IQM job with indexed results,
+  recoverable program counts, and indexed program queries ([#277])
+
+  ([**@burgholzer**]).
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -45,8 +49,6 @@ releases may include breaking changes.
   selection takes precedence over environment defaults. Temporary Core source
   pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
   ([**@burgholzer**]).
-- ✨ Submit ordered circuit lists as one native IQM job with indexed results and
-  recoverable program counts ([#277]) ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
   itself and does not require clients to trigger it ([#229], [#266])

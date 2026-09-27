@@ -486,7 +486,7 @@ auto FoMaC::submit_job(
   JobGuard guard{job};
   const size_t program_size = program.size() + 1;
   const void *program_data = program.c_str();
-  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
                                          &program_data);
   throw_if_error(ret, "Failed to set the program");
   ret = IQM_QDMI_device_job_set_parameter(
