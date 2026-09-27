@@ -37,6 +37,7 @@
 #include <iostream>
 #include <new>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
