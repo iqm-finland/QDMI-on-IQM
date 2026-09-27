@@ -1716,10 +1716,19 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
 }
 
 TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  EXPECT_EQ(
+      IQM_QDMI_device_job_set_programs(nullptr, format, 1, nullptr, nullptr),
+      QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_MAX, 1,
+                                             nullptr, nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_QASM3, 1,
+                                             nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_query_property(
                 job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, 0, nullptr, nullptr),
             QDMI_ERROR_BADSTATE);
-  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
   ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
                         TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
@@ -1741,6 +1750,8 @@ TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
   EXPECT_EQ(num_programs, 1U);
   http_stub.queue_post(200, R"({"id":"unchanged"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, format, 2, nullptr, nullptr),
+            QDMI_ERROR_BADSTATE);
   const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
   EXPECT_EQ(request.at("circuits").at(0),
             nlohmann::json::parse(TEST_CIRCUIT_IQM_JSON));
