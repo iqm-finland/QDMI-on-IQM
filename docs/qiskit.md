@@ -135,10 +135,10 @@ optional fields must use the JSON format accepted by the target IQM server. For
 example, current servers represent `qubit_mapping` as an array of
 `{"logical_name": ..., "physical_name": ...}` objects.
 
-The backend checks that the mapping is JSON-compatible and uses string keys. It
-does not keep an allowlist of server fields or validate their values; the
-accepted fields and defaults vary by server version. An unknown field may be
-ignored by some IQM servers. Consult the
+The backend checks that the mapping is JSON-compatible. It does not keep an
+allowlist of server fields or validate their values; the accepted fields and
+defaults vary by server version. An unknown field may be ignored by some IQM
+servers. Consult the
 [IQM RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html)
 for the server you use. `backend.run` rejects an invalid JSON mapping before
 submitting any circuit. `backend.set_options` rejects unknown top-level names,

@@ -19,13 +19,16 @@
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
+    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
     from mqt.core.qdmi import CustomProperty
     from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
@@ -37,18 +40,48 @@ except ImportError as e:
 
 from . import IQM_QDMI_DEVICE_ID
 from .gates import MoveGate
-from .options import execution_parameters
 
 if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
-    from collections.abc import Mapping
-
     from mqt.core.typing import QDMIJobParameters
     from qiskit.circuit import Instruction
     from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
+
+
+def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
+    """Encode optional IQM run-request fields as one custom job parameter.
+
+    Args:
+        options: Effective IQM backend options for one run.
+
+    Returns:
+        A JSON object in ``custom1``, or no custom value when unset.
+
+    Raises:
+        CircuitValidationError: An option cannot be represented as JSON or
+            tries to replace a QDMI-owned request field.
+    """
+    if unknown := options.keys() - {"run_request_options"}:
+        msg = f"Unsupported execution options: {', '.join(sorted(unknown))}"
+        raise CircuitValidationError(msg)
+    request_options = options.get("run_request_options")
+    if request_options is None:
+        return {"custom1": None}
+    if not isinstance(request_options, Mapping):
+        msg = "'run_request_options' must be a JSON object"
+        raise CircuitValidationError(msg)
+    if reserved := request_options.keys() & {"circuits", "shots", "calibration_set_id"}:
+        msg = f"'run_request_options' cannot override {', '.join(sorted(reserved))}"
+        raise CircuitValidationError(msg)
+    try:
+        payload = json.dumps(dict(request_options), allow_nan=False)
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        msg = "'run_request_options' must contain finite JSON-compatible values"
+        raise CircuitValidationError(msg) from exc
+    return {"custom1": payload}
 
 
 def __dir__() -> list[str]:

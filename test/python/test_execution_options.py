@@ -28,8 +28,7 @@ from mqt.core.qdmi import Device, Job, ProgramFormat
 from qiskit.circuit import Measure, QuantumCircuit
 from qiskit.transpiler import Target
 
-from iqm.qdmi.options import execution_parameters
-from iqm.qdmi.qiskit import IQMBackend
+from iqm.qdmi.qiskit import IQMBackend, execution_parameters
 
 
 def test_encode_partial_run_request() -> None:
@@ -52,8 +51,6 @@ def test_encode_partial_run_request() -> None:
         {"circuits": []},
         {"shots": 2},
         {"calibration_set_id": "other"},
-        {1: "value"},
-        {"nested": [{1: "value"}]},
         {"nested": object()},
         {"nested": float("nan")},
         {"nested": float("inf")},
@@ -75,7 +72,7 @@ def test_unset_run_request_uses_server_defaults() -> None:
 
 
 def test_reject_circular_run_request_options() -> None:
-    """A circular mapping must fail without hanging during key validation."""
+    """The JSON encoder rejects a circular mapping."""
     fields: dict[str, object] = {}
     fields["nested"] = fields
     with pytest.raises(CircuitValidationError, match="JSON-compatible"):
