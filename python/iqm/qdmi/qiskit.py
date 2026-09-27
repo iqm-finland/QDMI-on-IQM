@@ -69,7 +69,7 @@ def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
         raise CircuitValidationError(msg)
     request_options = options.get("run_request_options")
     if request_options is None:
-        return {"custom1": None}
+        return {}
     if not isinstance(request_options, Mapping):
         msg = "'run_request_options' must be a JSON object"
         raise CircuitValidationError(msg)
@@ -121,15 +121,11 @@ class IQMBackend(QDMIBackend):
     def _default_options(cls) -> Options:
         """Return shot options and optional IQM run-request fields.
 
-        Older MQT Core versions reject the new settings instead of accepting
-        them without forwarding them to the device.
-
         Returns:
             Backend defaults; ``None`` leaves server options at their defaults.
         """
         options = super()._default_options()
-        if hasattr(QDMIBackend, "_job_parameters"):
-            options.update_options(run_request_options=None)
+        options.update_options(run_request_options=None)
         return options
 
     def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
