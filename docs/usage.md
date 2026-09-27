@@ -546,8 +546,8 @@ program-list setter copies all programs before returning. They share the format,
 shots per circuit, and other job parameters, and are submitted together in one
 IQM job. Programs and results are indexed in input order, starting at zero; use
 `IQM_QDMI_device_job_get_program` to read a stored program. IQM exposes one
-outcome for the entire job; `QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES` returns
-`QDMI_ERROR_NOTSUPPORTED`.
+outcome for the entire job; `IQM_QDMI_device_job_get_program_status` returns
+`QDMI_ERROR_NOTSUPPORTED` for individual outcomes.
 
 MQT Core's Qiskit adapter groups compatible circuits into native multi-program
 jobs. Different shot counts remain separate jobs. The number of programs is
