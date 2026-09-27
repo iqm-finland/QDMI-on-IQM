@@ -86,30 +86,21 @@ class IQMBackend(QDMIBackend):
 
     @classmethod
     def _default_options(cls) -> Options:
-        """Return shot options and optional IQM execution settings.
+        """Return shot options and optional IQM run-request fields.
 
         Older MQT Core versions reject the new settings instead of accepting
         them without forwarding them to the device.
 
         Returns:
-            Backend defaults; ``None`` leaves the native IQM default unchanged.
+            Backend defaults; ``None`` leaves server options at their defaults.
         """
         options = super()._default_options()
         if hasattr(QDMIBackend, "_job_parameters"):
-            options.update_options(
-                heralding_mode=None,
-                move_gate_validation=None,
-                move_gate_frame_tracking=None,
-                dd_mode=None,
-                qubit_mapping=None,
-                max_circuit_duration_over_t2=None,
-                active_reset_cycles=None,
-                dd_strategy=None,
-            )
+            options.update_options(run_request_options=None)
         return options
 
     def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
-        """Validate and encode IQM options for every circuit in a run.
+        """Encode IQM run-request fields for every circuit in a run.
 
         Returns:
             IQM custom job parameters for MQT Core's submission hook.

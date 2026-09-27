@@ -28,9 +28,10 @@ releases may include breaking changes.
 - ✨ Submit ordered circuit lists as one native IQM job with indexed results,
   recoverable program counts, and indexed program queries ([#277])
   ([**@burgholzer**]).
-- ✨ Expose IQM execution options such as heralding, dynamical decoupling, and
-  active reset on `IQMBackend` through `set_options` and per-run overrides
-  ([#272]) ([**@marcelwa**])
+- ✨ Forward optional IQM RunRequest fields as one JSON object through a
+  standard QDMI custom job parameter, exposed on `IQMBackend` through
+  `run_request_options` in `set_options` and per-run overrides ([#272])
+  ([**@marcelwa**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off

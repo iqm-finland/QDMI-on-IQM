@@ -31,6 +31,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -1009,18 +1010,12 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   constexpr size_t shots_num = 64;
-  const std::string heralding_mode = "none";
-  const std::string move_validation_mode = "allow_prx";
-  const std::string move_gate_frame_tracking_mode = "no_detuning_correction";
-  const std::string dd_mode = "enabled";
   const auto qubit_sites = get_qubit_sites();
   ASSERT_GE(qubit_sites.size(), 2U);
   const auto first_qubit_name = fomac.get_site_name(qubit_sites[0]);
   const auto second_qubit_name = fomac.get_site_name(qubit_sites[1]);
   const auto qubit_mapping = std::map<std::string, std::string>{
       {"alice", first_qubit_name}, {"bob", second_qubit_name}};
-  constexpr double max_circuit_duration_over_t2 = 0;
-  constexpr size_t num_active_reset_cycles = 1;
   const std::string dd_strategy = R"({
     "merge_contiguous_waits": true,
     "target_qubits": [")" + first_qubit_name +
@@ -1057,12 +1052,25 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
       pos += key.length();
     }
   }
+  const auto run_request_options =
+      nlohmann::json{
+          {"heralding_mode", "none"},
+          {"move_gate_validation", "allow_prx"},
+          {"move_gate_frame_tracking", "no_detuning_correction"},
+          {"dd_mode", "enabled"},
+          {"qubit_mapping",
+           nlohmann::json::array({{{"logical_name", "alice"},
+                                   {"physical_name", first_qubit_name}},
+                                  {{"logical_name", "bob"},
+                                   {"physical_name", second_qubit_name}}})},
+          {"max_circuit_duration_over_t2", 0.0},
+          {"active_reset_cycles", 1},
+          {"dd_strategy", nlohmann::json::parse(dd_strategy)},
+      }
+          .dump();
   auto &job = jobs.emplace_back();
   job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
-                         heralding_mode, move_validation_mode,
-                         move_gate_frame_tracking_mode, dd_mode, qubit_mapping,
-                         max_circuit_duration_over_t2, num_active_reset_cycles,
-                         dd_strategy);
+                         run_request_options);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     GTEST_SKIP()

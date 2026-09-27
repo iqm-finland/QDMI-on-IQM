@@ -469,17 +469,10 @@ private:
 };
 } // namespace
 
-auto FoMaC::submit_job(
-    const std::string &program, const QDMI_Program_Format format,
-    const size_t num_shots, const std::string &heralding_mode,
-    const std::string &move_validation_mode,
-    const std::string &move_gate_frame_tracking_mode,
-    const std::string &dd_mode,
-    const std::optional<std::map<std::string, std::string>> &qubit_mapping,
-    const std::optional<double> &max_circuit_duration_over_t2,
-    const std::optional<size_t> &num_active_reset_cycles,
-    const std::optional<std::string> &dd_strategy) const
-    -> IQM_QDMI_Device_Job {
+auto FoMaC::submit_job(const std::string &program,
+                       const QDMI_Program_Format format, const size_t num_shots,
+                       const std::optional<std::string> &run_request_options)
+    const -> IQM_QDMI_Device_Job {
   IQM_QDMI_Device_Job job = nullptr;
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   throw_if_error(ret, "Failed to create a job");
@@ -492,62 +485,11 @@ auto FoMaC::submit_job(
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
   throw_if_error(ret, "Failed to set the number of shots");
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, heralding_mode.size() + 1,
-      heralding_mode.c_str());
-  throw_if_error(ret, "Failed to set the heralding mode");
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, move_validation_mode.size() + 1,
-      move_validation_mode.c_str());
-  throw_if_error(ret, "Failed to set the move validation mode");
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
-      move_gate_frame_tracking_mode.size() + 1,
-      move_gate_frame_tracking_mode.c_str());
-  throw_if_error(ret, "Failed to set the move gate frame tracking mode");
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
-                                        dd_mode.size() + 1, dd_mode.c_str());
-  throw_if_error(ret, "Failed to set the dynamical decoupling mode");
-  if (qubit_mapping.has_value()) {
-    std::string mapping_str;
-    for (const auto &pair : *qubit_mapping) {
-      mapping_str += pair.first + ":" + pair.second + ",";
-    }
-    if (!mapping_str.empty()) {
-      mapping_str.pop_back(); // Remove the trailing comma
-    }
+  if (run_request_options.has_value()) {
     ret = IQM_QDMI_device_job_set_parameter(
-        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM5, mapping_str.size() + 1,
-        mapping_str.c_str());
-    throw_if_error(ret, "Failed to set the qubit mapping");
-  }
-  if (max_circuit_duration_over_t2.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1),
-        sizeof(double), &max_circuit_duration_over_t2.value());
-    throw_if_error(ret, "Failed to set the maximum circuit duration over T2");
-  }
-  if (num_active_reset_cycles.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
-        sizeof(size_t), &num_active_reset_cycles.value());
-    throw_if_error(ret, "Failed to set the number of active reset cycles");
-  }
-  if (dd_strategy.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3),
-        dd_strategy->size() + 1, dd_strategy->c_str());
-    throw_if_error(ret, "Failed to set the dynamical decoupling strategy");
+        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, run_request_options->size() + 1,
+        run_request_options->c_str());
+    throw_if_error(ret, "Failed to set the run-request options");
   }
   ret = IQM_QDMI_device_job_submit(job);
   throw_if_error(ret, "Failed to submit the job");

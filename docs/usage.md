@@ -403,151 +403,35 @@ IQM Server API.
 
 ## Submitting jobs
 
-The QDMI device allows you to submit jobs to the quantum computing hardware. The
-following code snippet demonstrates how to submit a job with various parameters,
-including the
+Set one or more programs in a common format with
+{cpp:func}`IQM_QDMI_device_job_set_programs`. Set the shared shot count with
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`;
+it defaults to one. The device adds the session calibration set ID.
 
-- **programs and format**: One or more quantum programs in a common format, set
-  via {cpp:func}`IQM_QDMI_device_job_set_programs`,
-- **number of shots**: The number of shots to execute for a quantum circuit job,
-  set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`,
-- **heralding mode**: Controls heralding behavior (valid values: "none",
-  "zeros"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`,
-- **move validation mode**: Validation level for moves (valid values: "strict",
-  "allow_prx", "none"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM2`,
-- **move gate frame tracking mode**: Frame tracking behavior (valid values:
-  "full", "no_detuning_correction", "none"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM3`,
-- **dynamical decoupling mode**: Enable/disable dynamical decoupling (valid
-  values: "disabled", "enabled"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM4`,
-- **qubit mapping**: Mapping of logical qubit names to physical qubit names
-  (important for QIR programs), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM5`,
-- **maximum circuit duration over T2**: The maximum duration of a circuit over
-  T2 time, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1`,
-- **number of active reset cycles**: The number of active reset cycles to
-  perform, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2`, and
-- **dynamical decoupling strategy**: Strategy configuration as JSON string
-  according to the
-  [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791),
-  set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
+Optional IQM RunRequest fields go in one NUL-terminated JSON object in
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`:
 
-`CUSTOM4` also accepts a NUL-terminated JSON options object. This carries the
-extended settings through clients that expose only QDMI's five named custom
-parameters:
-
-```json
-{
-  "iqm_execution_options": 1,
-  "dd_mode": "enabled",
-  "max_circuit_duration_over_t2": 0.5,
-  "active_reset_cycles": 2,
-  "dd_strategy": {"merge_contiguous_waits": true}
-}
+```cpp
+const std::string options = R"({"heralding_mode":"zeros","dd_mode":"enabled"})";
+const auto status = IQM_QDMI_device_job_set_parameter(
+    job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, options.size() + 1,
+    options.c_str());
 ```
 
-The integer version marker is required. Other fields are optional. Unknown
-fields, invalid types, nonpositive/nonfinite duration ratios, negative reset
-counts, and non-object strategies return `QDMI_ERROR_INVALIDARGUMENT` without
-changing the job. Strategy contents are validated by the IQM server. Legacy
-`"enabled"`/`"disabled"` values and all `CUSTOM5` qubit mapping strings retain
-their existing meanings. If both this object and the standalone extended slots
-set the same field, the last successful setter wins. Omitted fields retain their
-previous values; setting the legacy mode changes only `dd_mode`.
+Check `status` before submitting the job. The object applies to every program
+in the job and replaces any previously set object. It may be omitted; the
+server supplies defaults for omitted optional fields. The device rejects
+malformed JSON and overrides of `circuits`, `shots`, or `calibration_set_id`,
+then forwards other fields without a local schema. Use the RunRequest fields
+accepted by your IQM server. Calibration jobs use a separate request format.
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
-reports the number of jobs ahead of the job while it is queued. Every property
-query refreshes the job status and queue position from the IQM server. The query
+reports the number of jobs ahead while the job is queued. Every property query
+refreshes the job status and queue position from the IQM server. The query
 returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
 `QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
 position.
-
-```cpp
-auto FoMaC::submit_job(
-    const std::string &program, const QDMI_Program_Format format,
-    const size_t num_shots, const std::string &heralding_mode,
-    const std::string &move_validation_mode,
-    const std::string &move_gate_frame_tracking_mode,
-    const std::string &dd_mode,
-    const std::optional<std::map<std::string, std::string>> &qubit_mapping,
-    const std::optional<double> &max_circuit_duration_over_t2,
-    const std::optional<size_t> &num_active_reset_cycles,
-    const std::optional<std::string> &dd_strategy) const
-    -> IQM_QDMI_Device_Job {
-  IQM_QDMI_Device_Job job = nullptr;
-  int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
-  const size_t program_size = program.size() + 1;
-  const void *program_data = program.c_str();
-  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
-                                      &program_data);
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, heralding_mode.size() + 1,
-      heralding_mode.c_str());
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, move_validation_mode.size() + 1,
-      move_validation_mode.c_str());
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
-      move_gate_frame_tracking_mode.size() + 1,
-      move_gate_frame_tracking_mode.c_str());
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
-                                        dd_mode.size() + 1, dd_mode.c_str());
-  if (qubit_mapping.has_value()) {
-    std::string mapping_str;
-    for (const auto &pair : *qubit_mapping) {
-      mapping_str += pair.first + ":" + pair.second + ",";
-    }
-    if (!mapping_str.empty()) {
-      mapping_str.pop_back(); // Remove the trailing comma
-    }
-    ret = IQM_QDMI_device_job_set_parameter(
-        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM5, mapping_str.size() + 1,
-        mapping_str.c_str());
-  }
-  if (max_circuit_duration_over_t2.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1),
-        sizeof(double), &max_circuit_duration_over_t2.value());
-  }
-  if (num_active_reset_cycles.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
-        sizeof(size_t), &num_active_reset_cycles.value());
-  }
-  if (dd_strategy.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3),
-        dd_strategy->size() + 1, dd_strategy->c_str());
-  }
-  ret = IQM_QDMI_device_job_submit(job);
-  return job;
-}
-```
-
-The {cpp:func}`IQM_QDMI_device_session_create_device_job` function creates a new
-job object, and the {cpp:func}`IQM_QDMI_device_job_set_parameter` function is
-used to set various parameters for the job. The job is submitted with
-{cpp:func}`IQM_QDMI_device_job_submit`, which sends the job to the quantum
-computing hardware for execution. As before, `ret` is the
-{cpp:enum}`QDMI_STATUS` return value of the last function call, which can be
-checked for error codes.
 
 **Important:** When submitting circuit jobs (QIR or IQM JSON), the
 implementation automatically includes the calibration set ID captured at job

@@ -109,18 +109,11 @@ public:
   [[nodiscard]] auto get_supported_program_formats() const
       -> std::vector<QDMI_Program_Format>;
 
-  [[nodiscard]] auto submit_job(
-      const std::string &program, QDMI_Program_Format format,
-      size_t num_shots = 0, const std::string &heralding_mode = "none",
-      const std::string &move_validation_mode = "strict",
-      const std::string &move_gate_frame_tracking_mode = "full",
-      const std::string &dd_mode = "disabled",
-      const std::optional<std::map<std::string, std::string>> &qubit_mapping =
-          std::nullopt,
-      const std::optional<double> &max_circuit_duration_over_t2 = std::nullopt,
-      const std::optional<size_t> &num_active_reset_cycles = std::nullopt,
-      const std::optional<std::string> &dd_strategy = std::nullopt) const
-      -> IQM_QDMI_Device_Job;
+  [[nodiscard]] auto
+  submit_job(const std::string &program, QDMI_Program_Format format,
+             size_t num_shots = 1,
+             const std::optional<std::string> &run_request_options =
+                 std::nullopt) const -> IQM_QDMI_Device_Job;
 
   static auto wait(IQM_QDMI_Device_Job job, size_t timeout = 0) -> void;
 

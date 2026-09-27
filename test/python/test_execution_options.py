@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""IQM execution option validation and submission tests."""
+"""IQM run-request option validation and submission tests."""
 
 from __future__ import annotations
 
@@ -32,94 +32,72 @@ from iqm.qdmi.options import execution_parameters
 from iqm.qdmi.qiskit import IQMBackend
 
 
-def test_encode_all_execution_options() -> None:
-    """Encode each supported option with its native type and field name."""
-    parameters = execution_parameters({
+def test_encode_partial_run_request() -> None:
+    """Forward arbitrary IQM fields as one JSON object without a local schema."""
+    fields = {
         "heralding_mode": "zeros",
-        "move_gate_validation": "allow_prx",
-        "move_gate_frame_tracking": "no_detuning_correction",
         "dd_mode": "enabled",
-        "qubit_mapping": {"q0": "QB1", "q1": "QB2"},
-        "max_circuit_duration_over_t2": 0.5,
-        "active_reset_cycles": 2,
-        "dd_strategy": {"merge_contiguous_waits": True},
-    })
-    assert parameters["custom1"] == "zeros"
-    assert parameters["custom2"] == "allow_prx"
-    assert parameters["custom3"] == "no_detuning_correction"
-    assert parameters["custom5"] == "q0:QB1,q1:QB2"
-    assert json.loads(str(parameters["custom4"])) == {
-        "iqm_execution_options": 1,
-        "dd_mode": "enabled",
-        "max_circuit_duration_over_t2": 0.5,
-        "active_reset_cycles": 2,
-        "dd_strategy": {"merge_contiguous_waits": True},
+        "max_circuit_duration_over_t2": 0.0,
+        "qubit_mapping": [{"logical_name": "alice", "physical_name": "QB1"}],
+        "future_server_field": {"nested": [1, True]},
     }
+    assert execution_parameters({"run_request_options": fields}) == {"custom1": json.dumps(fields)}
 
 
 @pytest.mark.parametrize(
-    ("name", "value"),
+    "value",
     [
-        ("unknown", "value"),
-        ("heralding_mode", "typo"),
-        ("dd_mode", True),
-        ("move_gate_validation", []),
-        ("move_gate_frame_tracking", "disabled"),
-        ("qubit_mapping", {}),
-        ("qubit_mapping", {"q:0": "QB1"}),
-        ("qubit_mapping", {"q0": "QB1,other"}),
-        ("qubit_mapping", {"q0": ""}),
-        ("qubit_mapping", {"q0": 1}),
-        ("qubit_mapping", {"q0": "QB1\0"}),
-        ("max_circuit_duration_over_t2", 0),
-        ("max_circuit_duration_over_t2", 10**400),
-        ("max_circuit_duration_over_t2", float("nan")),
-        ("max_circuit_duration_over_t2", float("inf")),
-        ("max_circuit_duration_over_t2", True),
-        ("active_reset_cycles", -1),
-        ("active_reset_cycles", 1.5),
-        ("active_reset_cycles", True),
-        ("active_reset_cycles", 2**128),
-        ("dd_strategy", "{}"),
-        ("dd_strategy", []),
-        ("dd_strategy", {1: "value"}),
-        ("dd_strategy", {"nested": [{1: "value"}]}),
-        ("dd_strategy", {"value": object()}),
-        ("dd_strategy", {"value": float("nan")}),
+        [],
+        "{}",
+        {"circuits": []},
+        {"shots": 2},
+        {"calibration_set_id": "other"},
+        {1: "value"},
+        {"nested": [{1: "value"}]},
+        {"nested": object()},
+        {"nested": float("nan")},
+        {"nested": float("inf")},
     ],
 )
-def test_reject_invalid_execution_options(name: str, value: object) -> None:
-    """Reject misspellings, coercions, and non-JSON values before submission."""
+def test_reject_invalid_run_request_options(value: object) -> None:
+    """Reject non-JSON objects and QDMI-owned fields before submission."""
     with pytest.raises(CircuitValidationError):
-        execution_parameters({name: value})
+        execution_parameters({"run_request_options": value})
 
 
-def test_unset_execution_options_preserve_native_defaults() -> None:
-    """Omitted settings leave all native options unchanged."""
-    assert all(value is None for value in execution_parameters({}).values())
-    assert all(
-        value is None for value in execution_parameters({"shots": 1024, "memory": False, "max_retries": 0}).values()
-    )
-    assert execution_parameters({"dd_mode": "enabled"})["custom4"] == "enabled"
-    assert execution_parameters({"active_reset_cycles": 0})["custom4"] is not None
+def test_unset_run_request_uses_server_defaults() -> None:
+    """An unset mapping does not occupy a QDMI custom parameter."""
+    assert execution_parameters({}) == {"custom1": None}
+    assert execution_parameters({"run_request_options": None}) == {"custom1": None}
+    assert execution_parameters({"run_request_options": {}}) == {"custom1": "{}"}
+    with pytest.raises(CircuitValidationError, match="Unsupported execution options"):
+        execution_parameters({"heralding_mode": "zeros"})
+
+
+def test_reject_circular_run_request_options() -> None:
+    """A circular mapping must fail without hanging during key validation."""
+    fields: dict[str, object] = {}
+    fields["nested"] = fields
+    with pytest.raises(CircuitValidationError, match="JSON-compatible"):
+        execution_parameters({"run_request_options": fields})
 
 
 def test_older_mqt_rejects_new_options(monkeypatch: pytest.MonkeyPatch) -> None:
     """An older backend must never accept new options without forwarding them."""
     monkeypatch.delattr(QDMIBackend, "_job_parameters", raising=False)
     options = IQMBackend._default_options()  # ruff:ignore[private-member-access]
-    assert "heralding_mode" not in options
+    assert "run_request_options" not in options
     backend = IQMBackend.__new__(IQMBackend)
     backend._options = options  # ruff:ignore[private-member-access]
-    with pytest.raises(CircuitValidationError, match="heralding_mode"):
-        backend.run(QuantumCircuit(1), heralding_mode="zeros")
+    with pytest.raises(CircuitValidationError, match="run_request_options"):
+        backend.run(QuantumCircuit(1), run_request_options={"dd_mode": "enabled"})
     with pytest.raises(AttributeError):
-        backend.set_options(heralding_mode="zeros")
+        backend.set_options(run_request_options={"dd_mode": "enabled"})
 
 
 @pytest.mark.skipif(not hasattr(QDMIBackend, "_job_parameters"), reason="requires MQT job-option hook")
 def test_iqm_backend_forwards_options_for_every_circuit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Exercise IQM option encoding through the generic MQT submission path."""
+    """Exercise the JSON option through the generic MQT submission path."""
     device = Mock(spec=Device)
     device.name.return_value = "IQM option test"
     device.version.return_value = "test"
@@ -138,23 +116,18 @@ def test_iqm_backend_forwards_options_for_every_circuit(monkeypatch: pytest.Monk
     monkeypatch.setattr(IQMBackend, "_build_target", lambda _self: target)
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", lambda *_args: ("{}", ProgramFormat.IQM_JSON))
     backend = IQMBackend()
-    backend.set_options(heralding_mode="zeros", active_reset_cycles=2)
+    backend.set_options(run_request_options={"heralding_mode": "zeros"})
     circuit = QuantumCircuit(1, 1)
     circuit.measure(0, 0)
-    backend.run([circuit, circuit], shots=10, heralding_mode="none", dd_mode="enabled")
+    backend.run([circuit, circuit], shots=10, run_request_options={"dd_mode": "enabled"})
     assert device.submit_job.call_count == 2
     for call in device.submit_job.call_args_list:
-        assert call.kwargs["custom1"] == "none"
-        assert json.loads(call.kwargs["custom4"]) == {
-            "iqm_execution_options": 1,
-            "dd_mode": "enabled",
-            "active_reset_cycles": 2,
-        }
+        assert json.loads(call.kwargs["custom1"]) == {"dd_mode": "enabled"}
         assert call.kwargs["num_shots"] == 10
-    assert backend.options.heralding_mode == "zeros"
+    assert backend.options.run_request_options == {"heralding_mode": "zeros"}
     device.submit_job.reset_mock()
-    with pytest.raises(CircuitValidationError, match="heralding_mode"):
-        backend.run(circuit, heralding_mode="bad")
+    with pytest.raises(CircuitValidationError, match="run_request_options"):
+        backend.run(circuit, run_request_options={"shots": 2})
     with pytest.raises(CircuitValidationError, match="Unsupported execution options"):
-        backend.run(circuit, heralding="zeros")
+        backend.run(circuit, heralding_mode="zeros")
     device.submit_job.assert_not_called()
