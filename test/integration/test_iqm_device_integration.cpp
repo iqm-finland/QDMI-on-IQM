@@ -1130,7 +1130,7 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   const auto failed_job_program = build_iqm_json_test_circuit();
   const size_t program_size = failed_job_program.size() + 1;
   const void *program_data = failed_job_program.c_str();
-  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
                                          &program_data);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto num_shots_invalid = static_cast<size_t>(0);
@@ -1167,7 +1167,7 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
   const size_t config_size = strlen(TEST_CALIBRATION_CONFIG) + 1;
   const void *config = TEST_CALIBRATION_CONFIG;
   ASSERT_EQ(
-      IQM_QDMI_device_job_set_programs(job, &format, 1, &config_size, &config),
+      IQM_QDMI_device_job_set_programs(job, format, 1, &config_size, &config),
       QDMI_SUCCESS);
 
   // Try to submit the calibration job

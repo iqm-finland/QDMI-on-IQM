@@ -59,7 +59,7 @@ int Set_program(IQM_QDMI_Device_Job job, const size_t size,
     return status;
   }
   return IQM_QDMI_device_job_set_programs(
-      job, &format, 1, &size, program == nullptr ? nullptr : &program);
+      job, format, 1, &size, program == nullptr ? nullptr : &program);
 }
 
 int Set_env_var_raw(const char *key, const char *value) {
@@ -1617,9 +1617,20 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
   constexpr auto second = R"({"name":"second","instructions":[]})";
   const std::array<const void *, 2> programs{first, second};
   const std::array sizes{strlen(first) + 1, strlen(second) + 1};
-  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, &format, programs.size(),
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, format, programs.size(),
                                              sizes.data(), programs.data()),
             QDMI_SUCCESS);
+  size_t payload_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 1, 0, nullptr, &payload_size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(payload_size, sizes[1]);
+  std::vector<char> payload(payload_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 1, payload.size(),
+                                            payload.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(payload.data(), second);
+  EXPECT_EQ(IQM_QDMI_device_job_get_program(job, 2, 0, nullptr, nullptr),
+            QDMI_ERROR_OUTOFRANGE);
   EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job),
             QDMI_ERROR_NOTSUPPORTED);
   EXPECT_TRUE(http_stub.post_bodies().empty());
@@ -1657,6 +1668,9 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
                                                QDMI_DEVICE_JOB_PROPERTY_PROGRAM,
                                                0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(
+      IQM_QDMI_device_job_get_program(retrieved_job, 1, 0, nullptr, nullptr),
+      QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_get_results(
                 retrieved_job, 0, QDMI_JOB_RESULT_SHOTS, 0, nullptr, nullptr),
             QDMI_ERROR_BADSTATE);
@@ -1714,10 +1728,10 @@ TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
       "bad\0tail",
   };
   const std::array<size_t, 2> sizes{12, 9};
-  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, &format, 2, sizes.data(),
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, format, 2, sizes.data(),
                                              invalid_programs.data()),
             QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, &format, 2, nullptr, nullptr),
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, format, 2, nullptr, nullptr),
             QDMI_SUCCESS);
   size_t num_programs = 0;
   ASSERT_EQ(IQM_QDMI_device_job_query_property(

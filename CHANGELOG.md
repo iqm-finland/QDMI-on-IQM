@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Submit ordered circuit lists as one native IQM job, with indexed results,
+  recoverable program counts, and indexed program queries ([#277])
+  ([**@burgholzer**]).
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -33,13 +36,11 @@ releases may include breaking changes.
   and support stable-ID opening through `IQMBackend`. Use temporary source pins
   and LLVM/MLIR CI setup until a suitable Core release is available ([#274])
   ([**@burgholzer**]).
-- 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
-  pulse-support properties. Expose calibration submission through the
-  IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Submit ordered
-  circuit lists as one native IQM job, with indexed results and recoverable
-  program counts. Replace the removed program setter with
-  `IQM_QDMI_device_job_set_programs`. Preserve surviving QDMI enum values
-  ([#229], [#266], [#277]) ([**@marcelwa**], [**@burgholzer**]).
+- 💥 Adopt QDMI 1.4 development headers, remove the calibration advisory and
+  pulse-support properties, and preserve surviving QDMI enum values ([#266])
+  ([**@burgholzer**]).
+- 💥 Expose calibration submission through the IQM-specific
+  `IQM_QDMI_device_job_submit_calibration` function ([#229]) ([**@marcelwa**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])

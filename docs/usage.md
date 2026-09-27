@@ -449,7 +449,7 @@ auto FoMaC::submit_job(
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   const size_t program_size = program.size() + 1;
   const void *program_data = program.c_str();
-  ret = IQM_QDMI_device_job_set_programs(job, &format, 1, &program_size,
+  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
                                       &program_data);
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
@@ -532,7 +532,8 @@ The QDMI device currently supports the following program formats:
 Pass QIR and JSON programs as strings with exactly one trailing NUL byte. The
 program-list setter copies all programs before returning. They share the format,
 shots per circuit, and other job parameters, and are submitted together in one
-IQM job. Results are indexed in input order, starting at zero. IQM exposes one
+IQM job. Programs and results are indexed in input order, starting at zero; use
+`IQM_QDMI_device_job_get_program` to read a stored program. IQM exposes one
 outcome for the entire job; `QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES` returns
 `QDMI_ERROR_NOTSUPPORTED`.
 
@@ -719,7 +720,7 @@ int calibrate(IQM_QDMI_Device_Session session, const char *config,
   }
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
   const void *program = config;
-  status = IQM_QDMI_device_job_set_programs(job, &format, 1, &config_size,
+  status = IQM_QDMI_device_job_set_programs(job, format, 1, &config_size,
                                         &program);
   if (status == QDMI_SUCCESS) {
     status = IQM_QDMI_device_job_submit_calibration(job);
