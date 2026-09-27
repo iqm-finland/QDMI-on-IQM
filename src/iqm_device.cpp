@@ -1374,6 +1374,21 @@ int IQM_QDMI_device_job_get_program(IQM_QDMI_Device_Job job,
   return QDMI_SUCCESS;
 }
 
+int IQM_QDMI_device_job_get_program_status(IQM_QDMI_Device_Job job,
+                                           const size_t program_index,
+                                           QDMI_Job_Status *status) {
+  if (job == nullptr || status == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->results_.empty()) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  if (program_index >= job->results_.size()) {
+    return QDMI_ERROR_OUTOFRANGE;
+  }
+  return QDMI_ERROR_NOTSUPPORTED;
+}
+
 int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                                        QDMI_Device_Job_Property prop,
                                        const size_t size, void *value,
@@ -1399,9 +1414,6 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
     ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION, size_t,
                               *job->queue_position_, prop, size, value,
                               size_ret)
-  }
-  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSTATUSES) {
-    return QDMI_ERROR_NOTSUPPORTED;
   }
   if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM && job->results_.empty()) {
     return QDMI_ERROR_BADSTATE;
