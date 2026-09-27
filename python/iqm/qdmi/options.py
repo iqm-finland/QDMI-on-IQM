@@ -52,7 +52,7 @@ def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
         CircuitValidationError: An option has an unsupported name, type, or value.
     """
     supported = {*_ENUM_OPTIONS, "qubit_mapping", "max_circuit_duration_over_t2", "active_reset_cycles", "dd_strategy"}
-    if unknown := options.keys() - supported - {"shots", "memory"}:
+    if unknown := options.keys() - supported - {"shots", "memory", "max_retries"}:
         msg = f"Unsupported execution options: {', '.join(sorted(unknown))}"
         raise CircuitValidationError(msg)
     values: dict[str, str] = {}

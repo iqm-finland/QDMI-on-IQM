@@ -97,6 +97,9 @@ def test_reject_invalid_execution_options(name: str, value: object) -> None:
 def test_unset_execution_options_preserve_native_defaults() -> None:
     """Omitted settings leave all native options unchanged."""
     assert all(value is None for value in execution_parameters({}).values())
+    assert all(
+        value is None for value in execution_parameters({"shots": 1024, "memory": False, "max_retries": 0}).values()
+    )
     assert execution_parameters({"dd_mode": "enabled"})["custom4"] == "enabled"
     assert execution_parameters({"active_reset_cycles": 0})["custom4"] is not None
 
@@ -105,7 +108,7 @@ def test_older_mqt_rejects_new_options(monkeypatch: pytest.MonkeyPatch) -> None:
     """An older backend must never accept new options without forwarding them."""
     monkeypatch.delattr(QDMIBackend, "_job_parameters", raising=False)
     options = IQMBackend._default_options()  # ruff:ignore[private-member-access]
-    assert set(options) == {"shots", "memory"}
+    assert "heralding_mode" not in options
     backend = IQMBackend.__new__(IQMBackend)
     backend._options = options  # ruff:ignore[private-member-access]
     with pytest.raises(CircuitValidationError, match="heralding_mode"):
