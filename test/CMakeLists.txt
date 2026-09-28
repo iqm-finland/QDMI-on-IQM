@@ -21,6 +21,16 @@ add_subdirectory(integration)
 set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
 
+if(UNIX AND NOT APPLE)
+  # Fails, listing the offenders, if the device exports anything but its ABI.
+  add_test(
+    NAME DeviceExportsOnlyQdmiAbi
+    COMMAND
+      sh -c
+      "! ${CMAKE_NM} -D --defined-only \"$1\" | awk '{print $3}' | grep -v '^IQM_QDMI_device_'"
+      sh $<TARGET_FILE:iqm-qdmi-device>)
+endif()
+
 if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
   add_subdirectory(unit)
 endif()
