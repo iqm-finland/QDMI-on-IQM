@@ -41,6 +41,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🩹 Keep a host application's libcurl from taking over the device's HTTP calls
+  on Linux, by exporting only the QDMI device functions ([#284])
+  ([**@marcelwa**])
 - 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
   warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
 - 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
@@ -264,6 +267,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#284]: https://github.com/iqm-finland/QDMI-on-IQM/pull/284
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
