@@ -193,6 +193,8 @@ overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 # Temporary: Core PR #2229 builds from source. Remove with the release pin.
 environment = { MLIR_DIR = "/opt/llvm-23.1.1/lib/cmake/mlir" }
 before-all = """
+set -e
+yum clean metadata
 yum install -y openssl-devel
 curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/download/v1.4.2/setup-mlir.sh | bash -s -- -v 23.1.1 -p /opt/llvm-23.1.1
 """
