@@ -163,7 +163,7 @@ def copy_licenses(prefix: Path, build_dir: Path, dependencies: dict[str, Path], 
     """Preserve project and dependency license texts in the archive.
 
     Raises:
-        RuntimeError: If a fetched or bundled dependency has no available license text.
+        RuntimeError: If a dependency has no license text, or a non-Linux build bundles one.
     """
     licenses = prefix / "licenses"
     licenses.mkdir(exist_ok=True)
@@ -189,22 +189,10 @@ def copy_licenses(prefix: Path, build_dir: Path, dependencies: dict[str, Path], 
                 raise RuntimeError(msg)
             for index, license_file in enumerate(license_files):
                 shutil.copy2(license_file, licenses / f"{package}-{index}-{license_file.name}")
-    else:
-        for name, source in dependencies.items():
-            license_file = next(
-                (
-                    file
-                    for directory in list(source.parents)[:4]
-                    for pattern in ("LICENSE*", "COPYING*")
-                    for file in directory.glob(pattern)
-                    if file.is_file()
-                ),
-                None,
-            )
-            if license_file is None:
-                msg = f"No license text found beside bundled dependency {name}: {source}"
-                raise RuntimeError(msg)
-            shutil.copy2(license_file, licenses / f"{name}-{license_file.name}")
+    elif dependencies:
+        # The macOS and Windows builds link every non-system library statically.
+        msg = f"Unexpected bundled runtime dependencies: {sorted(dependencies)}"
+        raise RuntimeError(msg)
 
 
 def make_archive(prefix: Path, output: Path) -> None:
