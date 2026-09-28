@@ -32,6 +32,20 @@ set_target_properties(
   PROPERTIES C_VISIBILITY_PRESET hidden
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN 1)
+# Export only the QDMI device ABI. The statically linked cpr and libcurl keep
+# default visibility, so without this a host process that loads its own libcurl
+# would capture the device's curl calls.
+if(UNIX AND NOT APPLE)
+  set(IQM_QDMI_DEVICE_VERSION_SCRIPT
+      "${CMAKE_CURRENT_SOURCE_DIR}/${QDMI_TARGET_NAME}.map")
+  target_link_options(
+    ${QDMI_TARGET_NAME} PRIVATE
+    "LINKER:--version-script=${IQM_QDMI_DEVICE_VERSION_SCRIPT}")
+  set_property(
+    TARGET ${QDMI_TARGET_NAME}
+    APPEND
+    PROPERTY LINK_DEPENDS "${IQM_QDMI_DEVICE_VERSION_SCRIPT}")
+endif()
 target_sources(
   ${QDMI_TARGET_NAME}
   PUBLIC FILE_SET
