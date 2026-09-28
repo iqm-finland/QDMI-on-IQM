@@ -189,44 +189,9 @@ struct IQM_QDMI_Device_Job_impl_d {
   /// Whether the format can be recovered from a retrieved job.
   bool format_known_ = true;
   /// The number of shots to execute for a quantum circuit job.
-  size_t num_shots_ = 0;
-  /// @brief Heralding mode for the job.
-  /// @details Valid values include "none" and "zeros".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 parameter.
-  std::string heralding_mode_ = "none";
-  /// @brief Move gate validation mode for the job.
-  /// @details Valid values include "strict", "allow_prx", and "none"
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM2 parameter.
-  std::string move_gate_validation_ = "strict";
-  /// @brief Move gate frame tracking mode for the job.
-  /// @details Valid values include "full", "no_detuning_correction", and
-  ///          "none".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM3 parameter.
-  std::string move_gate_frame_tracking_ = "full";
-  /// @brief Dynamical decoupling mode for the job.
-  /// @details Valid values include "disabled" and "enabled".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 parameter.
-  std::string dd_mode_ = "disabled";
-  /// @brief Stores a mapping of logical qubit names to physical qubit names.
-  /// @details This mapping can be important for the execution of QIR programs.
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 parameter.
-  ///          This is transferred as a comma-separated list of pairs of
-  ///          logical and physical qubit names, for example,
-  ///              "alice:QB0,bob:QB1"
-  std::optional<std::vector<std::pair<std::string, std::string>>>
-      qubit_mapping_ = std::nullopt;
-  /// @brief The maximum duration of a circuit over T2 time.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+1 parameter.
-  std::optional<double> max_circuit_duration_over_t2_ = std::nullopt;
-  /// @brief The number of active reset cycles.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+2 parameter.
-  std::optional<size_t> active_reset_cycles_ = std::nullopt;
-  /// @brief The dynamical decoupling strategy to use for the job.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+3 parameter.
-  ///          This is transferred as a JSON string according to the data model
-  ///          defined at
-  ///          https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791
-  std::optional<std::string> dd_strategy_ = std::nullopt;
+  size_t num_shots_ = 1;
+  /// Optional IQM run-request fields supplied through CUSTOM1.
+  nlohmann::json run_request_options_ = nlohmann::json::object();
   /// Cached results for one circuit, independent of its siblings.
   struct Program_results {
     std::map<std::string, size_t> counts;
@@ -1163,14 +1128,33 @@ void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   delete job;
 }
 
+namespace {
+/// Store optional run-request fields only after validating the whole object.
+int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
+                            const void *value) {
+  try {
+    const auto *text = static_cast<const char *>(value);
+    if (text[size - 1] != '\0') {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    auto options = nlohmann::json::parse(text, text + size - 1, nullptr, false);
+    if (!options.is_object() || options.contains("circuits") ||
+        options.contains("shots") || options.contains("calibration_set_id")) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    job->run_request_options_ = std::move(options);
+    return QDMI_SUCCESS;
+  } catch (const std::bad_alloc &) {
+    return QDMI_ERROR_OUTOFMEM;
+  }
+}
+} // namespace
+
 int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
                                       const QDMI_Device_Job_Parameter param,
                                       const size_t size, const void *value) {
   if (job == nullptr || (value != nullptr && size == 0) ||
-      (IS_INVALID_ARGUMENT(param, QDMI_DEVICE_JOB_PARAMETER) &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3)) {
+      IS_INVALID_ARGUMENT(param, QDMI_DEVICE_JOB_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->status_ != QDMI_JOB_STATUS_CREATED) {
@@ -1204,98 +1188,19 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
       if (size != sizeof(size_t)) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      job->num_shots_ = *static_cast<const size_t *>(value);
+      const auto shots = *static_cast<const size_t *>(value);
+      if (shots == 0) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      job->num_shots_ = shots;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM1:
     if (value != nullptr) {
-      const std::string heralding_mode(static_cast<const char *>(value));
-      if (heralding_mode != "none" && heralding_mode != "zeros") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->heralding_mode_ = heralding_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM2:
-    if (value != nullptr) {
-      const std::string move_validation_mode(static_cast<const char *>(value));
-      if (move_validation_mode != "strict" &&
-          move_validation_mode != "allow_prx" &&
-          move_validation_mode != "none") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->move_gate_validation_ = move_validation_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM3:
-    if (value != nullptr) {
-      const std::string move_gate_frame_tracking_mode(
-          static_cast<const char *>(value));
-      if (move_gate_frame_tracking_mode != "full" &&
-          move_gate_frame_tracking_mode != "no_detuning_correction" &&
-          move_gate_frame_tracking_mode != "none") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->move_gate_frame_tracking_ = move_gate_frame_tracking_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM4:
-    if (value != nullptr) {
-      const std::string dynamic_decoupling_mode(
-          static_cast<const char *>(value));
-      if (dynamic_decoupling_mode != "disabled" &&
-          dynamic_decoupling_mode != "enabled") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->dd_mode_ = dynamic_decoupling_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM5:
-    if (value != nullptr) {
-      std::string qubit_mapping_str(static_cast<const char *>(value));
-      std::vector<std::pair<std::string, std::string>> qubit_mapping;
-      size_t pos = 0;
-      while ((pos = qubit_mapping_str.find(',')) != std::string::npos) {
-        const auto pair = qubit_mapping_str.substr(0, pos);
-        const auto colon_pos = pair.find(':');
-        if (colon_pos == std::string::npos) {
-          return QDMI_ERROR_INVALIDARGUMENT;
-        }
-        qubit_mapping.emplace_back(pair.substr(0, colon_pos),
-                                   pair.substr(colon_pos + 1));
-        qubit_mapping_str.erase(0, pos + 1);
-      }
-      if (!qubit_mapping_str.empty()) {
-        const auto colon_pos = qubit_mapping_str.find(':');
-        if (colon_pos == std::string::npos) {
-          return QDMI_ERROR_INVALIDARGUMENT;
-        }
-        qubit_mapping.emplace_back(qubit_mapping_str.substr(0, colon_pos),
-                                   qubit_mapping_str.substr(colon_pos + 1));
-      }
-      job->qubit_mapping_ = qubit_mapping;
+      return Set_run_request_options(job, size, value);
     }
     return QDMI_SUCCESS;
   default:
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1) {
-      if (value != nullptr) {
-        job->max_circuit_duration_over_t2_ =
-            *static_cast<const double *>(value);
-      }
-      return QDMI_SUCCESS;
-    }
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2) {
-      if (value != nullptr) {
-        job->active_reset_cycles_ = *static_cast<const size_t *>(value);
-      }
-      return QDMI_SUCCESS;
-    }
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3) {
-      if (value != nullptr) {
-        job->dd_strategy_ = std::string(static_cast<const char *>(value));
-      }
-      return QDMI_SUCCESS;
-    }
     return QDMI_ERROR_NOTSUPPORTED;
   }
 }
@@ -1456,7 +1361,7 @@ std::string_view Program_contents(const std::string &stored_program) {
 
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
-  auto json_program = nlohmann::json();
+  auto json_program = job->run_request_options_;
   json_program["circuits"] = nlohmann::json::array();
   for (const auto &stored_program : job->programs_) {
     const auto program = Program_contents(stored_program);
@@ -1469,28 +1374,6 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   }
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
-  json_program["heralding_mode"] = job->heralding_mode_;
-  json_program["move_gate_validation"] = job->move_gate_validation_;
-  json_program["move_gate_frame_tracking"] = job->move_gate_frame_tracking_;
-  json_program["dd_mode"] = job->dd_mode_;
-  if (job->qubit_mapping_) {
-    nlohmann::json qubit_mapping_json = nlohmann::json::array();
-    for (const auto &[logical, physical] : *job->qubit_mapping_) {
-      qubit_mapping_json.push_back(
-          {{"logical_name", logical}, {"physical_name", physical}});
-    }
-    json_program["qubit_mapping"] = qubit_mapping_json;
-  }
-  if (job->max_circuit_duration_over_t2_) {
-    json_program["max_circuit_duration_over_t2"] =
-        *job->max_circuit_duration_over_t2_;
-  }
-  if (job->active_reset_cycles_) {
-    json_program["active_reset_cycles"] = *job->active_reset_cycles_;
-  }
-  if (job->dd_strategy_) {
-    json_program["dd_strategy"] = nlohmann::json::parse(*job->dd_strategy_);
-  }
 
   const auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,

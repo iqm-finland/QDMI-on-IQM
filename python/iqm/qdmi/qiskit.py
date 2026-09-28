@@ -19,12 +19,15 @@
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
+    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
     from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
     msg = (
@@ -39,9 +42,44 @@ from .gates import MoveGate
 if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
+    from mqt.core.typing import QDMIJobParameters
     from qiskit.circuit import Instruction
+    from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
+
+
+def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
+    """Encode optional IQM run-request fields as one custom job parameter.
+
+    Args:
+        options: Effective IQM backend options for one run.
+
+    Returns:
+        A JSON object in ``custom1``, or no custom value when unset.
+
+    Raises:
+        CircuitValidationError: An option cannot be represented as JSON or
+            tries to replace a QDMI-owned request field.
+    """
+    if unknown := options.keys() - {"run_request_options"}:
+        msg = f"Unsupported execution options: {', '.join(sorted(unknown))}"
+        raise CircuitValidationError(msg)
+    request_options = options.get("run_request_options")
+    if request_options is None:
+        return {}
+    if not isinstance(request_options, Mapping):
+        msg = "'run_request_options' must be a JSON object"
+        raise CircuitValidationError(msg)
+    if reserved := request_options.keys() & {"circuits", "shots", "calibration_set_id"}:
+        msg = f"'run_request_options' cannot override {', '.join(sorted(reserved))}"
+        raise CircuitValidationError(msg)
+    try:
+        payload = json.dumps(dict(request_options), allow_nan=False)
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        msg = "'run_request_options' must contain finite JSON-compatible values"
+        raise CircuitValidationError(msg) from exc
+    return {"custom1": payload}
 
 
 def __dir__() -> list[str]:
@@ -74,6 +112,25 @@ class IQMBackend(QDMIBackend):
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
     #: standard gate library, so the Target needs it supplied here.
     _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
+
+    @classmethod
+    def _default_options(cls) -> Options:
+        """Return shot options and optional IQM run-request fields.
+
+        Returns:
+            Backend defaults; ``None`` leaves server options at their defaults.
+        """
+        options = super()._default_options()
+        options.update_options(run_request_options=None)
+        return options
+
+    def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
+        """Encode IQM run-request fields for every circuit in a run.
+
+        Returns:
+            IQM custom job parameters for MQT Core's submission hook.
+        """
+        return execution_parameters(options)
 
     def __init__(
         self,

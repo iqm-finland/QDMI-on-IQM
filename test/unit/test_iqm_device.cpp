@@ -37,6 +37,7 @@
 #include <iostream>
 #include <new>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -1573,42 +1574,17 @@ TEST_F(DeviceJobMockTest, HistogramKeysOfDifferingLength) {
   EXPECT_STREQ(hist_keys.data(), "00,111");
 }
 
-TEST_F(DeviceJobMockTest, SubmissionUsesCanonicalRunRequestFields) {
-  http_stub.queue_post(200, R"({"id": "job-canonical-fields"})");
-
+TEST_F(DeviceJobMockTest, SubmissionUsesServerDefaultsWhenOptionsUnset) {
+  http_stub.queue_post(200, R"({"id":"defaults-job"})");
   ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
                         TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
-  constexpr auto move_validation = "allow_prx";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
-                strlen(move_validation) + 1, move_validation),
-            QDMI_SUCCESS);
-  constexpr auto frame_tracking = "no_detuning_correction";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
-                strlen(frame_tracking) + 1, frame_tracking),
-            QDMI_SUCCESS);
-  constexpr size_t active_reset_cycles = 3;
-  // The IQM extension parameters continue past QDMI's last named custom value.
-  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job,
-                static_cast<QDMI_Device_Job_Parameter>(
-                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
-                sizeof(active_reset_cycles), &active_reset_cycles),
-            QDMI_SUCCESS);
-
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
-  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
-  // NOLINTNEXTLINE(misc-include-cleaner)
   const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
-  EXPECT_EQ(request.at("move_gate_validation"), move_validation);
-  EXPECT_EQ(request.at("move_gate_frame_tracking"), frame_tracking);
-  EXPECT_EQ(request.at("active_reset_cycles"), active_reset_cycles);
-  EXPECT_FALSE(request.contains("move_validation_mode"));
-  EXPECT_FALSE(request.contains("move_gate_frame_tracking_mode"));
-  EXPECT_FALSE(request.contains("num_active_reset_cycles"));
+  EXPECT_EQ(request.size(), 3U);
+  EXPECT_TRUE(request.at("circuits").is_array());
+  EXPECT_EQ(request.at("shots"), 1);
+  EXPECT_TRUE(request.contains("calibration_set_id"));
 }
 
 TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
@@ -1757,6 +1733,105 @@ TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
   const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
   EXPECT_EQ(request.at("circuits").at(0),
             nlohmann::json::parse(TEST_CIRCUIT_IQM_JSON));
+}
+
+TEST_F(DeviceJobMockTest, RunRequestOptionsReachServerWithoutLocalSchema) {
+  constexpr auto options =
+      R"({"move_gate_validation":"allow_prx","move_gate_frame_tracking":"no_detuning_correction","max_circuit_duration_over_t2":0.0,"dd_strategy":{"merge_contiguous_waits":true},"qubit_mapping":[{"logical_name":"alice","physical_name":"QB1"}],"future_server_field":true})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(options) + 1, options),
+            QDMI_SUCCESS);
+  constexpr auto second = R"({"name":"second","instructions":[]})";
+  const std::array<const void *, 2> programs{TEST_CIRCUIT_IQM_JSON, second};
+  const std::array sizes{strlen(TEST_CIRCUIT_IQM_JSON) + 1, strlen(second) + 1};
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             programs.size(), sizes.data(),
+                                             programs.data()),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"options-job"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  const auto supplied_options = nlohmann::json::parse(options);
+  for (const auto &[key, value] : supplied_options.items()) {
+    EXPECT_EQ(request.at(key), value);
+  }
+  EXPECT_EQ(request.at("circuits").size(), 2U);
+  EXPECT_EQ(request.at("shots"), 1);
+}
+
+TEST_F(DeviceJobMockTest, RunRequestOptionsRejectInvalidObjectsAtomically) {
+  constexpr auto valid = R"({"dd_mode":"enabled"})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(valid) + 1, valid),
+            QDMI_SUCCESS);
+  const std::vector<std::string> invalid_options = {
+      "[1]",
+      "null",
+      "enabled",
+      "{invalid",
+      R"({"circuits":[]})",
+      R"({"shots":2})",
+      R"({"calibration_set_id":null})",
+      R"({"dd_mode":"enabled","shots":2})",
+      R"({"max_circuit_duration_over_t2":1e400})"};
+  for (const auto &options : invalid_options) {
+    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                  job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, options.size() + 1,
+                  options.c_str()),
+              QDMI_ERROR_INVALIDARGUMENT)
+        << options;
+  }
+  const std::array<char, 3> unterminated{'{', '}', 'x'};
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, unterminated.size(),
+                unterminated.data()),
+            QDMI_ERROR_INVALIDARGUMENT);
+  http_stub.queue_post(200, R"({"id":"unchanged-options"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("dd_mode"), "enabled");
+  EXPECT_EQ(request.size(), 4U);
+}
+
+TEST_F(DeviceJobMockTest, LastRunRequestOptionsObjectReplacesPreviousOne) {
+  constexpr auto first = R"({"dd_mode":"enabled","active_reset_cycles":2})";
+  constexpr auto second = R"({"heralding_mode":"zeros"})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(first) + 1, first),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(second) + 1, second),
+            QDMI_SUCCESS);
+  for (const auto param :
+       {QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
+        QDMI_DEVICE_JOB_PARAMETER_CUSTOM4, QDMI_DEVICE_JOB_PARAMETER_CUSTOM5}) {
+    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(job, param, 0, nullptr),
+              QDMI_ERROR_NOTSUPPORTED);
+  }
+  /// The former extension beyond QDMI's five slots is invalid.
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job,
+                /// NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+                static_cast<QDMI_Device_Job_Parameter>(
+                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1),
+                0, nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
+  http_stub.queue_post(200, R"({"id":"replacement-options"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("heralding_mode"), "zeros");
+  EXPECT_FALSE(request.contains("dd_mode"));
+  EXPECT_FALSE(request.contains("active_reset_cycles"));
 }
 
 TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
@@ -3163,19 +3238,6 @@ TEST_F(DeviceJobMockTest, MalformedProgramSubmissionReturnsAnErrorCode) {
   ASSERT_EQ(Set_program(job, strlen(invalid_circuit) + 1, invalid_circuit),
             QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
-
-  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
-                        TEST_CIRCUIT_IQM_JSON),
-            QDMI_SUCCESS);
-  const auto *const invalid_dd_strategy = R"({"strategy": )";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job,
-                // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-                static_cast<QDMI_Device_Job_Parameter>(
-                    QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3),
-                strlen(invalid_dd_strategy) + 1, invalid_dd_strategy),
-            QDMI_SUCCESS);
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
 }
 
 TEST_F(DeviceJobMockTest, JobStatusRejectsResponsesWithoutStatus) {
@@ -3477,12 +3539,12 @@ TEST_F(DeviceJobMockTest, MalformedCircuitHandling) {
 }
 
 TEST_F(DeviceJobMockTest, EdgeCaseParameterValues) {
-  // Test with zero shots
+  /// Zero shots cannot form a valid IQM circuit request.
   constexpr size_t zero_shots = 0;
   EXPECT_EQ(
       IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
                                         sizeof(zero_shots), &zero_shots),
-      QDMI_SUCCESS);
+      QDMI_ERROR_INVALIDARGUMENT);
 
   // Test with very large shots number
   constexpr size_t large_shots = 1000000;

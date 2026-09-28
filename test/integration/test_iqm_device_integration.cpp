@@ -31,6 +31,9 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+/// NOLINTNEXTLINE(misc-include-cleaner)
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -1013,30 +1016,19 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   constexpr size_t shots_num = 64;
-  const std::string heralding_mode = "none";
-  const std::string move_validation_mode = "allow_prx";
-  const std::string move_gate_frame_tracking_mode = "no_detuning_correction";
-  const std::string dd_mode = "enabled";
   const auto qubit_sites = get_qubit_sites();
   ASSERT_GE(qubit_sites.size(), 2U);
   const auto first_qubit_name = fomac.get_site_name(qubit_sites[0]);
   const auto second_qubit_name = fomac.get_site_name(qubit_sites[1]);
   const auto qubit_mapping = std::map<std::string, std::string>{
       {"alice", first_qubit_name}, {"bob", second_qubit_name}};
-  constexpr double max_circuit_duration_over_t2 = 0;
-  constexpr size_t num_active_reset_cycles = 1;
-  const std::string dd_strategy = R"({
-    "merge_contiguous_waits": true,
-    "target_qubits": [")" + first_qubit_name +
-                                  "\",\n\"" + second_qubit_name + "\"\n]," +
-                                  R"("skip_leading_wait": true,
-    "skip_trailing_wait": true,
-    "gate_sequences": [
-      [9, "XYXYYXYX", "asap"],
-      [5, "YXYX", "asap"],
-      [2, "XX", "center"]
-    ]
-  })";
+  const auto dd_strategy = nlohmann::json{
+      {"merge_contiguous_waits", true},
+      {"target_qubits", {first_qubit_name, second_qubit_name}},
+      {"skip_leading_wait", true},
+      {"skip_trailing_wait", true},
+      {"gate_sequences",
+       {{9, "XYXYYXYX", "asap"}, {5, "YXYX", "asap"}, {2, "XX", "center"}}}};
 
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
@@ -1061,12 +1053,25 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
       pos += key.length();
     }
   }
+  const auto run_request_options =
+      nlohmann::json{
+          {"heralding_mode", "none"},
+          {"move_gate_validation", "allow_prx"},
+          {"move_gate_frame_tracking", "no_detuning_correction"},
+          {"dd_mode", "enabled"},
+          {"qubit_mapping",
+           nlohmann::json::array({{{"logical_name", "alice"},
+                                   {"physical_name", first_qubit_name}},
+                                  {{"logical_name", "bob"},
+                                   {"physical_name", second_qubit_name}}})},
+          {"max_circuit_duration_over_t2", 0.0},
+          {"active_reset_cycles", 1},
+          {"dd_strategy", dd_strategy},
+      }
+          .dump();
   auto &job = jobs.emplace_back();
   job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
-                         heralding_mode, move_validation_mode,
-                         move_gate_frame_tracking_mode, dd_mode, qubit_mapping,
-                         max_circuit_duration_over_t2, num_active_reset_cycles,
-                         dd_strategy);
+                         run_request_options);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     GTEST_SKIP()
@@ -1133,10 +1138,10 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
                                          &program_data);
   ASSERT_EQ(ret, QDMI_SUCCESS);
-  constexpr auto num_shots_invalid = static_cast<size_t>(0);
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
-                                        sizeof(size_t), &num_shots_invalid);
+  constexpr auto invalid_options = R"({"dd_mode":"invalid"})";
+  ret = IQM_QDMI_device_job_set_parameter(
+      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, strlen(invalid_options) + 1,
+      invalid_options);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   ret = IQM_QDMI_device_job_submit(job);
   ASSERT_EQ(ret, QDMI_ERROR_FATAL);

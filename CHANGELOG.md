@@ -15,6 +15,10 @@ releases may include breaking changes.
 - ✨ Submit ordered circuit lists as one native IQM job, with indexed results,
   recoverable program counts, and indexed program queries ([#277])
   ([**@burgholzer**]).
+- ✨ Forward optional IQM RunRequest fields as one JSON object through a
+  standard QDMI custom job parameter, exposed on `IQMBackend` through
+  `run_request_options` in `set_options` and per-run overrides ([#272])
+  ([**@marcelwa**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -278,6 +282,7 @@ Compatible with QDMI `v1.3.0`.
 [#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
 [#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
+[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254

@@ -108,6 +108,33 @@ print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
 ```
 
+## IQM run-request options
+
+Pass optional IQM RunRequest fields through one `run_request_options` mapping:
+
+```python
+backend.set_options(run_request_options={"heralding_mode": "zeros"})
+job = backend.run(
+    transpile(qc, backend),
+    shots=128,
+    run_request_options={"dd_mode": "enabled", "active_reset_cycles": 2},
+)
+```
+
+The mapping on `run` replaces the backend default for that run. It applies to
+all circuits submitted together. When unset or `None`, the device sends the
+circuits, shot count, and session calibration set ID; the server supplies
+defaults for omitted optional fields. The mapping cannot override those three
+QDMI-owned fields.
+
+The backend checks that the mapping is a JSON object with finite values. It
+forwards other fields without a local allowlist, so use the names and values
+accepted by your server's
+[IQM RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
+Sampler `run_options` can carry the same mapping. Estimators use backend
+defaults because Qiskit's estimator has no `run_options` field. CLI and
+offloader calls do not forward this mapping.
+
 ## CLI Scripts
 
 The package also exposes the `iqm-sampler` and `iqm-estimator` CLI scripts for
