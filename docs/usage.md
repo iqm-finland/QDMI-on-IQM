@@ -10,13 +10,13 @@ quantum computing hardware.
 
 ### Prebuilt C++ SDK
 
-Each GitHub Release from the first release containing this feature offers a
-platform-specific `iqm-qdmi-device_*.tar.gz` archive. Download the archive for
-your operating system and CPU from the [Releases page], then extract it. The
-`iqm-qdmi-device/` directory is a relocatable CMake install prefix containing
-the shared device library, public headers, CMake package files, and the runtime
-libraries it needs beyond the operating system's standard runtime. License texts
-are in `licenses/`.
+Each GitHub Release from v1.5.0 onward offers a platform-specific
+`iqm-qdmi-device_*.tar.gz` archive. Download the archive for your operating
+system and CPU from the [Releases page], then extract it. The `iqm-qdmi-device/`
+directory is a relocatable CMake install prefix containing the shared device
+library, public headers, CMake package files, and the runtime libraries it needs
+beyond the operating system's standard runtime. License texts are in
+`licenses/`.
 
 For example, after extracting the archive beside your CMake project:
 
