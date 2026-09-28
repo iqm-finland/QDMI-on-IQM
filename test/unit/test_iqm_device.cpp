@@ -1669,6 +1669,8 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
   EXPECT_EQ(
       IQM_QDMI_device_job_get_program_status(retrieved_job, 0, &program_status),
       QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_program_status(retrieved_job, 0, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
                                                QDMI_DEVICE_JOB_PROPERTY_PROGRAM,
                                                0, nullptr, nullptr),
