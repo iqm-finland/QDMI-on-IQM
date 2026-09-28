@@ -1376,8 +1376,8 @@ int IQM_QDMI_device_job_get_program(IQM_QDMI_Device_Job job,
 
 int IQM_QDMI_device_job_get_program_status(IQM_QDMI_Device_Job job,
                                            const size_t program_index,
-                                           QDMI_Job_Status *status) {
-  if (job == nullptr || status == nullptr) {
+                                           QDMI_Job_Status * /*status*/) {
+  if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->results_.empty()) {
