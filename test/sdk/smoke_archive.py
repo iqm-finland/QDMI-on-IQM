@@ -31,7 +31,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 # The operating system's C and C++ runtime, which the archive must not bundle.
-LINUX_SYSTEM_LIBRARIES = re.compile(r"(?:linux-vdso|ld-linux[^/]*|lib(?:c|m|pthread|dl|rt|stdc\+\+|gcc_s))\.so[.\d]*")
+LINUX_SYSTEM_LIBRARIES = re.compile(
+    r"(?:linux-vdso|ld-linux[^/]*|lib(?:c|m|pthread|dl|rt|util|resolv|nsl|stdc\+\+|gcc_s))\.so[.\d]*"
+)
 
 
 def run(*command: str, env: dict[str, str] | None = None) -> str:
