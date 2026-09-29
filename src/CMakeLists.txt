@@ -32,10 +32,12 @@ set_target_properties(
   PROPERTIES C_VISIBILITY_PRESET hidden
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN 1)
-# Export only the QDMI device ABI. The statically linked cpr and libcurl keep
-# default visibility, so without this a host process that loads its own libcurl
-# would capture the device's curl calls.
-if(UNIX AND NOT APPLE)
+# Export only the QDMI device ABI, including when dependencies were compiled
+# with default visibility. On ELF this also prevents host symbol preemption.
+if(APPLE)
+  target_link_options(${QDMI_TARGET_NAME} PRIVATE
+                      "LINKER:-exported_symbol,_IQM_QDMI_device_*")
+elseif(UNIX)
   set(IQM_QDMI_DEVICE_VERSION_SCRIPT
       "${CMAKE_CURRENT_SOURCE_DIR}/${QDMI_TARGET_NAME}.map")
   target_link_options(
