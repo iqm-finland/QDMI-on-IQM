@@ -51,8 +51,8 @@ jobs:
       contents: read
       id-token: write # Needed to attest and to publish to PyPI
     steps:
-      # Release Drafter retargets the draft on every push to main, so a merge
-      # after staging would tag a commit the C++ SDK archives were not built from.
+      # The staging workflow tags the commit it built the C++ SDK archives from.
+      # This refuses a release published without them or onto another tag.
       - name: Check that the C++ SDK archives match the release commit
         env:
           GH_TOKEN: ${{ github.token }}

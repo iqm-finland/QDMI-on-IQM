@@ -37,8 +37,8 @@ jobs:
           version=$(sed -n 's/^[[:space:]]*VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt | head -n 1)
           test "$RELEASE_TAG" = "v$version"
           test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'The draft tag must not exist before assets are staged' >&2
+          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha 2>/dev/null) && test "$tag_sha" != "$GITHUB_SHA"; then
+            echo "$RELEASE_TAG already points at $tag_sha; delete it to stage $GITHUB_SHA" >&2
             exit 1
           fi
           echo "source-sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
@@ -62,36 +62,33 @@ jobs:
           pattern: cpp-sdk-*
           path: dist
           merge-multiple: true
-      - name: Verify full matrix and unchanged source
+      - name: Verify full matrix
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release-tag }}
           SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
         run: |
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'The draft tag was created while assets were building' >&2
-            exit 1
-          fi
           for triple in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu arm64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc; do
             test -f "dist/iqm-qdmi-device_${RELEASE_TAG}_${triple}.tar.gz"
           done
           test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 5
           (cd dist && cat ./*.sha256 > SHA256SUMS && sha256sum -c SHA256SUMS)
           echo "$SOURCE_SHA" > dist/SOURCE_SHA
-      - name: Pin draft target and upload assets
+      # Publishing onto an existing tag ignores the draft's target, which
+      # Release Drafter moves to main on every push.
+      - name: Tag the source commit and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release-tag }}
           SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
         run: |
-          release_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\" and .draft) | .id")
-          test -n "$release_id"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -f target_commitish="$SOURCE_SHA" --silent
+          if ! tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha 2>/dev/null); then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$SOURCE_SHA" --silent
+            tag_sha=$SOURCE_SHA
+          fi
+          test "$tag_sha" = "$SOURCE_SHA"
           gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS dist/SOURCE_SHA --repo "$GITHUB_REPOSITORY" --clobber
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$SOURCE_SHA"
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort > staged-assets.txt
           for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS SOURCE_SHA; do
             grep -Fqx "$name" staged-assets.txt
