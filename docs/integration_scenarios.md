@@ -19,7 +19,7 @@ drive a session yourself — see the [Usage Guide](usage.md). No scheduler is
 involved: the calling process owns the session lifecycle, authentication, and
 calibration/job queries end to end.
 
-- **Setup complexity**: low — link the library, call the C API.
+- **Setup complexity**: low — link the library, call the C/C++ API.
 - **Isolation**: whatever the host process provides; QDMI-on-IQM itself enforces
   no isolation between callers.
 - **Multi-tenancy**: none built in. Concurrent callers targeting the same QC
