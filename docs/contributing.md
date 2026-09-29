@@ -452,19 +452,22 @@ The generated HTML site is written to `docs/_build/html/`.
 GitHub Releases for this repository are immutable. Build and attach the five C++
 SDK archives to the Release Drafter draft **before** publishing it:
 
-1. Finish merging release changes to `main`, and avoid further merges until the
-   release is published. Ensure the draft's `vX.Y.Z` tag matches the version in
-   `CMakeLists.txt`; do not create the tag separately.
+1. Merge the release changes to `main`. Ensure the draft's `vX.Y.Z` tag matches
+   the version in `CMakeLists.txt`.
 2. Run the **Prepare C++ SDK release assets** workflow from `main`, supplying
    the draft tag. It builds Linux x86-64 and arm64, macOS arm64, and Windows
-   x86-64 and arm64 archives, then extracts and tests each one. The workflow
-   fails if `main` moves before upload.
+   x86-64 and arm64 archives, then extracts and tests each one. It then creates
+   the `vX.Y.Z` tag at the commit it built and attaches the archives to the
+   draft.
 3. Confirm that the draft has all five archives, `SHA256SUMS`, and `SOURCE_SHA`.
-   If `main` moved after upload, rerun the workflow before publishing: Release
-   Drafter retargets the draft on every push to `main`.
-4. Publish the draft. The existing CD workflow then builds and publishes the
-   Python distributions to PyPI. It refuses to publish when the release commit
-   differs from `SOURCE_SHA`.
+   Merges to `main` after the tag belong to the next release, but Release
+   Drafter still lists them in the draft notes; remove them before publishing.
+4. Publish the draft. GitHub releases the existing tag, and the CD workflow
+   publishes the Python distributions to PyPI. It refuses to publish when the
+   tag differs from `SOURCE_SHA`.
+
+To stage a newer commit before publishing, delete the tag and rerun the
+workflow.
 
 The SDK archives are also built as temporary artifacts on relevant PRs. They are
 not uploaded to a Release until the manual preparation workflow succeeds.
