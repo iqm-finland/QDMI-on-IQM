@@ -30,10 +30,10 @@ alongside a Python wrapper for straightforward installation via `pip` or `uv`.
 
 ## API Reference
 
-The generated API references cover both the C++ library and the Python package:
-the {doc}`C++ API reference <capi/index>` documents all public QDMI functions
-and types exposed by the library, while the
-{doc}`C++ API reference <api/iqm/qdmi/index>` covers the `iqm-qdmi` package
+The generated API references cover both the C API and the Python package: the
+{doc}`C API reference <capi/index>` documents all public QDMI functions and
+types exposed by the library, while the
+{doc}`Python API reference <api/iqm/qdmi/index>` covers the `iqm-qdmi` package
 including the Qiskit backend and its sampler and estimator primitives.
 
 ```{toctree}
