@@ -128,6 +128,12 @@ used to set various parameters for the session:
   Optional positive `uint64_t` duration in milliseconds applied to every HTTP
   request made by the session. If not set, each request uses the default
   one-hour timeout.
+- **Calibration Set ID** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4`): Optional
+  null-terminated canonical UUID string (lowercase hexadecimal). Set it before
+  session initialization to select and pin the architecture, quality metrics,
+  and execution calibration. Invalid UUIDs are rejected; a server response
+  naming a different calibration fails initialization. There is no fallback to
+  the default if selection fails.
 - **Authentication Token**
   ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_TOKEN`):
   Bearer token for authentication. If not set, falls back to the `IQM_TOKEN`
@@ -281,7 +287,17 @@ calibration data at a specific point in time. It includes:
 When you initialize a session, the system uses the "default" calibration set
 (typically the most recent calibration). You can trigger new calibrations using
 calibration jobs, which create new calibration sets and automatically update the
-session to use them.
+session to use them, unless an explicit calibration UUID was selected.
+Explicitly pinned sessions keep their architecture and metrics even after a
+calibration job finishes; open a new session to use its returned calibration
+UUID. For default sessions, rebuild cached compilation targets after a
+calibration-job refresh.
+
+Each newly created circuit job captures the session calibration. Subsequent
+session refreshes cannot change that job's execution calibration. Query
+`QDMI_DEVICE_JOB_PROPERTY_CUSTOM1` for this null-terminated UUID string. This
+property is unavailable for retrieved remote jobs, whose original calibration is
+not inferred from the retrieval session.
 
 ## Querying Device Information
 
@@ -493,9 +509,10 @@ computing hardware for execution. As before, `ret` is the
 checked for error codes.
 
 **Important:** When submitting circuit jobs (QIR or IQM JSON), the
-implementation automatically includes the current calibration set ID in the job
-submission. This ensures that the job uses the same calibrated gates that were
-available when the session was initialized or last updated.
+implementation automatically includes the calibration set ID captured at job
+creation in the job submission. This ensures that the job uses the same
+calibrated gates that were available when the session was initialized or last
+updated.
 
 The QDMI device currently supports the following program formats:
 
@@ -658,7 +675,8 @@ The results can be retrieved via the
 {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM1` job result
 parameter on a calibration job, which returns the new calibration set ID.
 
-**Important:** When querying the result of a calibration job, the system will:
+**Important:** For sessions without an explicit calibration selector, querying
+the result of a calibration job will:
 
 1. Extract the new calibration set ID from the job result
 2. Automatically update the session to use the new calibration set
