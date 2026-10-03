@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
+  Releases ([#270]) ([**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
@@ -265,6 +267,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
+[#270]: https://github.com/iqm-finland/QDMI-on-IQM/pull/270
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
