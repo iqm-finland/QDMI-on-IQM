@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from qiskit.circuit import QuantumCircuit
@@ -30,6 +30,9 @@ from qiskit.quantum_info import SparsePauliOp
 
 from iqm.qdmi import qiskit as iqm_qiskit
 from iqm.qdmi.qiskit import IQMBackend
+
+if TYPE_CHECKING:
+    from mqt.core.qdmi import Device
 
 ENVIRONMENT_TOKENS_FILE = Path("/opt/iqm/environment-tokens.json")
 EXPLICIT_TOKENS_FILE = Path("/opt/iqm/explicit-tokens.json")
@@ -114,6 +117,32 @@ def test_iqm_backend_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) 
         "custom1": "environment-qc-id",
         "custom2": "canonical-qc-alias",
     }
+
+
+def test_iqm_backend_reuses_open_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the licensed device and IQM gate support without opening a fallback."""
+    captured = _stub_backend_construction(monkeypatch)
+    monkeypatch.setenv("IQM_QC_ID", "unrelated-environment-device")
+    device = cast("Device", object())
+
+    backend = IQMBackend(device=device)
+
+    assert captured == {"device": device}
+    gate = backend._map_operation_to_gate("move")  # ruff: ignore[private-member-access]
+    assert gate is not None
+    assert not isinstance(gate, type)
+    assert gate.name == "move"
+
+
+@pytest.mark.parametrize("setting", ["base_url", "token", "tokens_file", "qc_id", "qc_alias"])
+def test_iqm_backend_open_device_rejects_session_settings(monkeypatch: pytest.MonkeyPatch, setting: str) -> None:
+    """Do not silently ignore session overrides on an existing handle."""
+    captured = _stub_backend_construction(monkeypatch)
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        IQMBackend(device=cast("Device", object()), **{setting: "override"})
+
+    assert not captured
 
 
 def test_iqm_backend_supports_legacy_environment_aliases(monkeypatch: pytest.MonkeyPatch) -> None:

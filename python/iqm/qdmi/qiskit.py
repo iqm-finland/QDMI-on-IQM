@@ -37,6 +37,7 @@ from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
 from .gates import MoveGate
 
 if TYPE_CHECKING:
+    from mqt.core.qdmi import Device
     from qiskit.circuit import Instruction
 
 __all__ = ["IQMBackend"]
@@ -51,10 +52,12 @@ def __dir__() -> list[str]:
 class IQMBackend(QDMIBackend):
     """Qiskit backend for the packaged IQM QDMI device library.
 
-    This backend loads the shared library distributed with `iqm-qdmi` and
+    By default, this backend loads the shared library distributed with `iqm-qdmi` and
     exposes it through MQT Core's Qiskit-compatible QDMI backend.
 
     Args:
+        device: An already-open IQM QDMI device, such as a device selected
+            from a Slurm license. Cannot be combined with session settings.
         base_url: Base URL of the IQM service. Overrides `IQM_SERVER_URL`, its
             `IQM_BASE_URL` alias, and the registered device default when provided.
         token: Authentication token. Defaults to `IQM_TOKEN`.
@@ -71,13 +74,25 @@ class IQMBackend(QDMIBackend):
     def __init__(
         self,
         *,
+        device: Device | None = None,
         base_url: str | None = None,
         token: str | None = None,
         tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
     ) -> None:
-        """Initialize the IQM Qiskit backend."""
+        """Initialize the IQM Qiskit backend.
+
+        Raises:
+            ValueError: If an open device is combined with session settings.
+        """
+        if device is not None:
+            if any(value is not None for value in (base_url, token, tokens_file, qc_id, qc_alias)):
+                msg = "device cannot be combined with session settings"
+                raise ValueError(msg)
+            super().__init__(device=device)
+            return
+
         resolved_base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None
         resolved_token = token or os.getenv("IQM_TOKEN")
         tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")

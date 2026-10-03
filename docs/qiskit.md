@@ -53,7 +53,9 @@ take precedence over the registered device default.
 The wrapper registers the packaged IQM QDMI device as a fallback under the
 stable ID `iqm.default` with the standard Resonance endpoint as its default. An
 existing configured definition with that ID is preserved, including its
-endpoint. Every backend opens a fresh device session with its own configuration.
+endpoint. Without `device=`, each backend opens a fresh device session. Pass an
+already-open handle with `IQMBackend(device=...)` to reuse Core’s
+license-selected device; see [IQM on Slurm](spank_plugin.md).
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the

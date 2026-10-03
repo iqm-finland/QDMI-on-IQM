@@ -38,32 +38,18 @@ handled by Qiskit's standard tools before the circuit reaches the QC.
 - **Fits**: single-researcher workstations, notebooks with direct network access
   to the IQM service, CI jobs that don't run on a cluster.
 
-## 3. Slurm + SPANK Env-Injection with Synchronous `srun` Offloading
+## 3. Core Static-License Slurm Deployment
 
-The production integration path today: the [SPANK plugin](spank_plugin.md)
-injects `IQM_*` environment variables into job steps, and the
-{py:mod}`~iqm.qdmi.offloader` module (see
-[Python Package](python_package.md#programmatic-offloading-with-the-offloader-module))
-submits `srun iqm-sampler`/`srun iqm-estimator` jobs from a login-node process
-such as a Jupyter notebook.
+Use
+[MQT Core's canonical Slurm setup](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+with the [IQM runtime, catalogue, and credentials](spank_plugin.md). Slurm
+handles license admission; Core supplies optional configuration-reference
+injection. The IQM provider authenticates and executes work in the job process.
 
-- **Setup complexity**: moderate — compile and deploy the SPANK plugin on login
-  and compute nodes, configure `plugstack.conf`, provision a `quantum` partition
-  (see the [Administrator Guide](admin_guide.md)).
-- **Isolation**: partition-gated — the plugin only activates on
-  administrator-listed partitions, and per-node launch-time validation rejects a
-  job step before any task starts if the target QC or credentials are invalid.
-- **Multi-tenancy**: Slurm's own scheduler arbitrates access to the `quantum`
-  partition; optionally, administrators can additionally model each QC as a
-  Slurm license (see
-  [Limiting Concurrent Access with Slurm Licenses](spank_plugin.md#limiting-concurrent-access-with-slurm-licenses))
-  so Slurm itself caps concurrent QC access ahead of the QC's own queue — most
-  useful for on-premise, effectively single-tenant hardware.
-- **Resource brokering**: deliberately shallow. The plugin injects environment
-  variables and validates reachability; it does not lock or schedule the QC
-  itself. Precedence when the same setting is given multiple ways: `srun`
-  command-line flags override user-set environment variables, which override
-  `plugstack.conf` administrator defaults.
+Applications pass `slurm.open_device_from_license()` to
+`IQMBackend(device=...)`. The existing offloader remains available for
+submitting IQM CLI workers; its explicit target arguments are worker options and
+do not need a provider SPANK plugin.
 
 ## 4. Spack-Based Install
 
@@ -79,45 +65,24 @@ CMake build.
   of the underlying scenario (3 or 1) — it only changes how the binaries get
   onto the cluster.
 
-## 5. Docker-Based Test/Dev Topology vs. Bare-Metal Production Deployment
+## 5. Shared Docker Integration Tests
 
-The SPANK plugin's test suite runs inside Docker (`spank/Dockerfile`,
-`.github/workflows/spank-tests.yml`) without requiring a real Slurm installation
-or credentials, as described in
-[Testing with Docker](spank_plugin.md#testing-with-docker).
-Production deployment instead installs the compiled plugin directly onto real
-login and compute nodes running `slurmd`/`slurmstepd`.
+The [provider test fixture](spank_plugin.md#validate-the-migration) supplies a
+local IQM endpoint and workload to Core's common Dockerized Slurm runner. Core
+owns the controller, compute services, cgroups, transport tests, and teardown.
+Production deployments use the same shared module built against the cluster's
+Slurm headers.
 
-- **Fits**: use the Docker topology for plugin development and CI; use the
-  bare-metal topology for any environment where jobs actually reach IQM
-  hardware, since the plugin is tied to the target cluster's Slurm daemon ABI
-  and must be rebuilt against it (see
-  [Compatibility and Requirements](spank_plugin.md#compatibility-and-requirements)).
-- These two topologies are not alternatives for the same purpose — treat Docker
-  as a pre-production verification step, not a deployment option.
+## 6. Shared or Dedicated Clusters
 
-## 6. Shared Multi-Tenant Cluster vs. Dedicated/Single-User Access
-
-Orthogonal to Scenarios 1-5: the same integration mechanism behaves differently
-depending on who else is on the cluster.
-
-- **Shared multi-tenant cluster**: partition gating (Scenario 3) and,
-  optionally, Slurm licenses become load-bearing — without them, any user on any
-  partition could target the QC, and concurrent jobs could overwhelm an
-  on-premise QC's own queue.
-- **Dedicated/single-user cluster**: partition gating and license limits are
-  still supported but less critical, since there is no competing tenant to
-  isolate from.
-- Direct usage (Scenarios 1-2) has no partition/license concept at all — choose
-  Scenario 3 instead as soon as more than one user or job needs regulated access
-  to the same QC.
+Choose static license counts and access controls according to the site's
+concurrency and account policies. Core's operations guide describes these
+scheduler choices. IQM authentication remains a separate provider control.
 
 ## 7. Forward-Looking: Non-Slurm Schedulers (Not Implemented)
 
-QDMI-on-IQM only supports Slurm today. Sites running other schedulers would need
-an equivalent env-injection mechanism, and the SPANK plugin's "shallow, no
-resource brokering" design is itself Slurm-specific — it would not port to
-another scheduler unchanged:
+Sites running other schedulers need their own job-environment integration.
+Core’s shared SPANK component is specific to Slurm:
 
 - **PBS/OpenPBS**: would need a PBS hook (`qmgr` server/queue hooks) written
   against PBS's own hook API to inject `IQM_*` variables into the job
@@ -153,8 +118,8 @@ functionality.
 | Site profile                                                                         | Recommended scenario                                            |
 | :----------------------------------------------------------------------------------- | :-------------------------------------------------------------- |
 | Single researcher, workstation or notebook, direct network access to the IQM service | 1 (C++) or 2 (Python/Qiskit)                                    |
-| Shared academic HPC center, multiple users/groups, on-premise or capacity-limited QC | 3 (Slurm + SPANK), with Slurm licenses enabled                  |
-| Dedicated production cluster, single tenant, still scheduler-managed                 | 3 (Slurm + SPANK), partition gating optional, licenses optional |
+| Shared academic HPC center, multiple users/groups, on-premise or capacity-limited QC | 3 (Core static-license Slurm setup)                             |
+| Dedicated production cluster, single tenant, still scheduler-managed                 | 3 (Core static-license Slurm setup)                             |
 | Site already standardized on Spack for software management                           | 4, layered on top of 1-3                                        |
 | Plugin development or CI, no access to real Slurm                                    | 5's Docker topology only — not a deployment target              |
 | Site running PBS, LSF, Grid Engine, Kubernetes (CRD-based), or Flux instead of Slurm | 7 — no supported path today; would require new integration work |

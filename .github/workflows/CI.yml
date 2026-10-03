@@ -30,7 +30,7 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/python-*.yml
       additional-cd-files: |
-        spank/**
+        test/slurm/**
         .github/workflows/spank-tests.yml
 
   cpp-tests-ubuntu:
@@ -206,8 +206,6 @@ jobs:
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     uses: $/.github/workflows/spank-tests.yml
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   # this job does nothing and is only used for branch protection
   required-checks-pass:
