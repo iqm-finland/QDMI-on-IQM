@@ -21,6 +21,33 @@ add_subdirectory(integration)
 set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
 
+if(MSVC)
+  get_filename_component(IQM_QDMI_LINKER_DIR "${CMAKE_LINKER}" DIRECTORY)
+  # ClangCL's linker can live outside the MSVC tools directory.
+  if(CMAKE_GENERATOR_INSTANCE)
+    file(GLOB IQM_QDMI_MSVC_TOOL_DIRS
+         "${CMAKE_GENERATOR_INSTANCE}/VC/Tools/MSVC/*/bin/Host*/*")
+  endif()
+  find_program(
+    IQM_QDMI_DUMPBIN dumpbin HINTS "${IQM_QDMI_LINKER_DIR}"
+                                   ${IQM_QDMI_MSVC_TOOL_DIRS} REQUIRED)
+  set(IQM_QDMI_EXPORT_COMMAND "${IQM_QDMI_DUMPBIN};/nologo;/exports")
+elseif(APPLE)
+  set(IQM_QDMI_EXPORT_COMMAND "${CMAKE_NM};-gUj")
+elseif(UNIX)
+  set(IQM_QDMI_EXPORT_COMMAND "${CMAKE_NM};-D;--defined-only;-j")
+endif()
+
+if(MSVC OR UNIX)
+  add_test(
+    NAME DeviceExportsOnlyQdmiAbi
+    COMMAND
+      ${CMAKE_COMMAND} "-DEXPORT_COMMAND=${IQM_QDMI_EXPORT_COMMAND}"
+      "-DLIBRARY=$<TARGET_FILE:iqm-qdmi-device>" "-DMSVC=${MSVC}"
+      "-DAPPLE=${APPLE}" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/check_device_exports.cmake")
+endif()
+
 if(NOT USE_INSTALLED_IQM_QDMI_DEVICE)
   add_subdirectory(unit)
 endif()
