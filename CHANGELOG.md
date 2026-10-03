@@ -27,6 +27,12 @@ releases may include breaking changes.
 
 ### Changed
 
+- ✨ Discover installed QDMI device manifests and open independent sessions
+  through the MQT Core QDMI driver. Include stable IDs for Garnet, Emerald and
+  Sirius and their mocks, preserve explicit selection over environment defaults,
+  and support stable-ID opening through `IQMBackend`. Use temporary source pins
+  and LLVM/MLIR CI setup until a suitable Core release is available ([#274])
+  ([**@burgholzer**]).
 - 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
   pulse-support properties. Expose calibration submission through the
   IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the
@@ -266,6 +272,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260

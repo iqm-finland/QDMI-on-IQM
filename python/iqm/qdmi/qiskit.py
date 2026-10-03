@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
+    from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
     msg = (
         "Failed to import Qiskit plugin. "
@@ -33,15 +33,15 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from . import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
+from . import IQM_QDMI_DEVICE_ID
 from .gates import MoveGate
 
 if TYPE_CHECKING:
+    from mqt.core.plugins.qiskit.provider import QDMIProvider
+    from mqt.core.qdmi import Device
     from qiskit.circuit import Instruction
 
 __all__ = ["IQMBackend"]
-
-IQM_DEFAULT_BASE_URL = "https://resonance.iqm.tech"
 
 
 def __dir__() -> list[str]:
@@ -55,13 +55,20 @@ class IQMBackend(QDMIBackend):
     exposes it through MQT Core's Qiskit-compatible QDMI backend.
 
     Args:
+        device_id: Stable ID from the installed catalogue. Defaults to `iqm.default`.
+        device: An already-open device, including one supplied by `from_device_id`.
+        provider: Optional Qiskit provider to associate with this backend.
         base_url: Base URL of the IQM service. Overrides `IQM_SERVER_URL`, its
-            `IQM_BASE_URL` alias, and the registered device default when provided.
+            `IQM_BASE_URL` alias, and the manifest default when provided.
         token: Authentication token. Defaults to `IQM_TOKEN`.
         tokens_file: Path to an authentication file. Defaults to `IQM_TOKENS_FILE`.
         qc_id: Optional IQM quantum computer identifier. Defaults to `IQM_QC_ID`.
         qc_alias: Optional IQM quantum computer alias. Defaults to
             `IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias.
+
+    Environment defaults for the endpoint and quantum computer apply only to
+    `iqm.default`. An explicit ID or alias takes precedence over either selector
+    from the environment. Named presets use their manifest configuration.
     """
 
     #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
@@ -70,35 +77,39 @@ class IQMBackend(QDMIBackend):
 
     def __init__(
         self,
+        device_id: str | None = None,
         *,
+        device: Device | None = None,
+        provider: QDMIProvider | None = None,
         base_url: str | None = None,
         token: str | None = None,
         tokens_file: str | os.PathLike[str] | None = None,
         qc_id: str | None = None,
         qc_alias: str | None = None,
     ) -> None:
-        """Initialize the IQM Qiskit backend."""
-        resolved_base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None
-        resolved_token = token or os.getenv("IQM_TOKEN")
-        tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
-        resolved_tokens_file = Path(tokens_file_value) if tokens_file_value else None
-        resolved_qc_id = qc_id or os.getenv("IQM_QC_ID")
-        resolved_qc_alias = qc_alias or os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS")
+        """Initialize the IQM Qiskit backend.
 
-        register_device_if_absent(
-            DeviceDefinition(
-                IQM_QDMI_DEVICE_ID,
-                IQM_QDMI_LIBRARY_PATH,
-                IQM_QDMI_PREFIX,
-                base_url=IQM_DEFAULT_BASE_URL,
+        Raises:
+            ValueError: If an already-open device is combined with session overrides.
+        """
+        if device is not None:
+            if any(value is not None for value in (base_url, token, tokens_file, qc_id, qc_alias)):
+                msg = "An already-open device cannot be combined with session overrides."
+                raise ValueError(msg)
+        else:
+            device_id = device_id or IQM_QDMI_DEVICE_ID
+            if device_id == IQM_QDMI_DEVICE_ID:
+                base_url = base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL")
+                if not qc_id and not qc_alias:
+                    qc_id = os.getenv("IQM_QC_ID")
+                    qc_alias = os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS")
+            tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
+            device = open_device(
+                device_id,
+                base_url=base_url or None,
+                token=token or os.getenv("IQM_TOKEN"),
+                auth_file=Path(tokens_file_value) if tokens_file_value else None,
+                custom1=qc_id,
+                custom2=qc_alias,
             )
-        )
-        device = open_device(
-            IQM_QDMI_DEVICE_ID,
-            base_url=resolved_base_url,
-            token=resolved_token,
-            auth_file=resolved_tokens_file,
-            custom1=resolved_qc_id,
-            custom2=resolved_qc_alias,
-        )
-        super().__init__(device=device)
+        super().__init__(device=device, provider=provider, device_id=device_id)
