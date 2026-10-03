@@ -18,6 +18,7 @@
  */
 
 #include "fomac.hpp"
+#include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 
 #include <algorithm>
@@ -1158,25 +1159,15 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_SUCCESS);
 
-  // Set job parameters
-  constexpr QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  const auto ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  if (ret == QDMI_ERROR_NOTSUPPORTED) {
-    GTEST_SKIP() << "Calibration endpoint is not supported";
-  }
-
-  GTEST_SKIP() << "Skipping calibration job per default to avoid messing with"
+  GTEST_SKIP() << "Skipping calibration job per default to avoid changing"
                   " device calibration state during regular tests.";
-  ASSERT_EQ(ret, QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
             QDMI_SUCCESS);
 
   // Try to submit the calibration job
-  const auto submit_result = IQM_QDMI_device_job_submit(job);
+  const auto submit_result = IQM_QDMI_device_job_submit_calibration(job);
   ASSERT_EQ(submit_result, QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, DEFAULT_JOB_WAIT_TIMEOUT),
             QDMI_SUCCESS);

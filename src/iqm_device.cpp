@@ -26,6 +26,7 @@
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
+#include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
 
@@ -179,6 +180,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::string job_id_;
   /// Whether this handle was opened for an existing remote job.
   bool retrieved_ = false;
+  /// Whether the job was submitted through the calibration extension.
+  bool calibration_ = false;
   /// The program format used for this job.
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
   /// The program to be executed.
@@ -1163,9 +1166,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
         return QDMI_ERROR_INVALIDARGUMENT;
       }
       if (format == QDMI_PROGRAM_FORMAT_IQMJSON ||
-          format == QDMI_PROGRAM_FORMAT_QIRBASESTRING ||
-          (job->session_->supports_calibration_jobs_ &&
-           format == QDMI_PROGRAM_FORMAT_CALIBRATION)) {
+          format == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
         job->program_format_ = format;
         return QDMI_SUCCESS;
       }
@@ -1310,6 +1311,10 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   if (job->retrieved_) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
+  if (job->calibration_ && (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT ||
+                            prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM)) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
@@ -1404,10 +1409,21 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   return QDMI_SUCCESS;
 }
 
-int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
+} // namespace
+
+int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
+  if (job == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->status_ != QDMI_JOB_STATUS_CREATED || job->session_ == nullptr) {
+    return QDMI_ERROR_BADSTATE;
+  }
   if (!job->session_->supports_calibration_jobs_) {
-    LOG_ERROR("Calibration jobs are not supported by this device");
+    LOG_DEBUG("Calibration jobs are not supported by this device");
     return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (!job->program_set_) {
+    return QDMI_ERROR_INVALIDARGUMENT;
   }
   LOG_INFO("Submitting calibration job");
   const auto program = std::string{Program_contents(job->program_)};
@@ -1432,6 +1448,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   }
 
   job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->calibration_ = true;
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
@@ -1445,8 +1462,13 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   LOG_INFO(log_message);
 
   return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
-} // namespace
 
 int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (job == nullptr) {
@@ -1464,9 +1486,6 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON ||
       job->program_format_ == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
     return IQM_QDMI_device_job_submit_circuit(job);
-  }
-  if (job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION) {
-    return IQM_QDMI_device_job_submit_calibration(job);
   }
   return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
 } catch (const iqm::ClientAuthenticationError &) {
@@ -1517,7 +1536,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   }
   LOG_INFO("Canceling job with ID: " + job->job_id_);
   const auto job_abortion_url =
-      job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION
+      job->calibration_
           ? job->session_->api_config_->url(
                 iqm::API_ENDPOINT::ABORT_CALIBRATION_JOB, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
@@ -1572,7 +1591,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   }
   LOG_DEBUG("Checking status for job with ID: " + job->job_id_);
   const auto job_status_url =
-      job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION
+      job->calibration_
           ? job->session_->api_config_->url(
                 iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
@@ -2154,9 +2173,6 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
 namespace {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
     QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON};
-constexpr std::array SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION = {
-    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
-    QDMI_PROGRAM_FORMAT_CALIBRATION};
 
 /// A device with at least this many queued jobs is reported as busy. The IQM
 /// on-demand queue is FIFO and executes one job at a time, so a single queued
@@ -2367,28 +2383,13 @@ int IQM_QDMI_device_session_query_device_property(
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_COUPLINGMAP,
                     (std::pair<IQM_QDMI_Site, IQM_QDMI_Site>{}),
                     session->connectivity_, prop, size, value, size_ret)
-  // Recalibration is scheduled by IQM, and the IQM Server exposes no signal
-  // asking a client to trigger one.
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION, size_t, 0,
-                            prop, size, value, size_ret)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONUNIT, "us", prop, size,
                       value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONSCALEFACTOR, double,
                             1.0, prop, size, value, size_ret)
-  // While QDMI does not properly support expose pulse-level properties, the
-  // corresponding property will simply be set to NONE.
-  ADD_SINGLE_VALUE_PROPERTY(
-      QDMI_DEVICE_PROPERTY_PULSESUPPORT, QDMI_Device_Pulse_Support_Level,
-      QDMI_DEVICE_PULSE_SUPPORT_LEVEL_NONE, prop, size, value, size_ret)
-  if (session->supports_calibration_jobs_) {
-    ADD_LIST_PROPERTY(
-        QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS, QDMI_Program_Format,
-        SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION, prop, size, value, size_ret)
-  } else {
-    ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS,
-                      QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop,
-                      size, value, size_ret)
-  }
+  ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS,
+                    QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop, size,
+                    value, size_ret)
   // Custom device property 1 exposes the current calibration set ID.
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_CUSTOM1,
                       session->calibration_set_id_.c_str(), prop, size, value,
