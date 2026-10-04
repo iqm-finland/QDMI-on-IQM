@@ -1671,10 +1671,6 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
       QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_get_program_status(retrieved_job, 0, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_query_property(retrieved_job,
-                                               QDMI_DEVICE_JOB_PROPERTY_PROGRAM,
-                                               0, nullptr, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(
       IQM_QDMI_device_job_get_program(retrieved_job, 1, 0, nullptr, nullptr),
       QDMI_ERROR_NOTSUPPORTED);
@@ -3398,10 +3394,9 @@ TEST_F(DeviceJobMockTest, JobParameterValidation) {
             QDMI_SUCCESS);
 }
 
-TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
+TEST_F(DeviceJobMockTest, IndexedProgramReturnsLatestCopiedBytes) {
   size_t size = 0;
-  EXPECT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
+  EXPECT_EQ(IQM_QDMI_device_job_get_program(job, 0, 0, nullptr, &size),
             QDMI_ERROR_BADSTATE);
 
   constexpr auto first_program_expected = std::to_array("first");
@@ -3410,14 +3405,12 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
             QDMI_SUCCESS);
   first_program.front() = 'X';
 
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 0, 0, nullptr, &size),
             QDMI_SUCCESS);
   ASSERT_EQ(size, first_program_expected.size());
   std::vector<char> retrieved_program(size);
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, retrieved_program.size(),
-                retrieved_program.data(), nullptr),
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 0, retrieved_program.size(),
+                                            retrieved_program.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_TRUE(std::ranges::equal(retrieved_program, first_program_expected));
 
@@ -3425,21 +3418,18 @@ TEST_F(DeviceJobMockTest, ProgramPropertyReturnsLatestCopiedBytes) {
   ASSERT_EQ(Set_program(job, latest_program.size(), latest_program.data()),
             QDMI_SUCCESS);
 
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, 0, nullptr, &size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 0, 0, nullptr, &size),
             QDMI_SUCCESS);
   ASSERT_EQ(size, latest_program.size());
 
   std::vector<char> too_small(size - 1);
-  EXPECT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, too_small.size(),
-                too_small.data(), nullptr),
+  EXPECT_EQ(IQM_QDMI_device_job_get_program(job, 0, too_small.size(),
+                                            too_small.data(), nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   retrieved_program.resize(size);
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAM, retrieved_program.size(),
-                retrieved_program.data(), nullptr),
+  ASSERT_EQ(IQM_QDMI_device_job_get_program(job, 0, retrieved_program.size(),
+                                            retrieved_program.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_TRUE(std::ranges::equal(retrieved_program, latest_program));
   constexpr auto format = QDMI_PROGRAM_FORMAT_QIRBASESTRING;

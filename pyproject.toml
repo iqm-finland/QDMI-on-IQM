@@ -51,7 +51,7 @@ classifiers = [
 name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
-# Temporary Core #2229 source pin: replace with a release before publishing.
+# Temporary Core #2373 source pin: replace with a release before publishing.
 [project.optional-dependencies]
 qiskit = [
   "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f9c17e92cd0208c4c68d44cb99d3800fc550cf1",

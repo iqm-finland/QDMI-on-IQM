@@ -1444,16 +1444,6 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
-  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM) {
-    if (job->retrieved_ || job->programs_.size() > 1) {
-      return QDMI_ERROR_NOTSUPPORTED;
-    }
-    if (job->programs_.empty()) {
-      return QDMI_ERROR_BADSTATE;
-    }
-    ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char,
-                      job->programs_.front(), prop, size, value, size_ret)
-  }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
                             job->num_shots_, prop, size, value, size_ret)
   return QDMI_ERROR_NOTSUPPORTED;

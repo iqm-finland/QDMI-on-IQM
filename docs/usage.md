@@ -549,9 +549,8 @@ IQM job. Programs and results are indexed in input order, starting at zero; use
 outcome for the entire job; `IQM_QDMI_device_job_get_program_status` returns
 `QDMI_ERROR_NOTSUPPORTED` for individual outcomes.
 
-MQT Core's Qiskit adapter groups compatible circuits into native multi-program
-jobs. Different shot counts remain separate jobs. The number of programs is
-available through `QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM`.
+The number of programs is available through
+`QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM`.
 
 ## Retrieving jobs by ID
 
