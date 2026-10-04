@@ -952,16 +952,13 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
             QDMI_SUCCESS);
 
   // The MAX parameter is not a valid program format for any device
-  QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_MAX;
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                sizeof(QDMI_Program_Format), &format),
+  constexpr QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_MAX;
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, format, 1, nullptr, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   for (const auto &program_format : fomac.get_supported_program_formats()) {
-    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                  job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                  sizeof(QDMI_Program_Format), &program_format),
+    ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, program_format, 1, nullptr,
+                                               nullptr),
               QDMI_SUCCESS);
   }
 
@@ -979,9 +976,8 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
       QDMI_PROGRAM_FORMAT_CUSTOM5};
 
   for (const auto &unsupported_format : unsupported_formats) {
-    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                  job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                  sizeof(QDMI_Program_Format), &unsupported_format),
+    EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, unsupported_format, 1,
+                                               nullptr, nullptr),
               QDMI_ERROR_NOTSUPPORTED);
   }
 
@@ -1123,10 +1119,6 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   auto ret = IQM_QDMI_device_session_create_device_job(session, &job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  ASSERT_EQ(ret, QDMI_SUCCESS);
   const auto failed_job_program = build_iqm_json_test_circuit();
   const size_t program_size = failed_job_program.size() + 1;
   const void *program_data = failed_job_program.c_str();

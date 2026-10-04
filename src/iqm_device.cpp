@@ -1189,27 +1189,6 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_BADSTATE;
   }
   switch (param) {
-  case QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT:
-    if (value != nullptr) {
-      if (size != sizeof(QDMI_Program_Format)) {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      const auto format = *static_cast<const QDMI_Program_Format *>(value);
-      if (IS_INVALID_ARGUMENT(format, QDMI_PROGRAM_FORMAT)) {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      if (format == QDMI_PROGRAM_FORMAT_IQMJSON ||
-          format == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
-        if (job->program_format_ != format) {
-          job->programs_.clear();
-          job->results_.clear();
-        }
-        job->program_format_ = format;
-        return QDMI_SUCCESS;
-      }
-      return QDMI_ERROR_NOTSUPPORTED;
-    }
-    return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM:
     if (value != nullptr) {
       if (size != sizeof(size_t)) {

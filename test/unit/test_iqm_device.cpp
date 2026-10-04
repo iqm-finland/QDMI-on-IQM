@@ -1720,6 +1720,10 @@ TEST_F(DeviceJobMockTest, MultiProgramResultsPreserveInputOrderAndRetrieval) {
 
 TEST_F(DeviceJobMockTest, ProgramListReplacementIsAtomic) {
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, static_cast<QDMI_Device_Job_Parameter>(0), 0, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(
       IQM_QDMI_device_job_set_programs(nullptr, format, 1, nullptr, nullptr),
       QDMI_ERROR_INVALIDARGUMENT);
@@ -1764,12 +1768,6 @@ TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
   constexpr auto replacement_program =
       R"({"name":"replacement","instructions":[],"metadata":{}})";
   http_stub.queue_post(200, R"({"id": "job-replaced-program"})");
-
-  constexpr auto format = QDMI_PROGRAM_FORMAT_QIRBASESTRING;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
-                &format),
-            QDMI_SUCCESS);
 
   ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
                         TEST_CIRCUIT_IQM_JSON),
@@ -3432,14 +3430,6 @@ TEST_F(DeviceJobMockTest, IndexedProgramReturnsLatestCopiedBytes) {
                                             retrieved_program.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_TRUE(std::ranges::equal(retrieved_program, latest_program));
-  constexpr auto format = QDMI_PROGRAM_FORMAT_QIRBASESTRING;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(format),
-                &format),
-            QDMI_SUCCESS);
-  EXPECT_EQ(IQM_QDMI_device_job_query_property(
-                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, 0, nullptr, nullptr),
-            QDMI_ERROR_BADSTATE);
 }
 
 TEST_F(DeviceJobMockTest, JobSubmissionWithoutRequiredParameters) {
