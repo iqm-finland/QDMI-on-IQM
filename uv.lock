@@ -817,7 +817,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mqt-core", marker = "extra == 'qiskit'", git = "https://github.com/munich-quantum-toolkit/core.git?rev=bad590b551f29fa3474252728428032a2d71721e" },
+    { name = "mqt-core", marker = "extra == 'qiskit'", git = "https://github.com/munich-quantum-toolkit/core.git?rev=0295cc1653579cf7f67a486ff334549e3da8c4ca" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
     { name = "numpy", marker = "python_full_version >= '3.15' and extra == 'qiskit'", specifier = ">=2.5.2" },
@@ -828,7 +828,7 @@ provides-extras = ["qiskit"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=bad590b551f29fa3474252728428032a2d71721e" },
+    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=0295cc1653579cf7f67a486ff334549e3da8c4ca" },
     { name = "nox", specifier = ">=2026.4.10" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "pytest", specifier = ">=9.0.1" },
@@ -850,13 +850,13 @@ docs = [
     { name = "sphinx-llm", specifier = ">=1" },
 ]
 qiskit = [
-    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=bad590b551f29fa3474252728428032a2d71721e" },
+    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=0295cc1653579cf7f67a486ff334549e3da8c4ca" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
 ]
 test = [
-    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=bad590b551f29fa3474252728428032a2d71721e" },
+    { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=0295cc1653579cf7f67a486ff334549e3da8c4ca" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "pytest-console-scripts", specifier = ">=1.4.1" },
@@ -1142,8 +1142,8 @@ wheels = [
 
 [[package]]
 name = "mqt-core"
-version = "4.0.1.dev165+gbad590b55"
-source = { git = "https://github.com/munich-quantum-toolkit/core.git?rev=bad590b551f29fa3474252728428032a2d71721e#bad590b551f29fa3474252728428032a2d71721e" }
+version = "4.0.1.dev166+g0295cc165"
+source = { git = "https://github.com/munich-quantum-toolkit/core.git?rev=0295cc1653579cf7f67a486ff334549e3da8c4ca#0295cc1653579cf7f67a486ff334549e3da8c4ca" }
 dependencies = [
     { name = "nanobind-backend" },
 ]
