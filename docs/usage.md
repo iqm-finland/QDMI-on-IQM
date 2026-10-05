@@ -222,6 +222,7 @@ copy the device library and manifest beside its executable. This integration
 requires CMake 3.28 or later:
 
 ```cmake
+# FIXME: Require mqt-core 4.1.0 once released; 4.0.0 does not copy the QDMI driver.
 find_package(mqt-core 4.0.0 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
