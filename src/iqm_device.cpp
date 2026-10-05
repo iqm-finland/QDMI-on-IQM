@@ -1405,7 +1405,9 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                               *job->queue_position_, prop, size, value,
                               size_ret)
   }
-  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM && job->results_.empty()) {
+  if ((prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM ||
+       prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT) &&
+      job->results_.empty()) {
     return QDMI_ERROR_BADSTATE;
   }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, size_t,

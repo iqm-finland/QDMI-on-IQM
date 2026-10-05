@@ -51,15 +51,9 @@ namespace {
 
 int Set_program(IQM_QDMI_Device_Job job, const size_t size,
                 const void *program) {
-  QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_IQMJSON;
-  const auto status = IQM_QDMI_device_job_query_property(
-      job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT, sizeof(format), &format,
-      nullptr);
-  if (status != QDMI_SUCCESS) {
-    return status;
-  }
   return IQM_QDMI_device_job_set_programs(
-      job, format, 1, &size, program == nullptr ? nullptr : &program);
+      job, QDMI_PROGRAM_FORMAT_IQMJSON, 1, &size,
+      program == nullptr ? nullptr : &program);
 }
 
 int Set_env_var_raw(const char *key, const char *value) {
@@ -3390,6 +3384,33 @@ TEST_F(DeviceJobMockTest, JobParameterValidation) {
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
             QDMI_SUCCESS);
+}
+
+TEST_F(DeviceJobMockTest, ProgramFormatRequiresProgramList) {
+  QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_MAX;
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT, sizeof(format),
+                &format, nullptr),
+            QDMI_ERROR_BADSTATE);
+
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             1, nullptr, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT, sizeof(format),
+                &format, nullptr),
+            QDMI_ERROR_BADSTATE);
+
+  const size_t size = strlen(TEST_CIRCUIT_IQM_JSON) + 1;
+  const void *program = TEST_CIRCUIT_IQM_JSON;
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             1, &size, &program),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_query_property(
+                job, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT, sizeof(format),
+                &format, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(format, QDMI_PROGRAM_FORMAT_IQMJSON);
 }
 
 TEST_F(DeviceJobMockTest, IndexedProgramReturnsLatestCopiedBytes) {
