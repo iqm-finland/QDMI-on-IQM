@@ -32,22 +32,8 @@ set_target_properties(
   PROPERTIES C_VISIBILITY_PRESET hidden
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN 1)
-# Export only the QDMI device ABI, including when dependencies were compiled
-# with default visibility. On ELF this also prevents host symbol preemption.
-if(APPLE)
-  target_link_options(${QDMI_TARGET_NAME} PRIVATE
-                      "LINKER:-exported_symbol,_IQM_QDMI_device_*")
-elseif(UNIX)
-  set(IQM_QDMI_DEVICE_VERSION_SCRIPT
-      "${CMAKE_CURRENT_SOURCE_DIR}/${QDMI_TARGET_NAME}.map")
-  target_link_options(
-    ${QDMI_TARGET_NAME} PRIVATE
-    "LINKER:--version-script=${IQM_QDMI_DEVICE_VERSION_SCRIPT}")
-  set_property(
-    TARGET ${QDMI_TARGET_NAME}
-    APPEND
-    PROPERTY LINK_DEPENDS "${IQM_QDMI_DEVICE_VERSION_SCRIPT}")
-endif()
+configure_qdmi_exports(TARGET ${QDMI_TARGET_NAME} INTERFACE device PREFIX
+                       ${QDMI_PREFIX})
 target_sources(
   ${QDMI_TARGET_NAME}
   PUBLIC FILE_SET
