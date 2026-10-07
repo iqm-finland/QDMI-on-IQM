@@ -820,6 +820,7 @@ requires-dist = [
     { name = "mqt-core", marker = "extra == 'qiskit'", specifier = "~=4.0.0" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
+    { name = "numpy", marker = "python_full_version >= '3.15' and extra == 'qiskit'", specifier = ">=2.5.2" },
     { name = "qiskit", extras = ["qasm3-import"], marker = "extra == 'qiskit'", specifier = ">=2.1" },
     { name = "qiskit-algorithms", marker = "extra == 'qiskit'", specifier = ">=0.4" },
 ]
