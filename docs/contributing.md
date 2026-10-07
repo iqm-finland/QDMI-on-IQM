@@ -415,7 +415,7 @@ If you touch one of these examples, update the corresponding documentation in
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and
-built with Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and
+built with Sphinx + MyST, using Doxygen XML via Breathe for the C/C++ API and
 AutoAPI for the Python package. The documentation source files can be found in
 the `docs/` directory.
 
