@@ -30,6 +30,7 @@ releases may include breaking changes.
 
 ### Changed
 
+- 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
@@ -264,6 +265,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
