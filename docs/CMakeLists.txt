@@ -22,16 +22,18 @@ set(DOXYGEN_CONFIG_FILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
 
 # Set the input directories for doxygen, i.e., all files that contain source
 # code with documentation.
-set(DOXYGEN_INPUT_DIRS ${PROJECT_BINARY_DIR}/src/include)
+set(DOXYGEN_INPUT_DIRS ${PROJECT_BINARY_DIR}/src/include
+                       ${PROJECT_SOURCE_DIR}/include/iqm_qdmi)
 
 # This variable is only needed to setup the dependency tracking of CMake
 # correctly and is not passed to Doxygen. Whenever such a file is modified,
 # CMake detects that change and will rerun the Doxygen command instead of using
 # the cached result when the target `docs` is built.
 
-file(GLOB_RECURSE DOXYGEN_INPUT_FILES
-     ${PROJECT_BINARY_DIR}/src/include/iqm_qdmi/*.h
-     ${CMAKE_CURRENT_SOURCE_DIR}/*.md)
+file(
+  GLOB_RECURSE DOXYGEN_INPUT_FILES
+  ${PROJECT_BINARY_DIR}/src/include/iqm_qdmi/*.h
+  ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.md)
 
 # By default the files are separated by a semicolon. This is not what Doxygen
 # wants, so we replace it with a space.
