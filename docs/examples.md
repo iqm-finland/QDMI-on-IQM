@@ -168,14 +168,12 @@ authentication before running the script.
 
 ## Discovering and Selecting Backends
 
-Before running a workload, it can be useful to discover which quantum computers
-are actually available on an IQM Server and pick one programmatically, rather
-than hardcoding a single alias. The `examples/discover_backends.py` script
-demonstrates this: it lists the quantum computers exposed by the configured IQM
-Server endpoint, opens each one and queries its status, qubit count, per-site
-T1/T2, and (where exposed) two-qubit gate fidelity through the public
-`mqt.core.fomac` `Device`/`Site`/`Operation` API, and selects the largest one
-that satisfies a `--min-qubits` constraint.
+`examples/discover_backends.py` lists the quantum computers on an IQM Server and
+selects the largest meeting `--min-qubits`. It reports status, qubit count,
+T1/T2, and two-qubit gate fidelity through MQT Core 4's public
+`mqt.core.qdmi.Device` API. Status and calibration data are informational;
+selection uses only qubit count, with inventory order breaking ties. The script
+queries properties without submitting jobs.
 
 ```{literalinclude} ../examples/discover_backends.py
 :language: python
@@ -183,65 +181,31 @@ that satisfies a `--min-qubits` constraint.
 :start-after: "# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception"
 ```
 
-Run it directly against an IQM Server (remember to set the required
-authentication environment variables first):
+Set `IQM_TOKEN` or `IQM_TOKENS_FILE`, then run:
 
 ```console
-./examples/discover_backends.py --min-qubits 5
+uv run --script examples/discover_backends.py --min-qubits 5
 ```
 
-Or exercise the simulator path, which reports the local DDSIM simulator's qubit
-count without contacting an IQM Server:
+`--base-url` overrides `IQM_SERVER_URL`, then `IQM_BASE_URL`, then the Resonance
+endpoint. Explicit authentication options override environment credentials;
+configure only one authentication source. The script skips computers whose
+properties cannot be queried and exits with an error if none meets the
+constraint. The separate REST inventory request reads the current access token
+from a tokens file; it does not refresh an expired token.
+
+Exercise the local DDSIM simulator without contacting an IQM Server:
 
 ```{code-cell} ipython3
 !../examples/discover_backends.py --backend sim --min-qubits 5
 ```
 
 :::{note}
-QDMI-on-IQM does not currently expose a Python or C++ binding for listing every
-quantum computer on a server: each opened QDMI device session resolves to
-exactly one quantum computer, selected by ID, alias, or "first available" during
-session initialization (`IQM_QDMI_device_session_init` /
-`Process_static_quantum_architecture` in `src/iqm_device.cpp`). This example
-works around that by issuing the same `api/v1/quantum-computers` request the
-session already performs internally to learn the available aliases, then opens
-each candidate's device and queries it through the public
-`mqt.core.fomac.Device`/`Site`/`Operation` API for every other query.
-:::
-
-:::{note}
-True multi-QC enumeration without the `api/v1/quantum-computers` REST call above
-is not something any current or planned `mqt-core` release can fix on its own,
-because the root cause lives in this repo's own C++ device implementation, not
-in `mqt-core`: `mqt.core.fomac.Session.get_devices()` only ever returns one
-`Device` per registered `DeviceDefinition`, and each `DeviceDefinition` this
-library can hand `mqt-core` still resolves to exactly one IQM quantum computer,
-per the session-initialization behavior above. Registering one
-`DeviceDefinition` per alias would still require knowing every alias up front -
-the same requirement the REST call exists to satisfy. An open (unmerged)
-`mqt-core` pull request,
-[core#1912](https://github.com/munich-quantum-toolkit/core/pull/1912) ("Add
-configurable QDMI device discovery"), adds exactly that
-`DeviceRegistry`/`DeviceDefinition` mechanism (`qdmi.json` / `[tool.qdmi]` /
-env-var configuration), which would be the right way to *register* multiple
-already-known aliases as separate `Device`s - but it is relevant only as context
-here, not as a fix for the enumeration problem itself, which needs a change to
-this repo's own C++ session initialization to resolve. A related, larger,
-also-open PR,
-[core#1901](https://github.com/munich-quantum-toolkit/core/pull/1901),
-redesigns FoMaC and `qdmi::Driver` around that same registry and was reportedly
-exercised against IQM's own QDMI implementation branches during development.
-Neither PR has merged, and this note describes context, not a plan this repo
-currently depends on.
-
-Separately, and independent of that `mqt-core` discussion: the IQM Server API is
-also known to expose a queue-length / execution-availability-window signal,
-described for the "pay-as-you-go queue" and therefore apparently
-cloud/Resonance-oriented (unconfirmed for on-premise quantum computers).
-QDMI-on-IQM does not currently surface that signal through its Python or C++
-bindings, so this example does not use it. Once it is exposed through the
-library, ranking candidates by queue depth in addition to qubit count and
-fidelity would be a natural enhancement here.
+MQT Core's registry discovers registered device definitions, not the quantum
+computers behind an IQM Server. This example uses `api/v1/quantum-computers` for
+that inventory, then `register_device_if_absent` and `open_device` to open fresh
+sessions by quantum computer ID. Using IDs avoids an ambient `IQM_QC_ID`
+overriding discovery.
 :::
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
