@@ -783,6 +783,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "qiskit", extra = ["qasm3-import"] },
     { name = "qiskit-algorithms" },
+    { name = "requests" },
 ]
 docs = [
     { name = "breathe" },
@@ -813,6 +814,7 @@ test = [
     { name = "pytest-xdist" },
     { name = "qiskit", extra = ["qasm3-import"] },
     { name = "qiskit-algorithms" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -837,6 +839,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
+    { name = "requests", specifier = ">=2.31" },
 ]
 docs = [
     { name = "breathe", specifier = ">=4.36" },
@@ -864,6 +867,7 @@ test = [
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
+    { name = "requests", specifier = ">=2.31" },
 ]
 
 [[package]]
