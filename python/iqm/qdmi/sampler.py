@@ -62,7 +62,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     with Path(args.circuit).open("rb") as file_obj:
         circuit = qpy.load(file_obj)[0]
 
-    backend, sampler = build_sampler(
+    sampler = build_sampler(
         simulator=args.simulator,
         base_url=args.base_url,
         tokens_file=args.tokens_file,
@@ -70,7 +70,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         qc_alias=args.qc_alias,
     )
 
-    circuit_for_execution = transpile(circuit, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
+    circuit_for_execution = transpile(circuit, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
     job = sampler.run([(circuit_for_execution,)], shots=args.shots)
     pickled = pickle.dumps(job.result())
     print(base64.b64encode(pickled).decode("utf-8"))

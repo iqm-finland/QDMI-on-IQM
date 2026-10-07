@@ -29,12 +29,28 @@
 #include <iqm_qdmi/constants.h>
 #include <iqm_qdmi/device.h>
 #include <map>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
+
+namespace {
+/// @brief Frees a device session, for use as a `std::unique_ptr` deleter.
+struct Session_deleter {
+  void operator()(IQM_QDMI_Device_Session session) const noexcept {
+    IQM_QDMI_device_session_free(session);
+  }
+};
+
+/// A device session that frees itself when it goes out of scope.
+using Owned_session =
+    std::unique_ptr<std::remove_pointer_t<IQM_QDMI_Device_Session>,
+                    Session_deleter>;
+} // namespace
 
 auto FoMaC::throw_if_error(const int status, const std::string &message)
     -> void {
@@ -93,26 +109,29 @@ FoMaC::get_iqm_session(const std::string &base_url,
                        const std::optional<std::string> &tokens_file,
                        const std::optional<std::string> &qc_id,
                        const std::optional<std::string> &qc_alias) {
-  IQM_QDMI_Device_Session session = nullptr;
-  auto ret = IQM_QDMI_device_session_alloc(&session);
+  IQM_QDMI_Device_Session raw_session = nullptr;
+  auto ret = IQM_QDMI_device_session_alloc(&raw_session);
   throw_if_error(ret, "Failed to allocate IQM QDMI device session.");
+  // Every step below reports failure by throwing, and the caller has no handle
+  // to free until this function returns one.
+  Owned_session session{raw_session};
 
   // Set the session parameters
   ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
+      session.get(), QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
       base_url.c_str());
   throw_if_error(ret, "Failed to set the base URL for the device session.");
 
   if (token.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
         token->c_str());
     throw_if_error(ret, "Failed to set the token for the device session.");
   }
 
   if (tokens_file.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
         tokens_file->size() + 1, tokens_file->c_str());
     throw_if_error(ret,
                    "Failed to set the tokens file for the device session.");
@@ -120,7 +139,7 @@ FoMaC::get_iqm_session(const std::string &base_url,
 
   if (qc_id.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1, qc_id->size() + 1,
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1, qc_id->size() + 1,
         qc_id->c_str());
     throw_if_error(
         ret, "Failed to set the quantum computer ID for the device session.");
@@ -128,17 +147,17 @@ FoMaC::get_iqm_session(const std::string &base_url,
 
   if (qc_alias.has_value()) {
     ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2, qc_alias->size() + 1,
-        qc_alias->c_str());
+        session.get(), QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
+        qc_alias->size() + 1, qc_alias->c_str());
     throw_if_error(
         ret,
         "Failed to set the quantum computer alias for the device session.");
   }
 
-  ret = IQM_QDMI_device_session_init(session);
+  ret = IQM_QDMI_device_session_init(session.get());
   throw_if_error(ret, "Failed to initialize the device session.");
 
-  return session;
+  return session.release();
 }
 
 auto FoMaC::get_name() const -> std::string {
@@ -418,6 +437,38 @@ auto FoMaC::get_supported_program_formats() const
   return formats;
 }
 
+namespace {
+/**
+ * @brief Owns a device job until it is handed to the caller.
+ * @details Every parameter that submit_job() sets is followed by a
+ *          throw_if_error(), so without this the job allocated up front is
+ *          leaked whenever any of those checks throws.
+ */
+class JobGuard final {
+public:
+  explicit JobGuard(IQM_QDMI_Device_Job job) : job_(job) {}
+
+  ~JobGuard() {
+    if (job_ != nullptr) {
+      IQM_QDMI_device_job_free(job_);
+    }
+  }
+
+  JobGuard(const JobGuard &) = delete;
+  JobGuard &operator=(const JobGuard &) = delete;
+  JobGuard(JobGuard &&) = delete;
+  JobGuard &operator=(JobGuard &&) = delete;
+
+  /// Hand ownership to the caller.
+  [[nodiscard]] auto release() -> IQM_QDMI_Device_Job {
+    return std::exchange(job_, nullptr);
+  }
+
+private:
+  IQM_QDMI_Device_Job job_;
+};
+} // namespace
+
 auto FoMaC::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots, const std::string &heralding_mode,
@@ -432,6 +483,7 @@ auto FoMaC::submit_job(
   IQM_QDMI_Device_Job job = nullptr;
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   throw_if_error(ret, "Failed to create a job");
+  JobGuard guard{job};
   ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
       &format);
@@ -502,7 +554,7 @@ auto FoMaC::submit_job(
   }
   ret = IQM_QDMI_device_job_submit(job);
   throw_if_error(ret, "Failed to submit the job");
-  return job;
+  return guard.release();
 }
 
 auto FoMaC::get_status(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {

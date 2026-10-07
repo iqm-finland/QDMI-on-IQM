@@ -259,13 +259,17 @@ ctest -C Release --test-dir build --output-on-failure
 ctest -C Release --test-dir build/test/unit --output-on-failure
 ```
 
+The integration tests also carry the `integration` CTest label, so
+`ctest -C Release --test-dir build -LE integration --output-on-failure` selects
+the same offline subset from the top-level build directory.
+
 **Running integration tests (requires IQM access):**
 
 Before running the integration tests, make sure you have set the necessary
 environment variables:
 
 ```console
-export IQM_BASE_URL="https://desired-iqm-server.com"
+export IQM_SERVER_URL="https://desired-iqm-server.com"
 export IQM_TOKEN="your-api-key"
 ctest -C Release --test-dir build/test/integration --output-on-failure
 ```
@@ -283,6 +287,38 @@ lcov --capture --directory build --output-file coverage.info
 lcov --remove coverage.info '/usr/*' '*/test/*' '*/build/_deps/*' --output-file coverage.info
 lcov --list coverage.info
 ```
+
+**Running the tests under sanitizers:**
+
+The device does a fair amount of manual memory work — raw allocations for the
+job program and caller-supplied output buffers sized by hand — so it is worth
+running the suite under
+[AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html) and
+[UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
+when touching those paths. Pass the sanitizers you want as a semicolon-separated
+list:
+
+```console
+cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DIQM_QDMI_SANITIZERS="address;undefined"
+cmake --build build-sanitizers
+ctest --test-dir build-sanitizers --output-on-failure
+```
+
+Use a build directory separate from your regular one: the flags apply to the
+external dependencies as well, so switching sanitizers on and off rebuilds
+everything.
+
+Supported values are `address`, `undefined`, `thread`, and `memory`. `thread`
+and `memory` each need their own build, as neither can be combined with
+`address`. On Windows only `address` is available, since MSVC ships no other
+sanitizer.
+
+Sanitizer findings abort the process by default, which is what makes them fail
+the test suite — an UndefinedBehaviorSanitizer diagnostic otherwise only prints
+and leaves the run green. Set `-DIQM_QDMI_SANITIZER_HALT_ON_ERROR=OFF` to
+collect every diagnostic in one run instead of stopping at the first.
+
+The same configuration runs in CI for every pull request that touches C++ code.
 
 ### C++ Code Formatting and Linting
 
@@ -379,7 +415,7 @@ If you touch one of these examples, update the corresponding documentation in
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and
-built with Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and
+built with Sphinx + MyST, using Doxygen XML via Breathe for the C/C++ API and
 AutoAPI for the Python package. The documentation source files can be found in
 the `docs/` directory.
 
@@ -452,6 +488,8 @@ Server API:
 
 - `GET_QUANTUM_COMPUTERS`: Retrieves the list of available quantum computers
   with their IDs and aliases.
+- `GET_QUEUE_AVAILABILITY`: Retrieves the current queue length for the selected
+  quantum computer when the backend exposes it.
 - `GET_STATIC_QUANTUM_ARCHITECTURE`: Fetches the static quantum architecture
   (qubits and connectivity) for a specific quantum computer.
 - `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Obtains the set of calibrated gates and
@@ -509,6 +547,19 @@ These steps correspond to the initialization sequence described in the
 - `CANCEL_JOB` or `ABORT_CALIBRATION_JOB`: Called when
   `IQM_QDMI_device_job_cancel` is invoked.
 
+**When Queue Length Is Queried:**
+
+- `GET_QUEUE_AVAILABILITY`: Called when `QDMI_DEVICE_PROPERTY_QUEUELENGTH` is
+  queried. Backends that do not expose this optional endpoint are reported as
+  not supporting the property.
+
+**When Job Queue Position Is Queried:**
+
+- `GET_JOB_STATUS` or `GET_CALIBRATION_JOB_STATUS`: Called for every
+  `QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION` query. The refreshed status and queue
+  position are cached together, and a value is returned only while the job is
+  queued.
+
 **After Calibration Job Completion:**
 
 When querying results of a calibration job, the implementation automatically:
@@ -545,13 +596,16 @@ The implementation expects JSON responses in specific formats:
   `value`, and `invalid` fields.
 - **Job Status**: Object with job status, errors, and messages.
 - **Measurement Counts Artifact**: Array with a single object containing
-  `counts` (object mapping bitstrings to count integers).
+  `measurement_keys` (the concatenation order for result bitstrings) and
+  `counts` (an object mapping bitstrings to count integers).
 - **Measurements Artifact**: Array typically containing a single object where
-  each measurement key maps to an array of all shot results. Each shot result is
-  a single-element array containing an integer (0 or 1). For example:
-  `[{"meas_2_0_0": [[0], [1], [0], [1]], "meas_2_0_1": [[1], [0], [1], [0]]}]`
-  represents 4 shots measuring two qubits, where each measurement key contains
-  all results for that qubit across all shots.
+  results have the shape `results[measurement_key][shot][qubit_index]`. A
+  measurement key may cover one or more qubits; its result arrays have a
+  constant width across shots and contain integer bits (0 or 1). For example,
+  `[{"m_pair": [[0, 1], [1, 0]], "m_single": [[0], [1]]}]` represents two shots,
+  with `m_pair` measuring two qubits and `m_single` one qubit. The
+  `measurement_keys` metadata from the corresponding counts artifact determines
+  how these per-key arrays are concatenated into each result bitstring.
 
 For more details, see the implementation in `iqm_device.cpp` and the API
 configuration in `iqm_api_config.hpp`/`.cpp`.

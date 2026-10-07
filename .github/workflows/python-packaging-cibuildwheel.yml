@@ -5,7 +5,7 @@ on:
     inputs:
       runs-on:
         description: "The runner image to test on"
-        default: "ubuntu-24.04"
+        default: "ubuntu-26.04"
         type: string
     secrets:
       IQM_TOKEN:
@@ -23,25 +23,25 @@ jobs:
     name: 🎡 ${{ inputs.runs-on }}
     runs-on: ${{ inputs.runs-on }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: ${{ !startsWith(inputs.runs-on, 'ubuntu') }}
           save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       # run cibuildwheel to build wheels for the specified Python version
-      - uses: pypa/cibuildwheel@294735312765b09d24a2fbec22660ce817587d55 # v4.1.0
+      - uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: "emerald:mock"
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+          IQM_LOG_LEVEL: "DEBUG"
 
       - name: Verify clean directory
         run: git diff --exit-code

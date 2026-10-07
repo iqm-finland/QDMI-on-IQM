@@ -34,16 +34,77 @@ Logger &Logger::get_instance() {
   return instance;
 }
 
+namespace {
+
+/// The environment variable that names the log level.
+constexpr auto LOG_LEVEL_VARIABLE = "IQM_LOG_LEVEL";
+/// The variable LOG_LEVEL_VARIABLE replaced, still read as a fallback.
+constexpr auto DEPRECATED_LOG_LEVEL_VARIABLE = "IQM_CPP_API_LOG_LEVEL";
+
+/**
+ * @brief Read an environment variable, treating an empty value as unset.
+ *
+ * Job schedulers and container runtimes routinely export a variable with an
+ * empty value, which must not count as a level the caller asked for.
+ *
+ * @param key Name of the environment variable.
+ * @return The value, or `nullptr` when it is unset or empty.
+ */
+const char *Non_empty_env(const char *key) {
+  const char *value = std::getenv(key);
+  if (value == nullptr || *value == '\0') {
+    return nullptr;
+  }
+  return value;
+}
+
+/**
+ * @brief Map a level name onto the level it selects.
+ * @param name The name given in the environment.
+ * @return The level, or LOG_LEVEL::NONE when @p name matches no level.
+ */
+LOG_LEVEL Level_from_name(const std::string &name) {
+  if (name == "ERROR") {
+    return LOG_LEVEL::ERROR;
+  }
+  if (name == "INFO") {
+    return LOG_LEVEL::INFO;
+  }
+  if (name == "DEBUG") {
+    return LOG_LEVEL::DEBUG;
+  }
+  return LOG_LEVEL::NONE;
+}
+
+} // namespace
+
+LOG_LEVEL Logger::level_from_environment() {
+  if (const char *level = Non_empty_env(LOG_LEVEL_VARIABLE); level != nullptr) {
+    return Level_from_name(level);
+  }
+  if (const char *level = Non_empty_env(DEPRECATED_LOG_LEVEL_VARIABLE);
+      level != nullptr) {
+    return Level_from_name(level);
+  }
+  return LOG_LEVEL::ERROR;
+}
+
+std::string Logger::deprecation_notice() {
+  if (Non_empty_env(LOG_LEVEL_VARIABLE) != nullptr ||
+      Non_empty_env(DEPRECATED_LOG_LEVEL_VARIABLE) == nullptr) {
+    return {};
+  }
+  return std::string{DEPRECATED_LOG_LEVEL_VARIABLE} +
+         " is deprecated and will be removed in a future release; set " +
+         LOG_LEVEL_VARIABLE + " instead";
+}
+
 Logger::Logger()
-    : current_level_(LOG_LEVEL::ERROR), output_stream_(&std::cerr) {
-  if (const char *level_str = std::getenv("IQM_CPP_API_LOG_LEVEL")) {
-    if (const std::string level = level_str; level == "INFO") {
-      current_level_ = LOG_LEVEL::INFO;
-    } else if (level == "DEBUG") {
-      current_level_ = LOG_LEVEL::DEBUG;
-    } else if (level != "ERROR") {
-      current_level_ = LOG_LEVEL::NONE;
-    }
+    : current_level_(level_from_environment()), output_stream_(&std::cerr) {
+  // Reported through this instance rather than the LOG_ERROR macro, which
+  // would re-enter get_instance() while it is still constructing.
+  if (const auto notice = deprecation_notice(); !notice.empty()) {
+    error(notice);
   }
 }
 

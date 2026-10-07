@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 nox.needs_version = ">=2026.04.10"
 nox.options.default_venv_backend = "uv"
 
-PYTHON_ALL_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+PYTHON_ALL_VERSIONS = ["3.11", "3.12", "3.13", "3.14"]
 
 if os.environ.get("CI", None):
     nox.options.error_on_missing_interpreters = True
@@ -77,9 +77,6 @@ def _run_tests(
 
     if extra_command:
         session.run(*extra_command, env=env)
-    if "--cov" in session.posargs:
-        # try to use the lighter-weight `sys.monitoring` coverage core
-        env["COVERAGE_CORE"] = "sysmon"
 
     session.run(
         "uv",
@@ -168,7 +165,7 @@ def examples(session: nox.Session) -> None:
     )
 
 
-@nox.session(reuse_venv=True)
+@nox.session(python="3.14", reuse_venv=True)
 def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
     parser = argparse.ArgumentParser()
@@ -185,6 +182,12 @@ def docs(session: nox.Session) -> None:
         "run",
         "--no-build-isolation-package",
         "iqm-qdmi",
+        "--config-settings-package",
+        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
+        "--config-settings-package",
+        "iqm-qdmi:build.targets=iqm-qdmi-device;iqm-qdmi-device-docs",
+        "--config-settings-package",
+        "iqm-qdmi:build-dir=build/docs",
         "--group",
         "docs",
         "--verbose",
@@ -196,10 +199,8 @@ def docs(session: nox.Session) -> None:
         f"docs/_build/{args.builder}",
         *posargs,
         env={
+            "IQM_QDMI_BUILD_DIR": "build/docs",
             "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
-            "SKBUILD_CMAKE_DEFINE": "BUILD_IQM_QDMI_DOCS=ON",
-            "SKBUILD_BUILD_TARGETS": "iqm-qdmi-device;iqm-qdmi-device-docs",
-            "SKBUILD_BUILD_DIR": "build/docs",
         },
     )
 

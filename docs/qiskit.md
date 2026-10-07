@@ -44,19 +44,47 @@ result = backend.run(transpiled_qc, shots=128).result()
 print(result.get_counts())
 ```
 
-If no explicit arguments are provided, the wrapper resolves `IQM_BASE_URL`,
-`IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QC_ALIAS` from the
-environment. Alternatively, pass any of those values directly to
-`IQMBackend(...)`.
+Explicit arguments to `IQMBackend(...)` take precedence over `IQM_SERVER_URL`,
+`IQM_TOKEN`, `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QUANTUM_COMPUTER` from the
+environment. `IQM_BASE_URL` and `IQM_QC_ALIAS` remain supported as legacy
+aliases. Canonical variables take precedence over their legacy aliases, which
+take precedence over the registered device default.
+
+The wrapper registers the packaged IQM QDMI device as a fallback under the
+stable ID `iqm.default` with the standard Resonance endpoint as its default. An
+existing configured definition with that ID is preserved, including its
+endpoint. Every backend opens a fresh device session with its own configuration.
+
+IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
+and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
+Qiskit serializer preserves these units. Applications submitting IQM JSON
+directly must use the same format; the legacy `angle_t` and `phase_t` fields
+expressed angles in turns.
+
+## Circuit Metadata
+
+The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
+program's `metadata` field without modifying the circuit. Empty metadata remains
+`{}`. Values follow Python's JSON encoding: dictionaries, lists, tuples (encoded
+as arrays), strings, booleans, `None`, integers, and finite floating-point
+numbers are supported. Object keys must be strings at every nesting level, so
+that keys such as `1` and `"1"` cannot collide after conversion to JSON.
+
+If any value is unsupported (such as NumPy arrays or custom Python objects), or
+the metadata has circular references or nonfinite numbers, the serializer drops
+the whole metadata with a warning and submits the circuit. Convert such values
+explicitly to keep them. This preserves metadata in the submitted IQM program;
+it does not add a metadata retrieval API or guarantee that a remote service
+returns it in results.
 
 ## Sampler and Estimator Primitives
 
 {py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and
 {py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing
-{py:class}`~qiskit.primitives.BaseSamplerV2` and
-{py:class}`~qiskit.primitives.BaseEstimatorV2` primitives bound to the backend
-instance.
+{py:class}`~qiskit.primitives.BackendSamplerV2` and
+{py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
+backend instance.
 
 ```{code-cell} ipython3
 sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)

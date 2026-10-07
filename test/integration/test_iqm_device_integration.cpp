@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -29,12 +30,14 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -48,6 +51,8 @@ class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
   FoMaC fomac{};
+  /// TearDown owns cleanup, including fatal assertions and skipped tests.
+  std::vector<IQM_QDMI_Device_Job> jobs;
   std::optional<std::string> requested_qc_alias = std::nullopt;
 
   void SetUp() override {
@@ -88,6 +93,21 @@ protected:
   }
 
   void TearDown() override {
+    for (auto *job : jobs) {
+      if (job == nullptr) {
+        continue;
+      }
+      QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+      if (IQM_QDMI_device_job_check(job, &status) != QDMI_SUCCESS ||
+          status == QDMI_JOB_STATUS_SUBMITTED ||
+          status == QDMI_JOB_STATUS_QUEUED ||
+          status == QDMI_JOB_STATUS_RUNNING) {
+        /// Best effort: a timeout must not leave a job queued remotely.
+        (void)IQM_QDMI_device_job_cancel(job);
+      }
+      IQM_QDMI_device_job_free(job);
+    }
+    jobs.clear();
     IQM_QDMI_device_session_free(session);
     EXPECT_EQ(IQM_QDMI_device_finalize(), QDMI_SUCCESS);
   }
@@ -135,8 +155,9 @@ protected:
     auto build_single_qubit = [&] {
       std::ostringstream circuit;
       circuit << R"({"name":"test_circuit","instructions":[)";
-      circuit << R"({"name":"prx","locus":[")" << q1_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << q1_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
       circuit << R"({"name":"measure","locus":[")" << q1_name
               << R"("],"args":{"key":"meas_1_0_0"}})";
       circuit << R"(],"metadata":{}})";
@@ -169,14 +190,17 @@ protected:
 
       std::ostringstream circuit;
       circuit << R"({"name":"test_circuit","instructions":[)";
-      circuit << R"({"name":"prx","locus":[")" << a_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-      circuit << R"({"name":"prx","locus":[")" << b_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << a_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << b_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
       circuit << R"({"name":"cz","locus":[")" << a_name << R"(",")" << b_name
               << R"("],"args":{}},)";
-      circuit << R"({"name":"prx","locus":[")" << b_name
-              << R"("],"args":{"angle_t":0.25,"phase_t":1.25}},)";
+      circuit
+          << R"({"name":"prx","locus":[")" << b_name
+          << R"("],"args":{"angle":1.5707963267948966,"phase":7.853981633974483}},)";
       circuit << R"({"name":"measure","locus":[")" << a_name
               << R"("],"args":{"key":"meas_2_0_0"}},)";
       circuit << R"({"name":"measure","locus":[")" << b_name
@@ -234,18 +258,21 @@ protected:
           const auto resonator_name = fomac.get_site_name(resonator);
           std::ostringstream circuit;
           circuit << R"({"name":"test_circuit","instructions":[)";
-          circuit << R"({"name":"prx","locus":[")" << qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-          circuit << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << second_qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
           circuit << R"({"name":"move","locus":[")" << second_qubit_name
                   << R"(",")" << resonator_name << R"("],"args":{}},)";
           circuit << R"({"name":"cz","locus":[")" << qubit_name << R"(",")"
                   << resonator_name << R"("],"args":{}},)";
           circuit << R"({"name":"move","locus":[")" << second_qubit_name
                   << R"(",")" << resonator_name << R"("],"args":{}},)";
-          circuit << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":1.25}},)";
+          circuit
+              << R"({"name":"prx","locus":[")" << second_qubit_name
+              << R"("],"args":{"angle":1.5707963267948966,"phase":7.853981633974483}},)";
           circuit << R"({"name":"measure","locus":[")" << qubit_name
                   << R"("],"args":{"key":"meas_2_0_0"}},)";
           circuit << R"({"name":"measure","locus":[")" << second_qubit_name
@@ -406,19 +433,88 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
             QDMI_ERROR_NOTSUPPORTED);
 }
 
+TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
+  if (!requested_qc_alias.has_value() || *requested_qc_alias != "garnet:mock") {
+    GTEST_SKIP() << "Queue-property integration coverage targets garnet:mock";
+  }
+
+  size_t queue_length = 0;
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_QUEUELENGTH, sizeof(queue_length),
+                &queue_length, nullptr),
+            QDMI_SUCCESS);
+
+  constexpr size_t shots_num = 64;
+  constexpr size_t jobs_num = 4;
+  constexpr size_t max_queue_position_queries = 10;
+  constexpr auto query_interval = std::chrono::milliseconds{200};
+  const auto circuit = build_iqm_json_test_circuit();
+  jobs.reserve(jobs_num);
+  for (size_t i = 0; i < jobs_num; ++i) {
+    jobs.emplace_back(
+        fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num));
+  }
+
+  // Poll the final job for as long as it plausibly sits in Garnet's queue.
+  // Every outcome here is legitimate: the property answers with a position
+  // while the job is queued, QDMI_ERROR_NOTSUPPORTED while the queue has not
+  // published one yet, and QDMI_ERROR_BADSTATE once the job has left the queue.
+  // What the poll asserts is that no other code ever comes back.
+  std::optional<size_t> observed_queue_position;
+  bool job_left_the_queue = false;
+  for (size_t i = 0; i < max_queue_position_queries; ++i) {
+    size_t queue_position = 0;
+    const auto result = IQM_QDMI_device_job_query_property(
+        jobs.back(), QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION,
+        sizeof(queue_position), &queue_position, nullptr);
+    if (result == QDMI_SUCCESS) {
+      observed_queue_position = queue_position;
+      break;
+    }
+    if (result == QDMI_ERROR_BADSTATE) {
+      job_left_the_queue = true;
+      break;
+    }
+    EXPECT_EQ(result, QDMI_ERROR_NOTSUPPORTED);
+    if (result != QDMI_ERROR_NOTSUPPORTED) {
+      break;
+    }
+    std::this_thread::sleep_for(query_interval);
+  }
+
+  // Garnet decides how long a job stays queued, and a mock job of this size can
+  // run to completion before the first query returns. Requiring a position to
+  // have been seen would assert on the timing of a shared service rather than
+  // on this device. The unit tests pin the property's contract against the HTTP
+  // stub, where it is deterministic.
+  if (!observed_queue_position.has_value()) {
+    GTEST_LOG_(INFO) << (job_left_the_queue
+                             ? "The job left Garnet's queue before a position "
+                               "could be observed"
+                             : "Garnet published no queue position within the "
+                               "polling window");
+  }
+  for (auto *job : jobs) {
+    EXPECT_EQ(wait_for_done(job), QDMI_JOB_STATUS_DONE);
+  }
+}
+
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
-  // Check whether there are equally many sites as reported qubits
+  // The site list covers the qubits and, on Star-topology devices, the
+  // computational resonators as well, so it is at least as long as the qubit
+  // count and longer whenever the device has resonators.
   const auto sites = fomac.get_sites();
   const auto qubits_num = fomac.get_qubits_num();
-  EXPECT_EQ(sites.size(), qubits_num);
+  EXPECT_GE(sites.size(), qubits_num);
 
   const auto duration_scale_factor = fomac.get_duration_scale_factor();
   ASSERT_GT(duration_scale_factor, 0.0);
 
-  // For every site check that the site ID is less than the number of qubits.
+  // Site IDs index the site list, so they are bounded by its size rather than
+  // by the qubit count.
   for (const auto &site : sites) {
     const auto site_id = fomac.get_site_index(site);
-    EXPECT_LT(site_id, qubits_num);
+    EXPECT_LT(site_id, sites.size());
     const auto site_name = fomac.get_site_name(site);
     EXPECT_FALSE(site_name.empty());
 
@@ -689,10 +785,11 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
 TEST_F(QDMIIntegrationTest, JobCycle) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
-  auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  const auto job_id = FoMaC::get_job_id(job);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -784,21 +881,67 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
 
-  IQM_QDMI_device_job_free(job);
+  IQM_QDMI_device_job_free(std::exchange(job, nullptr));
+  auto &retrieved_job = jobs.emplace_back();
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, job_id.c_str(), &retrieved_job),
+            QDMI_SUCCESS);
+  EXPECT_EQ(FoMaC::get_job_id(retrieved_job), job_id);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(wait_for_done(retrieved_job), QDMI_JOB_STATUS_DONE);
+  const auto retrieved_counts = FoMaC::get_histogram(retrieved_job);
+  const auto retrieved_sum =
+      std::accumulate(retrieved_counts.begin(), retrieved_counts.end(),
+                      size_t{0}, [](const size_t total, const auto &entry) {
+                        return total + entry.second;
+                      });
+  EXPECT_EQ(retrieved_sum, shots_num);
+
+  size_t retrieved_shots_size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+                                            QDMI_JOB_RESULT_SHOTS, 0, nullptr,
+                                            &retrieved_shots_size),
+            QDMI_SUCCESS);
+  ASSERT_GT(retrieved_shots_size, 1U);
+  std::vector<char> retrieved_shots(retrieved_shots_size);
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved_job, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
+                retrieved_shots.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
+            shots_num);
 }
 
 TEST_F(QDMIIntegrationTest, JobCancellation) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
-  auto *job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
-  EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_SUCCESS);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+
+  // A mock job of this size can reach a terminal status before the cancellation
+  // request lands, and a job that is no longer running can no longer be
+  // canceled. Which of the two happens is the backend's timing rather than this
+  // device's behavior, so assert against whichever one occurred.
+  const auto cancellation = IQM_QDMI_device_job_cancel(job);
   QDMI_Job_Status status{};
-  EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
-  EXPECT_EQ(status, QDMI_JOB_STATUS_CANCELED);
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  if (cancellation == QDMI_SUCCESS) {
+    EXPECT_EQ(status, QDMI_JOB_STATUS_CANCELED);
+  } else {
+    EXPECT_EQ(cancellation, QDMI_ERROR_INVALIDARGUMENT)
+        << "A cancellation can only be refused because the job already reached "
+           "a terminal status";
+    EXPECT_TRUE(status == QDMI_JOB_STATUS_DONE ||
+                status == QDMI_JOB_STATUS_CANCELED ||
+                status == QDMI_JOB_STATUS_FAILED)
+        << "The cancellation was refused, so the job must have finished; its "
+           "status is "
+        << status;
+  }
 }
 
 TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   EXPECT_EQ(IQM_QDMI_device_session_create_device_job(session, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_session_create_device_job(nullptr, &job),
@@ -864,7 +1007,6 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
             QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_ERROR_INVALIDARGUMENT);
   EXPECT_EQ(IQM_QDMI_device_job_cancel(nullptr), QDMI_ERROR_INVALIDARGUMENT);
-  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
@@ -897,10 +1039,12 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
   mapping_program << R"({"name":"test_circuit","instructions":[)";
-  mapping_program << R"({"name":"prx","locus":[")" << first_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
-  mapping_program << R"({"name":"prx","locus":[")" << second_qubit_name
-                  << R"("],"args":{"angle_t":0.25,"phase_t":0.75}},)";
+  mapping_program
+      << R"({"name":"prx","locus":[")" << first_qubit_name
+      << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
+  mapping_program
+      << R"({"name":"prx","locus":[")" << second_qubit_name
+      << R"("],"args":{"angle":1.5707963267948966,"phase":4.71238898038469}},)";
   mapping_program << R"({"name":"measure","locus":[")" << first_qubit_name
                   << R"("],"args":{"key":"meas_2_0_0"}},)";
   mapping_program << R"({"name":"measure","locus":[")" << second_qubit_name
@@ -915,14 +1059,14 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
       pos += key.length();
     }
   }
-  auto *job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
-                               heralding_mode, move_validation_mode,
-                               move_gate_frame_tracking_mode, dd_mode,
-                               qubit_mapping, max_circuit_duration_over_t2,
-                               num_active_reset_cycles, dd_strategy);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
+                         heralding_mode, move_validation_mode,
+                         move_gate_frame_tracking_mode, dd_mode, qubit_mapping,
+                         max_circuit_duration_over_t2, num_active_reset_cycles,
+                         dd_strategy);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -941,14 +1085,17 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   ASSERT_LE(sum, shots_num);
 }
 
-TEST_F(QDMIIntegrationTest, JobCycleQIR) {
+// Resonance currently rejects valid QIR programs with an internal server error.
+// Track re-enabling this test in
+// https://github.com/iqm-finland/QDMI-on-IQM/issues/170.
+TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   constexpr size_t shots_num = 64;
   const auto qir_program = build_qir_test_circuit();
-  auto *job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
-                               shots_num);
+  auto &job = jobs.emplace_back();
+  job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+                         shots_num);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
-    IQM_QDMI_device_job_free(job);
     GTEST_SKIP()
         << "Skipping because sirius:mock currently fails job execution in "
            "backend (known mock limitation), observed status "
@@ -970,7 +1117,7 @@ TEST_F(QDMIIntegrationTest, JobCycleQIR) {
 
 TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   testing::internal::CaptureStderr();
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   auto ret = IQM_QDMI_device_session_create_device_job(session, &job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
@@ -1002,14 +1149,12 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
 
   const auto captured_output = testing::internal::GetCapturedStderr();
   std::cout << captured_output << '\n';
-
-  IQM_QDMI_device_job_free(job);
 }
 
 TEST_F(QDMIIntegrationTest, CalibrationJob) {
   // Calibration endpoints are optional in unified API
   // Legacy cocos endpoints may not be available on all servers
-  IQM_QDMI_Device_Job job{};
+  auto &job = jobs.emplace_back();
   ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_SUCCESS);
 
@@ -1038,6 +1183,4 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
   const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
   EXPECT_FALSE(calibration_set_id.empty())
       << "Calibration job must return a valid calibration set ID";
-
-  IQM_QDMI_device_job_free(job);
 }

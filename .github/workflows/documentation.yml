@@ -20,20 +20,22 @@ permissions:
 
 jobs:
   build-documentation:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Clone Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev graphviz
+        run: sudo apt-get update && sudo apt-get install -y curl libcurl4-openssl-dev
 
       - name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Install Doxygen
-        uses: ssciwr/doxygen-install@329d88f5a303066a5bd006db7516b1925b86350e # v2.0.1
+        uses: ssciwr/doxygen-install@fa3e94d34131d3990b6b8ba939ab982964aa3758 # v2.0.3
         with:
           version: "1.16.1"
 
@@ -64,11 +66,11 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

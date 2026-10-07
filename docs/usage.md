@@ -33,6 +33,19 @@ Examples guide.
 - If both environment variables and explicit parameters are set simultaneously,
   the explicit parameters will take precedence.
 
+### TLS Certificates
+
+Linux wheels use the host's CA trust store, discovering the standard CA bundle
+on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
+distribution's `ca-certificates` package if it is missing. Other platforms keep
+libcurl's native defaults.
+
+For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
+bundle before making requests. `SSL_CERT_FILE` is also supported when
+`CURL_CA_BUNDLE` is unset or empty. Invalid explicit paths cause requests to
+fail; certificate and hostname verification remain enabled. This applies to both
+native and Python clients.
+
 ### Session Configuration
 
 To initiate a session with a particular endpoint and authentication method, the
@@ -132,7 +145,10 @@ If neither quantum computer ID nor alias is specified, the first available
 quantum computer from the server will be used.
 
 If the base URL is not specified explicitly, the session initialization path
-falls back to `IQM_BASE_URL` before using the standard Resonance endpoint.
+falls back to `IQM_SERVER_URL`, then its `IQM_BASE_URL` alias, before using the
+standard Resonance endpoint. A quantum computer alias similarly falls back to
+`IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias. `IQM_QC_ID` remains a
+separate quantum computer ID selector.
 
 The session is initialized with {cpp:func}`IQM_QDMI_device_session_init`, which:
 
@@ -194,6 +210,29 @@ For the REST API endpoints called during each of these steps, see
 [IQM API Usage in QDMI Device Implementation](contributing.md#iqm-api-usage-in-qdmi-device-implementation)
 in the Contributing guide.
 
+## Using the Device with MQT Core
+
+The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
+symbol prefix. Applications that link the MQT Core driver statically can use its
+runtime-copy helper to synthesize a relocatable manifest and colocate it with
+the device library beside the executable. This requires CMake 3.28 or newer:
+
+```cmake
+find_package(mqt-core 4.0.0 CONFIG REQUIRED)
+find_package(iqm-qdmi-device CONFIG REQUIRED)
+
+add_executable(my-application main.cpp)
+target_link_libraries(my-application PRIVATE MQT::CoreQDMI)
+mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
+```
+
+For dynamically linked consumers, automatic discovery searches beside the driver
+library rather than the executable. Such consumers must place the generated
+manifest in a discovered location or select a complete configuration with
+`MQT_CORE_QDMI_CONFIG_FILE`. Python integrations instead register the same
+stable ID directly from the packaged library path and open a fresh device
+session for each backend.
+
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the
@@ -248,8 +287,9 @@ session to use them.
 
 The QDMI device allows you to query various information about the quantum
 computing hardware, such as the available qubits, operations, and their
-properties. All device information is fetched during session initialization and
-kept in memory for efficient querying.
+properties. Architecture and calibration information is fetched during session
+initialization and kept in memory for efficient querying. Dynamic properties,
+such as queue length, are fetched when queried.
 
 The following properties about the device can be queried via the
 {cpp:func}`IQM_QDMI_device_session_query_device_property` function:
@@ -261,17 +301,37 @@ The following properties about the device can be queried via the
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_LIBRARYVERSION`:
   The version of the QDMI library.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`: The
-  current status of the device (e.g., idle, busy).
+  current status of the device (e.g., idle, busy). It is derived from what the
+  IQM Server reports about the quantum computer at the time of the query — its
+  health, the availability of its queue, and the number of queued jobs — so it
+  accounts for jobs submitted outside of QDMI as well. A quantum computer that
+  reports itself unhealthy, or whose queue has no availability, is reported as
+  under maintenance.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUEUELENGTH`:
+  The current number of jobs waiting in the selected quantum computer's queue,
+  if the IQM backend exposes queue availability.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM`: The
   number of qubits available on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_SITES`: The
-  list of available qubit sites on the device.
+  list of available sites on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_OPERATIONS`:
   The list of available calibrated operations on the device.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_COUPLINGMAP`:
   The coupling map between qubits on the device.
+- {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION`:
+  Whether the device needs calibration. IQM schedules recalibration itself and
+  the IQM Server publishes no signal asking a client to trigger one, so this is
+  always zero. A quantum computer that is unfit to run reports itself as under
+  maintenance through
+  {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_STATUS`.
 - {cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_CUSTOM1`: The
   current calibration set ID used by the session.
+
+**Note:** Sites and qubits are not the same quantity. On Star-topology devices
+the site list also contains the computational resonators, so it is longer than
+the qubit count. Allocate registers from
+{cpp:enumerator}`~QDMI_DEVICE_PROPERTY_T::QDMI_DEVICE_PROPERTY_QUBITSNUM` and
+address hardware through the site list.
 
 The following properties about every site (qubit) can be queried via the
 {cpp:func}`IQM_QDMI_device_session_query_site_property` function:
@@ -339,6 +399,14 @@ including the
   according to the
   [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791),
   set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
+
+After submission,
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
+reports the number of jobs ahead of the job while it is queued. Every property
+query refreshes the job status and queue position from the IQM server. The query
+returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
+`QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
+position.
 
 ```cpp
 auto FoMaC::submit_job(
@@ -444,6 +512,28 @@ The QDMI device currently supports the following program formats:
 For QIR and JSON formats, the program should be provided as a string via the
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
 parameter.
+
+## Retrieving jobs by ID
+
+Use {cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` with the job
+ID returned for an IQM circuit job by
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_ID` to
+obtain a new local handle for an existing IQM circuit job:
+
+```cpp
+IQM_QDMI_Device_Job retrieved_job = nullptr;
+const int ret = IQM_QDMI_device_session_retrieve_device_job_by_id(
+    session, job_id.c_str(), &retrieved_job);
+```
+
+The device validates the ID with the IQM Server using the current session
+credentials and initializes the handle with the remote job's current status.
+Retrieving does not clone or submit the job. Parameters cannot be changed and
+the retrieved handle cannot be submitted again. Freeing it only releases the
+local handle; it does not cancel or delete the remote job. Check or wait for
+completion before retrieving results. Since the original submission payload is
+not reconstructed, only the job ID is exposed as a job property on a retrieved
+handle.
 
 ## Retrieving Job Results
 
@@ -623,13 +713,43 @@ IQM_QDMI_device_job_check(job, &status);
 ## Logging
 
 The project provides a simple logging mechanism to help you debug your
-application. You can control the logging level by setting the
-`IQM_CPP_API_LOG_LEVEL` environment variable. The following logging levels are
-available:
+application. You can control the logging level by setting the `IQM_LOG_LEVEL`
+environment variable. The following logging levels are available:
 
 - `NONE`: No logging.
 - `ERROR`: Log only errors.
 - `INFO`: Log errors and info messages.
 - `DEBUG`: Log errors, info, and debug messages.
 
-By default, the logging level is set to `ERROR`.
+By default, the logging level is set to `ERROR`. Any other value disables
+logging entirely. Messages at disabled levels are not constructed.
+
+Logs are written to standard error. Set `IQM_LOG_LEVEL` before starting the
+application; the logger reads it once, on first use.
+
+`DEBUG` logs raw request and response bodies, including the bodies of failed
+requests and malformed JSON responses, preserving their original formatting.
+Treat that output as sensitive and avoid it in shared logs.
+
+:::{note}
+`IQM_CPP_API_LOG_LEVEL` is a deprecated alias for `IQM_LOG_LEVEL`. It is only
+read when `IQM_LOG_LEVEL` is unset or empty, and using it logs a notice at
+`ERROR` level. It will be removed in a future release.
+:::
+
+## Rate limiting
+
+The IQM Server API meters requests against a per-account quota of 2000 units
+over a rolling ten-second window, and blocks the account for 30 seconds once
+that quota is exhausted. Submitting or cancelling a job costs 100 units and a
+read costs 10, so twenty submissions inside one window run the quota out.
+
+Every successful response reports `RateLimit-Limit` and `RateLimit-Remaining`. A
+session follows what its own requests were told and waits out the rest of the
+window once the remaining quota falls below ten percent of the limit, which is
+far cheaper than the block it avoids. Set `IQM_RATE_LIMIT_THRESHOLD_PERCENT` to
+another whole percentage to move that point, or to `0` to take the block
+instead. The wait comes out of the timeout of the request that triggered it; a
+request with less time than that left proceeds without waiting. Other clients
+using the same token spend from the same quota, so the device still honors the
+`Retry-After` header of an HTTP 429 response.

@@ -21,6 +21,6 @@ add_executable(
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
   unit_tests PRIVATE GTest::gtest_main GTest::gtest qdmi::qdmi_project_warnings
-                     iqm::qdmi_device_internals)
+                     iqm::qdmi_device_internals nlohmann_json::nlohmann_json)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)

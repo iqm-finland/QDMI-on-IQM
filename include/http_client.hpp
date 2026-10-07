@@ -28,12 +28,14 @@
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
 #include <functional>
 #include <limits>
 #include <optional>
+#include <string>
 #include <type_traits>
 
 namespace iqm::http {
@@ -49,57 +51,68 @@ enum class ERROR_LOG_POLICY : uint8_t {
 };
 
 /**
+ * @brief The rate-limit quota the IQM Server API last reported to a session.
+ *
+ * The quota is metered per user account, so no client-side view of it is ever
+ * complete; a session slows down on what its own requests were told. A limit of
+ * zero means no response has reported one yet.
+ */
+struct Rate_limit_budget {
+  std::int64_t remaining = 0;
+  std::int64_t limit = 0;
+  std::chrono::steady_clock::time_point observed_at;
+};
+
+/**
  * @brief Perform an HTTP GET request.
  *
  * Sends an HTTP GET request to the specified URL with bearer token
- * authentication. HTTP 429 responses are retried according to the server's
- * Retry-After header.
+ * authentication. The request waits when @p rate_limit reports the
+ * remaining quota running low, and HTTP 429 responses are retried according to
+ * the server's Retry-After header.
  *
  * @param url The target URL for the GET request.
  * @param bearer_token Bearer token used for authentication, if configured.
- * @param timeout Overall timeout for the request and any rate-limit retries.
+ * @param connection_pool Connection pool shared by the owning device session.
+ * @param timeout Overall timeout for the request, the rate-limit wait, and any
+ * rate-limit retries.
+ * @param rate_limit Quota the calling session last saw, updated in place.
+ * A request belonging to no session passes nullptr and relies on Retry-After.
  * @return CPR response object.
  */
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
-                  std::chrono::milliseconds timeout = std::chrono::hours{1});
-
-/**
- * @brief Perform an optional HTTP GET request.
- *
- * Behaves like Get(), but downgrades non-success logging for capability
- * probes where missing endpoints are expected.
- *
- * @param url The target URL for the GET request.
- * @param bearer_token Bearer token used for authentication, if configured.
- * @param timeout Overall timeout for the request and any rate-limit retries.
- * @return CPR response object.
- */
-cpr::Response
-Get_optional(const cpr::Url &url,
-             const std::optional<cpr::Bearer> &bearer_token,
-             std::chrono::milliseconds timeout = std::chrono::hours{1});
+                  const cpr::ConnectionPool &connection_pool,
+                  std::chrono::milliseconds timeout = std::chrono::hours{1},
+                  Rate_limit_budget *rate_limit = nullptr);
 
 /**
  * @brief Perform an HTTP POST request.
  *
  * Sends an HTTP POST request to the specified URL with a JSON body. The
  * request automatically includes a JSON content type header and supports
- * additional custom headers. HTTP 429 responses are retried according to the
- * server's Retry-After header.
+ * additional custom headers. The request waits when @p rate_limit_budget
+ * reports the remaining quota running low, and HTTP 429 responses are retried
+ * according to the server's Retry-After header.
  *
  * @param url The target URL for the POST request.
  * @param bearer_token Bearer token used for authentication, if configured.
+ * @param connection_pool Connection pool shared by the owning device session.
  * @param data The request body data.
  * @param additional_headers Additional HTTP headers to include.
- * @param timeout Overall timeout for the request and any rate-limit retries.
+ * @param timeout Overall timeout for the request, the rate-limit wait, and any
+ * rate-limit retries.
+ * @param rate_limit Quota the calling session last saw, updated in place.
+ * A request belonging to no session passes nullptr and relies on Retry-After.
  * @return CPR response object.
  */
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data,
                    const cpr::Header &additional_headers = {},
-                   std::chrono::milliseconds timeout = std::chrono::hours{1});
+                   std::chrono::milliseconds timeout = std::chrono::hours{1},
+                   Rate_limit_budget *rate_limit = nullptr);
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -111,6 +124,11 @@ QDMI_STATUS Handle_response(
     ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
 
 namespace internal {
+/// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
+/// bundle. An empty result leaves libcurl's platform default in place.
+/// Explicit paths are passed through even when invalid, so TLS fails closed.
+[[nodiscard]] std::string Resolve_ca_bundle();
+
 /**
  * @brief Clamp a logical timeout to the integer range used by a transport.
  *
@@ -149,16 +167,20 @@ struct Hooks {
   /// Hook for GET requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
-      const cpr::Header &headers, std::chrono::milliseconds timeout)>
+      const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
+      std::chrono::milliseconds timeout)>
       get;
   /// Hook for POST requests.
-  std::function<cpr::Response(const cpr::Url &url,
-                              const std::optional<cpr::Bearer> &bearer_token,
-                              const cpr::Header &headers, const cpr::Body &body,
-                              std::chrono::milliseconds timeout)>
+  std::function<cpr::Response(
+      const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+      const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
+      const cpr::Body &body, std::chrono::milliseconds timeout)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;
+  /// Hook for the monotonic clock behind request deadlines and the rate-limit
+  /// window. Tests replace it with one the stubbed sleep advances.
+  std::function<std::chrono::steady_clock::time_point()> now;
 };
 
 /// Access the mutable, process-wide hook set.

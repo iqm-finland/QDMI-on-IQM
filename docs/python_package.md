@@ -94,6 +94,10 @@ To run a parameter estimation job:
 iqm-estimator ansatz.qpy observable.pkl --maxiter 10
 ```
 
+The estimator CLI and `offloader.estimate` use Qiskit's default precision of
+`1/64`, corresponding to 4,096 shots per measurement circuit. See the
+[primitive options](qiskit.md#sampler-and-estimator-primitives).
+
 ## Programmatic Offloading with the `offloader` Module
 
 For workflows running on a Slurm login node (such as Jupyter notebooks on a
@@ -103,27 +107,60 @@ queue.
 
 The module provides two primary functions:
 
-- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the given circuit to QPY,
-  submits a Slurm job using `srun iqm-sampler`, and parses the base64-encoded
-  pickled result back to a python dictionary of counts.
+- {py:func}`~iqm.qdmi.offloader.sample`: Serializes the circuit to QPY and
+  submits a Slurm job using `srun iqm-sampler`. The returned sampler result is
+  converted to joint counts across all classical registers in Qiskit's bit
+  order.
 - {py:func}`~iqm.qdmi.offloader.estimate`: Serializes the ansatz and observable,
-  submits a Slurm job using `srun iqm-estimator`, and parses the base64-encoded
-  pickled `VQEResult` to return it, matching the semantics of running `VQE`
-  directly against the regular (non-offloaded) estimator.
+  submits a Slurm job using `srun iqm-estimator`, and returns the complete
+  `VQEResult` produced by the worker.
 
-Both functions support a `local=True` argument for running simulation/hardware
-compilation locally (useful for debugging) and a `simulator=True` argument when
-submitting Slurm jobs to target simulated devices instead of real QPU hardware.
+Both worker CLIs reserve stdout for one base64-encoded pickle containing the
+native Qiskit result; diagnostics belong on stderr. The offloader is intended
+for controlled Slurm deployments with trusted workers and serialized inputs. Use
+compatible Python and dependency environments on the submitting and worker
+nodes. Result loading uses standard pickle without a restricted unpickler.
 
-### Slurm Partition Requirement
+Both functions support `local=True` to execute in the submitting process instead
+of Slurm, and `simulator=True` to select the simulator in either mode.
 
-Both functions submit their `srun` jobs to a partition named `quantum`
-(`srun --partition=quantum ...`). This assumes the cluster has a partition of
-that exact name configured, typically gating access to nodes with the quantum
-computer exposed as a Slurm GRES resource. Ensure such a `quantum` partition
-exists before using the offloader; see the
-[SPANK plugin documentation](spank_plugin.md) for an example cluster
-configuration.
+### Selecting the Slurm Partition
+
+Both functions submit their `srun` jobs to the partition gating the nodes that
+expose the quantum computer as a Slurm GRES resource. Its name is a per-site
+choice, resolved in this order:
+
+1. The `partition` keyword argument.
+2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
+   set the site's name once for every user. An empty value counts as unset.
+3. `quantum`, the name used throughout the
+   [SPANK plugin documentation](spank_plugin.md) and the
+   [Administrator Guide](admin_guide.md).
+
+```python
+counts = sample(qc, shots=512, partition="qc-nodes")
+```
+
+Slurm's own `SLURM_PARTITION` has no effect here, because the resolved name is
+always passed as an explicit `--partition`, which takes precedence over it.
+
+:::{important}
+Renaming the partition is not enough on its own. The SPANK plugin only runs on
+the partitions its `partitions=` option lists, so that list has to carry the new
+name too — see [Configuration](spank_plugin.md#configuration). Otherwise the
+plugin silently skips the job and never injects `IQM_BASE_URL`, `IQM_QC_ID`, or
+`IQM_QC_ALIAS`.
+:::
+
+### Sizing the Slurm Allocation
+
+Both functions accept a `nodes` keyword argument, forwarded as `--nodes` and
+defaulting to a single node. The worker itself always runs as one task
+(`--ntasks=1`), so `nodes` only sizes the allocation for a site whose partition
+demands more than one node; it does not distribute or parallelize the workload.
+
+It has no environment fallback: the node count is a per-job resource request
+rather than a site-wide constant.
 
 ### Shared Jobs Directory
 
@@ -147,6 +184,21 @@ default backend configuration. When set, they are passed as `--iqm-qc-id` and
 [SPANK plugin](spank_plugin.md) resolves into the job's `IQM_QC_ID` and
 `IQM_QC_ALIAS` environment variables. Only used when `local=False`.
 
+### Requesting a Slurm License
+
+Both functions accept an optional `licenses` keyword argument, forwarded
+verbatim as a `--licenses` option on the `srun` command (Slurm's own
+`name[:count][,name[:count]...]` syntax). This is unrelated to QC selection: a
+site administrator can configure a Slurm license per QC to cap concurrent jobs
+against it -- see the SPANK plugin's
+[Limiting Concurrent Access with Slurm Licenses](spank_plugin.md#limiting-concurrent-access-with-slurm-licenses)
+docs -- and `licenses` is how a caller requests it. Only used when
+`local=False`.
+
+```python
+counts = sample(qc, shots=512, simulator=True, qc_alias="emerald", licenses="iqm_qc_emerald:1")
+```
+
 ### Programmatic Sampling Example
 
 ```python
@@ -162,3 +214,51 @@ qc.measure_all()
 counts = sample(qc, shots=512, simulator=True)
 print("Counts:", counts)
 ```
+
+## Querying the Device Directly
+
+The Qiskit backend covers circuit execution, but a QDMI device also answers
+questions about itself. Open a session with MQT Core's driver to reach them.
+Constructing an {py:class}`~iqm.qdmi.qiskit.IQMBackend` registers the device
+under the stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID`, after which
+`open_device` resolves it:
+
+```python
+from mqt.core.qdmi.driver import open_device
+
+from iqm.qdmi import IQM_QDMI_DEVICE_ID
+
+device = open_device(IQM_QDMI_DEVICE_ID, token="…", custom2="emerald")
+
+print(device.status())
+print(device.supported_program_formats())
+```
+
+### Queue Length and Queue Position
+
+The device reports how busy the quantum computer is, so a client can decide
+whether to submit now or wait:
+
+```python
+waiting = device.queue_length()  # jobs waiting, excluding those executing
+```
+
+`queue_length()` returns `None` when the IQM API does not supply a trustworthy
+value. A queued job reports how many jobs are ahead of it; querying it refreshes
+the job's status first:
+
+```python
+ahead = job.queue_position  # None once the job is no longer queued
+```
+
+### Retrieving an Existing Job
+
+A job outlives the session that submitted it. Given its ID, a later session can
+pick it up again to poll, wait, cancel, or fetch results:
+
+```python
+job = device.retrieve_job_by_id("d3416f0a-…")
+print(job.check())
+```
+
+A retrieved job cannot be resubmitted, and its parameters cannot be changed.

@@ -11,7 +11,7 @@ These dependencies are linked into the shared library and
 
 | Dependency      | Version | License                        | Purpose                                                    |
 | :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
-| [QDMI]          | 1.3.2   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
+| [QDMI]          | 1.3.3   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
 | [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
 | [CPR]           | 1.14.2  | MIT License                    | C++ Requests HTTP client library for backend communication |
 
@@ -43,8 +43,8 @@ These are installed when users request the `qiskit` extra via
 
 | Dependency | Version | License     | Purpose                                                                  |
 | :--------- | :------ | :---------- | :----------------------------------------------------------------------- |
-| [MQT Core] | ~=3.7.0 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
-| [Qiskit]   | ≥1.1    | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
+| [MQT Core] | ~=4.0.0 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
+| [Qiskit]   | ≥2.1    | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
 
 ## End-to-End Example Dependencies
 
@@ -98,7 +98,7 @@ any binary or wheel.
 
 ```{note}
 Doxygen is licensed under GNU GPL v2, but
-[documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/),
+[documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), <!-- rumdl-disable-line MD013 -->
 and are therefore not affected by the GPL. The generated documentation remains
 under the project's own license terms.
 ```

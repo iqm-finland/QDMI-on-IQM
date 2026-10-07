@@ -5,7 +5,7 @@ on:
       runs-on:
         description: >
           The ubuntu runner image to use. Defaults to 'ubuntu-latest'.
-          This can be any valid ubuntu runner image, such as 'ubuntu-22.04', 'ubuntu-24.04', or their ARM variants 'ubuntu-22.04-arm', 'ubuntu-24.04-arm'.
+          This can be any valid ubuntu runner image, such as 'ubuntu-22.04', 'ubuntu-26.04', or their ARM variants 'ubuntu-22.04-arm', 'ubuntu-26.04-arm'.
         default: "ubuntu-latest"
         type: string
       config:
@@ -36,14 +36,16 @@ jobs:
       CTEST_PARALLEL_LEVEL: 4
       FORCE_COLOR: 3
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
       # Set up ccache for faster C++ builds
       - name: Setup ccache
-        uses: Chocobo1/setup-ccache-action@802ec72ba1d54bbf75c52f45367253d6abec30f5 # v1.5.8
+        uses: Chocobo1/setup-ccache-action@a4d08616f5b614053bce228ddf881592f69d61d4 # v1.5.9
         with:
           prepend_symlinks_to_path: false
           override_cache_key: c++-tests-${{ inputs.runs-on }}-${{ inputs.config }}
@@ -61,5 +63,5 @@ jobs:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-          IQM_CPP_API_LOG_LEVEL: "DEBUG"
+          IQM_LOG_LEVEL: "DEBUG"
         run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3

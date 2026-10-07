@@ -28,16 +28,28 @@ repos:
 
   ## Check JSON schemata
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.4
+    rev: 0.38.2
     hooks:
+      - id: check-codecov
+        priority: 0
       - id: check-github-workflows
         priority: 0
       - id: check-readthedocs
         priority: 0
+      - id: check-renovate
+        additional_dependencies: [json5]
+        priority: 0
+
+  ## Check for security issues in GitHub Actions workflows
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.30.1
+    hooks:
+      - id: zizmor
+        priority: 0
 
   ## Check best practices for scientific Python code
   - repo: https://github.com/scientific-python/cookie
-    rev: 2026.06.18
+    rev: 2026.08.14
     hooks:
       - id: sp-repo-review
         additional_dependencies: ["repo-review[cli]"]
@@ -45,14 +57,14 @@ repos:
 
   ## Check pyproject.toml file
   - repo: https://github.com/henryiii/validate-pyproject-schema-store
-    rev: 2026.07.17
+    rev: 2026.09.25
     hooks:
       - id: validate-pyproject
         priority: 0
 
   ## Ensure uv.lock is up to date
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.29
+    rev: 0.12.19
     hooks:
       - id: uv-lock
         priority: 0
@@ -69,7 +81,7 @@ repos:
 
   ## Check for typos
   - repo: https://github.com/adhtruong/mirrors-typos
-    rev: v1.48.0
+    rev: v1.50.3
     hooks:
       - id: typos
         priority: 3
@@ -102,7 +114,7 @@ repos:
 
   ## Format configuration files with prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.9.5
+    rev: v3.9.9
     hooks:
       - id: prettier
         types_or: [yaml, html, css, scss, javascript, json, json5]
@@ -110,13 +122,20 @@ repos:
 
   ## Format Markdown files with rumdl
   - repo: https://github.com/rvben/rumdl-pre-commit
-    rev: v0.2.37
+    rev: v0.2.77
     hooks:
       - id: rumdl
         args: [--fix]
         priority: 5
       - id: rumdl-fmt
         priority: 6
+
+  ## Format pyproject.toml with pyproject-fmt
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.29.4
+    hooks:
+      - id: pyproject-fmt
+        priority: 5
 
   ## Format CMake files with cmake-format
   - repo: https://github.com/cheshirekow/cmake-format-precommit
@@ -130,7 +149,7 @@ repos:
 
   ## Format C++ files with clang-format
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v22.1.8
+    rev: v23.1.1
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]
@@ -138,7 +157,7 @@ repos:
 
   ## Format and lint Python files with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.22
+    rev: v0.16.9
     hooks:
       - id: ruff-check
         require_serial: true
@@ -149,7 +168,7 @@ repos:
 
   ## Check Python types with ty
   - repo: https://github.com/astral-sh/ty-pre-commit
-    rev: v0.0.61
+    rev: v0.0.84
     hooks:
       - id: ty
         args: [--isolated, --only-dev]

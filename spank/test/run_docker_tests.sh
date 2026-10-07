@@ -42,6 +42,18 @@ if ldd "${plugin_path}" | grep -Fq libiqm-qdmi-device; then
   exit 1
 fi
 
+echo "=== Verifying the SPANK plugin exports only the SPANK ABI ==="
+expected_symbols=$(printf '%s\n' \
+  plugin_name plugin_type plugin_version spank_plugin_version \
+  slurm_spank_init slurm_spank_init_post_opt slurm_spank_user_init \
+  slurm_spank_task_init slurm_spank_task_init_privileged slurm_spank_exit | sort)
+actual_symbols=$(nm --dynamic --defined-only "${plugin_path}" | awk '{print $3}' | sort)
+if [[ "${actual_symbols}" != "${expected_symbols}" ]]; then
+  echo "IQM SPANK plugin exports symbols beyond the SPANK ABI:" >&2
+  echo "${actual_symbols}" >&2
+  exit 1
+fi
+
 echo "=== Verifying basic Slurm srun connectivity ==="
 srun --partition=debug --immediate=5 /bin/true
 

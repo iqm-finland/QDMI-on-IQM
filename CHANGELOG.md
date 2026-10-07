@@ -12,11 +12,143 @@ releases may include breaking changes.
 
 ### Added
 
-- ✨ Add `examples/discover_backends.py`, listing the quantum computers
-  available on an IQM Server and selecting one that satisfies a `--min-qubits`
-  constraint ([#146]) ([**@marcelwa**])
+- ✨ Discover IQM quantum computers and select the largest matching
+  `--min-qubits` with `examples/discover_backends.py` ([#146]) ([**@marcelwa**])
+- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
+  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
+  asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
+  out the quota window instead of taking a 30-second block.
+  `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
+  ([#214]) ([**@marcelwa**])
+- ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
+  environment variables for IQM Server and quantum computer selection, while
+  keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
+  ([**@burgholzer**])
+- ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
+  `sample`/`estimate`, with the partition also resolvable from
+  `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
+  `quantum` can use the offloader ([#202]) ([**@marcelwa**])
+
+### Changed
+
+- 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
+  and using estimator precision `1/64` (4,096 shots per measurement circuit) by
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
+- 💥 Drop support for x86 macOS and stop publishing the respective wheels
+  ([#220]) ([**@denialhaag**])
+- ⬆️ Raise the macOS deployment target to 13.3 ([#220])
+  ([**@denialhaag**])
+- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
+
+### Fixed
+
+- 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
+  warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
+- 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
+  JSON fields ([#231]) ([**@burgholzer**])
+- 🩹 Report backend job failure messages at the default log level ([#231])
+  ([**@burgholzer**])
+- 🩹 Preserve joint sampling counts across all classical registers in offloaded
+  results ([#231]) ([**@burgholzer**])
+- 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
+  and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
+  ([**@burgholzer**])
+- 🩹 Skip disabled log message formatting and use original HTTP response bodies
+  in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
+- 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
+  internal object library without DLL import decorations ([#242])
+  ([**@marcelwa**])
+- 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
+  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
+- ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
+  environments install and run ([#218], [#220], [#246]) ([**@burgholzer**],
+  [**@marcelwa**])
+
+## [1.4.0] - 2026-08-25
+
+### Added
+
+- ✨ Take over the IQM JSON serialization and the `MoveGate` from MQT Core,
+  which removed both in 3.9.1, and advertise the serializer through MQT Core's
+  `mqt.core.qiskit.program_serializers` entry point group so any QDMI backend
+  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**])
+- ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
+  level, injected by the SPANK plugin through `iqm_log_level` and
+  `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
+  ([#206]) ([**@marcelwa**])
+- ✅ Cover the device's queue length, a queued job's position, retrieval of an
+  existing job by ID, and its advertised program formats through MQT Core's
+  Python QDMI API ([#195]) ([**@marcelwa**])
+- 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
+  AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
+  MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
+  ([#173]) ([**@marcelwa**])
+- 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**])
+- ✨ Expose current device queue length and queued job position through QDMI,
+  refreshing IQM job status for every position query ([#172])
+  ([**@burgholzer**])
+- ✨ Add a `licenses` keyword argument to `iqm.qdmi.offloader`'s `sample`/
+  `estimate`, forwarded as `--licenses` on `srun`, so callers can request the
+  Slurm license a site administrator may require via the SPANK plugin's
+  `iqm_require_license` option ([#162]) ([**@marcelwa**])
+- ✨ Support retrieving existing IQM circuit jobs by ID ([#160])
+  ([**@burgholzer**])
+
+### Fixed
+
+- 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, keeping
+  only their size and content type at the default log level ([#205])
+  ([**@marcelwa**])
+- 🐛 Keep authentication working past January 2038 by reading JWT expiry times
+  as 64-bit values ([#205]) ([**@marcelwa**])
+- 🐛 Survive a calibration set whose gate loci or coherence times have an
+  unexpected shape, dropping the affected gate or metric instead of crashing or
+  misreporting it ([#204]) ([**@marcelwa**])
+- 🐛 Report a cancellation that the server refuses because the job already
+  finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
+  `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
+  the job interface ([#199]) ([**@marcelwa**])
+- 🐛 Report the status the quantum computer is actually in, instead of pinning a
+  session to busy from its first job submission onwards ([#190])
+  ([**@marcelwa**])
+- 🐛 Keep a job checkable when a status or cancellation request fails, instead
+  of permanently reporting a still-running job as failed ([#187])
+  ([**@marcelwa**])
+- 🐛 Fix a potential histogram buffer size mismatch ([#181]) ([**@marcelwa**])
+- 🐛 Report the number of qubits without the computational resonators, which
+  inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
+  ([**@marcelwa**])
+- 🐛 Contain exceptions so they do not escape the C interface ([#175], [#188])
+  ([**@burgholzer**], [**@marcelwa**])
+- 🐛 Serialize move-gate and active-reset options using the canonical IQM
+  RunRequest field names ([#169]) ([**@burgholzer**])
+- 🩹 Preserve exact program bytes across QDMI job parameter updates and property
+  queries ([#159]) ([**@burgholzer**])
+- 🩹 Keep IQM shot and histogram bitstrings in the measurement-key and qubit
+  order specified by IQM's result metadata ([#158]) ([**@burgholzer**])
+
+### Changed
+
+- ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
+  and its explicit sampler and estimator shot and precision defaults ([#195])
+  ([**@marcelwa**])
+- ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
+  prefix through QDMI's `configure_qdmi_device_target` ([#195])
+  ([**@marcelwa**])
+- ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
+  setup during initialization and subsequent requests ([#163])
+  ([**@burgholzer**])
+
+## [1.3.0] - 2026-07-31
+
+### Added
+
 - ✨ Validate IQM backend and target-QC availability once per node for each
   Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
+- ✨ Export the stable IQM device ID and symbol prefix on the installed CMake
+  target so MQT Core can synthesize relocatable manifests ([#140])
+  ([**@burgholzer**])
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])
@@ -24,6 +156,11 @@ releases may include breaking changes.
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
   on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**])
+- 📝 Add an integration scenarios analysis comparing IQM integration paths
+  (direct C++/Python usage, Slurm + SPANK offloading, Spack install, and
+  non-Slurm schedulers as forward-looking guidance) and an administrator guide
+  walking through standing up IQM access on a Slurm cluster ([#147])
+  ([**@marcelwa**])
 
 ### Changed
 
@@ -31,11 +168,15 @@ releases may include breaking changes.
   environment variables, bound each launch-time request to 30 seconds by
   default, emit task diagnostics once per node and step, and require Slurm 20.02
   or newer ([#136]) ([**@burgholzer**])
+- ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry with
+  per-backend device sessions ([#140]) ([**@burgholzer**])
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
   ([#122]) ([**@burgholzer**])
 
 ### Fixed
 
+- 🩹 Preserve a configured `iqm.default` endpoint unless `IQMBackend` receives
+  an explicit or environment-provided base URL ([#140]) ([**@burgholzer**])
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
   ([**@burgholzer**])
 
@@ -114,7 +255,9 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.0.1...v1.1.0
@@ -123,7 +266,44 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
+[#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
+[#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
+[#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
+[#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
+[#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
+[#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
+[#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
+[#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
+[#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
+[#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
+[#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
+[#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
+[#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
+[#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
+[#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
+[#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
+[#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190
+[#189]: https://github.com/iqm-finland/QDMI-on-IQM/pull/189
+[#188]: https://github.com/iqm-finland/QDMI-on-IQM/pull/188
+[#187]: https://github.com/iqm-finland/QDMI-on-IQM/pull/187
+[#182]: https://github.com/iqm-finland/QDMI-on-IQM/pull/182
+[#181]: https://github.com/iqm-finland/QDMI-on-IQM/pull/181
+[#177]: https://github.com/iqm-finland/QDMI-on-IQM/pull/177
+[#175]: https://github.com/iqm-finland/QDMI-on-IQM/pull/175
+[#173]: https://github.com/iqm-finland/QDMI-on-IQM/pull/173
+[#172]: https://github.com/iqm-finland/QDMI-on-IQM/pull/172
+[#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
+[#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
+[#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
+[#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
+[#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
+[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
+[#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#146]: https://github.com/iqm-finland/QDMI-on-IQM/pull/146
+[#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
 [#133]: https://github.com/iqm-finland/QDMI-on-IQM/pull/133
@@ -153,6 +333,7 @@ Compatible with QDMI `v1.3.0`.
 [**@burgholzer**]: https://github.com/burgholzer
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm
+[**@denialhaag**]: https://github.com/denialhaag
 
 <!-- General links -->
 
