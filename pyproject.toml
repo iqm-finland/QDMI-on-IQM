@@ -54,7 +54,7 @@ email = "developers@iqm.tech"
 # Temporary Core #2229 source pin: replace with a release before publishing.
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@4a2b31ea14f523a474c53eca7c6286db171a74a9",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5c88ed6a6b70386613b5612786aa653ea1284252",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
@@ -103,7 +103,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@4a2b31ea14f523a474c53eca7c6286db171a74a9",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5c88ed6a6b70386613b5612786aa653ea1284252",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
@@ -191,12 +191,12 @@ overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 
 [tool.cibuildwheel.linux]
 # Temporary: Core PR #2229 builds from source. Remove with the release pin.
-environment = { MLIR_DIR = "/opt/llvm-23.1.1/lib/cmake/mlir" }
+environment = { MLIR_DIR = "/opt/llvm-23.1.2/lib/cmake/mlir" }
 before-all = """
 set -e
 yum clean metadata
 yum install -y openssl-devel
-curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/download/v1.4.2/setup-mlir.sh | bash -s -- -v 23.1.1 -p /opt/llvm-23.1.1
+curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/download/v1.4.2/setup-mlir.sh | bash -s -- -v 23.1.2 -p /opt/llvm-23.1.2
 """
 
 [tool.cibuildwheel.macos]

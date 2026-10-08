@@ -20,6 +20,8 @@ releases may include breaking changes.
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
+  them through `IQMBackend.from_device_id` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
   `IQM_QDMI_device_job_submit_calibration` function ([#266])
   ([**@burgholzer**]).
@@ -38,11 +40,10 @@ releases may include breaking changes.
 
 ### Changed
 
-- ✨ Discover installed QDMI device manifests and open independent sessions
-  through the MQT Core QDMI driver. Include stable IDs for Garnet, Emerald and
-  Sirius and their mocks, preserve explicit selection over environment defaults,
-  and support stable-ID opening through `IQMBackend`. Use temporary source pins
-  and LLVM/MLIR CI setup until a suitable Core release is available ([#274])
+- ✨ Discover the installed QDMI manifest without loading provider code and open
+  independent sessions through the MQT Core QDMI driver. Explicit device
+  selection takes precedence over environment defaults. Temporary Core source
+  pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
   ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
