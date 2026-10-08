@@ -27,7 +27,6 @@ releases may include breaking changes.
   ([**@burgholzer**]).
 - ✨ Submit ordered circuit lists as one native IQM job with indexed results,
   recoverable program counts, and indexed program queries ([#277])
-
   ([**@burgholzer**]).
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
@@ -55,9 +54,8 @@ releases may include breaking changes.
   ([**@marcelwa**], [**@burgholzer**]).
 - 💥 Drop the QDMI pulse-support property while preserving surviving enum values
   for binary compatibility ([#266]) ([**@burgholzer**]).
-- 💥 Replace the removed program setter with
-  `IQM_QDMI_device_job_set_programs` ([#277]) ([**@burgholzer**]).
-
+- 💥 Replace the removed program setter with `IQM_QDMI_device_job_set_programs`
+  ([#277]) ([**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])

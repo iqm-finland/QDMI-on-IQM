@@ -318,10 +318,6 @@ struct IQM_QDMI_Operation_impl_d {
     }                                                                          \
   }
 
-#define IS_INVALID_ARGUMENT(value, prefix)                                     \
-  ((value) >= prefix##_MAX && (value) != prefix##_CUSTOM1 &&                   \
-   (value) != prefix##_CUSTOM2 && (value) != prefix##_CUSTOM3 &&               \
-   (value) != prefix##_CUSTOM4 && (value) != prefix##_CUSTOM5)
 // NOLINTEND(bugprone-macro-parentheses)
 
 int IQM_QDMI_device_initialize() { return QDMI_SUCCESS; }
@@ -930,7 +926,7 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
                                           const size_t size,
                                           const void *value) {
   if (session == nullptr || (value != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(param, QDMI_DEVICE_SESSION_PARAMETER)) {
+      QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_SESSION_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::ALLOCATED) {
@@ -1178,7 +1174,7 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
                                       const QDMI_Device_Job_Parameter param,
                                       const size_t size, const void *value) {
   if (job == nullptr || (value != nullptr && size == 0) ||
-      (IS_INVALID_ARGUMENT(param, QDMI_DEVICE_JOB_PARAMETER) &&
+      (QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_JOB_PARAMETER) &&
        param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1 &&
        param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2 &&
        param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3)) {
@@ -1301,7 +1297,7 @@ int IQM_QDMI_device_job_set_programs(IQM_QDMI_Device_Job job,
   if (job->status_ != QDMI_JOB_STATUS_CREATED) {
     return QDMI_ERROR_BADSTATE;
   }
-  if (IS_INVALID_ARGUMENT(format, QDMI_PROGRAM_FORMAT)) {
+  if (QDMI_IS_INVALID_ENUM_VALUE(format, QDMI_PROGRAM_FORMAT)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (format != QDMI_PROGRAM_FORMAT_IQMJSON &&
@@ -1384,7 +1380,7 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                                        const size_t size, void *value,
                                        size_t *size_ret) {
   if (job == nullptr || (value != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(prop, QDMI_DEVICE_JOB_PROPERTY)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_DEVICE_JOB_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
@@ -2096,7 +2092,7 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
                                     QDMI_Job_Result result, const size_t size,
                                     void *data, size_t *size_ret) try {
   if (job == nullptr || (data != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(result, QDMI_JOB_RESULT)) {
+      QDMI_IS_INVALID_ENUM_VALUE(result, QDMI_JOB_RESULT)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
 
@@ -2300,7 +2296,7 @@ int IQM_QDMI_device_session_query_device_property(
     IQM_QDMI_Device_Session session, const QDMI_Device_Property prop,
     const size_t size, void *value, size_t *size_ret) try {
   if (session == nullptr || (value != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(prop, QDMI_DEVICE_PROPERTY)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_DEVICE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
@@ -2371,7 +2367,7 @@ int IQM_QDMI_device_session_query_site_property(IQM_QDMI_Device_Session session,
                                                 size_t *size_ret) {
   if (session == nullptr || site == nullptr ||
       (value != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(prop, QDMI_SITE_PROPERTY)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_SITE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_SITE_PROPERTY_INDEX, uint64_t, site->id_, prop,
@@ -2398,7 +2394,7 @@ int IQM_QDMI_device_session_query_operation_property(
       (sites != nullptr && num_sites == 0) ||
       (params != nullptr && num_params == 0) ||
       (value != nullptr && size == 0) ||
-      IS_INVALID_ARGUMENT(prop, QDMI_OPERATION_PROPERTY) ||
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_OPERATION_PROPERTY) ||
       !session->operations_sites_map_.contains(operation) ||
       session->operations_sites_map_.at(operation).empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
