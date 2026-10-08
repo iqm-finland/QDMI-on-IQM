@@ -1323,7 +1323,7 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_NOTSUPPORTED;
   }
   if (job->calibration_ && (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT ||
-                             prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM)) {
+                            prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM)) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,

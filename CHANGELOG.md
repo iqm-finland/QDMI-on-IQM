@@ -20,6 +20,9 @@ releases may include breaking changes.
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Expose calibration submission through the IQM-specific
+  `IQM_QDMI_device_job_submit_calibration` function ([#266])
+  ([**@burgholzer**]).
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -36,11 +39,11 @@ releases may include breaking changes.
 ### Changed
 
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
-- 💥 Adopt QDMI 1.4 development headers and remove the calibration advisory and
-  pulse-support properties. Expose calibration submission through the
-  IQM-specific `IQM_QDMI_device_job_submit_calibration` function. Preserve the
-  remaining QDMI IDs for binary compatibility with existing MQT Core clients
-  ([#229], [#266]) ([**@marcelwa**], [**@burgholzer**]).
+- 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
+  itself and does not require clients to trigger it ([#229], [#266])
+  ([**@marcelwa**], [**@burgholzer**]).
+- 💥 Drop the QDMI pulse-support property while preserving surviving enum values
+  for binary compatibility ([#266]) ([**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
