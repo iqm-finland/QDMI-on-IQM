@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Discover IQM quantum computers and select the largest matching
+  `--min-qubits` with `examples/discover_backends.py` ([#146]) ([**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
@@ -302,6 +304,7 @@ Compatible with QDMI `v1.3.0`.
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
 [#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
+[#146]: https://github.com/iqm-finland/QDMI-on-IQM/pull/146
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
