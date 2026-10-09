@@ -1141,7 +1141,8 @@ int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
                             const void *value) {
   try {
     const auto *text = static_cast<const char *>(value);
-    if (text[size - 1] != '\0') {
+    if (text[size - 1] != '\0' ||
+        std::memchr(text, '\0', size - 1) != nullptr) {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     auto options = nlohmann::json::parse(text, text + size - 1, nullptr, false);

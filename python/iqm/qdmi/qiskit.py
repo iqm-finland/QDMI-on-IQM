@@ -51,39 +51,6 @@ if TYPE_CHECKING:
 __all__ = ["IQMBackend"]
 
 
-def execution_parameters(options: Mapping[str, object]) -> QDMIJobParameters:
-    """Encode optional IQM run-request fields as one custom job parameter.
-
-    Args:
-        options: Effective IQM backend options for one run.
-
-    Returns:
-        A JSON object in ``custom1``, or no custom value when unset.
-
-    Raises:
-        CircuitValidationError: An option cannot be represented as JSON or
-            tries to replace a QDMI-owned request field.
-    """
-    if unknown := options.keys() - {"run_request_options"}:
-        msg = f"Unsupported execution options: {', '.join(sorted(unknown))}"
-        raise CircuitValidationError(msg)
-    request_options = options.get("run_request_options")
-    if request_options is None:
-        return {}
-    if not isinstance(request_options, Mapping):
-        msg = "'run_request_options' must be a JSON object"
-        raise CircuitValidationError(msg)
-    if reserved := request_options.keys() & {"circuits", "shots", "calibration_set_id"}:
-        msg = f"'run_request_options' cannot override {', '.join(sorted(reserved))}"
-        raise CircuitValidationError(msg)
-    try:
-        payload = json.dumps(dict(request_options), allow_nan=False)
-    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
-        msg = "'run_request_options' must contain finite JSON-compatible values"
-        raise CircuitValidationError(msg) from exc
-    return {"custom1": payload}
-
-
 def __dir__() -> list[str]:
     return __all__
 
@@ -129,12 +96,30 @@ class IQMBackend(QDMIBackend):
         return options
 
     def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
-        """Encode IQM run-request fields for every circuit in a run.
+        """Serialize the run-request mapping into QDMI ``custom1``.
 
         Returns:
-            IQM custom job parameters for MQT Core's submission hook.
+            Custom job parameters shared by every circuit in the run.
+
+        Raises:
+            CircuitValidationError: The mapping contains reserved fields or
+                values that cannot be serialized as finite JSON.
         """
-        return execution_parameters(options)
+        request_options = options.get("run_request_options")
+        if request_options is None:
+            return {}
+        if not isinstance(request_options, Mapping):
+            msg = "'run_request_options' must be a JSON object"
+            raise CircuitValidationError(msg)
+        if reserved := request_options.keys() & {"circuits", "shots", "calibration_set_id"}:
+            msg = f"'run_request_options' cannot override {', '.join(sorted(reserved))}"
+            raise CircuitValidationError(msg)
+        try:
+            payload = json.dumps(dict(request_options), allow_nan=False)
+        except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+            msg = "'run_request_options' must contain finite JSON-compatible values"
+            raise CircuitValidationError(msg) from exc
+        return {"custom1": payload}
 
     def __init__(
         self,

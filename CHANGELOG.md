@@ -30,8 +30,9 @@ releases may include breaking changes.
   ([**@burgholzer**]).
 - ✨ Forward optional IQM RunRequest fields as one JSON object through a
   standard QDMI custom job parameter, exposed on `IQMBackend` through
-  `run_request_options` in `set_options` and per-run overrides ([#272])
-  ([**@marcelwa**])
+  `run_request_options` in `set_options` and per-run overrides. Validate
+  complete JSON buffers and document the result-reader limitation for heralded
+  shots ([#272]) ([**@marcelwa**], [**@burgholzer**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off

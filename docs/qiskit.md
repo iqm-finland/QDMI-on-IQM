@@ -110,10 +110,10 @@ print(f"Standard deviations: {data['stds']}")
 
 ## IQM run-request options
 
-Pass optional IQM RunRequest fields through one `run_request_options` mapping:
+Configure execution with IQM RunRequest fields in `run_request_options`:
 
 ```python
-backend.set_options(run_request_options={"heralding_mode": "zeros"})
+backend.set_options(run_request_options={"dd_mode": "enabled"})
 job = backend.run(
     transpile(qc, backend),
     shots=128,
@@ -121,19 +121,24 @@ job = backend.run(
 )
 ```
 
-The mapping on `run` replaces the backend default for that run. It applies to
-all circuits submitted together. When unset or `None`, the device sends the
-circuits, shot count, and session calibration set ID; the server supplies
-defaults for omitted optional fields. The mapping cannot override those three
-QDMI-owned fields.
+The mapping on `run` replaces the backend default for that run and applies to
+every circuit in the job. Use `None` or `{}` to use server defaults. Set `shots`
+on `run` and select `calibration_set_id` when constructing the backend;
+`circuits`, `shots`, and `calibration_set_id` are reserved request fields.
 
-The backend checks that the mapping is a JSON object with finite values. It
-forwards other fields without a local allowlist, so use the names and values
-accepted by your server's
+Values must be JSON-compatible and numbers must be finite. The IQM service
+defines the supported fields and values; consult your server's
 [IQM RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
-Sampler `run_options` can carry the same mapping. Estimators use backend
-defaults because Qiskit's estimator has no `run_options` field. CLI and
-offloader calls do not forward this mapping.
+For sampling, pass the mapping as
+`backend.sampler(run_options={"run_request_options": options})`. For estimation,
+configure it with `backend.set_options(...)` before creating the estimator. This
+interface is available through `IQMBackend` and its bound primitives.
+
+Use execution settings that retain the requested number of shots. IQM's
+[`heralding_mode="zeros"`](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.HeraldingMode.html)
+discards shots that fail the initial-state check. If any shots are discarded,
+the current MQT Core result reader raises an error; postselected results are not
+supported by this Qiskit interface.
 
 ## CLI Scripts
 

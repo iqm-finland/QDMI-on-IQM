@@ -31,7 +31,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
-/// NOLINTNEXTLINE(misc-include-cleaner)
+// NOLINTNEXTLINE(misc-include-cleaner)
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <numeric>

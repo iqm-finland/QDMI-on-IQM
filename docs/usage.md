@@ -406,24 +406,34 @@ IQM Server API.
 Set one or more programs in a common format with
 {cpp:func}`IQM_QDMI_device_job_set_programs`. Set the shared shot count with
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`;
-it defaults to one. The device adds the session calibration set ID.
+it must be positive and defaults to one. The device adds the session calibration
+set ID.
 
-Optional IQM RunRequest fields go in one NUL-terminated JSON object in
+Optional IQM RunRequest fields go in a JSON object with exactly one trailing NUL
+byte in
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`:
 
 ```cpp
-const std::string options = R"({"heralding_mode":"zeros","dd_mode":"enabled"})";
+const std::string options = R"({"dd_mode":"enabled","active_reset_cycles":2})";
 const auto status = IQM_QDMI_device_job_set_parameter(
     job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, options.size() + 1,
     options.c_str());
 ```
 
 Check `status` before submitting the job. The object applies to every program in
-the job and replaces any previously set object. It may be omitted; the server
-supplies defaults for omitted optional fields. The device rejects malformed JSON
-and overrides of `circuits`, `shots`, or `calibration_set_id`, then forwards
-other fields without a local schema. Use the RunRequest fields accepted by your
-IQM server. Calibration jobs use a separate request format.
+the job and replaces any previously set object. Omit it or set `{}` to use
+server defaults. The device validates the JSON object and reserves `circuits`,
+`shots`, and `calibration_set_id` for the programs, shot count, and session
+configuration. The IQM service defines the supported optional fields and values
+in its
+[RunRequest model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
+Calibration jobs use a separate request format.
+
+For jobs using `heralding_mode="zeros"`, IQM may discard shots. Histogram
+results contain the retained counts. Reading `QDMI_JOB_RESULT_SHOTS` from a
+locally submitted job requires the requested number of shots and fails if any
+were discarded. Use histogram results for these jobs; the Qiskit interface
+currently requires the requested shot count for both counts and memory.
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
