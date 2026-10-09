@@ -3369,11 +3369,21 @@ TEST_F(DeviceJobMockTest, EdgeCaseParameterValues) {
 }
 
 TEST_F(DeviceTest, CalibrationSelectorValidatesInput) {
+  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4, 0, nullptr),
+            QDMI_SUCCESS);
   constexpr auto invalid = "../default";
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
                 strlen(invalid) + 1, invalid),
             QDMI_ERROR_INVALIDARGUMENT);
+  for (const auto *invalid_uuid : {"f0fb4be5/e913-4a04-8c94-18d1bd842def",
+                                   "f0fb4be5-e913-4a04-8c94-18d1bd842dez"}) {
+    EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                  session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
+                  strlen(invalid_uuid) + 1, invalid_uuid),
+              QDMI_ERROR_INVALIDARGUMENT);
+  }
   constexpr auto unterminated = "f0fb4be5-e913-4a04-8c94-18d1bd842defx";
   EXPECT_EQ(
       IQM_QDMI_device_session_set_parameter(
