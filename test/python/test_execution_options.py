@@ -47,6 +47,7 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:
     target = Target(num_qubits=1)
     target.add_instruction(Measure(), {(0,): None})
     monkeypatch.setattr(IQMBackend, "_build_target", lambda _self: target)
+    monkeypatch.setattr(IQMBackend, "_preprocess_circuit", lambda _self, circuit: circuit)
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", lambda *_args: ("{}", ProgramFormat.IQM_JSON))
     return IQMBackend(device=device), device
 
@@ -78,6 +79,7 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
     circuit.measure(0, 0)
     cases: list[tuple[object, dict[str, Any], object]] = [
         (None, {}, None),
+        ({"heralding_mode": "none"}, {}, {"heralding_mode": "none"}),
         (defaults, {}, defaults),
         (defaults, {"run_request_options": {"active_reset_cycles": 2}}, {"active_reset_cycles": 2}),
         (defaults, {"run_request_options": None}, None),
@@ -93,3 +95,17 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
         assert (json.loads(params["custom1"]) if params else None) == expected
         assert iqm_backend.options.run_request_options == default
         submission.reset_mock()
+
+
+@pytest.mark.parametrize("use_default", [False, True])
+def test_reject_heralding_before_submission(backend: tuple[IQMBackend, Mock], *, use_default: bool) -> None:
+    """Reject postselection before either native-batch or single-job submission."""
+    iqm_backend, device = backend
+    options = {"heralding_mode": "zeros"}
+    if use_default:
+        iqm_backend.set_options(run_request_options=options)
+    overrides: dict[str, Any] = {} if use_default else {"run_request_options": options}
+    with pytest.raises(CircuitValidationError, match="heralding"):
+        iqm_backend.run([QuantumCircuit(1), QuantumCircuit(1)], **overrides)
+    device.try_submit_job.assert_not_called()
+    device.submit_job.assert_not_called()

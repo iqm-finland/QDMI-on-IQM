@@ -28,11 +28,11 @@ releases may include breaking changes.
 - ✨ Submit ordered circuit lists as one native IQM job with indexed results,
   recoverable program counts, and indexed program queries ([#277])
   ([**@burgholzer**]).
-- ✨ Forward optional IQM RunRequest fields as one JSON object through a
-  standard QDMI custom job parameter, exposed on `IQMBackend` through
+- ✨ Forward optional IQM `CircuitJobDefinition` fields as one JSON object
+  through a standard QDMI custom job parameter, exposed on `IQMBackend` through
   `run_request_options` in `set_options` and per-run overrides. Validate
-  complete JSON buffers and document the result-reader limitation for heralded
-  shots ([#272]) ([**@marcelwa**], [**@burgholzer**])
+  complete JSON buffers and reject `heralding_mode="zeros"` before submission
+  because it may discard shots ([#272]) ([**@marcelwa**], [**@burgholzer**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -72,6 +72,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
+  operations, preserving physical site names during IQM JSON serialization
+  ([**@burgholzer**])
 - 🩹 Restrict Linux and macOS exports to the QDMI device ABI and IQM
   calibration, preventing host libcurl interference on Linux and hiding bundled
   dependencies on macOS ([#284]) ([**@marcelwa**])

@@ -1777,6 +1777,28 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReplaceAtomically) {
   EXPECT_EQ(nlohmann::json::parse(http_stub.post_bodies().front()), expected);
 }
 
+TEST_F(DeviceJobMockTest, RejectsHeraldingBeforeSubmission) {
+  constexpr auto supported = R"({"heralding_mode":"none","dd_mode":"enabled"})";
+  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(supported) + 1, supported),
+            QDMI_SUCCESS);
+  constexpr auto heralded = R"({"heralding_mode":"zeros"})";
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+                                              strlen(heralded) + 1, heralded),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_TRUE(http_stub.post_bodies().empty());
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"non-heralded"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().front());
+  EXPECT_EQ(request.at("heralding_mode"), "none");
+  EXPECT_EQ(request.at("dd_mode"), "enabled");
+}
+
 TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
   constexpr auto replacement_program =
       R"({"name":"replacement","instructions":[],"metadata":{}})";

@@ -1150,6 +1150,11 @@ int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
         options.contains("shots") || options.contains("calibration_set_id")) {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
+    if (options.contains("heralding_mode") &&
+        options.at("heralding_mode") == "zeros") {
+      LOG_ERROR("Heralding is unsupported because it may discard shots");
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
     job->run_request_options_ = std::move(options);
     return QDMI_SUCCESS;
   } catch (const std::bad_alloc &) {

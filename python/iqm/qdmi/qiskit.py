@@ -28,7 +28,7 @@ from uuid import UUID
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
+    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError, UnsupportedDeviceError
     from mqt.core.qdmi import CustomProperty
     from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
@@ -38,6 +38,8 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
+from qiskit.transpiler import Target
+
 from . import IQM_QDMI_DEVICE_ID
 from .gates import MoveGate
 
@@ -45,7 +47,7 @@ if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
     from mqt.core.typing import QDMIJobParameters
-    from qiskit.circuit import Instruction
+    from qiskit.circuit import Instruction, QuantumCircuit
     from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
@@ -84,6 +86,64 @@ class IQMBackend(QDMIBackend):
     #: standard gate library, so the Target needs it supplied here.
     _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
 
+    @property
+    def physical_qubits(self) -> tuple[int, ...]:
+        """Device site indices in target order, including computational resonators."""
+        return self._physical_qubits
+
+    def _build_target(self) -> Target:
+        """Return a target restricted to qubits with PRX and measurement support.
+
+        Returns:
+            A calibrated target with contiguous indices and native resonator operations.
+
+        Raises:
+            UnsupportedDeviceError: No qubits have both required calibrations.
+        """
+        target = super()._build_target()
+        num_qubits = self.device.qubits_num()
+        self._physical_qubits = tuple(
+            index
+            for index in range(target.num_qubits)
+            if index >= num_qubits
+            or all(target.instruction_supported(operation_name=gate, qargs=(index,)) for gate in ("r", "measure"))
+        )
+        if not any(index < num_qubits for index in self._physical_qubits):
+            msg = "No IQM qubits have calibrated PRX and measurement operations."
+            raise UnsupportedDeviceError(msg)
+        if len(self._physical_qubits) == target.num_qubits:
+            return target
+
+        indices = {physical: logical for logical, physical in enumerate(self._physical_qubits)}
+        restricted = Target(description=target.description, num_qubits=len(indices))
+        for name in target.operation_names:
+            properties = {
+                None if locus is None else tuple(indices[index] for index in locus): props
+                for locus, props in target[name].items()
+                if locus is None or all(index in indices for index in locus)
+            }
+            if properties:
+                operation = target.operation_from_name(name)
+                restricted.add_instruction(operation, None if isinstance(operation, type) else properties, name=name)
+        return restricted
+
+    def _preprocess_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
+        """Check that the circuit uses calibrated target indices.
+
+        Returns:
+            The input circuit unchanged.
+
+        Raises:
+            CircuitValidationError: The circuit is wider than the calibrated target.
+        """
+        if circuit.num_qubits > len(self._physical_qubits):
+            msg = (
+                f"Circuit has {circuit.num_qubits} qubits, "
+                f"but the calibrated IQM target has {len(self._physical_qubits)}."
+            )
+            raise CircuitValidationError(msg)
+        return circuit
+
     @classmethod
     def _default_options(cls) -> Options:
         """Return shot options and optional IQM run-request fields.
@@ -119,6 +179,9 @@ class IQMBackend(QDMIBackend):
         except (TypeError, ValueError, OverflowError, RecursionError) as exc:
             msg = "'run_request_options' must contain finite JSON-compatible values"
             raise CircuitValidationError(msg) from exc
+        if request_options.get("heralding_mode") == "zeros":
+            msg = "IQM heralding_mode='zeros' is unsupported because it may discard shots."
+            raise CircuitValidationError(msg)
         return {"custom1": payload}
 
     def __init__(

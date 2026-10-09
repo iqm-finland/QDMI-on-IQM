@@ -39,6 +39,7 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from .gates import MoveGate
+from .qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
@@ -108,7 +109,8 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
     Args:
         circuit: The Qiskit quantum circuit to serialize.
         backend: The backend that runs the circuit. Its device provides the site
-            names the format uses as loci.
+            names the format uses as loci. For :class:`~iqm.qdmi.qiskit.IQMBackend`,
+            circuit indices follow the calibrated target's site order.
 
     Returns:
         JSON string representation of the circuit in IQM format.
@@ -150,6 +152,8 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
             _raise_error(UnsupportedOperationError, msg)
 
         sites = backend.device.sites()
+        if isinstance(backend, IQMBackend):
+            sites = [sites[index] for index in backend.physical_qubits]
         instructions: list[dict[str, Any]] = []
 
         for instruction in circuit.data:
