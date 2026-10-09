@@ -2,12 +2,12 @@
 
 This test runs a Qiskit workload against a local IQM HTTP mock in
 [MQT Core's Docker Slurm cluster](https://github.com/munich-quantum-toolkit/core/tree/main/docker/slurm).
-It requires rootful Docker on a disposable Linux cgroup-v2 host.
 
 Use the MQT Core revision pinned in the Slurm workflow and build its Linux wheel
-with `uv build --wheel --out-dir "$CORE_DIST"` from that checkout. The wheel
-must match the Docker host architecture. The fixture requires rootful Docker on
-a disposable Linux cgroup-v2 host and Slurm 25.11 or newer.
+with `uv build --wheel --out-dir "$CORE_DIST" -Ccmake.define.DEPLOY=ON` from
+that checkout. The wheel must match the Docker host architecture. The fixture
+requires rootful Docker on a disposable Linux cgroup-v2 host and Slurm 25.11 or
+newer.
 
 ```sh
 PROVIDER_INSTALL_MODE=native uv run --no-project \

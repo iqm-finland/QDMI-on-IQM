@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: munich-quantum-toolkit/core
-          ref: b965ed922f70fe9ae465cfa338a74aa0ebf2c9ae
+          ref: 28ebf9fcc0dd4eff8da0221e26997c004c1fac71
           fetch-depth: 0
           persist-credentials: false
           path: core
