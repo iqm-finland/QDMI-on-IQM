@@ -52,7 +52,9 @@ the following variables are set as needed:
 
 For the full set of authentication options available when configuring C++
 sessions directly, see [Authentication Methods](usage.md#authentication-methods)
-in the Usage Guide.
+in the Usage Guide. Its
+[session configuration example](usage.md#session-configuration) is taken from
+the internal C++ test helper; it is not an installed client API.
 
 You can either run the full suite of examples using the dedicated `nox` session
 or individually execute the scripts from the command line.

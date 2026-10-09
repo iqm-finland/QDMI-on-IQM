@@ -23,6 +23,7 @@
 #include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
+#include "qdmi_client.hpp"
 
 #include <algorithm>
 #include <array>
@@ -38,6 +39,7 @@
 #include <new>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -1062,6 +1064,49 @@ TEST_F(DeviceTest, JobCreationWithoutInitialization) {
   // Try to create job without initializing session
   EXPECT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
             QDMI_ERROR_BADSTATE);
+}
+
+TEST_F(DeviceIntegrationMockTest, QdmiClientSessionAndOperations) {
+  IQM_QDMI_device_session_free(session);
+  session = nullptr;
+  queue_successful_initialization();
+  session = QDMIClient::get_iqm_session(
+      "https://localhost", "test-token", std::nullopt,
+      "01966208-f3ec-73b7-890d-100000000000", "default");
+
+  const QDMIClient client{session};
+  EXPECT_EQ(client.get_name(), "default");
+  ASSERT_FALSE(http_stub.get_bearer_tokens().empty());
+  ASSERT_TRUE(http_stub.get_bearer_tokens().front().has_value());
+  EXPECT_STREQ(http_stub.get_bearer_tokens().front()->GetToken(), "test-token");
+  const auto operations = client.get_operation_map();
+  for (const auto *name : {"cz", "measure", "prx"}) {
+    ASSERT_TRUE(operations.contains(name));
+    EXPECT_EQ(client.get_operation_name(operations.at(name)), name);
+  }
+}
+
+TEST_F(DeviceJobMockTest, QdmiClientSubmissionErrorsAndOwnership) {
+  const QDMIClient client{session};
+  EXPECT_THROW(IQM_QDMI_device_job_free(client.submit_job(
+                   TEST_CIRCUIT_IQM_JSON, QDMI_PROGRAM_FORMAT_MAX)),
+               std::invalid_argument);
+
+  http_stub.queue_post(403);
+  EXPECT_THROW(IQM_QDMI_device_job_free(client.submit_job(
+                   TEST_CIRCUIT_IQM_JSON, QDMI_PROGRAM_FORMAT_IQMJSON)),
+               std::runtime_error);
+
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  http_stub.queue_post(201, R"({"id":"helper-job"})");
+  job = client.submit_job(TEST_CIRCUIT_IQM_JSON, QDMI_PROGRAM_FORMAT_IQMJSON, 3,
+                          R"({"dd_mode":"enabled"})");
+  EXPECT_EQ(QDMIClient::get_job_id(job), "helper-job");
+  const auto request = nlohmann::json::parse(http_stub.post_bodies().back());
+  EXPECT_EQ(request.at("circuits").size(), 1U);
+  EXPECT_EQ(request.at("shots"), 3U);
+  EXPECT_EQ(request.at("dd_mode"), "enabled");
 }
 
 TEST_F(DeviceJobMockTest, JobRetrievalValidatesArguments) {

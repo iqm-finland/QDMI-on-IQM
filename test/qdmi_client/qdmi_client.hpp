@@ -17,9 +17,8 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-/** @file
- * @brief QDMI client implementation for testing the IQM QDMI Device.
- */
+/// @file
+/// Test helper for the IQM QDMI Device interface.
 
 #pragma once
 
@@ -34,18 +33,23 @@
 #include <utility>
 #include <vector>
 
+/// Test helper for the IQM QDMI Device interface.
+///
+/// Borrows the session owned by the test fixture.
 class QDMIClient {
   IQM_QDMI_Device_Session session_;
 
   static auto throw_if_error(int status, const std::string &message) -> void;
 
 public:
-  static IQM_QDMI_Device_Session
+  /// Initialize a device session and transfer ownership to the caller.
+  static auto
   get_iqm_session(const std::string &base_url,
                   const std::optional<std::string> &token = std::nullopt,
                   const std::optional<std::string> &tokens_file = std::nullopt,
                   const std::optional<std::string> &qc_id = std::nullopt,
-                  const std::optional<std::string> &qc_alias = std::nullopt);
+                  const std::optional<std::string> &qc_alias = std::nullopt)
+      -> IQM_QDMI_Device_Session;
 
   QDMIClient() = default;
   explicit QDMIClient(IQM_QDMI_Device_Session session) : session_(session) {
@@ -109,23 +113,16 @@ public:
   [[nodiscard]] auto get_supported_program_formats() const
       -> std::vector<QDMI_Program_Format>;
 
+  /// Submit one textual program and transfer job ownership to the caller.
   [[nodiscard]] auto
   submit_job(const std::string &program, QDMI_Program_Format format,
              size_t num_shots = 1,
              const std::optional<std::string> &run_request_options =
                  std::nullopt) const -> IQM_QDMI_Device_Job;
 
-  static auto wait(IQM_QDMI_Device_Job job, size_t timeout = 0) -> void;
-
-  static auto cancel(IQM_QDMI_Device_Job job) -> void;
-
   static auto get_job_id(IQM_QDMI_Device_Job job) -> std::string;
 
-  static auto get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t;
-
-  [[nodiscard]] static auto get_status(IQM_QDMI_Device_Job job)
-      -> QDMI_Job_Status;
-
+  /// Read the histogram for the helper's single-program job.
   [[nodiscard]] static auto get_histogram(IQM_QDMI_Device_Job job)
       -> std::map<std::string, size_t>;
 

@@ -48,65 +48,19 @@ native and Python clients.
 
 ### Session Configuration
 
-To initiate a session with a particular endpoint and authentication method, the
-following code snippet can be used:
+The internal `QDMIClient` test helper configures a device session as shown
+below. It calls the IQM QDMI Device interface directly and is not part of the
+installed API. Each failed call throws; the helper frees the session on failure
+and transfers ownership to the caller on success.
 
-```cpp
-IQM_QDMI_Device_Session QDMIClient::get_iqm_session(
-    const std::string &base_url,
-    const std::optional<std::string> &quantum_computer_id,
-    const std::optional<std::string> &quantum_computer_alias,
-    const std::optional<std::string> &token,
-    const std::optional<std::string> &tokens_file) {
-  IQM_QDMI_Device_Session session = nullptr;
-  auto ret = IQM_QDMI_device_session_alloc(&session);
-
-  // Set the base URL for the IQM server
-  ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
-      base_url.c_str());
-
-  // Optionally specify which quantum computer to use by ID
-  if (quantum_computer_id.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
-        quantum_computer_id->size() + 1, quantum_computer_id->c_str());
-  }
-
-  // Optionally specify which quantum computer to use by alias
-  if (quantum_computer_alias.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
-        quantum_computer_alias->size() + 1, quantum_computer_alias->c_str());
-  }
-
-  // Set authentication token if provided
-  if (token.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
-        token->c_str());
-  }
-
-  // Set tokens file path if provided
-  if (tokens_file.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
-        tokens_file->size() + 1, tokens_file->c_str());
-  }
-
-  // Optionally override the one-hour default timeout for every HTTP request
-  // made by this session.
-  const uint64_t request_timeout_milliseconds = 30'000;
-  ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
-      sizeof(request_timeout_milliseconds), &request_timeout_milliseconds);
-
-  // Initialize the session
-  IQM_QDMI_device_session_init(session);
-
-  return session;
-}
+```{literalinclude} ../test/qdmi_client/qdmi_client.cpp
+:language: cpp
+:start-at: auto QDMIClient::get_iqm_session(
+:end-before: auto QDMIClient::get_name()
 ```
+
+Set optional session parameters, such as the HTTP request timeout, before
+calling {cpp:func}`IQM_QDMI_device_session_init`.
 
 The {cpp:func}`IQM_QDMI_device_session_alloc` function allocates a new session
 object, and the {cpp:func}`IQM_QDMI_device_session_set_parameter` function is

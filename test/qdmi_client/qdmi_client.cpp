@@ -17,9 +17,8 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-/** @file
- * @brief QDMIClient Implementation for testing the IQM QDMI Device.
- */
+/// @file
+/// Test helper for the IQM QDMI Device interface.
 
 #include "qdmi_client.hpp"
 
@@ -59,56 +58,22 @@ auto QDMIClient::throw_if_error(const int status, const std::string &message)
   }
 
   if (status == QDMI_WARN_GENERAL) {
-    if (message.empty()) {
-      std::cerr << "A general warning.\n";
-      return;
-    }
     std::cerr << message << '\n';
     return;
   }
 
-  if (!message.empty()) {
-    if (status == QDMI_ERROR_INVALIDARGUMENT) {
-      throw std::invalid_argument(message);
-    }
-    throw std::runtime_error(message);
-  }
-
-  if (status == QDMI_ERROR_FATAL) {
-    throw std::runtime_error("A fatal error.");
-  }
-  if (status == QDMI_ERROR_OUTOFMEM) {
-    throw std::bad_alloc();
-  }
-  if (status == QDMI_ERROR_NOTIMPLEMENTED) {
-    throw std::runtime_error("Not implemented.");
-  }
-  if (status == QDMI_ERROR_LIBNOTFOUND) {
-    throw std::runtime_error("Library not found.");
-  }
-  if (status == QDMI_ERROR_NOTFOUND) {
-    throw std::runtime_error("Element not found.");
-  }
-  if (status == QDMI_ERROR_OUTOFRANGE) {
-    throw std::out_of_range("Out of range.");
-  }
   if (status == QDMI_ERROR_INVALIDARGUMENT) {
-    throw std::invalid_argument("Invalid argument.");
+    throw std::invalid_argument(message);
   }
-  if (status == QDMI_ERROR_PERMISSIONDENIED) {
-    throw std::runtime_error("Permission denied.");
-  }
-  if (status == QDMI_ERROR_NOTSUPPORTED) {
-    throw std::runtime_error("Operation is not supported.");
-  }
+  throw std::runtime_error(message);
 }
 
-IQM_QDMI_Device_Session
-QDMIClient::get_iqm_session(const std::string &base_url,
-                            const std::optional<std::string> &token,
-                            const std::optional<std::string> &tokens_file,
-                            const std::optional<std::string> &qc_id,
-                            const std::optional<std::string> &qc_alias) {
+auto QDMIClient::get_iqm_session(const std::string &base_url,
+                                 const std::optional<std::string> &token,
+                                 const std::optional<std::string> &tokens_file,
+                                 const std::optional<std::string> &qc_id,
+                                 const std::optional<std::string> &qc_alias)
+    -> IQM_QDMI_Device_Session {
   IQM_QDMI_Device_Session raw_session = nullptr;
   auto ret = IQM_QDMI_device_session_alloc(&raw_session);
   throw_if_error(ret, "Failed to allocate IQM QDMI device session.");
@@ -219,17 +184,7 @@ auto QDMIClient::get_operation_map() const
   throw_if_error(ret, "Failed to retrieve operations.");
   std::map<std::string, IQM_QDMI_Operation> ops_map;
   for (const auto &op : ops) {
-    size_t name_length = 0;
-    ret = IQM_QDMI_device_session_query_operation_property(
-        session_, op, 0, nullptr, 0, nullptr, QDMI_OPERATION_PROPERTY_NAME, 0,
-        nullptr, &name_length);
-    throw_if_error(ret, "Failed to retrieve operation name length.");
-    std::string name(name_length - 1, '\0');
-    ret = IQM_QDMI_device_session_query_operation_property(
-        session_, op, 0, nullptr, 0, nullptr, QDMI_OPERATION_PROPERTY_NAME,
-        name_length, name.data(), nullptr);
-    throw_if_error(ret, "Failed to retrieve operation name.");
-    ops_map.emplace(name, op);
+    ops_map.emplace(get_operation_name(op), op);
   }
   return ops_map;
 }
@@ -437,38 +392,6 @@ auto QDMIClient::get_supported_program_formats() const
   return formats;
 }
 
-namespace {
-/**
- * @brief Owns a device job until it is handed to the caller.
- * @details Every parameter that submit_job() sets is followed by a
- *          throw_if_error(), so without this the job allocated up front is
- *          leaked whenever any of those checks throws.
- */
-class JobGuard final {
-public:
-  explicit JobGuard(IQM_QDMI_Device_Job job) : job_(job) {}
-
-  ~JobGuard() {
-    if (job_ != nullptr) {
-      IQM_QDMI_device_job_free(job_);
-    }
-  }
-
-  JobGuard(const JobGuard &) = delete;
-  JobGuard &operator=(const JobGuard &) = delete;
-  JobGuard(JobGuard &&) = delete;
-  JobGuard &operator=(JobGuard &&) = delete;
-
-  /// Hand ownership to the caller.
-  [[nodiscard]] auto release() -> IQM_QDMI_Device_Job {
-    return std::exchange(job_, nullptr);
-  }
-
-private:
-  IQM_QDMI_Device_Job job_;
-};
-} // namespace
-
 auto QDMIClient::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots,
@@ -477,7 +400,9 @@ auto QDMIClient::submit_job(
   IQM_QDMI_Device_Job job = nullptr;
   int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
   throw_if_error(ret, "Failed to create a job");
-  JobGuard guard{job};
+  std::unique_ptr<std::remove_pointer_t<IQM_QDMI_Device_Job>,
+                  decltype(&IQM_QDMI_device_job_free)>
+      guard{job, IQM_QDMI_device_job_free};
   const size_t program_size = program.size() + 1;
   const void *program_data = program.c_str();
   ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
@@ -497,23 +422,6 @@ auto QDMIClient::submit_job(
   return guard.release();
 }
 
-auto QDMIClient::get_status(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {
-  QDMI_Job_Status status{};
-  const int ret = IQM_QDMI_device_job_check(job, &status);
-  throw_if_error(ret, "Failed to check the job status");
-  return status;
-}
-
-auto QDMIClient::wait(IQM_QDMI_Device_Job job, const size_t timeout) -> void {
-  const int ret = IQM_QDMI_device_job_wait(job, timeout);
-  throw_if_error(ret, "Failed to wait for the job");
-}
-
-auto QDMIClient::cancel(IQM_QDMI_Device_Job job) -> void {
-  const int ret = IQM_QDMI_device_job_cancel(job);
-  throw_if_error(ret, "Failed to cancel the job");
-}
-
 auto QDMIClient::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
   size_t job_id_size = 0;
   const int ret = IQM_QDMI_device_job_query_property(
@@ -524,15 +432,6 @@ auto QDMIClient::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
       job, QDMI_DEVICE_JOB_PROPERTY_ID, job_id_size, job_id.data(), nullptr);
   throw_if_error(ret2, "Failed to query the job ID");
   return job_id;
-}
-
-auto QDMIClient::get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t {
-  size_t num_shots = 0;
-  const int ret =
-      IQM_QDMI_device_job_query_property(job, QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM,
-                                         sizeof(size_t), &num_shots, nullptr);
-  throw_if_error(ret, "Failed to query the number of shots");
-  return num_shots;
 }
 
 auto QDMIClient::get_histogram(IQM_QDMI_Device_Job job)
