@@ -14,8 +14,9 @@ releases may include breaking changes.
 
 - ✨ Select and pin an IQM calibration before target construction through
   session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
-  effective UUID, and retain each job's calibration snapshot across session
-  refreshes ([#271]) ([**@marcelwa**])
+  effective UUID, and keep every session on its initial calibration when a
+  calibration job returns a new set ([#271]) ([**@burgholzer**],
+  [**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])

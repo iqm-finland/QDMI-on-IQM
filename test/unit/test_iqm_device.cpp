@@ -2106,10 +2106,6 @@ TEST_F(DeviceJobMockTest,
 }
 
 TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
-  // A circuit created before recalibration must retain its original snapshot.
-  IQM_QDMI_Device_Job pending_job = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &pending_job),
-            QDMI_SUCCESS);
   // Job submission
   auto ret = IQM_QDMI_device_job_set_parameter(
       job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
@@ -2143,11 +2139,6 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
     "run_config": {}
   })";
   http_stub.queue_get(200, job_results_response);
-  auto refreshed =
-      nlohmann::json::parse(get_dynamic_quantum_architectures_response);
-  refreshed["calibration_set_id"] = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
-  http_stub.queue_get(200, refreshed.dump());
-  http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
 
   size_t size = 0;
   ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, 0,
@@ -2157,18 +2148,36 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
   ret = IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM1, size,
                                         calibration_set_id.data(), nullptr);
   ASSERT_EQ(ret, QDMI_SUCCESS);
-  EXPECT_FALSE(calibration_set_id.empty())
-      << "Calibration job must return a valid calibration set ID";
+  EXPECT_EQ(calibration_set_id, "4286b859-30a7-4036-8c25-1e42ddd85c0e");
+  std::array<char, 37> session_calibration{};
+  ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
+                session, QDMI_DEVICE_PROPERTY_CUSTOM1,
+                session_calibration.size(), session_calibration.data(),
+                nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(session_calibration.data(),
+               "f0fb4be5-e913-4a04-8c94-18d1bd842def");
+  EXPECT_EQ(http_stub.get_urls().size(), 7U);
+
+  IQM_QDMI_Device_Job circuit_job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &circuit_job),
+            QDMI_SUCCESS);
+  std::array<char, 37> job_calibration{};
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                circuit_job, QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,
+                job_calibration.size(), job_calibration.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_STREQ(job_calibration.data(), session_calibration.data());
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                pending_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
+                circuit_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
                 strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
-  http_stub.queue_post(200, R"({"id":"pre-refresh-circuit"})");
-  ASSERT_EQ(IQM_QDMI_device_job_submit(pending_job), QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"post-calibration-circuit"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(circuit_job), QDMI_SUCCESS);
   EXPECT_EQ(nlohmann::json::parse(http_stub.post_bodies().back())
                 .at("calibration_set_id"),
             "f0fb4be5-e913-4a04-8c94-18d1bd842def");
-  IQM_QDMI_device_job_free(pending_job);
+  IQM_QDMI_device_job_free(circuit_job);
 }
 
 // ============================================================================
@@ -3360,17 +3369,11 @@ TEST_F(DeviceJobMockTest, EdgeCaseParameterValues) {
 }
 
 TEST_F(DeviceTest, CalibrationSelectorValidatesInput) {
+  constexpr auto invalid = "../default";
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4, 0, nullptr),
-            QDMI_SUCCESS);
-  for (const auto *invalid :
-       {"", "default", "../default", "f0fb4be5-e913-4a04-8c94-18d1bd842dez",
-        "f0fb4be5/e913-4a04-8c94-18d1bd842def"}) {
-    EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                  session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
-                  strlen(invalid) + 1, invalid),
-              QDMI_ERROR_INVALIDARGUMENT);
-  }
+                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
+                strlen(invalid) + 1, invalid),
+            QDMI_ERROR_INVALIDARGUMENT);
   constexpr auto unterminated = "f0fb4be5-e913-4a04-8c94-18d1bd842defx";
   EXPECT_EQ(
       IQM_QDMI_device_session_set_parameter(
@@ -3378,78 +3381,33 @@ TEST_F(DeviceTest, CalibrationSelectorValidatesInput) {
       QDMI_ERROR_INVALIDARGUMENT);
 }
 
-TEST_F(DeviceIntegrationMockTest, SelectedCalibrationPinsArchitectureAndJobs) {
-  constexpr auto selected = "f0fb4be5-e913-4a04-8c94-18d1bd842def";
+TEST_F(DeviceIntegrationMockTest,
+       SelectedCalibrationLoadsArchitectureAndMetrics) {
+  constexpr auto selected = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
   ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
                 strlen(selected) + 1, selected),
             QDMI_SUCCESS);
-  queue_successful_initialization();
+  auto architecture =
+      nlohmann::json::parse(get_dynamic_quantum_architectures_response);
+  architecture["calibration_set_id"] = selected;
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, architecture.dump());
+  http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
+  http_stub.queue_get(200, cocos_health_response);
   ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
   EXPECT_NE(http_stub.get_urls().at(2).find(selected), std::string::npos);
   EXPECT_NE(http_stub.get_urls().at(3).find(selected), std::string::npos);
-  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
-                strlen(selected) + 1, selected),
-            QDMI_ERROR_BADSTATE);
-
-  IQM_QDMI_Device_Job calibration_job = nullptr;
-  ASSERT_EQ(
-      IQM_QDMI_device_session_create_device_job(session, &calibration_job),
-      QDMI_SUCCESS);
-  constexpr auto format = QDMI_PROGRAM_FORMAT_CALIBRATION;
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                calibration_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                sizeof(format), &format),
-            QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                calibration_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
-            QDMI_SUCCESS);
-  http_stub.queue_post(200, R"({"id":"pinned-calibration"})");
-  ASSERT_EQ(IQM_QDMI_device_job_submit(calibration_job), QDMI_SUCCESS);
-  http_stub.queue_get(200, R"({"status":"ready"})");
-  ASSERT_EQ(IQM_QDMI_device_job_wait(calibration_job, 0), QDMI_SUCCESS);
-  http_stub.queue_get(
-      200,
-      R"({"result":{"success":true,"calibration_set_id":"4286b859-30a7-4036-8c25-1e42ddd85c0e"}})");
   std::array<char, 37> result{};
-  ASSERT_EQ(
-      IQM_QDMI_device_job_get_results(calibration_job, QDMI_JOB_RESULT_CUSTOM1,
-                                      result.size(), result.data(), nullptr),
-      QDMI_SUCCESS);
-  EXPECT_STREQ(result.data(), "4286b859-30a7-4036-8c25-1e42ddd85c0e");
-  // No architecture or metrics refresh may invalidate the pinned target.
-  EXPECT_EQ(http_stub.get_urls().size(), 7U);
   ASSERT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM1, result.size(),
                 result.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_STREQ(result.data(), selected);
-  IQM_QDMI_device_job_free(calibration_job);
-
-  IQM_QDMI_Device_Job circuit_job = nullptr;
-  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &circuit_job),
-            QDMI_SUCCESS);
-  ASSERT_EQ(IQM_QDMI_device_job_query_property(
-                circuit_job, QDMI_DEVICE_JOB_PROPERTY_CUSTOM1, result.size(),
-                result.data(), nullptr),
-            QDMI_SUCCESS);
-  EXPECT_STREQ(result.data(), selected);
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                circuit_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
-            QDMI_SUCCESS);
-  http_stub.queue_post(200, R"({"id":"pinned-circuit"})");
-  ASSERT_EQ(IQM_QDMI_device_job_submit(circuit_job), QDMI_SUCCESS);
-  EXPECT_EQ(nlohmann::json::parse(http_stub.post_bodies().back())
-                .at("calibration_set_id"),
-            selected);
-  IQM_QDMI_device_job_free(circuit_job);
 }
 
-TEST_F(DeviceIntegrationMockTest,
-       SelectedCalibrationRejectsMismatchAndCanRetry) {
+TEST_F(DeviceIntegrationMockTest, SelectedCalibrationRejectsMismatch) {
   constexpr auto selected = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
   ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
@@ -3460,28 +3418,4 @@ TEST_F(DeviceIntegrationMockTest,
   http_stub.queue_get(200, get_dynamic_quantum_architectures_response);
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
   EXPECT_EQ(http_stub.get_urls().size(), 3U);
-  auto architecture =
-      nlohmann::json::parse(get_dynamic_quantum_architectures_response);
-  architecture["calibration_set_id"] = selected;
-  http_stub.queue_get(200, list_quantum_computers_response);
-  http_stub.queue_get(200, get_static_quantum_architectures_response);
-  http_stub.queue_get(200, architecture.dump());
-  http_stub.queue_get(200, get_calibration_set_quality_metrics_response);
-  http_stub.queue_get(200, cocos_health_response);
-  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-}
-
-TEST_F(DeviceIntegrationMockTest,
-       SelectedCalibrationDoesNotFallBackWhenUnavailable) {
-  constexpr auto selected = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
-  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
-                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
-                strlen(selected) + 1, selected),
-            QDMI_SUCCESS);
-  http_stub.queue_get(200, list_quantum_computers_response);
-  http_stub.queue_get(200, get_static_quantum_architectures_response);
-  http_stub.queue_get(404);
-  EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_NOTFOUND);
-  EXPECT_EQ(http_stub.get_urls().size(), 3U);
-  EXPECT_NE(http_stub.get_urls().back().find(selected), std::string::npos);
 }

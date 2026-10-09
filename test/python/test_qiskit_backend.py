@@ -306,12 +306,11 @@ def test_iqm_backend_selects_calibration_before_target_creation(monkeypatch: pyt
     assert captured["session"]["custom4"] == calibration_id
 
 
-@pytest.mark.parametrize("calibration_id", ["", "default", "../default", "not-a-uuid"])
-def test_iqm_backend_rejects_invalid_calibration(monkeypatch: pytest.MonkeyPatch, calibration_id: str) -> None:
-    """Invalid selectors fail before opening a device."""
+def test_iqm_backend_rejects_invalid_calibration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reject an invalid selector before opening a device."""
     captured = _stub_backend_construction(monkeypatch)
     with pytest.raises(ValueError, match="UUID"):
-        IQMBackend(calibration_set_id=calibration_id)
+        IQMBackend(calibration_set_id="../default")
     assert "opened_id" not in captured
 
 

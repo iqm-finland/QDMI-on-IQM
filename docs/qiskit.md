@@ -122,17 +122,12 @@ backend = IQMBackend(
 )
 ```
 
-`backend.calibration_set_id` exposes the effective UUID, including when the
-server default was resolved during initialization. Pass that UUID to a separate
-execution client's `IQMBackend` constructor to preserve the compilation
-calibration across processes. Keep the quantum computer selection the same. The
-driver rejects invalid UUIDs, unavailable calibration sets, and a server
-response that names a different set instead of silently using the default.
+`backend.calibration_set_id` gives the effective UUID, including a resolved
+server default. Share this UUID and the quantum computer identity with a
+separate execution client, and pass the UUID to its `IQMBackend` constructor. An
+externally compiled circuit does not carry its calibration UUID automatically.
 
-Explicit selection pins the session for its lifetime. Retrieving the result of a
-calibration job does not replace its target or calibration; construct a new
-backend with the returned UUID to adopt the new set. With no explicit selector,
-legacy calibration-job refresh remains enabled: recreate the backend after such
-a refresh to avoid reusing a cached target. The driver cannot determine which
-calibration an arbitrary externally compiled circuit used; its producer and
-consumer must carry and agree on the UUID.
+Every backend keeps its calibration for its lifetime, including one resolved
+from the server default. A calibration job returns a new UUID without changing
+the existing backend. Construct a new backend with that UUID to compile and run
+circuits against the new calibration.

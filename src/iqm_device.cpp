@@ -114,7 +114,7 @@ struct IQM_QDMI_Device_Session_impl_d {
   /// Quantum computer alias
   std::optional<std::string> quantum_computer_alias_ = std::nullopt;
 
-  /// Explicit calibration selection, immutable for the session lifetime.
+  /// Optional calibration selected before session initialization.
   std::optional<std::string> requested_calibration_set_id_;
 
   /// Calibration set id
@@ -178,8 +178,6 @@ struct IQM_QDMI_Device_Session_impl_d {
 struct IQM_QDMI_Device_Job_impl_d {
   /// The session this job belongs to.
   IQM_QDMI_Device_Session session_ = nullptr;
-  /// Calibration snapshot captured when the job is created.
-  std::string calibration_set_id_;
   /// The job ID as returned by the API.
   std::string job_id_;
   /// Whether this handle was opened for an existing remote job.
@@ -822,33 +820,6 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
-int IQM_QDMI_device_update_dynamic_quantum_architecture(
-    IQM_QDMI_Device_Session session,
-    const std::string &calibration_set_id = "default") {
-  if (session == nullptr || calibration_set_id.empty()) {
-    return QDMI_ERROR_INVALIDARGUMENT;
-  }
-  LOG_INFO("Updating dynamic quantum architecture with calibration set ID: " +
-           calibration_set_id);
-  session->calibration_set_id_ = calibration_set_id;
-  session->operations_.clear();
-  session->operations_ptr_.clear();
-  session->operations_map_.clear();
-  session->operations_sites_map_.clear();
-
-  if (const auto ret = Process_calibrated_gates(session); ret != QDMI_SUCCESS) {
-    return ret;
-  }
-
-  // Get the latest quality metrics
-  if (const auto ret = Process_calibration_metrics(session);
-      ret != QDMI_SUCCESS) {
-    return ret;
-  }
-
-  return QDMI_SUCCESS;
-}
-
 int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Initializing device session");
   Apply_environment_session_defaults(session);
@@ -868,9 +839,12 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
     return ret;
   }
 
-  // Get the dynamic quantum architecture via a GET request
-  if (const auto ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
-          session, session->requested_calibration_set_id_.value_or("default"));
+  session->calibration_set_id_ =
+      session->requested_calibration_set_id_.value_or("default");
+  if (const auto ret = Process_calibrated_gates(session); ret != QDMI_SUCCESS) {
+    return ret;
+  }
+  if (const auto ret = Process_calibration_metrics(session);
       ret != QDMI_SUCCESS) {
     return ret;
   }
@@ -1038,7 +1012,6 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
 
   *job = new IQM_QDMI_Device_Job_impl_d;
   (*job)->session_ = session;
-  (*job)->calibration_set_id_ = session->calibration_set_id_;
   (*job)->status_ = QDMI_JOB_STATUS_CREATED;
   LOG_INFO("Created new device job");
   return QDMI_SUCCESS;
@@ -1349,8 +1322,8 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_NOTSUPPORTED;
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,
-                      job->calibration_set_id_.c_str(), prop, size, value,
-                      size_ret)
+                      job->session_->calibration_set_id_.c_str(), prop, size,
+                      value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
@@ -1384,7 +1357,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   } else {
     json_program["circuits"].emplace_back(std::string{program});
   }
-  json_program["calibration_set_id"] = job->calibration_set_id_;
+  json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
   json_program["heralding_mode"] = job->heralding_mode_;
   json_program["move_gate_validation"] = job->move_gate_validation_;
@@ -1877,23 +1850,6 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     }
     job->new_calibration_set_id_ =
         calibration_result.at("calibration_set_id").get<std::string>();
-
-    // Update the dynamic quantum architecture with the new calibration set ID,
-    // unless the session is pinned to an explicitly selected one.
-    auto ret = job->session_->requested_calibration_set_id_.has_value()
-                   ? QDMI_SUCCESS
-                   : IQM_QDMI_device_update_dynamic_quantum_architecture(
-                         job->session_, job->new_calibration_set_id_);
-    if (ret != QDMI_SUCCESS) {
-      LOG_INFO("Failed to update dynamic quantum architecture after "
-               "calibration request. Retrying in 120 seconds...");
-      std::this_thread::sleep_for(std::chrono::seconds(120));
-      ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
-          job->session_, job->new_calibration_set_id_);
-      if (ret != QDMI_SUCCESS) {
-        return ret;
-      }
-    }
   }
 
   const size_t req_size = job->new_calibration_set_id_.length() + 1;

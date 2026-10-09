@@ -560,15 +560,6 @@ These steps correspond to the initialization sequence described in the
   position are cached together, and a value is returned only while the job is
   queued.
 
-**After Calibration Job Completion:**
-
-When querying results of a calibration job in a session without an explicit
-calibration selector, the implementation automatically:
-
-1. Extracts the new calibration set ID from the job result.
-2. Calls `GET_DYNAMIC_QUANTUM_ARCHITECTURE` with the new calibration set ID.
-3. Calls `GET_CALIBRATION_SET_QUALITY_METRICS` to update quality metrics.
-
 ### API Configuration
 
 The `APIConfig` class in `iqm_api_config.hpp` provides a centralized way to
