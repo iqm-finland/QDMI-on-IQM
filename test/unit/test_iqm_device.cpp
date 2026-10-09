@@ -3161,20 +3161,26 @@ TEST_F(DeviceJobMockTest, JobSubmissionRejectsResponsesWithoutJobId) {
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
             QDMI_SUCCESS);
 
-  http_stub.queue_post(200, R"({"queue_position": 3})");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  for (const auto *response :
+       {R"({"queue_position": 3})", R"({"id": 5})", R"({"id": )"}) {
+    http_stub.queue_post(200, response);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+    const auto submissions = http_stub.post_urls().size();
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_BADSTATE);
+    EXPECT_EQ(http_stub.post_urls().size(), submissions);
 
-  // A job ID of the wrong type must be reported, not retyped.
-  http_stub.queue_post(200, R"({"id": 5})");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
-
-  http_stub.queue_post(200, R"({"id": )");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
-
-  // An unreadable submission response says nothing about the remote job, so
-  // the handle stays usable and can be submitted again.
-  http_stub.queue_post(200, R"({"id": "job-123"})");
-  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+    IQM_QDMI_device_job_free(job);
+    job = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+              QDMI_SUCCESS);
+    ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
+    ASSERT_EQ(
+        IQM_QDMI_device_job_set_parameter(
+            job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+        QDMI_SUCCESS);
+  }
 }
 
 TEST_F(DeviceJobMockTest, MalformedProgramSubmissionReturnsAnErrorCode) {
@@ -3310,7 +3316,25 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
   for (const auto &[exception, expected_status] : mappings) {
     throw_from_transport(exception);
     EXPECT_EQ(IQM_QDMI_device_job_submit(job), expected_status);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_BADSTATE);
+
+    IQM_QDMI_device_job_free(job);
+    job = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+              QDMI_SUCCESS);
+    ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
     EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), expected_status);
+    EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_BADSTATE);
+
+    IQM_QDMI_device_job_free(job);
+    job = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+              QDMI_SUCCESS);
+    ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
   }
 
   restore_transport();
@@ -3345,6 +3369,17 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": )");
   EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_FATAL);
+  const auto submissions = http_stub.post_urls().size();
+  EXPECT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(http_stub.post_urls().size(), submissions);
+
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+            QDMI_SUCCESS);
+  ASSERT_EQ(Set_program(job, strlen(TEST_CALIBRATION_CONFIG) + 1,
+                        TEST_CALIBRATION_CONFIG),
+            QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id": "job-123"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit_calibration(job), QDMI_SUCCESS);
   http_stub.queue_get(200, R"({"status": "ready"})");
