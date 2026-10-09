@@ -10,7 +10,7 @@ on:
         type: string
     secrets:
       IQM_TOKEN:
-        required: true
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-cpp-coverage
@@ -76,7 +76,8 @@ jobs:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest -C Debug --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
+          CTEST_EXCLUDE_LABEL: ${{ secrets.IQM_TOKEN == '' && 'integration' || '^$' }}
+        run: ctest -C Debug --output-on-failure --test-dir build -LE "$CTEST_EXCLUDE_LABEL" --timeout 600 --repeat until-pass:3
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1

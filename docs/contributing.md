@@ -177,6 +177,11 @@ perfect. We will guide you through the process.
 Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer.
 
+CI runs unit tests without IQM credentials. Live integration tests run when
+`IQM_TOKEN` is available. Documentation builds without credentials skip notebook
+execution; set `IQM_DOCS_EXECUTION=cache` with valid credentials to execute the
+examples. The Slurm smoke test uses a local mock and needs no service access.
+
 ### Configure and Build
 
 This project uses CMake as the main build configuration tool. Building a project

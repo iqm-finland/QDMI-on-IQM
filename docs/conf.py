@@ -110,7 +110,7 @@ myst_substitutions = {
 }
 myst_heading_anchors = 3
 
-nb_execution_mode = "cache"
+nb_execution_mode = os.environ.get("IQM_DOCS_EXECUTION", "cache")
 nb_execution_raise_on_error = True
 nb_execution_timeout = 300
 nb_mime_priority_overrides = [("latex", "image/svg+xml", 15)]

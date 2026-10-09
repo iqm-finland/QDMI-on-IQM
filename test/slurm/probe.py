@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) 2026 IQM Finland Oy
 # All rights reserved.
 #
@@ -17,40 +16,33 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Simple Python script to run a real workflow on Resonance for SPANK validation."""
+"""Submit an IQM circuit through the license-selected Qiskit adapter."""
 
 from __future__ import annotations
 
+import os
+from unittest.mock import patch
+
+from provider_probe import open_device_from_license  # ty: ignore[unresolved-import]
 from qiskit import QuantumCircuit, transpile
 
 from iqm.qdmi.qiskit import IQMBackend
 
 
 def main() -> None:
-    """Run a Bell state circuit on Resonance."""
-    # Initialize backend
-    backend = IQMBackend()
+    """Reuse the licensed IQM handle and retrieve deterministic fixture shots."""
+    with patch.dict(os.environ, {"IQM_QC_ID": "qc-default", "IQM_QC_ALIAS": "default"}):
+        device = open_device_from_license()
+    assert device.qubits_num() == 2
 
-    # Build a simple Bell state circuit
-    qc = QuantumCircuit(2)
-    qc.h(0)
-    qc.cx(0, 1)
-    qc.measure_all()
-
-    # Transpile the circuit
-    transpiled_qc = transpile(qc, backend)
-
-    # Submit job
-    shots = 8
-    job = backend.run(transpiled_qc, shots=shots)
-
-    # Wait for results
-    result = job.result()
-    counts = result.get_counts()
-
-    total_shots = sum(counts.values())
-
-    assert total_shots == shots
+    backend = IQMBackend(device=device)
+    circuit = QuantumCircuit(2)
+    circuit.h(0)
+    circuit.cx(0, 1)
+    circuit.measure_all()
+    circuit = transpile(circuit, backend)
+    counts = backend.run(circuit, shots=8).result().get_counts()
+    assert counts == {"00": 4, "11": 4}
 
 
 if __name__ == "__main__":

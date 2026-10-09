@@ -22,7 +22,7 @@ on:
         type: string
     secrets:
       IQM_TOKEN:
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -64,4 +64,5 @@ jobs:
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
+          CTEST_EXCLUDE_LABEL: ${{ secrets.IQM_TOKEN == '' && 'integration' || '^$' }}
+        run: ctest --output-on-failure --test-dir build -LE "$CTEST_EXCLUDE_LABEL" --timeout 600 --repeat until-pass:3
