@@ -2327,9 +2327,8 @@ TEST_F(DeviceJobMockTest, FullLifecycleCalibration) {
                 job_calibration.size(), job_calibration.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_STREQ(job_calibration.data(), session_calibration.data());
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                circuit_job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CIRCUIT_IQM_JSON) + 1, TEST_CIRCUIT_IQM_JSON),
+  ASSERT_EQ(Set_program(circuit_job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
             QDMI_SUCCESS);
   http_stub.queue_post(200, R"({"id":"post-calibration-circuit"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(circuit_job), QDMI_SUCCESS);

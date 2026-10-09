@@ -1415,6 +1415,10 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
   if (job->calibration_ && prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
+  if (job->retrieved_ && prop == QDMI_DEVICE_JOB_PROPERTY_CUSTOM1) {
+    // A retrieved job may have used a different calibration than this session.
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,
                       job->session_->calibration_set_id_.c_str(), prop, size,
                       value, size_ret)
