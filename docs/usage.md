@@ -429,9 +429,10 @@ in its
 [`PostJobsRequest` model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
 Calibration jobs use a separate request format.
 
-Setting `heralding_mode="zeros"` returns `QDMI_ERROR_NOTSUPPORTED` before
-submission because this mode may discard shots. The previous options object
-remains unchanged. Omit `heralding_mode` or use `"none"` to retain all shots.
+Execution requires the requested number of shots. Omit `heralding_mode` or use
+`"none"`. Setting the shot-discarding `"zeros"` mode returns
+`QDMI_ERROR_NOTSUPPORTED`; rejected options leave the job's current settings
+intact.
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`

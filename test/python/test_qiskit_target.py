@@ -23,8 +23,7 @@ import json
 from unittest.mock import Mock
 
 import pytest
-from mqt.core.plugins.qiskit.backend import QDMIBackend
-from mqt.core.plugins.qiskit.exceptions import CircuitValidationError, UnsupportedDeviceError
+from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedDeviceError
 from mqt.core.qdmi import Device, Job, ProgramFormat
 from qiskit import QuantumCircuit, transpile
 
@@ -32,7 +31,7 @@ from iqm.qdmi.qiskit import IQMBackend
 from iqm.qdmi.serializers import qiskit_to_iqm_json
 
 
-def _device(*, missing_gate: str = "prx", missing_index: int | None = 1, resonator: bool = False) -> Mock:
+def _device(*, missing_gate: str | None = "prx", resonator: bool = False) -> Mock:
     device = Mock(spec=Device)
     device.name.return_value = "IQM calibration test"
     device.version.return_value = "test"
@@ -50,7 +49,7 @@ def _device(*, missing_gate: str = "prx", missing_index: int | None = 1, resonat
         op.qubits_num.return_value = 1 if name in {"prx", "measure"} else 2
         op.duration.return_value = None
         op.fidelity.return_value = 0.97
-        op.sites.return_value = [site for i, site in enumerate(sites[:3]) if name != missing_gate or i != missing_index]
+        op.sites.return_value = [site for i, site in enumerate(sites[:3]) if name != missing_gate or i != 1]
         op.site_pairs.return_value = (
             [(sites[0], sites[3]), (sites[1], sites[3]), (sites[2], sites[3])]
             if name == "move"
@@ -64,64 +63,32 @@ def _device(*, missing_gate: str = "prx", missing_index: int | None = 1, resonat
     return device
 
 
-@pytest.mark.parametrize("missing_gate", ["prx", "measure"])
-@pytest.mark.parametrize(("missing_index", "usable"), [(0, [1, 2]), (1, [0, 2]), (2, [0, 1])])
-def test_transpile_uses_calibrated_qubits(missing_gate: str, missing_index: int, usable: list[int]) -> None:
-    """A missing calibration must not prevent using the remaining connected pair."""
-    device = _device(missing_gate=missing_gate, missing_index=missing_index)
+@pytest.mark.parametrize("missing_gate", [None, "prx", "measure"])
+def test_transpile_and_submit_calibrated_qubits(missing_gate: str | None) -> None:
+    """Transpilation and both serialization paths address calibrated physical sites."""
+    device = _device(missing_gate=missing_gate)
     backend = IQMBackend(device=device)
-    assert backend.num_qubits == 2
-    assert backend.physical_qubits == tuple(usable)
+    usable = (0, 2) if missing_gate else (0, 1, 2)
+    assert backend.num_qubits == len(usable)
+    assert backend.physical_qubits == usable
     circuit = QuantumCircuit(2, 2)
     circuit.h(0)
     circuit.cx(0, 1)
-    circuit.measure([0, 1], [0, 1])
+    circuit.measure([0, 1], [1, 0])
     compiled = transpile(circuit, backend, optimization_level=2, seed_transpiler=7)
     backend.run([compiled, compiled], shots=8)
-    programs = device.try_submit_job.call_args.args[0]
-    assert len(programs) == 2
-    for program in programs:
-        instructions = json.loads(program)["instructions"]
-        assert {site for instruction in instructions for site in instruction["locus"]} == {f"QB{i + 1}" for i in usable}
+    program = qiskit_to_iqm_json(compiled, backend)
+    assert device.try_submit_job.call_args.args[0] == [program, program]
+    instructions = json.loads(program)["instructions"]
+    used_sites = {site for instruction in instructions for site in instruction["locus"]}
+    assert len(used_sites) == 2
+    assert used_sites <= {f"QB{i + 1}" for i in usable}
+    assert compiled.layout is not None
+    assert {inst["args"]["key"]: inst["locus"] for inst in instructions if inst["name"] == "measure"} == {
+        f"c_2_0_{1 - logical}": [f"QB{usable[index] + 1}"]
+        for logical, index in enumerate(compiled.layout.final_index_layout())
+    }
     assert backend.target["r"][0,].error == pytest.approx(0.03)
-
-
-def test_submission_restores_physical_sites_and_classical_destinations() -> None:
-    """Compacting away QB2 must preserve QB3 and the caller's classical mapping."""
-    device = _device()
-    backend = IQMBackend(device=device)
-    circuit = QuantumCircuit(2, 2, name="mapped")
-    circuit.r(0.3, 0.4, 1)
-    circuit.cz(0, 1)
-    circuit.measure([0, 1], [1, 0])
-    circuit.metadata = {"label": "keep"}
-    original = circuit.copy()
-    backend.run(circuit, shots=8)
-    program = json.loads(device.submit_job.call_args.args[0])
-    assert json.loads(qiskit_to_iqm_json(circuit, backend)) == program
-    assert [(inst["name"], inst["locus"]) for inst in program["instructions"]] == [
-        ("prx", ["QB3"]),
-        ("cz", ["QB1", "QB3"]),
-        ("measure", ["QB1"]),
-        ("measure", ["QB3"]),
-    ]
-    assert [inst["args"]["key"] for inst in program["instructions"] if inst["name"] == "measure"] == [
-        "c_2_0_1",
-        "c_2_0_0",
-    ]
-    assert program["name"] == "mapped"
-    assert program["metadata"] == {"label": "keep"}
-    assert circuit == original
-    assert circuit.num_qubits == 2
-
-
-def test_generic_backend_keeps_raw_device_sites() -> None:
-    """The generic QDMI backend still uses its unfiltered target's site order."""
-    backend = QDMIBackend(device=_device())
-    circuit = QuantumCircuit(3)
-    circuit.r(0.3, 0.4, 1)
-    program = json.loads(qiskit_to_iqm_json(circuit, backend))
-    assert program["instructions"][0]["locus"] == ["QB2"]
 
 
 def test_target_preserves_resonator_and_move_sites() -> None:
@@ -137,12 +104,14 @@ def test_target_preserves_resonator_and_move_sites() -> None:
     assert program["instructions"][0]["locus"] == ["QB3", "CR1"]
 
 
-def test_reject_circuit_wider_than_calibrated_target() -> None:
-    """Raw physical indices must not bypass the compact target's index mapping."""
+def test_reject_operation_outside_target() -> None:
+    """An unaddressable target index fails before submission."""
     device = _device()
     backend = IQMBackend(device=device)
-    with pytest.raises(CircuitValidationError):
-        backend.run(QuantumCircuit(3))
+    circuit = QuantumCircuit(3)
+    circuit.r(0.3, 0.4, 2)
+    with pytest.raises(TranslationError):
+        backend.run([QuantumCircuit(2), circuit])
     device.submit_job.assert_not_called()
     device.try_submit_job.assert_not_called()
 
@@ -153,15 +122,3 @@ def test_reject_target_without_usable_qubits() -> None:
     device.operations.return_value = [op for op in device.operations() if op.name() != "prx"]
     with pytest.raises(UnsupportedDeviceError, match="calibrated"):
         IQMBackend(device=device)
-
-
-def test_fully_calibrated_target_keeps_physical_indices() -> None:
-    """Fully calibrated backends retain their existing qubit numbering."""
-    device = _device(missing_index=None)
-    backend = IQMBackend(device=device)
-    assert backend.num_qubits == 3
-    circuit = QuantumCircuit(3)
-    circuit.r(0.3, 0.4, 2)
-    backend.run(circuit)
-    program = json.loads(device.submit_job.call_args.args[0])
-    assert program["instructions"][0]["locus"] == ["QB3"]

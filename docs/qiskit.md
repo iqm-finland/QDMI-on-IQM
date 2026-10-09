@@ -47,39 +47,34 @@ Pass `device_id` alongside any session overrides, such as
 `IQMBackend(device_id="iqm.emerald.mock", token="…")`. Every backend opens an
 independent device session.
 
-`IQMBackend()` keeps the configurable `iqm.default` connection. Explicit
+`IQMBackend()` uses the configurable `iqm.default` connection. Explicit
 arguments override environment defaults: `IQM_SERVER_URL`, `IQM_TOKEN`,
 `IQM_TOKENS_FILE`, `IQM_QC_ID`, and `IQM_QUANTUM_COMPUTER`. `IQM_BASE_URL` and
-`IQM_QC_ALIAS` remain legacy aliases, with canonical variables taking
-precedence. An explicit quantum computer ID or alias suppresses both environment
-selectors.
+`IQM_QC_ALIAS` are aliases, with canonical variables taking precedence. An
+explicit quantum computer ID or alias suppresses both environment selectors.
 
 Named presets use their configured endpoint and quantum computer; routing
-environment variables cannot redirect them. Authentication still uses the usual
-token or token-file defaults. Explicit arguments and driver configuration can
-override manifest values.
+environment variables cannot redirect them. Authentication uses the token or
+token-file defaults. Explicit arguments and driver configuration can override
+manifest values.
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
-Qiskit serializer preserves these units. Applications submitting IQM JSON
-directly must use the same format; the legacy `angle_t` and `phase_t` fields
-expressed angles in turns.
+Qiskit serializer uses these units. Applications submitting IQM JSON directly
+must use the same format.
 
 ## Calibrated qubits
 
-`IQMBackend` exposes only qubits with both calibrated PRX and measurement
-operations in its Qiskit target. Operations involving excluded qubits are also
-removed from the target; computational resonators retain their native
-operations. Opening a backend fails if no qubits have both required
-calibrations.
+`IQMBackend` builds its Qiskit target from qubits with both PRX and measurement
+calibrations, together with the device's computational resonators. At least one
+calibrated qubit is required.
 
 Circuit qubit indices and `initial_layout` entries refer to this target. For
 example, if QB2 is unavailable on a three-qubit device, target indices 0 and 1
-refer to QB1 and QB3. `backend.physical_qubits` records this target-to-device
-mapping. The IQM JSON serializer uses it to select physical site names,
-preserving classical measurement destinations and circuit metadata. The
-underlying QDMI device and generic MQT Core `QDMIBackend` still expose physical
-site indices.
+refer to QB1 and QB3. Inspect `backend.physical_qubits` for the corresponding
+device site indices; the IQM JSON serializer uses this mapping for instruction
+loci. The underlying QDMI device and generic MQT Core `QDMIBackend` expose
+physical site indices.
 
 ## Circuit Metadata
 
@@ -151,12 +146,10 @@ For sampling, pass the mapping as
 configure it with `backend.set_options(...)` before creating the estimator. This
 interface is available through `IQMBackend` and its bound primitives.
 
-IQM's
-[`heralding_mode="zeros"`](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.HeraldingMode.html)
-may discard shots that fail the initial-state check. `IQMBackend.run` rejects
-this setting with `CircuitValidationError` before creating or submitting a job,
-including when it is set as a backend default. Omit `heralding_mode` or use
-`"none"` to retain all shots.
+Execution requires the requested number of shots. Omit `heralding_mode` or use
+`"none"`. The shot-discarding
+[`"zeros"` mode](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.HeraldingMode.html)
+raises `CircuitValidationError` in `IQMBackend.run` before submission.
 
 ## CLI Scripts
 

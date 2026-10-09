@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
     from mqt.core.typing import QDMIJobParameters
-    from qiskit.circuit import Instruction, QuantumCircuit
+    from qiskit.circuit import Instruction
     from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
@@ -92,7 +92,7 @@ class IQMBackend(QDMIBackend):
         return self._physical_qubits
 
     def _build_target(self) -> Target:
-        """Return a target restricted to qubits with PRX and measurement support.
+        """Build a target from calibrated qubits and computational resonators.
 
         Returns:
             A calibrated target with contiguous indices and native resonator operations.
@@ -101,6 +101,7 @@ class IQMBackend(QDMIBackend):
             UnsupportedDeviceError: No qubits have both required calibrations.
         """
         target = super()._build_target()
+        # The IQM device lists qubits first, followed by computational resonators.
         num_qubits = self.device.qubits_num()
         self._physical_qubits = tuple(
             index
@@ -116,33 +117,16 @@ class IQMBackend(QDMIBackend):
 
         indices = {physical: logical for logical, physical in enumerate(self._physical_qubits)}
         restricted = Target(description=target.description, num_qubits=len(indices))
-        for name in target.operation_names:
+        # IQM native operations have explicit calibrated loci.
+        for name, placements in target.items():
             properties = {
-                None if locus is None else tuple(indices[index] for index in locus): props
-                for locus, props in target[name].items()
-                if locus is None or all(index in indices for index in locus)
+                tuple(indices[index] for index in locus): props
+                for locus, props in placements.items()
+                if locus is not None and all(index in indices for index in locus)
             }
             if properties:
-                operation = target.operation_from_name(name)
-                restricted.add_instruction(operation, None if isinstance(operation, type) else properties, name=name)
+                restricted.add_instruction(target.operation_from_name(name), properties, name=name)
         return restricted
-
-    def _preprocess_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
-        """Check that the circuit uses calibrated target indices.
-
-        Returns:
-            The input circuit unchanged.
-
-        Raises:
-            CircuitValidationError: The circuit is wider than the calibrated target.
-        """
-        if circuit.num_qubits > len(self._physical_qubits):
-            msg = (
-                f"Circuit has {circuit.num_qubits} qubits, "
-                f"but the calibrated IQM target has {len(self._physical_qubits)}."
-            )
-            raise CircuitValidationError(msg)
-        return circuit
 
     @classmethod
     def _default_options(cls) -> Options:
@@ -162,8 +146,8 @@ class IQMBackend(QDMIBackend):
             Custom job parameters shared by every circuit in the run.
 
         Raises:
-            CircuitValidationError: The mapping contains reserved fields or
-                values that cannot be serialized as finite JSON.
+            CircuitValidationError: The options contain reserved fields,
+                invalid JSON values, or shot-discarding heralding.
         """
         request_options = options.get("run_request_options")
         if request_options is None:
