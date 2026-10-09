@@ -17,7 +17,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@17f5c58e46c51027501e7d8d38dc182654ed035c # v2.5.0
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -162,7 +162,7 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@17f5c58e46c51027501e7d8d38dc182654ed035c # v2.5.0
     with:
       check-stubs: false
       enable-ty: true

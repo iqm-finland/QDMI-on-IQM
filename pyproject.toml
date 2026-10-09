@@ -56,6 +56,7 @@ qiskit = [
   "mqt-core~=4.0.0",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
+  "numpy>=2.5.2; python_version>='3.15'",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
 ]
@@ -171,7 +172,6 @@ test-skip = [
   "cp3??t-*",      # no freethreading qiskit wheels
   "cp*-win_arm64", # no numpy, qiskit, ... wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
-  "cp315*",        # no 3.15 wheels yet
 ]
 archs = "auto64"
 build-frontend = "uv"
