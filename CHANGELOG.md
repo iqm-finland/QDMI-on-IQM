@@ -32,7 +32,8 @@ releases may include breaking changes.
   through a standard QDMI custom job parameter, exposed on `IQMBackend` through
   `run_request_options` in `set_options` and per-run overrides. Validate
   complete JSON buffers and reject `heralding_mode="zeros"` before submission
-  because it may discard shots ([#272]) ([**@marcelwa**], [**@burgholzer**])
+  because it may discard shots ([#272], [#293]) ([**@marcelwa**],
+  [**@burgholzer**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -74,7 +75,7 @@ releases may include breaking changes.
 
 - 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
   operations, preserving physical site names during IQM JSON serialization
-  ([**@burgholzer**])
+  ([#293]) ([**@burgholzer**])
 - 🩹 Restrict Linux and macOS exports to the QDMI device ABI and IQM
   calibration, preventing host libcurl interference on Linux and hiding bundled
   dependencies on macOS ([#284]) ([**@marcelwa**])
@@ -301,6 +302,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
 [#284]: https://github.com/iqm-finland/QDMI-on-IQM/pull/284
 [#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
