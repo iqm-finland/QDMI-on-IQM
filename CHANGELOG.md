@@ -21,7 +21,7 @@ releases may include breaking changes.
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
 - ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
-  them through `IQMBackend.from_device_id` ([#274]) ([**@burgholzer**]).
+  them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
   `IQM_QDMI_device_job_submit_calibration` function ([#266])
   ([**@burgholzer**]).

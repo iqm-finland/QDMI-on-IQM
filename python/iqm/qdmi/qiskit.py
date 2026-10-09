@@ -58,7 +58,7 @@ class IQMBackend(QDMIBackend):
 
     Args:
         device_id: Stable ID from the installed catalogue. Defaults to `iqm.default`.
-        device: An already-open device, including one supplied by `from_device_id`.
+        device: An already-open device.
         provider: Optional Qiskit provider to associate with this backend.
         base_url: Base URL of the IQM service. Overrides `IQM_SERVER_URL`, its
             `IQM_BASE_URL` alias, and the manifest default when provided.
@@ -81,8 +81,8 @@ class IQMBackend(QDMIBackend):
 
     def __init__(
         self,
-        device_id: str | None = None,
         *,
+        device_id: str | None = None,
         device: Device | None = None,
         provider: QDMIProvider | None = None,
         base_url: str | None = None,

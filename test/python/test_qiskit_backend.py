@@ -153,7 +153,7 @@ def test_iqm_backend_explicit_selection_ignores_environment(monkeypatch: pytest.
     monkeypatch.setenv("IQM_QUANTUM_COMPUTER", "other-alias")
     monkeypatch.setenv("IQM_SERVER_URL", "https://other.example")
 
-    IQMBackend(device_id, qc_alias="garnet:mock" if device_id == "iqm.default" else None)
+    IQMBackend(device_id=device_id, qc_alias="garnet:mock" if device_id == "iqm.default" else None)
 
     assert captured["opened_id"] == device_id
     assert captured["session"]["custom1"] is None
@@ -162,11 +162,11 @@ def test_iqm_backend_explicit_selection_ignores_environment(monkeypatch: pytest.
         assert captured["session"]["base_url"] is None
 
 
-def test_iqm_backend_from_device_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Core's factory retains the IQM adapter and the selected stable ID."""
+def test_iqm_backend_selects_stable_id_by_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Device selection uses the IQM constructor's named stable-ID argument."""
     captured = _stub_backend_construction(monkeypatch)
 
-    backend = IQMBackend.from_device_id("iqm.emerald.mock")
+    backend = IQMBackend(device_id="iqm.emerald.mock")
 
     assert isinstance(backend, IQMBackend)
     assert captured["opened_id"] == "iqm.emerald.mock"

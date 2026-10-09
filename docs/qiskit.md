@@ -27,7 +27,7 @@ from iqm.qdmi.qiskit import IQMBackend
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
-backend = IQMBackend("iqm.emerald.mock")
+backend = IQMBackend(device_id="iqm.emerald.mock")
 ```
 
 ```{code-cell} ipython3
@@ -43,9 +43,9 @@ print(result.get_counts())
 
 Select any stable ID from the
 [installed catalogue](usage.md#using-the-device-with-mqt-core).
-`IQMBackend.from_device_id("iqm.emerald.mock", token="…")` provides the same IQM
-adapter through Core's factory API. Every backend opens an independent device
-session.
+Pass `device_id` alongside any session overrides, such as
+`IQMBackend(device_id="iqm.emerald.mock", token="…")`. Every backend opens an
+independent device session.
 
 `IQMBackend()` keeps the configurable `iqm.default` connection. Explicit
 arguments override environment defaults: `IQM_SERVER_URL`, `IQM_TOKEN`,

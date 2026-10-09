@@ -264,9 +264,8 @@ A retrieved job cannot be resubmitted, and its parameters cannot be changed.
 
 ## Temporary driver-stack validation
 
-This development branch pins unreleased QDMI #511 and MQT Core #2229 commits to
-exercise installed driver and device discovery. It is not ready for release
-publication. Replace both pins with suitable releases and regenerate `uv.lock`
-before publishing. Remove the temporary LLVM/MLIR setup from Python CI and Linux
-wheel-test containers once Core wheels are available for these APIs. Native-only
-device builds do not require LLVM/MLIR.
+This repository currently pins QDMI #511 and MQT Core #2229 commits to exercise
+installed driver and device discovery. Replace both pins with suitable releases
+and regenerate `uv.lock` before publishing. Remove the temporary LLVM/MLIR setup
+from Python CI and Linux wheel-test containers once Core wheels are available
+for these APIs. Native-only device builds do not require LLVM/MLIR.
