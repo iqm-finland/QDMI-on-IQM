@@ -60,10 +60,11 @@ result = backend.run(transpile(circuit, backend), shots=100).result()
 print(result.get_counts())
 ```
 
-With the site environment and your credentials available, submit the job:
+With the site environment and your credentials available, submit the job to the
+site's quantum-access partition (`iqm` in the shared cluster example):
 
 ```console
-srun --licenses=iqm.emerald.mock python bell.py
+srun --partition=iqm --licenses=iqm.emerald.mock python bell.py
 ```
 
 The

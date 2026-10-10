@@ -26,7 +26,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: munich-quantum-toolkit/core
-          ref: 883fd4b96b241490b8e21a30fe50697937ab9259
+          # Shared Slurm integration from MQT Core #2599 until it is merged.
+          ref: 3ee541eeb90f22f4a7e563a1a7c0aeda883816cc
           fetch-depth: 0
           persist-credentials: false
           path: core
@@ -60,6 +61,7 @@ jobs:
               --dist dist \
               --setup-script test/slurm/setup.sh \
               --compose-file provider/test/slurm/compose.yml \
+              --partition iqm \
               --device-license iqm.emerald.mock \
               --qdmi-config-file /opt/provider-catalogue.json \
               -- python3 /workload/test/slurm/probe.py

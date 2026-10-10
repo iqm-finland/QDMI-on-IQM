@@ -18,6 +18,7 @@ PROVIDER_INSTALL_MODE=native uv run --no-project \
   --workload . --dist "$CORE_DIST" \
   --setup-script test/slurm/setup.sh \
   --compose-file test/slurm/compose.yml \
+  --partition iqm \
   --device-license iqm.emerald.mock \
   --qdmi-config-file /opt/provider-catalogue.json \
   -- python3 /workload/test/slurm/probe.py
@@ -28,11 +29,14 @@ and check the actual loaded library path. The workload submits eight Bell-state
 shots through `IQMBackend(device=...)` in each mode. Jobs run as an unprivileged
 user. Only the `iqm.emerald.mock` catalogue entry is enabled.
 
-The Compose overlay passes `IQM_TOKEN` from the host environment to the
-controller at runtime; Slurm exports it to the job. It does not forward
-`IQM_TOKENS_FILE`. Keep tokens out of command arguments, build arguments, and
-logs. CI receives the repository's `RESONANCE_API_KEY` as `IQM_TOKEN` and
-reports an explicit skip when that secret is unavailable.
+The Compose overlay passes `IQM_TOKEN` to the login node for job submission and
+to the controller for availability monitoring. Slurm exports the login node's
+submission environment to the job. This smoke test uses one token for both
+roles; production deployments should configure separate site-owned monitor
+credentials. It does not forward `IQM_TOKENS_FILE`. Keep tokens out of command
+arguments, build arguments, and logs. CI receives the repository's
+`RESONANCE_API_KEY` as `IQM_TOKEN` and reports an explicit skip when that secret
+is unavailable.
 
 See [IQM on Slurm](../../docs/spank_plugin.md) for deployment.
 
