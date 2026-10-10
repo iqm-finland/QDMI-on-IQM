@@ -19,7 +19,7 @@ jobs:
 
       # Temporary: remove after replacing the Core source pin with a release.
       - name: Set up LLVM/MLIR for source-built MQT Core
-        uses: munich-quantum-software/setup-mlir@3f32263ce571a8b745068980f30f188b6e800763 # v1.4.2
+        uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
         with:
           llvm-version: 23.1.2
 
