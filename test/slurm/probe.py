@@ -16,13 +16,14 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Submit an IQM circuit through the license-selected Qiskit adapter."""
+"""Submit an IQM circuit through the Qiskit adapter."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from mqt.core.qdmi import slurm
+from mqt.core.qdmi import builtin_driver
 from qiskit import QuantumCircuit, transpile
 
 from iqm.qdmi import IQM_QDMI_LIBRARY_PATH
@@ -30,8 +31,9 @@ from iqm.qdmi.qiskit import IQMBackend
 
 
 def main() -> None:
-    """Retrieve eight shots from the licensed Emerald Resonance mock."""
-    device = slurm.open_device_from_license()
+    """Retrieve eight shots from the selected Emerald Resonance mock."""
+    device_id = sys.argv[1]
+    device = builtin_driver.open_device(device_id)
     native = Path("/opt/provider-native/lib") / IQM_QDMI_LIBRARY_PATH.name
     library = native if native.exists() else IQM_QDMI_LIBRARY_PATH
     assert str(library.resolve()) in Path("/proc/self/maps").read_text(encoding="utf-8")

@@ -182,9 +182,9 @@ supplied through the job environment.
 ### Requesting a Slurm License
 
 The optional `licenses` argument is forwarded to `srun` unchanged. The offloader
-selects the quantum computer through its explicit arguments. To select a device
-by its allocated license, run an application using
-`IQMBackend(device=slurm.open_device_from_license())`, as shown in
+selects the quantum computer through its explicit arguments. Applications can
+also open a catalogue ID with `builtin_driver.open_device()` and pass that
+device to `IQMBackend`, as shown in
 [IQM on Slurm](spank_plugin.md#run-a-qiskit-job).
 
 ### Programmatic Sampling Example

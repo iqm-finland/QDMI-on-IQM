@@ -59,7 +59,9 @@ in the Usage Guide. Its
 the internal C++ test helper; it is not an installed client API.
 
 You can either run the full suite of examples using the dedicated `nox` session
-or individually execute the scripts from the command line.
+or individually execute the scripts from the command line. For cluster jobs, see
+[IQM on Slurm](spank_plugin.md) for explicit device selection and license
+requests.
 
 ```console
 # Run the entire suite

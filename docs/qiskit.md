@@ -48,7 +48,7 @@ Select any stable ID from the
 Pass `device_id` alongside any session overrides, such as
 `IQMBackend(device_id="iqm.emerald.mock", token="…")`. Every backend opens an
 independent device session. Pass an already-open handle with
-`IQMBackend(device=...)` to reuse MQT Core's license-selected device; see
+`IQMBackend(device=...)` to reuse a device opened through MQT Core's driver; see
 [IQM on Slurm](spank_plugin.md).
 
 `IQMBackend()` uses the configurable `iqm.default` connection. Explicit

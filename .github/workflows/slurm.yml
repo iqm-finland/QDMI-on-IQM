@@ -27,7 +27,7 @@ jobs:
         with:
           repository: munich-quantum-toolkit/core
           # Shared Slurm integration from MQT Core #2599 until it is merged.
-          ref: 3ee541eeb90f22f4a7e563a1a7c0aeda883816cc
+          ref: c9be8c8f73e8dca842a5a405cac57b46c0238873
           fetch-depth: 0
           persist-credentials: false
           path: core
@@ -61,9 +61,8 @@ jobs:
               --dist dist \
               --setup-script test/slurm/setup.sh \
               --compose-file provider/test/slurm/compose.yml \
-              --partition iqm \
               --device-license iqm.emerald.mock \
               --qdmi-config-file /opt/provider-catalogue.json \
-              -- python3 /workload/test/slurm/probe.py
+              -- python3 /workload/test/slurm/probe.py iqm.emerald.mock
             echo "Slurm $mode: eight Emerald Resonance mock shots passed." >> "$GITHUB_STEP_SUMMARY"
           done

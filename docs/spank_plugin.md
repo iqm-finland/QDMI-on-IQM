@@ -1,11 +1,15 @@
 # IQM on Slurm
 
-[MQT Core's Slurm integration](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-provides the cluster configuration, device licenses, and availability monitor.
-Cluster administrators install IQM alongside the other QDMI device
-implementations in one workload environment on login and compute nodes. MQT
-Core's driver opens the device selected by the job's license; the IQM
-implementation handles authentication and quantum execution.
+[MQT Core's shared Slurm example](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+configures device licenses and availability monitoring. Cluster administrators
+install IQM alongside the other QDMI device implementations in one workload
+environment on login and quantum access nodes. Applications open a catalogue ID
+through MQT Core's driver; the IQM implementation handles authentication and
+quantum execution.
+
+The shared `quantum` partition contains interchangeable quantum access nodes.
+Each node can reach every configured device; the catalogue ID selects the device
+independently of the node running the job.
 
 ## Configure IQM access
 
@@ -47,11 +51,11 @@ precedence over an alias; unset it when using an alias-based catalogue entry.
 Save this workload as `bell.py`:
 
 ```python
-from mqt.core.qdmi import slurm
+from mqt.core.qdmi import builtin_driver
 from qiskit import QuantumCircuit, transpile
 from iqm.qdmi.qiskit import IQMBackend
 
-backend = IQMBackend(device=slurm.open_device_from_license())
+backend = IQMBackend(device=builtin_driver.open_device("iqm.emerald.mock"))
 circuit = QuantumCircuit(2)
 circuit.h(0)
 circuit.cx(0, 1)
@@ -61,10 +65,11 @@ print(result.get_counts())
 ```
 
 With the site environment and your credentials available, submit the job to the
-site's quantum-access partition (`iqm` in the shared cluster example):
+site's quantum partition (`quantum` in the shared cluster example). Request the
+license matching the device ID opened by the application:
 
 ```console
-srun --partition=iqm --licenses=iqm.emerald.mock python bell.py
+srun --partition=quantum --licenses=iqm.emerald.mock python bell.py
 ```
 
 The
