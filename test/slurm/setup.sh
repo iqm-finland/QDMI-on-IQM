@@ -1,3 +1,4 @@
+#!/bin/sh
 # Copyright (c) 2026 IQM Finland Oy
 # All rights reserved.
 #
@@ -16,22 +17,23 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-ClusterName=local-ci
-SlurmctldHost=localhost(127.0.0.1)
-SlurmUser=slurm
-SlurmctldPort=6817
-SlurmdPort=6818
-AuthType=auth/munge
-StateSaveLocation=/var/spool/slurmctld
-SlurmdSpoolDir=/var/spool/slurmd
-SlurmdLogFile=/var/log/slurmd.log
-SlurmctldLogFile=/var/log/slurmctld.log
-ProctrackType=proctrack/pgid
-SchedulerType=sched/backfill
-SelectType=select/linear
-TaskPlugin=task/none
-SlurmdParameters=config_overrides
-PlugStackConfig=/etc/slurm/plugstack.conf
-Licenses=iqm_qc_emerald:2,iqm_qc_emerald_mock:2,other:2
-NodeName=localhost NodeAddr=127.0.0.1 State=UNKNOWN
-PartitionName=debug Nodes=localhost Default=YES MaxTime=INFINITE State=UP
+set -eu
+
+python3 - "${1:-/opt/provider-catalogue.json}" <<'CATALOGUE'
+import json
+import os
+import sys
+from pathlib import Path
+from iqm.qdmi import IQM_QDMI_LIBRARY_PATH
+
+catalogue = IQM_QDMI_LIBRARY_PATH.parent / "iqm-qdmi-device.qdmi.json"
+presets = json.loads(catalogue.read_text())["qdmi"]["devices"]
+library = IQM_QDMI_LIBRARY_PATH
+if os.environ["PROVIDER_INSTALL_MODE"] == "native":
+    library = Path("/opt/provider-native/lib/libiqm-qdmi-device.so")
+for preset in presets:
+    preset["library"] = str(library.resolve())
+    preset["enabled"] = preset["id"] == "iqm.emerald.mock"
+configuration = {"schema-version": 1, "qdmi": {"devices": presets}}
+Path(sys.argv[1]).write_text(json.dumps(configuration))
+CATALOGUE

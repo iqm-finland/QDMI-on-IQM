@@ -1,0 +1,68 @@
+name: Slurm smoke test
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "The ubuntu runner image to use."
+        default: "ubuntu-26.04"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  slurm-tests:
+    name: Slurm native and wheel smoke tests
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: provider
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: munich-quantum-toolkit/core
+          # Shared Slurm integration from MQT Core #2599 until it is merged.
+          ref: c9be8c8f73e8dca842a5a405cac57b46c0238873
+          fetch-depth: 0
+          persist-credentials: false
+          path: core
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.15"
+
+      - name: Set up MLIR
+        uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
+        with:
+          llvm-version: 23.1.2
+
+      - name: Build MQT Core
+        working-directory: core
+        run: uv build --wheel --out-dir ../dist -Ccmake.define.DEPLOY=ON
+
+      - name: Run native and wheel workloads
+        env:
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+        run: |
+          if [[ -z "$IQM_TOKEN" ]]; then
+            echo "::notice::Skipping Slurm live tests: IQM_TOKEN is unavailable."
+            echo "Slurm live tests skipped: IQM_TOKEN is unavailable." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for mode in native wheel; do
+            PROVIDER_INSTALL_MODE="$mode" uv run \
+              --no-project core/test/slurm/run_integration.py \
+              --workload provider \
+              --dist dist \
+              --setup-script test/slurm/setup.sh \
+              --compose-file provider/test/slurm/compose.yml \
+              --device-license iqm.emerald.mock \
+              --qdmi-config-file /opt/provider-catalogue.json \
+              -- python3 /workload/test/slurm/probe.py iqm.emerald.mock
+            echo "Slurm $mode: eight Emerald Resonance mock shots passed." >> "$GITHUB_STEP_SUMMARY"
+          done

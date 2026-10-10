@@ -229,7 +229,7 @@ An explicitly configured quantum computer ID or alias takes precedence over both
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the
-[SPANK Plugin Guide](spank_plugin.md).
+[IQM on Slurm](spank_plugin.md).
 
 ## Understanding Quantum Architecture and Calibration Sets
 

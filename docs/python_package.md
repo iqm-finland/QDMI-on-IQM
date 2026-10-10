@@ -2,6 +2,8 @@
 file_format: mystnb
 kernelspec:
   name: python3
+language_info:
+  name: python
 mystnb:
   number_source_lines: true
 ---
@@ -126,16 +128,13 @@ of Slurm, and `simulator=True` to select the simulator in either mode.
 
 ### Selecting the Slurm Partition
 
-Both functions submit their `srun` jobs to the partition gating the nodes that
-expose the quantum computer as a Slurm GRES resource. Its name is a per-site
-choice, resolved in this order:
+Both functions submit their `srun` jobs to a site-defined partition. Its name is
+resolved in this order:
 
 1. The `partition` keyword argument.
 2. The `IQM_SLURM_PARTITION` environment variable, which lets an administrator
    set the site's name once for every user. An empty value counts as unset.
-3. `quantum`, the name used throughout the
-   [SPANK plugin documentation](spank_plugin.md) and the
-   [Administrator Guide](admin_guide.md).
+3. `quantum`.
 
 ```python
 counts = sample(qc, shots=512, partition="qc-nodes")
@@ -145,11 +144,9 @@ Slurm's own `SLURM_PARTITION` has no effect here, because the resolved name is
 always passed as an explicit `--partition`, which takes precedence over it.
 
 :::{important}
-Renaming the partition is not enough on its own. The SPANK plugin only runs on
-the partitions its `partitions=` option lists, so that list has to carry the new
-name too — see [Configuration](spank_plugin.md#configuration). Otherwise the
-plugin silently skips the job and never injects `IQM_BASE_URL`, `IQM_QC_ID`, or
-`IQM_QC_ALIAS`.
+Use the
+[MQT Core Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+for scheduler setup and license-based injection.
 :::
 
 ### Sizing the Slurm Allocation
@@ -177,27 +174,18 @@ accessible by both the login node and all Slurm compute nodes.
 
 ### Selecting a Quantum Computer per Job
 
-Both functions accept optional `qc_id` and `qc_alias` keyword arguments to pin a
-specific quantum computer for a single job, without changing the process's
-default backend configuration. When set, they are passed as `--iqm-qc-id` and
-`--iqm-qc-alias` options on the `srun` command itself, which the QDMI-on-IQM
-[SPANK plugin](spank_plugin.md) resolves into the job's `IQM_QC_ID` and
-`IQM_QC_ALIAS` environment variables. Only used when `local=False`.
+Both functions accept optional `qc_id` and `qc_alias` arguments for a remote
+job. These non-secret selectors are passed to the `iqm-sampler` and
+`iqm-estimator` worker options `--qc-id` and `--qc-alias`. Credentials are
+supplied through the job environment.
 
 ### Requesting a Slurm License
 
-Both functions accept an optional `licenses` keyword argument, forwarded
-verbatim as a `--licenses` option on the `srun` command (Slurm's own
-`name[:count][,name[:count]...]` syntax). This is unrelated to QC selection: a
-site administrator can configure a Slurm license per QC to cap concurrent jobs
-against it -- see the SPANK plugin's
-[Limiting Concurrent Access with Slurm Licenses](spank_plugin.md#limiting-concurrent-access-with-slurm-licenses)
-docs -- and `licenses` is how a caller requests it. Only used when
-`local=False`.
-
-```python
-counts = sample(qc, shots=512, simulator=True, qc_alias="emerald", licenses="iqm_qc_emerald:1")
-```
+The optional `licenses` argument is forwarded to `srun` unchanged. The offloader
+selects the quantum computer through its explicit arguments. Applications can
+also open a catalogue ID with `builtin_driver.open_device()` and pass that
+device to `IQMBackend`, as shown in
+[IQM on Slurm](spank_plugin.md#run-a-qiskit-job).
 
 ### Programmatic Sampling Example
 
@@ -219,8 +207,9 @@ print("Counts:", counts)
 
 The Qiskit backend covers circuit execution, but a QDMI device also answers
 questions about itself. MQT Core discovers the installed device manifest without
-importing provider code or loading the device library. Open its stable ID
-{py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the MQT Core QDMI driver:
+importing device implementation code or loading the device library. Open its
+stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the MQT Core QDMI
+driver:
 
 ```python
 from mqt.core.qdmi.builtin_driver import open_device
@@ -268,5 +257,5 @@ This repository currently pins QDMI #509 and MQT Core #2373 commits to exercise
 native multi-program jobs and installed device discovery. Replace both pins with
 suitable releases and regenerate `uv.lock` before publishing. Remove the
 temporary LLVM/MLIR setup from Python CI and Linux wheel-test containers once
-Core wheels are available for these APIs. Native-only device builds do not
+MQT Core wheels are available for these APIs. Native-only device builds do not
 require LLVM/MLIR.

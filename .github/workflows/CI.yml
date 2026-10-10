@@ -30,8 +30,8 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/python-*.yml
       additional-cd-files: |
-        spank/**
-        .github/workflows/spank-tests.yml
+        test/slurm/**
+        .github/workflows/slurm.yml
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -210,11 +210,11 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
-  spank-tests:
-    name: 🇸 Test SPANK
+  slurm-tests:
+    name: 🇸 Test Slurm
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: $/.github/workflows/spank-tests.yml
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
+    uses: $/.github/workflows/slurm.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
@@ -235,7 +235,7 @@ jobs:
       - examples
       - build-sdist
       - build-wheel
-      - spank-tests
+      - slurm-tests
     runs-on: ubuntu-slim
     steps:
       - name: Decide whether the needed jobs succeeded or failed
@@ -263,7 +263,7 @@ jobs:
               && 'build-sdist,build-wheel,' || ''
             }}
             ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'spank-tests,' || ''
+              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
+              && 'slurm-tests,' || ''
             }}
           jobs: ${{ toJSON(needs) }}

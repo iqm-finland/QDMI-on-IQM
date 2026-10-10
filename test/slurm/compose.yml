@@ -16,11 +16,15 @@
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# IQM QDMI SPANK Plugin — plugstack.conf.d drop-in configuration.
-#
-# This file is installed by CMake into the plugstack.conf.d directory.
-# To activate, uncomment the plugin line below and fill in site-specific
-# values. The whole directive must stay on a single line; plugstack.conf does
-# not support line continuation. See the plugin README for details.
+x-device-environment: &device-environment
+  - IQM_TOKEN
 
-# required @IQM_QDMI_SPANK_INSTALL_DIR@/iqm-spank-plugin.so partitions= iqm_base_url= iqm_tokens_file= iqm_qc_id= iqm_qc_alias= iqm_validation_timeout=30 iqm_license_prefix= iqm_require_license=
+services:
+  controller:
+    build:
+      args:
+        PROVIDER_INSTALL_MODE: ${PROVIDER_INSTALL_MODE:-native}
+        PROVIDER_RUNTIME_COMPONENT: iqm-qdmi-device_Runtime
+    environment: *device-environment
+  login:
+    environment: *device-environment

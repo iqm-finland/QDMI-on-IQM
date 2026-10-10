@@ -51,10 +51,10 @@ classifiers = [
 name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
-# Temporary Core #2373 source pin: replace with a release before publishing.
+# Pin the QDMI 1.4-compatible MQT Core main revision until Core 4.1 is released.
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@bc056a33e6adc8e46a8d3eab47cca730c3be0827",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@62125acadbab5ecbb130dd179803c4e14d6f5ed4",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
@@ -103,7 +103,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@bc056a33e6adc8e46a8d3eab47cca730c3be0827",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@62125acadbab5ecbb130dd179803c4e14d6f5ed4",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
@@ -130,7 +130,6 @@ make-fallback = true
 exclude = [
   "**/docs",
   "**/test",
-  "spank/**",
   "sitecustomize.py",
   ".*",
 ]
@@ -234,6 +233,7 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
+per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true

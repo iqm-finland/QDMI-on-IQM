@@ -36,16 +36,14 @@ explicit intent, valid credentials, and an appropriate target.
 - Check links: `uvx nox -s docs -- -b linkcheck`
 - Generated HTML: `docs/_build/html/`
 
-## SPANK Plugin
+## Slurm Integration
 
-- Sources: `spank/`
-- Build with the core project by configuring CMake with `-DBUILD_IQM_SPANK=ON`
-  on a Linux system with Slurm development headers.
-- The SPANK plugin is GPLv3-licensed, unlike the Apache-2.0-with-LLVM-exception
-  core project. Preserve this license boundary and the applicable file headers.
-- Smoke and Resonance sessions in `spank/noxfile.py` require an active Slurm
-  deployment; Resonance tests additionally require IQM credentials. Do not run
-  either session unless that external access is explicitly intended.
+- MQT Core owns the shared Slurm runner and Docker cluster.
+- `test/slurm/` contains catalogue setup and an SDK workload for the Emerald
+  Resonance mock. Its README describes the required credentials and eight-shot
+  workload. Run it only when live IQM access is explicitly intended.
+- These retained test fixtures use GPL-3.0-or-later. Preserve their license
+  boundary and applicable file headers.
 
 ## Tech Stack
 

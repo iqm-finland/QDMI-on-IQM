@@ -2,6 +2,8 @@
 file_format: mystnb
 kernelspec:
   name: python3
+language_info:
+  name: python
 mystnb:
   number_source_lines: true
 ---
@@ -45,7 +47,9 @@ Select any stable ID from the
 [installed catalogue](usage.md#using-the-device-with-mqt-core).
 Pass `device_id` alongside any session overrides, such as
 `IQMBackend(device_id="iqm.emerald.mock", token="…")`. Every backend opens an
-independent device session.
+independent device session. Pass an already-open handle with
+`IQMBackend(device=...)` to reuse a device opened through MQT Core's driver; see
+[IQM on Slurm](spank_plugin.md).
 
 `IQMBackend()` uses the configurable `iqm.default` connection. Explicit
 arguments override environment defaults: `IQM_SERVER_URL`, `IQM_TOKEN`,

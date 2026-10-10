@@ -21,7 +21,7 @@ alongside a Python wrapper for straightforward installation via `pip` or `uv`.
 | Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)                            |
 | Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)                                    |
 | Integrate the C++ library directly                               | [Usage Guide](usage.md)                                    |
-| Integrate with **Slurm** on an HPC cluster                       | [SPANK Plugin Guide](spank_plugin.md)                      |
+| Integrate with **Slurm** on an HPC cluster                       | [IQM on Slurm](spank_plugin.md)                            |
 | Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)                              |
 | Understand the Python package and its entry points               | [Python Package](python_package.md)                        |
 | Compare integration options for my HPC site                      | [Integration Scenarios Analysis](integration_scenarios.md) |
