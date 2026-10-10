@@ -1,15 +1,16 @@
 # IQM Slurm smoke test
 
 This test runs a Qiskit workload against IQM's Emerald Resonance mock in
-[MQT Core's Docker Slurm cluster](https://github.com/munich-quantum-toolkit/core/tree/main/docker/slurm).
+[MQT Core's Slurm cluster example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm).
 It requires a valid `IQM_TOKEN` and network access to
 `https://resonance.iqm.tech`.
 
 Use the MQT Core revision pinned in the Slurm workflow and build its Linux wheel
-with `uv build --wheel --out-dir "$CORE_DIST" -Ccmake.define.DEPLOY=ON` from
-that checkout. The wheel must match the Docker host architecture. The fixture
-requires rootful Docker on a disposable Linux cgroup-v2 host and Slurm 25.11 or
-newer.
+with
+`uv build --python 3.15 --wheel --out-dir "$CORE_DIST" -Ccmake.define.DEPLOY=ON`
+from that checkout. The wheel must match the host architecture and Python 3.15.
+The example deploys Slurm 25.11 or newer through rootful Docker on a disposable
+Linux cgroup-v2 host.
 
 ```sh
 PROVIDER_INSTALL_MODE=native uv run --no-project \
@@ -19,7 +20,7 @@ PROVIDER_INSTALL_MODE=native uv run --no-project \
   --compose-file test/slurm/compose.yml \
   --device-license iqm.emerald.mock \
   --qdmi-config-file /opt/provider-catalogue.json \
-  -- sh -ec 'mqt-core-qdmi-check --device iqm.emerald.mock --timeout 30; exec python3 /workload/test/slurm/probe.py'
+  -- python3 /workload/test/slurm/probe.py
 ```
 
 Repeat with `PROVIDER_INSTALL_MODE=wheel`. Both modes install the Python adapter
@@ -36,6 +37,8 @@ reports an explicit skip when that secret is unavailable.
 See [IQM on Slurm](../../docs/spank_plugin.md) for deployment.
 
 For jobs from several vendors on the same cluster, use the
-[MQT Core multi-vendor example](https://github.com/munich-quantum-toolkit/core/tree/main/docker/slurm#multiple-device-implementations).
-Each device environment has its own catalogue and credentials.
+[MQT Core multi-vendor example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm#multiple-device-implementations).
+MQT Core and all device implementations share one Python environment. Each job
+opens its selected device through the driver, with the credentials that device
+needs. The cluster monitors each device before admitting its jobs.
 `setup.sh [OUTPUT]` writes the catalogue to the chosen path.

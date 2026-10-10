@@ -20,15 +20,21 @@
 
 from __future__ import annotations
 
-from provider_probe import open_device_from_license  # ty: ignore[unresolved-import]
+from pathlib import Path
+
+from mqt.core.qdmi import slurm
 from qiskit import QuantumCircuit, transpile
 
+from iqm.qdmi import IQM_QDMI_LIBRARY_PATH
 from iqm.qdmi.qiskit import IQMBackend
 
 
 def main() -> None:
     """Retrieve eight shots from the licensed Emerald Resonance mock."""
-    device = open_device_from_license()
+    device = slurm.open_device_from_license()
+    native = Path("/opt/provider-native/lib") / IQM_QDMI_LIBRARY_PATH.name
+    library = native if native.exists() else IQM_QDMI_LIBRARY_PATH
+    assert str(library.resolve()) in Path("/proc/self/maps").read_text(encoding="utf-8")
 
     backend = IQMBackend(device=device)
     circuit = QuantumCircuit(2)

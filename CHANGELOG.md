@@ -51,12 +51,13 @@ releases may include breaking changes.
 
 - ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
   Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
-- 💥 Use MQT Core's shared Slurm 25.11+ setup and remove the provider SPANK
-  plugin. `IQMBackend(device=...)` accepts the licensed handle; offloader QC
-  selection uses existing worker options. Jobs inherit their credentials through
-  Slurm's environment, and native and wheel smoke tests submit eight shots each
-  to the Emerald Resonance mock ([#265]) ([**@flowerthrower**],
-  [**@burgholzer**])
+- 💥 Use MQT Core's shared Slurm 25.11+ setup with Python 3.15 and availability
+  monitoring. All QDMI device implementations share one environment; no device
+  SPANK plugin is required. `IQMBackend(device=...)` accepts the licensed
+  handle; offloader QC selection uses existing worker options. Jobs inherit
+  their credentials through Slurm's environment, and native and wheel smoke
+  tests submit eight shots each to the Emerald Resonance mock ([#265])
+  ([**@flowerthrower**], [**@burgholzer**])
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
   selection takes precedence over environment defaults. Temporary Core source

@@ -1,49 +1,42 @@
 # IQM on Slurm
 
-Use
 [MQT Core's Slurm integration](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-to schedule QDMI workloads. That guide covers cluster setup, license counts, job
-environments, and the Docker cluster. This page supplies the IQM runtime,
-credentials, and workload.
+provides the cluster configuration, device licenses, and availability monitor.
+Install IQM alongside the other QDMI device implementations in the same workload
+environment on every compute node. MQT Core's driver opens the device selected
+by the job's license; the IQM implementation handles authentication and quantum
+execution.
 
-## Install and configure the device
+## Configure IQM access
 
-Install the [Python package](python_package.md) in the environment available on
-each compute node:
+Install the [Python package](python_package.md) with its Qiskit adapter:
 
 ```console
 uv pip install 'iqm-qdmi[qiskit]'
 ```
 
-The package includes the device library and its catalogue. Locate the catalogue
-for native commands such as `mqt-core-qdmi-check`:
+MQT Core discovers the installed device catalogue from the Python package. For
+the unreleased QDMI 1.4 and MQT Core 4.1 interfaces, build the repositories'
+current source revisions together as shown in the
+[shared cluster example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm).
+Native installations need a readable catalogue and library on each compute node;
+retain the Python package for the Qiskit adapter.
 
-```bash
-export MQT_CORE_QDMI_CONFIG_FILE=$(python -c 'from iqm.qdmi import IQM_QDMI_LIBRARY_PATH; print(IQM_QDMI_LIBRARY_PATH.parent / "iqm-qdmi-device.qdmi.json")')
-```
-
-For a native installation, use the catalogue installed beside the library
-instead. Keep the Python package available for the Qiskit adapter.
-
-The installed catalogue includes `iqm.emerald`, `iqm.garnet`, and their `.mock`
-variants. Register the selected ID as a Slurm license. For example,
-`Licenses=iqm.emerald.mock:1` admits one allocation at a time for the Resonance
-mock endpoint. It still requires IQM credentials and network access.
-
-Use the [device configuration](usage.md#session-configuration) to pin a
-site-specific quantum computer by its actual QC ID when needed. An inherited
-`IQM_QC_ID` takes precedence over an alias; unset it when using an alias-based
-catalogue entry.
-
-## Credentials
+The catalogue includes `iqm.emerald`, `iqm.garnet`, and their `.mock` variants.
+Register the selected ID as a Slurm license: `Licenses=iqm.emerald.mock:1`
+permits one allocation at a time for the Emerald Resonance mock. The cluster's
+availability monitor reserves the license while this device is unavailable. It
+needs IQM credentials and network access, just as workloads do.
 
 Set `IQM_TOKENS_FILE` to a credential file readable by the job user on each
-compute node. Keep tokens out of Slurm configuration and scripts committed to
-source control. See [authentication](usage.md#authentication-methods) for
-supported credential sources and token renewal.
+compute node. See [authentication](usage.md#authentication-methods) for other
+credential sources and token renewal. Keep tokens out of Slurm configuration and
+committed scripts. Slurm exports the submission environment; AWS credentials and
+IQM credentials can coexist in the same job environment.
 
-Slurm exports the submission environment. Set catalogue and credential-file
-paths in the job script or the site's environment module before submitting it.
+Use the [device configuration](usage.md#session-configuration) to pin a quantum
+computer by its actual QC ID when needed. An inherited `IQM_QC_ID` takes
+precedence over an alias; unset it when using an alias-based catalogue entry.
 
 ## Run a Qiskit job
 
@@ -63,7 +56,7 @@ result = backend.run(transpile(circuit, backend), shots=100).result()
 print(result.get_counts())
 ```
 
-After activating the workload environment and setting the catalogue path:
+Activate the shared workload environment and submit the job:
 
 ```bash
 export IQM_TOKENS_FILE=/shared/iqm/tokens.json
@@ -71,18 +64,17 @@ unset IQM_QC_ID
 srun --licenses=iqm.emerald.mock python bell.py
 ```
 
-An optional availability probe can run inside the allocation before the
-workload, after environment setup. Follow MQT Core's job-script example. The
+The
 [offloader](python_package.md#programmatic-offloading-with-the-offloader-module)
-also submits IQM sampler and estimator jobs through `srun`.
+also submits IQM sampler and estimator jobs through `srun`. IQM supports IQM
+JSON and QIR. MQT Core's PennyLane adapter requires OpenQASM; use the IQM Qiskit
+adapter for these workloads.
 
-IQM supports IQM JSON and QIR. MQT Core's PennyLane adapter requires OpenQASM;
-use the IQM Qiskit adapter for these workloads.
-
-## Test locally
+## Exercise the integration
 
 The
 [Slurm smoke test](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/test/slurm)
-uses the Emerald Resonance mock and MQT Core's Docker cluster. It checks native
-and wheel installations with eight shots each and requires IQM credentials.
-Follow its README to run it.
+runs an eight-shot Qiskit job on the Emerald Resonance mock for both native and
+wheel installations. It uses MQT Core's shared cluster example, with real Slurm
+scheduling and IQM authentication. Its README describes the credentials and
+commands.

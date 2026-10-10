@@ -26,14 +26,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: munich-quantum-toolkit/core
-          ref: 805aabf29a3ffb69dfa2c50fd423b497194561f0
+          ref: 99d78ade73313f1cc643cf7c1d88589478bc0c8b
           fetch-depth: 0
           persist-credentials: false
           path: core
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          python-version: "3.14"
+          version: "0.13.0"
+          python-version: "3.15"
 
       - name: Set up MLIR
         uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
@@ -62,6 +63,6 @@ jobs:
               --compose-file provider/test/slurm/compose.yml \
               --device-license iqm.emerald.mock \
               --qdmi-config-file /opt/provider-catalogue.json \
-              -- sh -ec 'mqt-core-qdmi-check --device iqm.emerald.mock --timeout 30; exec python3 /workload/test/slurm/probe.py'
+              -- python3 /workload/test/slurm/probe.py
             echo "Slurm $mode: eight Emerald Resonance mock shots passed." >> "$GITHUB_STEP_SUMMARY"
           done
