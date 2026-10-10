@@ -71,5 +71,4 @@ The components of this repository are licensed under two separate licenses:
   license text.
 - Slurm integration fixtures in [test/slurm/](test/slurm/) retain their
   **GPL-3.0-or-later** license; see
-  [test/slurm/LICENSE.md](test/slurm/LICENSE.md). The optional shared SPANK
-  component is maintained by MQT Core.
+  [test/slurm/LICENSE.md](test/slurm/LICENSE.md).

@@ -22,26 +22,5 @@ services:
       args:
         PROVIDER_INSTALL_MODE: ${PROVIDER_INSTALL_MODE:-native}
         PROVIDER_RUNTIME_COMPONENT: iqm-qdmi-device_Runtime
-    depends_on:
-      iqm:
-        condition: service_healthy
-  node:
-    depends_on:
-      iqm:
-        condition: service_healthy
-  iqm:
-    image: python:3.14-slim
-    command: [python, /workload/test/slurm/mock_iqm_backend.py, --host, 0.0.0.0]
-    volumes:
-      - ${MQT_CORE_SLURM_WORKLOAD}:/workload:ro
-    healthcheck:
-      test:
-        [
-          CMD,
-          python,
-          -c,
-          "import urllib.request; urllib.request.urlopen('http://localhost:18080/request-count')",
-        ]
-      interval: 2s
-      timeout: 2s
-      retries: 30
+    environment:
+      - IQM_TOKEN

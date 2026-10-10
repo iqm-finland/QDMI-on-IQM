@@ -20,7 +20,6 @@
 set -eu
 
 python3 - <<'CATALOGUE'
-import base64
 import json
 import os
 from pathlib import Path
@@ -31,19 +30,9 @@ presets = json.loads(catalogue.read_text())["qdmi"]["devices"]
 library = IQM_QDMI_LIBRARY_PATH
 if os.environ["PROVIDER_INSTALL_MODE"] == "native":
     library = Path("/opt/provider-native/lib/libiqm-qdmi-device.so")
-configuration = {
-    "schema-version": 1,
-    # Python discovers the installed presets; keep this workload on the mock.
-    "qdmi": {"devices": [{"id": preset["id"], "enabled": False} for preset in presets] + [{
-        "id": "iqm.fixture.emerald",
-        "library": str(library.resolve()),
-        "prefix": "IQM",
-        "enabled": True,
-        "session": {"base-url": "http://iqm:18080", "custom1": "qc-emerald"},
-    }]},
-}
+for preset in presets:
+    preset["library"] = str(library.resolve())
+    preset["enabled"] = preset["id"] == "iqm.emerald.mock"
+configuration = {"schema-version": 1, "qdmi": {"devices": presets}}
 Path("/opt/provider-catalogue.json").write_text(json.dumps(configuration))
-# Deliberately unsigned fixture credential; never accepted by a real IQM server.
-payload = base64.urlsafe_b64encode(json.dumps({"exp": 9223372036854775807}).encode()).decode().rstrip("=")
-Path("/opt/iqm-fixture-tokens.json").write_text(json.dumps({"access_token": f"fixture.{payload}.signature"}))
 CATALOGUE

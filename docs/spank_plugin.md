@@ -2,9 +2,9 @@
 
 Use
 [MQT Core's Slurm integration](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-to schedule QDMI workloads. That guide covers cluster setup, license counts,
-optional site defaults, and the Docker cluster. This page supplies the IQM
-runtime, credentials, and workload.
+to schedule QDMI workloads. That guide covers cluster setup, license counts, job
+environments, and the Docker cluster. This page supplies the IQM runtime,
+credentials, and workload.
 
 ## Install and configure the device
 
@@ -42,9 +42,8 @@ compute node. Keep tokens out of Slurm configuration and scripts committed to
 source control. See [authentication](usage.md#authentication-methods) for
 supported credential sources and token renewal.
 
-Slurm exports the submission environment. Administrators can supply default
-catalogue and credential-file paths through MQT Core's optional SPANK module;
-the job environment overrides those defaults.
+Slurm exports the submission environment. Set catalogue and credential-file
+paths in the job script or the site's environment module before submitting it.
 
 ## Run a Qiskit job
 
@@ -84,5 +83,6 @@ use the IQM Qiskit adapter for these workloads.
 
 The
 [Slurm smoke test](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/test/slurm)
-uses a local HTTP mock and MQT Core's Docker cluster. It checks native and wheel
-installations without contacting IQM services. Follow its README to run it.
+uses the Emerald Resonance mock and MQT Core's Docker cluster. It checks native
+and wheel installations with eight shots each and requires IQM credentials.
+Follow its README to run it.

@@ -6,6 +6,9 @@ on:
         description: "The ubuntu runner image to use."
         default: "ubuntu-26.04"
         type: string
+    secrets:
+      IQM_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -23,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: munich-quantum-toolkit/core
-          ref: 28ebf9fcc0dd4eff8da0221e26997c004c1fac71
+          ref: 224e97eb0b2fc1d60efaa2be6a9c399302229334
           fetch-depth: 0
           persist-credentials: false
           path: core
@@ -42,7 +45,14 @@ jobs:
         run: uv build --wheel --out-dir ../dist -Ccmake.define.DEPLOY=ON
 
       - name: Run native and wheel workloads
+        env:
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
         run: |
+          if [[ -z "$IQM_TOKEN" ]]; then
+            echo "::notice::Skipping Slurm live tests: IQM_TOKEN is unavailable."
+            echo "Slurm live tests skipped: IQM_TOKEN is unavailable." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           for mode in native wheel; do
             PROVIDER_INSTALL_MODE="$mode" uv run \
               --no-project core/test/slurm/run_integration.py \
@@ -50,8 +60,8 @@ jobs:
               --dist dist \
               --setup-script test/slurm/setup.sh \
               --compose-file provider/test/slurm/compose.yml \
-              --device-license iqm.fixture.emerald \
+              --device-license iqm.emerald.mock \
               --qdmi-config-file /opt/provider-catalogue.json \
-              --reference IQM_TOKENS_FILE=/opt/iqm-fixture-tokens.json \
-              -- python3 /workload/test/slurm/probe.py
+              -- sh -ec 'mqt-core-qdmi-check --device iqm.emerald.mock --timeout 30; exec python3 /workload/test/slurm/probe.py'
+            echo "Slurm $mode: eight Emerald Resonance mock shots passed." >> "$GITHUB_STEP_SUMMARY"
           done

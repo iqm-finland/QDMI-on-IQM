@@ -180,7 +180,8 @@ Building the project requires a C++20-capable C++ compiler and
 CI runs unit tests without IQM credentials. Live integration tests run when
 `IQM_TOKEN` is available. Documentation builds without credentials skip notebook
 execution; set `IQM_DOCS_EXECUTION=cache` with valid credentials to execute the
-examples. The Slurm smoke test uses a local mock and needs no service access.
+examples. The Slurm smoke test submits eight shots per installation mode to the
+Emerald Resonance mock and requires `IQM_TOKEN`.
 
 ### Configure and Build
 

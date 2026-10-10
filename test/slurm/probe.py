@@ -20,9 +20,6 @@
 
 from __future__ import annotations
 
-import os
-from unittest.mock import patch
-
 from provider_probe import open_device_from_license  # ty: ignore[unresolved-import]
 from qiskit import QuantumCircuit, transpile
 
@@ -30,10 +27,8 @@ from iqm.qdmi.qiskit import IQMBackend
 
 
 def main() -> None:
-    """Reuse the licensed IQM handle and retrieve deterministic fixture shots."""
-    with patch.dict(os.environ, {"IQM_QC_ID": "qc-default", "IQM_QC_ALIAS": "default"}):
-        device = open_device_from_license()
-    assert device.qubits_num() == 2
+    """Retrieve eight shots from the licensed Emerald Resonance mock."""
+    device = open_device_from_license()
 
     backend = IQMBackend(device=device)
     circuit = QuantumCircuit(2)
@@ -42,7 +37,7 @@ def main() -> None:
     circuit.measure_all()
     circuit = transpile(circuit, backend)
     counts = backend.run(circuit, shots=8).result().get_counts()
-    assert counts == {"00": 4, "11": 4}
+    assert sum(counts.values()) == 8
 
 
 if __name__ == "__main__":

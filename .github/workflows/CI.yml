@@ -215,6 +215,8 @@ jobs:
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     uses: $/.github/workflows/slurm.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   # this job does nothing and is only used for branch protection
   required-checks-pass:

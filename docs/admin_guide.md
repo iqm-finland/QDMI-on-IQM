@@ -2,7 +2,7 @@
 
 Follow
 [MQT Core's Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-for scheduler configuration, license counts, and optional site defaults.
+for scheduler configuration, license counts, and job environments.
 
 Install the IQM device implementation in the workload environment on the compute
 nodes. Then follow [IQM on Slurm](spank_plugin.md) to select a catalogue entry,

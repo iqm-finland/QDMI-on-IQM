@@ -38,9 +38,10 @@ explicit intent, valid credentials, and an appropriate target.
 
 ## Slurm Integration
 
-- MQT Core owns the shared Slurm runner and optional SPANK plugin.
-- `test/slurm/` contains the IQM mock, catalogue setup, and SDK workload. Follow
-  its README to run the shared fixture without live IQM access.
+- MQT Core owns the shared Slurm runner and Docker cluster.
+- `test/slurm/` contains catalogue setup and an SDK workload for the Emerald
+  Resonance mock. Its README describes the required credentials and eight-shot
+  workload. Run it only when live IQM access is explicitly intended.
 - These retained test fixtures use GPL-3.0-or-later. Preserve their license
   boundary and applicable file headers.
 
