@@ -34,3 +34,8 @@ logs. CI receives the repository's `RESONANCE_API_KEY` as `IQM_TOKEN` and
 reports an explicit skip when that secret is unavailable.
 
 See [IQM on Slurm](../../docs/spank_plugin.md) for deployment.
+
+For jobs from several vendors on the same cluster, use the
+[MQT Core multi-vendor example](https://github.com/munich-quantum-toolkit/core/tree/main/docker/slurm#multiple-device-implementations).
+Each device environment has its own catalogue and credentials.
+`setup.sh [OUTPUT]` writes the catalogue to the chosen path.

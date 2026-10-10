@@ -19,9 +19,10 @@
 
 set -eu
 
-python3 - <<'CATALOGUE'
+python3 - "${1:-/opt/provider-catalogue.json}" <<'CATALOGUE'
 import json
 import os
+import sys
 from pathlib import Path
 from iqm.qdmi import IQM_QDMI_LIBRARY_PATH
 
@@ -34,5 +35,5 @@ for preset in presets:
     preset["library"] = str(library.resolve())
     preset["enabled"] = preset["id"] == "iqm.emerald.mock"
 configuration = {"schema-version": 1, "qdmi": {"devices": presets}}
-Path("/opt/provider-catalogue.json").write_text(json.dumps(configuration))
+Path(sys.argv[1]).write_text(json.dumps(configuration))
 CATALOGUE
