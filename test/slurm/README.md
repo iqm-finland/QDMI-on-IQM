@@ -1,7 +1,7 @@
 # IQM Slurm smoke test
 
 This test runs a Qiskit workload against IQM's Emerald Resonance mock in
-[MQT Core's Slurm cluster example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm).
+[MQT Core's Slurm cluster example](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html).
 It requires a valid `IQM_TOKEN` and network access to
 `https://resonance.iqm.tech`.
 
@@ -37,7 +37,7 @@ reports an explicit skip when that secret is unavailable.
 See [IQM on Slurm](../../docs/spank_plugin.md) for deployment.
 
 For jobs from several vendors on the same cluster, use the
-[MQT Core multi-vendor example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm#multiple-device-implementations).
+[MQT Core multi-vendor example](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html#multiple-device-implementations).
 MQT Core and all device implementations share one Python environment. Each job
 opens its selected device through the driver, with the credentials that device
 needs. The cluster monitors each device before admitting its jobs.

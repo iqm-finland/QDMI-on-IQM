@@ -2,10 +2,10 @@
 
 [MQT Core's Slurm integration](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
 provides the cluster configuration, device licenses, and availability monitor.
-Install IQM alongside the other QDMI device implementations in the same workload
-environment on every compute node. MQT Core's driver opens the device selected
-by the job's license; the IQM implementation handles authentication and quantum
-execution.
+Cluster administrators install IQM alongside the other QDMI device
+implementations in one workload environment on login and compute nodes. MQT
+Core's driver opens the device selected by the job's license; the IQM
+implementation handles authentication and quantum execution.
 
 ## Configure IQM access
 
@@ -18,17 +18,21 @@ uv pip install 'iqm-qdmi[qiskit]'
 MQT Core discovers the installed device catalogue from the Python package. For
 the unreleased QDMI 1.4 and MQT Core 4.1 interfaces, build the repositories'
 current source revisions together as shown in the
-[shared cluster example](https://github.com/munich-quantum-toolkit/core/tree/main/examples/slurm).
+[shared cluster example](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html).
 Native installations need a readable catalogue and library on each compute node;
-retain the Python package for the Qiskit adapter.
+retain the Python package for the Qiskit adapter. Administrators can put shared
+non-secret settings in `/etc/mqt-core/qdmi.json`, which MQT Core reads
+automatically, and make the workload environment available through the site
+defaults or a software module.
 
 The catalogue includes `iqm.emerald`, `iqm.garnet`, and their `.mock` variants.
 Register the selected ID as a Slurm license: `Licenses=iqm.emerald.mock:1`
 permits one allocation at a time for the Emerald Resonance mock. The cluster's
 availability monitor reserves the license while this device is unavailable. It
-needs IQM credentials and network access, just as workloads do.
+uses separate site-owned IQM credentials and needs network access to Resonance.
 
-Set `IQM_TOKENS_FILE` to a credential file readable by the job user on each
+Select your IQM credentials in the submission environment. For example, set
+`IQM_TOKENS_FILE` to your credential file, readable at the same path on each
 compute node. See [authentication](usage.md#authentication-methods) for other
 credential sources and token renewal. Keep tokens out of Slurm configuration and
 committed scripts. Slurm exports the submission environment; AWS credentials and
@@ -56,11 +60,9 @@ result = backend.run(transpile(circuit, backend), shots=100).result()
 print(result.get_counts())
 ```
 
-Activate the shared workload environment and submit the job:
+With the site environment and your credentials available, submit the job:
 
-```bash
-export IQM_TOKENS_FILE=/shared/iqm/tokens.json
-unset IQM_QC_ID
+```console
 srun --licenses=iqm.emerald.mock python bell.py
 ```
 
