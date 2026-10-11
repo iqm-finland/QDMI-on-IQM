@@ -340,9 +340,8 @@ Pass `shots` to `compile_pulse_program` instead.
 
 ## Temporary development dependencies
 
-This repository uses QDMI 1.4.0 and pins a compatible MQT Core development
-commit for native multi-program jobs and installed device discovery. Replace the
-Core pin with a suitable release and regenerate `uv.lock` before publishing.
-Remove the temporary LLVM/MLIR setup from Python CI and Linux wheel-test
-containers once Core wheels are available for these APIs. Native-only device
-builds do not require LLVM/MLIR.
+This repository pins the QDMI v1.4.0 release commit and a current MQT Core
+source commit. Replace the Core pin with a 4.1 release and regenerate `uv.lock`
+before publishing. Remove the temporary LLVM/MLIR setup from Python CI and Linux
+wheel-test containers once Core wheels are available for these APIs. Native-only
+device builds do not require LLVM/MLIR.

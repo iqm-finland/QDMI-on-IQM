@@ -51,7 +51,7 @@ classifiers = [
 name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
-# Temporary Core #2373 source pin: replace with a release before publishing.
+# Temporary Core source pin: replace with the 4.1 release before publishing.
 [project.optional-dependencies]
 # 14.0.1 is the oldest Pulla release supported by this integration.
 pulla = [
@@ -200,7 +200,7 @@ test-sources = [ "test/python" ]
 overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 
 [tool.cibuildwheel.linux]
-# Temporary: Core builds from the pinned development commit. Remove with the release pin.
+# Temporary: Core builds from source. Remove with the 4.1 release pin.
 environment = { MLIR_DIR = "/opt/llvm-23.1.2/lib/cmake/mlir" }
 before-all = """
 set -e
