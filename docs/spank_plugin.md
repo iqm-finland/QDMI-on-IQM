@@ -364,9 +364,9 @@ if *any* enabled source says so):
   probe from an earlier revision of this prototype. Kept for backwards
   compatibility and as an optional supplementary check; not recommended as the
   sole source, for the reasons above.
-- **`queue-length` (experimental, off by default, cloud/pay-as-you-go QCs only)**:
-  best-effort polling of the queue-status endpoint described above. Because the
-  exact path is unconfirmed, this source requires an explicit
+- **`queue-length` (experimental, off by default, cloud/pay-as-you-go QCs
+  only)**: best-effort polling of the queue-status endpoint described above.
+  Because the exact path is unconfirmed, this source requires an explicit
   `--queue-status-url-template` (a URL template with a `{qc_id}` placeholder)
   rather than shipping a guessed, hardcoded path. Any request failure (wrong
   path, 404, network error, unexpected schema) degrades to "inconclusive" rather
