@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Added
 
+- 🧪 Test native and wheel installations in Slurm with an authenticated,
+  eight-shot Qiskit job on the Emerald Resonance mock ([#265])
+  ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Select and pin an IQM calibration before target construction through
   session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
   effective UUID, and keep every session on its initial calibration when a
@@ -51,12 +54,10 @@ releases may include breaking changes.
 
 - ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
   Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
-- 💥 Run IQM jobs in MQT Core's shared Slurm example, using one `quantum`
-  partition and one environment for all QDMI device implementations.
-  Applications open an explicit catalogue ID, while Slurm licenses schedule
-  access and the cluster monitors device availability. Remove the device SPANK
-  plugin. Native and wheel smoke tests submit eight shots each to the Emerald
-  Resonance mock ([#265]) ([**@flowerthrower**], [**@burgholzer**])
+- ♻️ Use MQT Core's shared Slurm cluster example, with one `quantum` partition
+  and one environment for all QDMI device implementations. Slurm licenses
+  schedule access, and the cluster monitors device availability ([#265])
+  ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
   selection takes precedence over environment defaults. Temporary Core source
@@ -79,8 +80,18 @@ releases may include breaking changes.
   ([**@denialhaag**])
 - 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
 
+### Removed
+
+- 💥 Remove the IQM-specific SPANK plugin and its cluster configuration. Slurm
+  exports credentials through the job environment, and applications select
+  devices through the QDMI Client Interface ([#265]) ([**@flowerthrower**],
+  [**@burgholzer**]).
+
 ### Fixed
 
+- 🐛 Pass the offloader's quantum computer selection to the IQM worker instead
+  of a SPANK-specific `srun` option ([#265]) ([**@flowerthrower**],
+  [**@burgholzer**]).
 - 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
   operations, preserving physical site names during IQM JSON serialization
   ([#293]) ([**@burgholzer**])

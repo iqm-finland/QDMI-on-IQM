@@ -63,12 +63,5 @@ for the development workflow, coding standards, and pull request process.
 
 ## License
 
-The components of this repository are licensed under two separate licenses:
-
-- The main **QDMI-on-IQM** codebase (including the core C++ library and the
-  Python wrapper) is licensed under the
-  **Apache License 2.0 with LLVM exception**. See [LICENSE](LICENSE) for the
-  license text.
-- Slurm integration fixtures in [test/slurm/](test/slurm/) retain their
-  **GPL-3.0-or-later** license; see
-  [test/slurm/LICENSE.md](test/slurm/LICENSE.md).
+This project is licensed under the **Apache License 2.0 with LLVM exception**.
+See [LICENSE](LICENSE) for the license text.

@@ -19,7 +19,7 @@ PROVIDER_INSTALL_MODE=native uv run --no-project \
   --compose-file test/slurm/compose.yml \
   --device-license iqm.emerald.mock \
   --qdmi-config-file /opt/provider-catalogue.json \
-  -- python3 /workload/test/slurm/probe.py iqm.emerald.mock
+  -- python3 /workload/test/slurm/workload.py
 ```
 
 Repeat with `PROVIDER_INSTALL_MODE=wheel`. Both modes install the Python adapter
@@ -34,10 +34,9 @@ submission environment to the job. This smoke test uses one token for both
 roles; production deployments should configure separate site-owned monitor
 credentials. It does not forward `IQM_TOKENS_FILE`. Keep tokens out of command
 arguments, build arguments, and logs. CI receives the repository's
-`RESONANCE_API_KEY` as `IQM_TOKEN` and reports an explicit skip when that secret
-is unavailable.
+`RESONANCE_API_KEY` as the required `IQM_TOKEN` secret.
 
-See [IQM on Slurm](../../docs/spank_plugin.md) for deployment.
+See [IQM on Slurm](../../docs/slurm.md) for deployment.
 
 For jobs from several vendors on the same cluster, use the
 [MQT Core multi-vendor example](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html#multiple-device-implementations).

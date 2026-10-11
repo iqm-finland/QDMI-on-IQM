@@ -177,11 +177,10 @@ perfect. We will guide you through the process.
 Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer.
 
-CI runs unit tests without IQM credentials. Live integration tests run when
-`IQM_TOKEN` is available. Documentation builds without credentials skip notebook
-execution; set `IQM_DOCS_EXECUTION=cache` with valid credentials to execute the
-examples. The Slurm smoke test submits eight shots per installation mode to the
-Emerald Resonance mock and requires `IQM_TOKEN`.
+CI runs the native integration tests and documentation notebooks with
+`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
+Slurm smoke test submits eight shots per installation mode to the Emerald
+Resonance mock.
 
 ### Configure and Build
 

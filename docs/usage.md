@@ -215,10 +215,10 @@ environment-based selection.
 List configured IDs offline, then open only the selected device:
 
 ```python
-from mqt.core.qdmi import builtin_driver
+from mqt.core.qdmi import builtin_driver as qdmi_driver
 
-print(builtin_driver.registered_device_ids())
-device = builtin_driver.open_device("iqm.emerald.mock", token="…")
+print(qdmi_driver.registered_device_ids())
+device = qdmi_driver.open_device("iqm.emerald.mock", token="…")
 ```
 
 An explicit configuration augments built-in and installed device definitions and
@@ -230,7 +230,7 @@ An explicitly configured quantum computer ID or alias takes precedence over both
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the
-[IQM on Slurm](spank_plugin.md).
+[IQM on Slurm](slurm.md).
 
 ## Understanding Quantum Architecture and Calibration Sets
 

@@ -14,7 +14,6 @@
 !python/**
 !test/
 !test/slurm/
-!test/slurm/LICENSE.md
 !test/slurm/setup.sh
 **/__pycache__/
 **/*.py[cod]

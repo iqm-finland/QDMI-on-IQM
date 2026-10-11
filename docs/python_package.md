@@ -183,9 +183,9 @@ supplied through the job environment.
 
 The optional `licenses` argument is forwarded to `srun` unchanged. The offloader
 selects the quantum computer through its explicit arguments. Applications can
-also open a catalogue ID with `builtin_driver.open_device()` and pass that
-device to `IQMBackend`, as shown in
-[IQM on Slurm](spank_plugin.md#run-a-qiskit-job).
+also open a catalogue ID with `qdmi_driver.open_device()` and pass that device
+to `IQMBackend`, as shown in
+[IQM on Slurm](slurm.md#submit-a-qiskit-job).
 
 ### Programmatic Sampling Example
 
@@ -212,11 +212,11 @@ stable ID {py:data}`~iqm.qdmi.IQM_QDMI_DEVICE_ID` through the MQT Core QDMI
 driver:
 
 ```python
-from mqt.core.qdmi.builtin_driver import open_device
+from mqt.core.qdmi import builtin_driver as qdmi_driver
 
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 
-device = open_device(IQM_QDMI_DEVICE_ID, token="…", custom2="emerald")
+device = qdmi_driver.open_device(IQM_QDMI_DEVICE_ID, token="…", custom2="emerald")
 
 print(device.status())
 print(device.supported_program_formats())

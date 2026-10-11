@@ -42,8 +42,6 @@ explicit intent, valid credentials, and an appropriate target.
 - `test/slurm/` contains catalogue setup and an SDK workload for the Emerald
   Resonance mock. Its README describes the required credentials and eight-shot
   workload. Run it only when live IQM access is explicitly intended.
-- These retained test fixtures use GPL-3.0-or-later. Preserve their license
-  boundary and applicable file headers.
 
 ## Tech Stack
 

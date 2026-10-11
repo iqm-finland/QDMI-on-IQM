@@ -8,7 +8,7 @@ on:
         type: string
     secrets:
       IQM_TOKEN:
-        required: false
+        required: true
 
 permissions:
   contents: read
@@ -27,12 +27,12 @@ jobs:
         with:
           repository: munich-quantum-toolkit/core
           # Shared Slurm integration from MQT Core #2599 until it is merged.
-          ref: c9be8c8f73e8dca842a5a405cac57b46c0238873
+          ref: db1a6459c1667943fad1bac9c870babb16a6251f
           fetch-depth: 0
           persist-credentials: false
           path: core
 
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.15"
 
@@ -49,11 +49,6 @@ jobs:
         env:
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
         run: |
-          if [[ -z "$IQM_TOKEN" ]]; then
-            echo "::notice::Skipping Slurm live tests: IQM_TOKEN is unavailable."
-            echo "Slurm live tests skipped: IQM_TOKEN is unavailable." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
           for mode in native wheel; do
             PROVIDER_INSTALL_MODE="$mode" uv run \
               --no-project core/test/slurm/run_integration.py \
@@ -63,6 +58,6 @@ jobs:
               --compose-file provider/test/slurm/compose.yml \
               --device-license iqm.emerald.mock \
               --qdmi-config-file /opt/provider-catalogue.json \
-              -- python3 /workload/test/slurm/probe.py iqm.emerald.mock
+              -- python3 /workload/test/slurm/workload.py
             echo "Slurm $mode: eight Emerald Resonance mock shots passed." >> "$GITHUB_STEP_SUMMARY"
           done

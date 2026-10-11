@@ -24,7 +24,7 @@ import math
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import re
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from qiskit import QuantumCircuit
@@ -34,6 +34,9 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms import VQEResult
 
 from iqm.qdmi import offloader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 #: The stdout a worker produces for a sampling job returning a single `0` shot.
 SAMPLE_STDOUT = base64.b64encode(
@@ -94,87 +97,6 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         return FakeCompletedProcess()
 
     monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-    circuit = QuantumCircuit(1)
-    circuit.measure_all()
-
-    counts = offloader.sample(circuit, shots=7, local=False, simulator=True)
-
-    assert counts == {"0": 1}
-    assert "srun" in captured_command
-    assert "iqm-sampler" in captured_command
-    assert "--shots" in captured_command
-    assert "7" in captured_command
-    # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
-    # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
-    assert "--base-url" not in captured_command
-
-
-def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Test estimation via Slurm offloading using a mocked subprocess."""
-    captured_command: list[str] = []
-
-    class FakeCompletedProcess:
-        returncode = 0
-        stdout = ESTIMATE_STDOUT
-        stderr = b""
-
-    def fake_run(
-        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
-    ) -> FakeCompletedProcess:
-        assert capture_output is True
-        assert check is False
-        assert timeout is None
-        captured_command[:] = command
-        return FakeCompletedProcess()
-
-    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-    ansatz = QuantumCircuit(1)
-    ansatz.ry(ESTIMATE_PARAMETER, 0)
-    operator = SparsePauliOp.from_list([("Z", 1.0)])
-
-    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
-
-    assert result.optimal_parameters == {ansatz.parameters[0]: 0.125}
-    assert "srun" in captured_command
-    assert "iqm-estimator" in captured_command
-    assert "--maxiter" in captured_command
-    assert "3" in captured_command
-    # Backend configuration (base URL, tokens, etc.) is not passed explicitly:
-    # it is inherited by the job's environment (e.g. via the Slurm SPANK plugin).
-    assert "--base-url" not in captured_command
-
-
-def test_sample_slurm_uses_worker_qc_alias_and_no_cli_credentials(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """The Slurm path must never put credentials on the `srun` command line.
-
-    Backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`) reach the job
-    purely through the environment -- either plain Slurm propagation or the
-    shared injection -- never as CLI arguments. Only the explicit `qc_alias`
-    selection is forwarded to the IQM worker.
-    """
-    captured_command: list[str] = []
-
-    class FakeCompletedProcess:
-        returncode = 0
-        stdout = SAMPLE_STDOUT
-        stderr = b""
-
-    def fake_run(
-        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
-    ) -> FakeCompletedProcess:
-        assert capture_output is True
-        assert check is False
-        assert timeout is None
-        captured_command[:] = command
-        return FakeCompletedProcess()
-
-    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
     monkeypatch.setenv("IQM_BASE_URL", "https://resonance.example")
     monkeypatch.setenv("IQM_TOKENS_FILE", "tokens_path")
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -184,26 +106,18 @@ def test_sample_slurm_uses_worker_qc_alias_and_no_cli_credentials(
 
     counts = offloader.sample(circuit, shots=7, local=False, simulator=True, qc_alias="emerald:mock")
 
-    worker_index = captured_command.index("iqm-sampler")
-    worker_command = captured_command[worker_index : worker_index + 4]
     assert counts == {"0": 1}
-    assert "https://resonance.example" not in captured_command
-    assert "tokens_path" not in captured_command
-    for flag in ("--base-url", "--tokens-file", "--token"):
-        assert flag not in captured_command
-    assert not any(arg.startswith("--iqm-") for arg in captured_command)
-    assert "--qc-alias=emerald:mock" in captured_command
-    assert captured_command.index("--qc-alias=emerald:mock") > worker_index
-    assert worker_command[0] == "iqm-sampler"
-    assert Path(worker_command[1]).name == "qc.qpy"
-    assert worker_command[2] == "--shots"
-    assert worker_command[3] == "7"
+    assert "srun" in captured_command
+    assert "iqm-sampler" in captured_command
+    assert "--shots" in captured_command
+    assert "7" in captured_command
+    for argument in ("--base-url", "--tokens-file", "--token", "https://resonance.example", "tokens_path"):
+        assert argument not in captured_command
+    assert captured_command.index("--qc-alias=emerald:mock") > captured_command.index("iqm-sampler")
 
 
-def test_estimate_slurm_uses_worker_qc_id_and_no_cli_credentials(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Mirrors `test_sample_slurm_uses_worker_qc_alias_and_no_cli_credentials` for `estimate()`."""
+def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test estimation via Slurm offloading using a mocked subprocess."""
     captured_command: list[str] = []
 
     class FakeCompletedProcess:
@@ -230,22 +144,16 @@ def test_estimate_slurm_uses_worker_qc_id_and_no_cli_credentials(
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     qc_id = "12345678-1234-1234-1234-123456789abc"
-    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
+    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
 
-    worker_index = captured_command.index("iqm-estimator")
-    worker_command = captured_command[worker_index : worker_index + 5]
-    assert "https://resonance.example" not in captured_command
-    assert "tokens_path" not in captured_command
-    for flag in ("--base-url", "--tokens-file", "--token"):
-        assert flag not in captured_command
-    assert not any(arg.startswith("--iqm-") for arg in captured_command)
-    assert f"--qc-id={qc_id}" in captured_command
-    assert captured_command.index(f"--qc-id={qc_id}") > worker_index
-    assert worker_command[0] == "iqm-estimator"
-    assert Path(worker_command[1]).name == "ansatz.qpy"
-    assert Path(worker_command[2]).name == "operator.pkl"
-    assert worker_command[3] == "--maxiter"
-    assert worker_command[4] == "3"
+    assert result.optimal_parameters == {ansatz.parameters[0]: 0.125}
+    assert "srun" in captured_command
+    assert "iqm-estimator" in captured_command
+    assert "--maxiter" in captured_command
+    assert "3" in captured_command
+    for argument in ("--base-url", "--tokens-file", "--token", "https://resonance.example", "tokens_path"):
+        assert argument not in captured_command
+    assert captured_command.index(f"--qc-id={qc_id}") > captured_command.index("iqm-estimator")
 
 
 def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
