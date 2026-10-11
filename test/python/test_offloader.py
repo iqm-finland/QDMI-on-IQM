@@ -28,39 +28,23 @@ from pathlib import Path
 
 import pytest
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
+from qiskit.circuit import Parameter, ParameterVector
+from qiskit.primitives.containers import BitArray, DataBin, PrimitiveResult, SamplerPubResult
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms import VQEResult
 
 from iqm.qdmi import offloader
 
+#: The stdout a worker produces for a sampling job returning a single `0` shot.
+SAMPLE_STDOUT = base64.b64encode(
+    pickle.dumps(PrimitiveResult([SamplerPubResult(DataBin(meas=BitArray.from_samples(["0"])), metadata={})]))
+)
 
-class FakeBitArray:
-    """Mock for Qiskit's BitArray."""
-
-    def __init__(self, counts: dict[str, int]) -> None:
-        """Initialize counts."""
-        self.counts = counts
-
-    def get_counts(self) -> dict[str, int]:
-        """Return counts."""
-        return self.counts
-
-
-class FakePubResult:
-    """Mock for PubResult."""
-
-    def __init__(self, data: dict[str, FakeBitArray]) -> None:
-        """Initialize data."""
-        self.data = data
-        self.metadata: dict[str, object] = {}
-
-
-class FakeVQEResult:
-    """Mock for VQEResult."""
-
-    def __init__(self, optimal_parameters: dict[str, float]) -> None:
-        """Initialize optimal parameters."""
-        self.optimal_parameters = optimal_parameters
+ESTIMATE_PARAMETER = Parameter("theta")
+_ESTIMATE_RESULT = VQEResult()
+_ESTIMATE_RESULT.optimal_parameters = {ESTIMATE_PARAMETER: 0.125}
+#: The stdout a worker produces for an estimation job converging on `theta`.
+ESTIMATE_STDOUT = base64.b64encode(pickle.dumps(_ESTIMATE_RESULT))
 
 
 def test_sample_local_simulator() -> None:
@@ -97,7 +81,7 @@ def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -133,7 +117,7 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -149,11 +133,12 @@ def test_estimate_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
 
-    assert result.optimal_parameters == {"theta": 0.125}
+    assert result.optimal_parameters == {ansatz.parameters[0]: 0.125}
     assert "srun" in captured_command
     assert "iqm-estimator" in captured_command
     assert "--maxiter" in captured_command
@@ -178,7 +163,7 @@ def test_sample_slurm_uses_spank_qc_alias_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps([FakePubResult({"meas": FakeBitArray({"0": 1})})]))
+        stdout = SAMPLE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -223,7 +208,7 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
 
     class FakeCompletedProcess:
         returncode = 0
-        stdout = base64.b64encode(pickle.dumps(FakeVQEResult({"theta": 0.125})))
+        stdout = ESTIMATE_STDOUT
         stderr = b""
 
     def fake_run(
@@ -241,14 +226,14 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
     operator = SparsePauliOp.from_list([("Z", 1.0)])
 
     qc_id = "12345678-1234-1234-1234-123456789abc"
-    result = offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, qc_id=qc_id)
 
     worker_index = captured_command.index("iqm-estimator")
     worker_command = captured_command[worker_index : worker_index + 5]
-    assert result.optimal_parameters == {"theta": 0.125}
     assert "https://resonance.example" not in captured_command
     assert "tokens_path" not in captured_command
     for flag in ("--base-url", "--tokens-file", "--token", "--qc-id", "--qc-alias"):
@@ -260,6 +245,279 @@ def test_estimate_slurm_uses_spank_qc_id_and_no_cli_credentials(
     assert Path(worker_command[2]).name == "operator.pkl"
     assert worker_command[3] == "--maxiter"
     assert worker_command[4] == "3"
+
+
+def test_sample_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The `licenses` kwarg is forwarded verbatim as `--licenses` on `srun`, ahead of the worker command."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = SAMPLE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    counts = offloader.sample(
+        circuit, shots=7, local=False, simulator=True, qc_alias="emerald:mock", licenses="iqm_qc_emerald_mock:1"
+    )
+
+    worker_index = captured_command.index("iqm-sampler")
+    assert counts == {"0": 1}
+    assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
+    assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
+
+
+def test_sample_slurm_omits_licenses_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Without a `licenses` kwarg, `--licenses` is not added to the `srun` command."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = SAMPLE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True)
+
+    assert not any(arg.startswith("--licenses") for arg in captured_command)
+
+
+def test_estimate_slurm_forwards_licenses(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Mirrors `test_sample_slurm_forwards_licenses` for `estimate()`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ESTIMATE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    offloader.estimate(
+        ansatz,
+        operator,
+        maxiter=3,
+        local=False,
+        simulator=True,
+        qc_alias="emerald:mock",
+        licenses="iqm_qc_emerald_mock:1",
+    )
+
+    worker_index = captured_command.index("iqm-estimator")
+    assert "--licenses=iqm_qc_emerald_mock:1" in captured_command
+    assert captured_command.index("--licenses=iqm_qc_emerald_mock:1") < worker_index
+
+
+@pytest.mark.parametrize(
+    ("partition", "partition_env", "expected"),
+    [
+        (None, None, "--partition=quantum"),
+        (None, "qc-nodes", "--partition=qc-nodes"),
+        ("qc-nodes", "ignored", "--partition=qc-nodes"),
+    ],
+)
+def test_sample_slurm_resolves_partition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    partition: str | None,
+    partition_env: str | None,
+    expected: str,
+) -> None:
+    """An explicit `partition` wins over `IQM_SLURM_PARTITION`, which wins over the `quantum` default."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = SAMPLE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    if partition_env is None:
+        monkeypatch.delenv("IQM_SLURM_PARTITION", raising=False)
+    else:
+        monkeypatch.setenv("IQM_SLURM_PARTITION", partition_env)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True, partition=partition)
+
+    assert expected in captured_command
+    assert captured_command.index(expected) < captured_command.index("iqm-sampler")
+
+
+def test_sample_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The `nodes` kwarg sizes the allocation while the worker stays a single task."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = SAMPLE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+
+    # Both options only reach Slurm if they precede the worker on the command
+    # line; after it they would be the worker's own arguments.
+    offloader.sample(circuit, shots=7, local=False, simulator=True)
+    worker_index = captured_command.index("iqm-sampler")
+    assert captured_command.index("--nodes=1") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+    offloader.sample(circuit, shots=7, local=False, simulator=True, nodes=4)
+    worker_index = captured_command.index("iqm-sampler")
+    assert captured_command.index("--nodes=4") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+
+@pytest.mark.parametrize(
+    ("partition", "partition_env", "expected"),
+    [
+        (None, None, "--partition=quantum"),
+        (None, "qc-nodes", "--partition=qc-nodes"),
+        ("qc-nodes", "ignored", "--partition=qc-nodes"),
+    ],
+)
+def test_estimate_slurm_resolves_partition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    partition: str | None,
+    partition_env: str | None,
+    expected: str,
+) -> None:
+    """`estimate()` walks the same resolution order as `test_sample_slurm_resolves_partition`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ESTIMATE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    if partition_env is None:
+        monkeypatch.delenv("IQM_SLURM_PARTITION", raising=False)
+    else:
+        monkeypatch.setenv("IQM_SLURM_PARTITION", partition_env)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, partition=partition)
+
+    assert expected in captured_command
+    assert captured_command.index(expected) < captured_command.index("iqm-estimator")
+
+
+def test_estimate_slurm_requests_nodes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Mirrors `test_sample_slurm_requests_nodes` for `estimate()`."""
+    captured_command: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ESTIMATE_STDOUT
+        stderr = b""
+
+    def fake_run(
+        command: list[str], *, capture_output: bool, check: bool, timeout: float | None
+    ) -> FakeCompletedProcess:
+        assert capture_output is True
+        assert check is False
+        assert timeout is None
+        captured_command[:] = command
+        return FakeCompletedProcess()
+
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(ESTIMATE_PARAMETER, 0)
+    operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True)
+    worker_index = captured_command.index("iqm-estimator")
+    assert captured_command.index("--nodes=1") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
+
+    offloader.estimate(ansatz, operator, maxiter=3, local=False, simulator=True, nodes=2)
+    worker_index = captured_command.index("iqm-estimator")
+    assert captured_command.index("--nodes=2") < worker_index
+    assert captured_command.index("--ntasks=1") < worker_index
 
 
 def test_sample_slurm_failure_keeps_job_dir_for_debugging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -315,7 +573,53 @@ def test_sample_slurm_timeout_raises_runtime_error(monkeypatch: pytest.MonkeyPat
         offloader.sample(circuit, shots=7, local=False, simulator=True, timeout=5)
 
 
-def test_first_pub_raises_on_empty_result() -> None:
+def test_extract_counts_raises_on_empty_result() -> None:
     """An empty primitive result raises a clear RuntimeError instead of a bare StopIteration."""
     with pytest.raises(RuntimeError, match="no pubs"):
-        offloader._first_pub([])  # ruff:ignore[private-member-access]
+        offloader.extract_counts(PrimitiveResult([]))
+
+
+@pytest.mark.parametrize("stdout", [b"", b"\xff", b"not base64", base64.b64encode(b"not pickle")])
+def test_invalid_pickled_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stdout: bytes) -> None:
+    """Malformed worker output raises the public error type."""
+    process = subprocess.CompletedProcess([], 0, stdout, b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    with pytest.raises(RuntimeError, match=r"No output|Error parsing"):
+        offloader.estimate(QuantumCircuit(1), SparsePauliOp.from_list([("Z", 1.0)]), simulator=True)
+
+
+def test_vqe_result_pickle_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A genuine VQE result retains its full state across the pickle transport."""
+    theta = ParameterVector("theta", 2)
+    ansatz = QuantumCircuit(2)
+    ansatz.ry(theta[0], 0)
+    ansatz.cx(0, 1)
+    ansatz.ry(theta[1], 1)
+    operator = SparsePauliOp.from_list([("ZZ", 1.0)])
+    expected = offloader.estimate(ansatz, operator, maxiter=3, local=True, simulator=True)
+
+    expected.optimizer_evals = 7
+    encoded = base64.b64encode(pickle.dumps(expected)) + b"\n"
+    process = subprocess.CompletedProcess([], 0, encoded, b"")
+    monkeypatch.setenv("IQM_JOBS_DIR", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: process)
+    result = offloader.estimate(ansatz, operator, simulator=True)
+
+    assert result.optimal_parameters == expected.optimal_parameters
+    assert result.optimal_circuit == expected.optimal_circuit
+    assert result.eigenvalue == expected.eigenvalue
+    assert result.cost_function_evals == expected.cost_function_evals
+    assert result.optimal_point == pytest.approx(expected.optimal_point)
+    assert result.optimal_value == expected.optimal_value
+    assert result.optimizer_time == pytest.approx(expected.optimizer_time)
+    assert result.optimizer_evals == expected.optimizer_evals
+    assert result.aux_operators_evaluated == expected.aux_operators_evaluated
+    assert result.optimizer_result is not None
+    assert expected.optimizer_result is not None
+    assert result.optimizer_result.x == pytest.approx(expected.optimizer_result.x)
+    assert result.optimizer_result.fun == expected.optimizer_result.fun
+    assert result.optimizer_result.jac == pytest.approx(expected.optimizer_result.jac)
+    assert result.optimizer_result.nfev == expected.optimizer_result.nfev
+    assert result.optimizer_result.njev == expected.optimizer_result.njev
+    assert result.optimizer_result.nit == expected.optimizer_result.nit

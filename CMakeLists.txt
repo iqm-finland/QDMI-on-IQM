@@ -15,11 +15,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.24...4.2)
+cmake_minimum_required(VERSION 3.24...4.4)
 project(
   iqm-qdmi-device
   LANGUAGES C CXX
-  VERSION 1.2.0
+  VERSION 1.4.0
   DESCRIPTION "Implementation of a QDMI device for IQM Quantum Computers")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -61,6 +61,11 @@ option(BUILD_IQM_QDMI_TESTS "Build tests for the IQM QDMI device"
 option(BUILD_IQM_SPANK "Build the IQM SPANK plugin" OFF)
 option(BUILD_IQM_QDMI_DOCS "Build documentation for the IQM QDMI device" OFF)
 option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+
+# Configure runtime sanitizers. This has to happen before the external
+# dependencies are declared so that they are instrumented as well.
+include(cmake/Sanitizers.cmake)
+iqm_qdmi_apply_sanitizers()
 
 # Manage external dependencies
 include(cmake/ExternalDependencies.cmake)

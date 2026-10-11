@@ -66,7 +66,7 @@ explicit intent, valid credentials, and an appropriate target.
 
 ### Python
 
-- Python 3.10+
+- Python 3.11+
 - `scikit-build-core` as the build backend
 - `pytest` for tests in `test/python/`
 - `ruff` for formatting and linting
@@ -76,7 +76,7 @@ explicit intent, valid credentials, and an appropriate target.
 
 - Sphinx and MyST
 - Furo theme
-- Doxygen and Breathe for C++ API documentation
+- Doxygen and Breathe for C/C++ API documentation
 - AutoAPI for Python API documentation
 
 ## Development Guidelines
@@ -93,6 +93,9 @@ explicit intent, valid credentials, and an appropriate target.
 - MUST follow existing patterns in neighboring source and test files.
 - MUST document new user-facing behavior and update `CHANGELOG.md` for
   noteworthy user-facing changes.
+- MUST format changelog entries with the pull request reference and every
+  contributing author, for example `([#123]) ([**@username**])`, and define the
+  corresponding links at the bottom of `CHANGELOG.md`.
 - MUST fold additions, enhancements, or bug fixes for features that are still in
   `[Unreleased]` into the existing `[Unreleased]` `CHANGELOG.md` entry for that
   feature (appending the PR number) rather than creating separate bullet points

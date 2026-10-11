@@ -47,6 +47,7 @@
  *   - iqm_tokens_file  /  --iqm-tokens-file  → IQM_TOKENS_FILE
  *   - iqm_qc_id        /  --iqm-qc-id        → IQM_QC_ID
  *   - iqm_qc_alias     /  --iqm-qc-alias     → IQM_QC_ALIAS
+ *   - iqm_log_level    /  --iqm-log-level    → IQM_LOG_LEVEL
  *
  * Additional plugstack-only arguments:
  *   - partitions=quantum,quantum-dev (comma-separated, restricts activation)
@@ -133,7 +134,27 @@ struct Config_mapping {
   const char *option_name;
   /// srun option usage description.
   const char *option_usage;
+  /// Check for the value, or nullptr when every non-empty value is accepted.
+  bool (*validate)(std::string_view) = nullptr;
 };
+
+/// Log level names the QDMI device library recognizes.
+constexpr std::array<std::string_view, 4> K_LOG_LEVELS = {"NONE", "ERROR",
+                                                          "INFO", "DEBUG"};
+
+/**
+ * @brief Check that a value names a log level the device library understands.
+ *
+ * The library maps every name it does not recognize onto "no logging at all",
+ * so an unchecked typo would silence the compute node instead of raising the
+ * verbosity that was asked for.
+ *
+ * @param value The value given for the log level.
+ * @return True when @p value names a recognized level.
+ */
+bool Is_valid_log_level(const std::string_view value) {
+  return std::ranges::find(K_LOG_LEVELS, value) != K_LOG_LEVELS.end();
+}
 
 /// A SPANK environment variable and its corresponding QDMI session parameter.
 struct Session_parameter_mapping {
@@ -154,7 +175,7 @@ struct Validation_state {
 };
 
 /// All recognized configuration entries and their mappings.
-constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
+constexpr std::array<Config_mapping, 5> K_CONFIG_MAPPINGS = {{
     {.key = "iqm_base_url",
      .env_var = "IQM_BASE_URL",
      .option_name = "iqm-base-url",
@@ -171,6 +192,11 @@ constexpr std::array<Config_mapping, 4> K_CONFIG_MAPPINGS = {{
      .env_var = "IQM_QC_ALIAS",
      .option_name = "iqm-qc-alias",
      .option_usage = "Quantum computer alias"},
+    {.key = "iqm_log_level",
+     .env_var = "IQM_LOG_LEVEL",
+     .option_name = "iqm-log-level",
+     .option_usage = "QDMI log level: NONE, ERROR, INFO, or DEBUG",
+     .validate = &Is_valid_log_level},
 }};
 
 /// Effective job values passed explicitly to the validation session.
@@ -292,11 +318,20 @@ public:
 
       bool matched = false;
       for (std::size_t j = 0; j < K_CONFIG_MAPPINGS.size(); ++j) {
-        if (key == K_CONFIG_MAPPINGS[j].key) {
-          plugstack_values_[j] = std::string{value};
-          matched = true;
-          break;
+        if (key != K_CONFIG_MAPPINGS[j].key) {
+          continue;
         }
+        const auto &validate = K_CONFIG_MAPPINGS[j].validate;
+        if (validate != nullptr && !validate(value)) {
+          slurm_spank_log("[iqm_spank_plugin] warning: ignoring invalid "
+                          "plugstack value for %s (expected %s)",
+                          std::string{key}.c_str(),
+                          K_CONFIG_MAPPINGS[j].option_usage);
+        } else {
+          plugstack_values_[j] = std::string{value};
+        }
+        matched = true;
+        break;
       }
 
       // Handle the partition filter argument.
@@ -1093,10 +1128,16 @@ int IQMSpankConfigManager::option_callback(const int val, const char *optarg,
     slurm_spank_log("[iqm_spank_plugin] error: invalid option id %d", val);
     return -1;
   }
+  const auto &mapping = K_CONFIG_MAPPINGS[static_cast<std::size_t>(val)];
   if (optarg == nullptr || optarg[0] == '\0') {
-    slurm_spank_log(
-        "[iqm_spank_plugin] error: empty value for --%s",
-        K_CONFIG_MAPPINGS[static_cast<std::size_t>(val)].option_name);
+    slurm_spank_log("[iqm_spank_plugin] error: empty value for --%s",
+                    mapping.option_name);
+    return -1;
+  }
+  if (mapping.validate != nullptr && !mapping.validate(optarg)) {
+    slurm_spank_log("[iqm_spank_plugin] error: invalid value '%s' for --%s "
+                    "(expected %s)",
+                    optarg, mapping.option_name, mapping.option_usage);
     return -1;
   }
   g_config.srun_values_[static_cast<std::size_t>(val)] = std::string{optarg};

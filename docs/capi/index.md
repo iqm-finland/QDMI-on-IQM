@@ -1,8 +1,8 @@
-# C API Reference
+# C/C++ API Reference
 
 ```{toctree}
 :maxdepth: 2
-:caption: C API Reference
+:caption: C/C++ API Reference
 
 types
 constants

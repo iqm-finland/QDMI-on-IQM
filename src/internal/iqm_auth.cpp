@@ -67,13 +67,15 @@ std::string Base64_decode(const std::string &encoded_string) {
   const size_t outlen = ((encoded_string.length() * 3) / 4) - padding;
   std::vector<unsigned char> decoded(outlen);
 
+  // Both the standard alphabet (RFC 4648 section 4) and the URL-safe one
+  // (section 5) decode here, because JWTs are base64url-encoded per RFC 7515.
   static constexpr auto DECODE_TABLE = std::array{
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57,
+      -1, -1, -1, -1, -1, -1, -1, 62, -1, 62, -1, 63, 52, 53, 54, 55, 56, 57,
       58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,
       7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-      25, -1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+      25, -1, -1, -1, -1, 63, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
       37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1,
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -171,7 +173,7 @@ std::string Read_access_token_from_file(const std::string &path) {
 // TokenManager implementation
 //
 
-int TokenManager::time_left_seconds(const std::string &token) {
+int64_t TokenManager::time_left_seconds(const std::string &token) {
   if (token.empty()) {
     return 0;
   }
@@ -209,8 +211,9 @@ int TokenManager::time_left_seconds(const std::string &token) {
         nlohmann::json::parse(decoded); // NOLINT(misc-include-cleaner)
 
     // Get expiration time
-    const int exp_time = json.value("exp", 0);
-    return (std::max)(0, exp_time - static_cast<int>(std::time(nullptr)));
+    const auto exp_time = json.value("exp", int64_t{0});
+    return (std::max)(int64_t{0},
+                      exp_time - static_cast<int64_t>(std::time(nullptr)));
   } catch (const std::exception &e) {
     LOG_DEBUG("Failed to parse token body: " + std::string(e.what()));
     return 0;

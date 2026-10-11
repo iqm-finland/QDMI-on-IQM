@@ -63,6 +63,27 @@ public:
   static Logger &get_instance();
 
   /**
+   * Resolve the logging level configured in the environment.
+   *
+   * `IQM_LOG_LEVEL` names the level. `IQM_CPP_API_LOG_LEVEL` is a deprecated
+   * alias that is only consulted when `IQM_LOG_LEVEL` is unset or empty.
+   * Recognized values are `NONE`, `ERROR`, `INFO`, and `DEBUG`; any other
+   * value disables logging.
+   *
+   * @return The configured level, or LOG_LEVEL::ERROR if neither variable is
+   * set.
+   */
+  static LOG_LEVEL level_from_environment();
+
+  /**
+   * The notice to emit about a deprecated log level variable.
+   *
+   * @return The notice, or an empty string when the level did not come from a
+   * deprecated variable.
+   */
+  static std::string deprecation_notice();
+
+  /**
    * Get the current logging level.
    * @return The current logging level.
    */
@@ -108,6 +129,16 @@ private:
 
 } // namespace iqm
 
-#define LOG_ERROR(msg) (iqm::Logger::get_instance().error(msg))
-#define LOG_INFO(msg) (iqm::Logger::get_instance().info(msg))
-#define LOG_DEBUG(msg) (iqm::Logger::get_instance().debug(msg))
+/// Evaluate log messages only when their level is enabled.
+#define LOG_ERROR(msg)                                                         \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::ERROR            \
+       ? iqm::Logger::get_instance().error(msg)                                \
+       : static_cast<void>(0))
+#define LOG_INFO(msg)                                                          \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::INFO             \
+       ? iqm::Logger::get_instance().info(msg)                                 \
+       : static_cast<void>(0))
+#define LOG_DEBUG(msg)                                                         \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::DEBUG            \
+       ? iqm::Logger::get_instance().debug(msg)                                \
+       : static_cast<void>(0))

@@ -34,6 +34,7 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
     // Job management endpoints
     {API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "api/v1/jobs/%s/circuit"},
     {API_ENDPOINT::GET_JOB_STATUS, "api/v1/jobs/%s"},
+    {API_ENDPOINT::GET_JOB_PAYLOAD, "api/v1/jobs/%s/payload"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
      "api/v1/jobs/%s/artifacts/measurement_counts"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,
@@ -42,6 +43,10 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
 
     // Quantum computer endpoints
     {API_ENDPOINT::GET_QUANTUM_COMPUTERS, "api/v1/quantum-computers"},
+    {API_ENDPOINT::GET_QUANTUM_COMPUTER_HEALTH,
+     "api/v1/quantum-computers/%s/health"},
+    {API_ENDPOINT::GET_QUEUE_AVAILABILITY,
+     "api/v1/quantum-computers/%s/queue-availability"},
     {API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
      "api/v1/quantum-computers/%s/artifacts/static-quantum-architectures"},
     {API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,

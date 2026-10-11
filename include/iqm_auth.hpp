@@ -32,7 +32,7 @@
 namespace iqm {
 
 // Constants
-constexpr auto REFRESH_MARGIN_SECONDS = 60;
+constexpr int64_t REFRESH_MARGIN_SECONDS = 60;
 
 /**
  * Authentication related errors.
@@ -62,7 +62,7 @@ public:
    * @param token JWT token
    * @return Time left on token in seconds
    */
-  static int time_left_seconds(const std::string &token);
+  static int64_t time_left_seconds(const std::string &token);
 
   /**
    * Constructor with explicit parameters.

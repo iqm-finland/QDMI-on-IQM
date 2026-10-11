@@ -26,10 +26,13 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
 #include <cpr/redirect.h>
@@ -40,6 +43,7 @@
 #include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -48,6 +52,30 @@
 
 namespace iqm::http {
 namespace internal {
+
+std::string Resolve_ca_bundle() {
+  for (const auto *variable : {"CURL_CA_BUNDLE", "SSL_CERT_FILE"}) {
+    if (const auto *value = std::getenv(variable);
+        value != nullptr && *value != '\0') {
+      return value;
+    }
+  }
+
+#ifdef __linux__
+  constexpr std::array bundles{
+      "/etc/ssl/certs/ca-certificates.crt",
+      "/etc/pki/tls/certs/ca-bundle.crt",
+      "/etc/ssl/ca-bundle.pem",
+      "/etc/ssl/cert.pem",
+  };
+  for (const auto *bundle : bundles) {
+    if (const std::ifstream file{bundle}; file.good()) {
+      return bundle;
+    }
+  }
+#endif
+  return {};
+}
 
 namespace {
 
@@ -67,8 +95,10 @@ cpr::Header Make_json_headers(const cpr::Header &additional_headers) {
 
 void Apply_common_options(cpr::Session &session, const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::ConnectionPool &connection_pool,
                           const cpr::Header &headers,
                           const std::chrono::milliseconds timeout) {
+  session.SetConnectionPool(connection_pool);
   session.SetUrl(url);
   session.SetHeader(headers);
   session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
@@ -77,6 +107,9 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
       cpr::Timeout{Clamp_timeout_for_transport<CprTimeoutRep>(timeout)});
   session.SetRedirect(cpr::Redirect{true});
   session.SetVerifySsl(cpr::VerifySsl{true});
+  if (const auto bundle = Resolve_ca_bundle(); !bundle.empty()) {
+    session.SetSslOptions(cpr::Ssl(cpr::ssl::CaInfo{bundle}));
+  }
   if (bearer_token.has_value()) {
     session.SetBearer(*bearer_token);
   }
@@ -84,19 +117,23 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
 
 cpr::Response Default_get(const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
+                          const cpr::ConnectionPool &connection_pool,
                           const cpr::Header &headers,
                           const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers, timeout);
+  Apply_common_options(session, url, bearer_token, connection_pool, headers,
+                       timeout);
   return session.Get();
 }
 
 cpr::Response Default_post(const cpr::Url &url,
                            const std::optional<cpr::Bearer> &bearer_token,
+                           const cpr::ConnectionPool &connection_pool,
                            const cpr::Header &headers, const cpr::Body &body,
                            const std::chrono::milliseconds timeout) {
   cpr::Session session;
-  Apply_common_options(session, url, bearer_token, headers, timeout);
+  Apply_common_options(session, url, bearer_token, connection_pool, headers,
+                       timeout);
   session.SetBody(body);
   return session.Post();
 }
@@ -105,12 +142,24 @@ void Default_sleep(const int seconds) {
   std::this_thread::sleep_for(std::chrono::seconds(seconds));
 }
 
+std::chrono::steady_clock::time_point Default_now() {
+  return std::chrono::steady_clock::now();
+}
+
 /// Number of times to retry after receiving HTTP 429. Each retry waits for the
 /// server-provided Retry-After duration.
 constexpr uint8_t RATE_LIMIT_RETRY_COUNT = 10;
 /// Conservative fallback for malformed test servers or proxies that strip
 /// Retry-After from HTTP 429 responses. IQM's documented block duration is 30s.
 constexpr int DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS = 30;
+/// Length of the IQM Server API's rolling quota window. A quota observed now is
+/// fully replenished this long after the observation.
+constexpr int RATE_LIMIT_WINDOW_SECONDS = 10;
+/// Share of the quota below which a request waits for the window to replenish.
+constexpr std::int64_t DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT = 10;
+/// Names the threshold percentage. Zero turns the waiting off.
+constexpr auto RATE_LIMIT_THRESHOLD_VARIABLE =
+    "IQM_RATE_LIMIT_THRESHOLD_PERCENT";
 
 int Retry_after_seconds(const cpr::Response &http_response) {
   const auto retry_after = http_response.header.find("Retry-After");
@@ -128,6 +177,82 @@ int Retry_after_seconds(const cpr::Response &http_response) {
   return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
 }
 
+/// Parse a decimal string that must denote a whole number. Callers apply their
+/// own bounds; this rejects only what is no whole number at all, or one the
+/// platform cannot represent.
+std::optional<std::int64_t> Parse_number(const std::string &value) {
+  const char *text = value.c_str();
+  errno = 0;
+  char *end = nullptr;
+  const auto parsed = std::strtoll(text, &end, 10);
+  if (end == text || *end != '\0' || errno == ERANGE) {
+    return std::nullopt;
+  }
+  return parsed;
+}
+
+/// The percentage of the quota below which requests wait, or zero when the
+/// waiting is turned off.
+std::int64_t Threshold_percent() {
+  const char *configured = std::getenv(RATE_LIMIT_THRESHOLD_VARIABLE);
+  // Job schedulers and container runtimes routinely export a variable with an
+  // empty value, which must not count as a threshold the caller asked for.
+  if (configured == nullptr || *configured == '\0') {
+    return DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT;
+  }
+  const auto percent = Parse_number(configured);
+  if (!percent.has_value() || *percent < 0 || *percent > 100) {
+    LOG_DEBUG(std::string{RATE_LIMIT_THRESHOLD_VARIABLE} +
+              " must be a whole percentage between 0 and 100; using " +
+              std::to_string(DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT));
+    return DEFAULT_RATE_LIMIT_THRESHOLD_PERCENT;
+  }
+  return *percent;
+}
+
+/// Record the quota a successful response reports. A response that reports no
+/// usable quota teaches nothing and leaves the previous reading in place.
+void Record_rate_limit(Rate_limit_budget &budget,
+                       const cpr::Response &http_response) {
+  if (http_response.status_code < 200 || http_response.status_code >= 300) {
+    return;
+  }
+  const auto limit_header = http_response.header.find("RateLimit-Limit");
+  const auto remaining_header =
+      http_response.header.find("RateLimit-Remaining");
+  if (limit_header == http_response.header.end() ||
+      remaining_header == http_response.header.end()) {
+    return;
+  }
+  const auto limit = Parse_number(limit_header->second);
+  const auto remaining = Parse_number(remaining_header->second);
+  if (!limit.has_value() || !remaining.has_value() || *limit <= 0) {
+    return;
+  }
+  budget = {
+      // A negative count means the quota is overdrawn, which is exhausted.
+      .remaining = std::max<std::int64_t>(0, *remaining),
+      .limit = *limit,
+      .observed_at = Get_hooks().now()};
+}
+
+/// How long to hold back before spending more of a quota running low: the
+/// seconds left of the window @p budget was read in, or zero or less when that
+/// quota is unknown, healthy, or already replenished.
+int Rate_limit_wait_seconds(const Rate_limit_budget &budget) {
+  // Dividing first keeps the product inside the range for any limit a server
+  // reports; the threshold is a heuristic, so the truncation is immaterial.
+  const auto threshold = budget.limit / 100 * Threshold_percent();
+  if (budget.remaining >= threshold) {
+    return 0;
+  }
+  const auto replenished_at =
+      budget.observed_at + std::chrono::seconds{RATE_LIMIT_WINDOW_SECONDS};
+  return static_cast<int>(std::chrono::ceil<std::chrono::seconds>(
+                              replenished_at - Get_hooks().now())
+                              .count());
+}
+
 void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   if (policy == ERROR_LOG_POLICY::LOG_AS_DEBUG) {
     LOG_DEBUG(message);
@@ -136,20 +261,40 @@ void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
   LOG_ERROR(message);
 }
 
-/// Execute a hooked request, obeying IQM Server API Retry-After headers for
-/// HTTP 429 rate limiting.
+/// Execute a hooked request, holding back when the session's quota is running
+/// low and obeying Retry-After headers for HTTP 429 rate limiting.
 template <typename Perform_attempt>
 cpr::Response Perform_with_retries(const cpr::Url &url,
                                    const std::chrono::milliseconds timeout,
+                                   Rate_limit_budget *budget,
                                    Perform_attempt perform_attempt) {
   const auto &hooks = Get_hooks();
-  const auto start = std::chrono::steady_clock::now();
+  const auto start = hooks.now();
   const auto remaining_timeout = [&]() {
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
+        hooks.now() - start);
     return elapsed >= timeout ? std::chrono::milliseconds::zero()
                               : timeout - elapsed;
   };
+
+  // Waiting out the window costs a fraction of the 30-second block it avoids,
+  // but it comes out of this request's own timeout: a caller that cannot spare
+  // the wait goes out unthrottled and falls back on Retry-After.
+  if (budget != nullptr) {
+    if (const auto wait = Rate_limit_wait_seconds(*budget); wait > 0) {
+      if (std::chrono::seconds{wait} < timeout) {
+        LOG_DEBUG("Request to URL '" + url.str() + "' is holding back for " +
+                  std::to_string(wait) +
+                  " second(s) to let the rate-limit window replenish");
+        hooks.sleep(wait);
+      } else {
+        LOG_DEBUG("Request to URL '" + url.str() +
+                  "' would wait out the rate-limit window, but that exceeds "
+                  "the request timeout; proceeding without waiting");
+      }
+    }
+  }
+
   for (uint8_t attempt = 0; attempt <= RATE_LIMIT_RETRY_COUNT; ++attempt) {
     const auto remaining = remaining_timeout();
     if (remaining <= std::chrono::milliseconds::zero()) {
@@ -161,11 +306,14 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
       return response;
     }
 
-    const auto http_response =
-        perform_attempt(attempt == 0 ? timeout : remaining);
+    const auto http_response = perform_attempt(remaining);
 
     if (http_response.error) {
       return http_response;
+    }
+
+    if (budget != nullptr) {
+      Record_rate_limit(*budget, http_response);
     }
 
     if (http_response.status_code != 429 || attempt == RATE_LIMIT_RETRY_COUNT) {
@@ -201,16 +349,19 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
 } // namespace
 
 Hooks &Get_hooks() {
-  static Hooks hooks{
-      .get = Default_get, .post = Default_post, .sleep = Default_sleep};
+  static Hooks hooks{.get = Default_get,
+                     .post = Default_post,
+                     .sleep = Default_sleep,
+                     .now = Default_now};
   return hooks;
 }
 
 void Reset_hooks() {
-  auto &[get, post, sleep] = Get_hooks();
+  auto &[get, post, sleep, now] = Get_hooks();
   get = Default_get;
   post = Default_post;
   sleep = Default_sleep;
+  now = Default_now;
 }
 
 } // namespace internal
@@ -328,9 +479,23 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
     }
   }
 
-  // Fall back to raw response if no structured errors are available
+  // The raw body is unvalidated server output that can echo request content,
+  // so its content stays at DEBUG level. Its size and type are safe to report
+  // alongside the status, and are often all that separates an upstream proxy
+  // failure from one the device itself produced.
   if (!logged_structured_error && !response.text.empty()) {
-    internal::Log_error(error_log_policy, "Response: " + response.text);
+    if (error_log_policy == ERROR_LOG_POLICY::LOG_AS_ERROR) {
+      const auto content_type = response.header.find("content-type");
+      internal::Log_error(error_log_policy,
+                          "Response carries no structured error: " +
+                              std::to_string(response.text.size()) +
+                              " byte(s) of " +
+                              (content_type == response.header.end()
+                                   ? std::string{"an unnamed content type"}
+                                   : content_type->second) +
+                              ", logged at DEBUG level");
+    }
+    LOG_DEBUG("Response: " + response.text);
   }
 
   // Log IQM messages if present (might contain additional context)
@@ -370,32 +535,25 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
 
 cpr::Response Get(const cpr::Url &url,
                   const std::optional<cpr::Bearer> &bearer_token,
-                  const std::chrono::milliseconds timeout) {
+                  const cpr::ConnectionPool &connection_pool,
+                  const std::chrono::milliseconds timeout,
+                  Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing GET request to " + url.str());
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_headers();
   return internal::Perform_with_retries(
-      url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, headers, remaining);
-      });
-}
-
-cpr::Response Get_optional(const cpr::Url &url,
-                           const std::optional<cpr::Bearer> &bearer_token,
-                           const std::chrono::milliseconds timeout) {
-  LOG_INFO("Performing GET request to " + url.str());
-  const auto &hooks = internal::Get_hooks();
-  const auto headers = internal::Make_headers();
-  return internal::Perform_with_retries(
-      url, timeout, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, headers, remaining);
+      url, timeout, rate_limit, [&](const auto remaining) {
+        return hooks.get(url, bearer_token, connection_pool, headers,
+                         remaining);
       });
 }
 
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data, const cpr::Header &additional_headers,
-                   const std::chrono::milliseconds timeout) {
+                   const std::chrono::milliseconds timeout,
+                   Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing POST request to " + url.str());
   if (const auto &data_str = data.str(); !data_str.empty()) {
     LOG_DEBUG("POST data: " + data_str);
@@ -403,8 +561,9 @@ cpr::Response Post(const cpr::Url &url,
   const auto &hooks = internal::Get_hooks();
   const auto headers = internal::Make_json_headers(additional_headers);
   return internal::Perform_with_retries(
-      url, timeout, [&](const auto remaining) {
-        return hooks.post(url, bearer_token, headers, data, remaining);
+      url, timeout, rate_limit, [&](const auto remaining) {
+        return hooks.post(url, bearer_token, connection_pool, headers, data,
+                          remaining);
       });
 }
 

@@ -26,6 +26,7 @@
 
 #include <chrono>
 #include <cpr/bearer.h>
+#include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cstddef>
 #include <cstdint>
@@ -51,7 +52,7 @@ struct Scripted_response {
 };
 
 /**
- * @brief Scripts HTTP responses so that iqm::http::Get/Get_optional/Post
+ * @brief Scripts HTTP responses so that iqm::http::Get/Post
  * (and everything built on top of them, up to and including the public
  * `IQM_QDMI_device_session_init`) can be exercised end-to-end without any
  * live network traffic or real time delays.
@@ -67,6 +68,9 @@ struct Scripted_response {
  * and returns a generic HTTP 500 response, so missing expectations are
  * caught reliably. The retry backoff delay is stubbed out (counted, not
  * slept), so tests that exercise HTTP 429 retries run instantly.
+ *
+ * Time is stubbed with it: the clock hook reads a counter only the stubbed
+ * sleep and advance() move, so waits are exact rather than racing the clock.
  *
  * The default hooks are restored on destruction (RAII), so each test that
  * owns an instance of this class gets an isolated, self-cleaning stub.
@@ -100,18 +104,28 @@ public:
   /// Timeouts passed to GET requests, in call order.
   [[nodiscard]] const std::vector<std::chrono::milliseconds> &
   get_timeouts() const;
+  /// Connection pools passed to GET requests, in call order.
+  [[nodiscard]] const std::vector<const cpr::ConnectionPool *> &
+  get_connection_pools() const;
   /// URLs requested via POST, in call order.
   [[nodiscard]] const std::vector<std::string> &post_urls() const;
+  /// Request bodies passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<std::string> &post_bodies() const;
   /// Bearer tokens passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::optional<cpr::Bearer>> &
   post_bearer_tokens() const;
   /// Timeouts passed to POST requests, in call order.
   [[nodiscard]] const std::vector<std::chrono::milliseconds> &
   post_timeouts() const;
+  /// Connection pools passed to POST requests, in call order.
+  [[nodiscard]] const std::vector<const cpr::ConnectionPool *> &
+  post_connection_pools() const;
   /// Number of retry-delay ("sleep") calls triggered by HTTP 429 retries.
   [[nodiscard]] size_t sleep_call_count() const;
   /// Retry-delay durations requested by HTTP 429 handling, in call order.
   [[nodiscard]] const std::vector<int> &sleep_durations() const;
+  /// Move the stubbed clock forward without issuing a request.
+  void advance(std::chrono::milliseconds elapsed);
 
 private:
   std::deque<Scripted_response> get_responses_;
@@ -119,10 +133,16 @@ private:
   std::vector<std::string> get_urls_;
   std::vector<std::optional<cpr::Bearer>> get_bearer_tokens_;
   std::vector<std::chrono::milliseconds> get_timeouts_;
+  std::vector<const cpr::ConnectionPool *> get_connection_pools_;
   std::vector<std::string> post_urls_;
+  std::vector<std::string> post_bodies_;
   std::vector<std::optional<cpr::Bearer>> post_bearer_tokens_;
   std::vector<std::chrono::milliseconds> post_timeouts_;
+  std::vector<const cpr::ConnectionPool *> post_connection_pools_;
   std::vector<int> sleep_durations_;
+  /// Time the stubbed clock reports, moved only by sleeps and advance().
+  std::chrono::steady_clock::time_point now_{
+      std::chrono::steady_clock::time_point{} + std::chrono::hours{1}};
 };
 
 } // namespace iqm::test_support

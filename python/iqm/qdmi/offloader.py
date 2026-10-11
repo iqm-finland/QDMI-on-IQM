@@ -26,9 +26,8 @@ import os
 import pickle  # ruff:ignore[suspicious-pickle-import]
 import subprocess
 import uuid
-from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, SupportsInt, cast
+from typing import TYPE_CHECKING, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
@@ -41,80 +40,31 @@ except ImportError as e:
     _IMPORT_ERROR = e
 
 if TYPE_CHECKING:
-    from qiskit.primitives.containers.pub_result import PubResult
+    from qiskit.primitives.containers import BitArray, PrimitiveResult, SamplerPubResult
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_algorithms import VQEResult
 
-
-def _count_to_int(count: object) -> int:
-    """Convert an external count payload to a plain integer.
-
-    Returns:
-        The converted count value.
-    """
-    return int(cast("SupportsInt | str | bytes | bytearray", count))
+_DEFAULT_PARTITION = "quantum"
+_DEFAULT_NODES = 1
 
 
-def normalize_counts(raw_counts: object) -> dict[str, int]:
-    """Convert backend count payloads into a plain typed dictionary.
+def extract_counts(primitive_result: PrimitiveResult[SamplerPubResult]) -> dict[str, int]:
+    """Extract joint counts from the native sampler's single submitted circuit.
 
     Returns:
-        A normalized mapping from bitstrings to integer counts.
-    """
-    if isinstance(raw_counts, Mapping):
-        return {str(bitstring): _count_to_int(count) for bitstring, count in raw_counts.items()}
-
-    pairs = cast("Iterable[tuple[object, object]]", raw_counts)
-    return {str(bitstring): _count_to_int(count) for bitstring, count in pairs}
-
-
-def extract_counts(pub_result: PubResult) -> dict[str, int]:
-    """Extract counts from the first classical register exposed by a primitive result.
-
-    Returns:
-        A normalized mapping from measured bitstrings to shot counts.
+        Joint bitstrings in Qiskit's register order, mapped to shot counts.
 
     Raises:
-        RuntimeError: If no classical register with counts is present in the result.
+        RuntimeError: If the result is empty or has no classical registers with counts.
     """
-    data = pub_result.data
-
-    if isinstance(data, dict):
-        values: Iterable[object] = data.values()
-    else:
-        keys = getattr(data, "keys", None)
-        values = (data[key] for key in keys()) if callable(keys) else ()
-
-    for value in values:
-        get_counts = getattr(value, "get_counts", None)
-        if callable(get_counts):
-            return normalize_counts(get_counts())
-
-    for key in ("meas", "c"):
-        with contextlib.suppress(AttributeError, KeyError, TypeError):
-            value = data[key]
-            get_counts = getattr(value, "get_counts", None)
-            if callable(get_counts):
-                return normalize_counts(get_counts())
-
-    msg = "Could not find a classical register with counts in the primitive result."
-    raise RuntimeError(msg)
-
-
-def _first_pub(primitive_result: Iterable[PubResult]) -> PubResult:
-    """Return the first pub result from a primitive result.
-
-    Returns:
-        The first pub result.
-
-    Raises:
-        RuntimeError: If the primitive result contains no pubs.
-    """
-    first_pub = next(iter(primitive_result), None)
-    if first_pub is None:
+    if not primitive_result:
         msg = "Primitive result contained no pubs."
         raise RuntimeError(msg)
-    return first_pub
+    try:
+        return cast("BitArray", primitive_result[0].join_data()).get_counts()
+    except (TypeError, ValueError) as e:
+        msg = f"Could not extract measurement counts: {e}"
+        raise RuntimeError(msg) from e
 
 
 def _get_jobs_dir() -> Path:
@@ -153,8 +103,8 @@ def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[st
     Unlike backend credentials (`IQM_BASE_URL`/`IQM_TOKENS_FILE`), which reach
     the job purely through the environment -- either plain Slurm propagation
     from the submitting shell, or the QDMI-on-IQM SPANK plugin's own
-    plugstack.conf.d defaults on the `quantum` partition -- QC selection is a
-    per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
+    plugstack.conf.d defaults on whichever partitions it is configured for --
+    QC selection is a per-call choice. It is passed as a `--iqm-qc-id`/`--iqm-qc-alias` option on
     `srun` itself, which the SPANK plugin resolves into the job's
     `IQM_QC_ID`/`IQM_QC_ALIAS` environment variable.
 
@@ -167,6 +117,40 @@ def _spank_qc_selection_args(qc_id: str | None, qc_alias: str | None) -> list[st
     if qc_alias:
         args.append(f"--iqm-qc-alias={qc_alias}")
     return args
+
+
+def _licenses_arg(licenses: str | None) -> list[str]:
+    """Build `srun` options for an optional Slurm license request.
+
+    Slurm licenses are a cluster admin's own capacity-limiting mechanism (see
+    the SPANK plugin's "Limiting Concurrent Access with Slurm Licenses" docs)
+    and are unrelated to QC selection: the caller passes whatever license
+    name(s)/count(s) their site has configured for the target QC, verbatim,
+    as Slurm's own `name[:count][,name[:count]...]` syntax.
+
+    Returns:
+        List of `srun` options requesting *licenses*, or an empty list if none
+        was given.
+    """
+    return [f"--licenses={licenses}"] if licenses else []
+
+
+def _resolve_partition(partition: str | None) -> str:
+    """Resolve the Slurm partition the `srun` job is submitted to.
+
+    The partition holding the QC nodes carries whatever name its administrator
+    gave it, so an explicit *partition* takes precedence over the
+    `IQM_SLURM_PARTITION` environment variable, which in turn takes precedence
+    over the `quantum` name the administrator guide provisions. This mirrors how
+    the QDMI-on-IQM SPANK plugin's `IQM_BASE_URL`/`IQM_QC_ID`/`IQM_QC_ALIAS`
+    variables let a site set a default once for every user. Slurm's own
+    `SLURM_PARTITION` cannot serve that role here, because the resolved name is
+    always passed as an explicit `--partition`, which overrides it.
+
+    Returns:
+        The partition name to pass to `srun`.
+    """
+    return partition or os.getenv("IQM_SLURM_PARTITION") or _DEFAULT_PARTITION
 
 
 def _run_srun(
@@ -200,33 +184,23 @@ def _run_srun(
     return process
 
 
-def _decode_payload(process: subprocess.CompletedProcess[bytes]) -> bytes:
-    """Extract and base64-decode the job's stdout payload.
+def _load_pickled_result(process: subprocess.CompletedProcess[bytes]) -> object:
+    """Load a base64-encoded pickle from a trusted Slurm worker.
+
+    The submitting process and worker must use compatible environments.
 
     Returns:
-        The decoded, still-pickled result payload.
+        The worker's native Qiskit result.
 
     Raises:
-        RuntimeError: If the job produced no output.
+        RuntimeError: If the worker output is empty or cannot be decoded.
     """
-    stdout = process.stdout.decode().strip()
+    stdout = process.stdout.strip()
     if not stdout:
         msg = "No output from the job."
         raise RuntimeError(msg)
-    return base64.b64decode(stdout.encode())
-
-
-def _load_pickled_result(payload: bytes) -> object:
-    """Unpickle a decoded job result payload.
-
-    Returns:
-        The unpickled result object.
-
-    Raises:
-        RuntimeError: If the payload cannot be unpickled.
-    """
     try:
-        return pickle.loads(payload)  # ruff:ignore[suspicious-pickle-usage]
+        return pickle.loads(base64.b64decode(stdout, validate=True))  # ruff:ignore[suspicious-pickle-usage]
     except Exception as e:
         msg = f"Error parsing the output: {e}"
         raise RuntimeError(msg) from e
@@ -241,6 +215,9 @@ def sample(
     timeout: float | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
+    licenses: str | None = None,
+    partition: str | None = None,
+    nodes: int = _DEFAULT_NODES,
 ) -> dict[str, int]:
     """Sample from a quantum circuit.
 
@@ -248,15 +225,14 @@ def sample(
     and submits it to the Slurm workload manager using the `srun` command.
     After completion, the counts are parsed and returned as a dictionary.
 
-    When `local=True`, runs the circuit locally using the MQT Core DDSIM simulator backend.
+    When `local=True`, runs the circuit in this process on the selected backend.
 
     Args:
         qc: The quantum circuit to run.
         shots: The number of shots to run. Default is 1024.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
@@ -265,13 +241,27 @@ def sample(
         qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
             QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
             environment variable. Only used when `local=False`.
+        licenses: If given, passed as `--licenses` to `srun`, requesting the
+            named Slurm license(s) (Slurm's own `name[:count][,name[:count]
+            ...]` syntax) that a site administrator may have configured to
+            cap concurrent jobs against a QC -- e.g. required by the SPANK
+            plugin's `iqm_require_license` option. Only used when
+            `local=False`.
+        partition: The Slurm partition to submit to, passed as `--partition`
+            to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
+            variable, and to `quantum` when that is unset. Only used when
+            `local=False`.
+        nodes: The number of nodes to allocate, passed as `--nodes` to `srun`.
+            The worker always runs as a single task (`--ntasks=1`), so this
+            only sizes the allocation for sites whose partition demands more
+            than one node. Default is 1. Only used when `local=False`.
 
     Returns:
         A dictionary of measurement counts.
 
     Raises:
         ImportError: If Qiskit or the QDMI backend plugins are not installed.
-        RuntimeError: If there is an error while submitting the job to Slurm or parsing the output.
+        RuntimeError: Propagated from job submission or result decoding.
     """  # ruff:ignore[docstring-extraneous-exception]
     if _IMPORT_ERROR is not None:
         msg = (
@@ -280,11 +270,10 @@ def sample(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        backend, sampler = build_sampler(simulator=simulator)
-        qc_for_execution = transpile(qc, backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
+        sampler = build_sampler(simulator=simulator)
+        qc_for_execution = transpile(qc, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
-        first_pub = _first_pub(cast("Iterable[PubResult]", job.result()))
-        return extract_counts(first_pub)
+        return extract_counts(job.result())
 
     # Make sure the `jobs` directory exists on the shared filesystem
     job_dir = _new_job_dir()
@@ -300,9 +289,11 @@ def sample(
     command = [
         "srun",
         f"--job-name={job_name}",
-        "--nodes=1",
-        "--partition=quantum",
+        f"--nodes={nodes}",
+        "--ntasks=1",
+        f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
+        *_licenses_arg(licenses),
         "iqm-sampler",
         str(qc_path.absolute()),
         "--shots",
@@ -318,10 +309,8 @@ def sample(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    primitive_result = cast("Iterable[PubResult]", _load_pickled_result(payload))
-    first_pub = _first_pub(primitive_result)
-    return extract_counts(first_pub)
+    result = cast("PrimitiveResult[SamplerPubResult]", _load_pickled_result(process))
+    return extract_counts(result)
 
 
 def estimate(
@@ -334,6 +323,9 @@ def estimate(
     timeout: float | None = None,
     qc_id: str | None = None,
     qc_alias: str | None = None,
+    licenses: str | None = None,
+    partition: str | None = None,
+    nodes: int = _DEFAULT_NODES,
 ) -> VQEResult:
     """Estimate the optimal parameters for a given ansatz circuit and operator.
 
@@ -353,10 +345,9 @@ def estimate(
         operator: The operator to run.
         maxiter: The maximum number of iterations for the optimization.
             Default is 80.
-        local: If True, run the job locally using the built-in QDMI simulator backend.
+        local: If True, run the job in this process on the selected backend.
             If False (default), offload to Slurm.
         simulator: If True, run the job on the simulator instead of the quantum computer.
-            Only used when `local=False`.
         timeout: How long to wait for the Slurm job to complete, in seconds,
             before giving up. Only used when `local=False`.
         qc_id: If given, passed as `--iqm-qc-id` to `srun`, which the QDMI-on-IQM
@@ -365,6 +356,20 @@ def estimate(
         qc_alias: If given, passed as `--iqm-qc-alias` to `srun`, which the
             QDMI-on-IQM SPANK plugin resolves into the `IQM_QC_ALIAS` job
             environment variable. Only used when `local=False`.
+        licenses: If given, passed as `--licenses` to `srun`, requesting the
+            named Slurm license(s) (Slurm's own `name[:count][,name[:count]
+            ...]` syntax) that a site administrator may have configured to
+            cap concurrent jobs against a QC -- e.g. required by the SPANK
+            plugin's `iqm_require_license` option. Only used when
+            `local=False`.
+        partition: The Slurm partition to submit to, passed as `--partition`
+            to `srun`. Defaults to the `IQM_SLURM_PARTITION` environment
+            variable, and to `quantum` when that is unset. Only used when
+            `local=False`.
+        nodes: The number of nodes to allocate, passed as `--nodes` to `srun`.
+            The worker always runs as a single task (`--ntasks=1`), so this
+            only sizes the allocation for sites whose partition demands more
+            than one node. Default is 1. Only used when `local=False`.
 
     Returns:
         The VQE result, including the optimal parameters and eigenvalue.
@@ -380,7 +385,7 @@ def estimate(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        _, estimator = build_estimator(simulator=simulator)
+        estimator = build_estimator(simulator=simulator)
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
         return vqe.compute_minimum_eigenvalue(operator=operator)
 
@@ -402,9 +407,11 @@ def estimate(
     command = [
         "srun",
         f"--job-name={job_name}",
-        "--nodes=1",
-        "--partition=quantum",
+        f"--nodes={nodes}",
+        "--ntasks=1",
+        f"--partition={_resolve_partition(partition)}",
         *_spank_qc_selection_args(qc_id, qc_alias),
+        *_licenses_arg(licenses),
         "iqm-estimator",
         str(qc_path.absolute()),
         str(operator_path.absolute()),
@@ -422,5 +429,4 @@ def estimate(
     with contextlib.suppress(OSError):
         job_dir.rmdir()
 
-    payload = _decode_payload(process)
-    return cast("VQEResult", _load_pickled_result(payload))
+    return cast("VQEResult", _load_pickled_result(process))

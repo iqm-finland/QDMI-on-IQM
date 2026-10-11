@@ -22,26 +22,16 @@ from ._version import version as __version__
 
 __all__ = [
     "IQM_QDMI_CMAKE_DIR",
+    "IQM_QDMI_DEVICE_ID",
     "IQM_QDMI_INCLUDE_DIR",
     "IQM_QDMI_LIBRARY_PATH",
+    "IQM_QDMI_PREFIX",
     "__version__",
 ]
+
+IQM_QDMI_DEVICE_ID = "iqm.default"
+IQM_QDMI_PREFIX = "IQM"
 
 
 def __dir__() -> list[str]:
     return __all__
-
-
-# If pickling is not supported by Qiskit's DataBin container, patch it.
-# This shim is for compatibility with older Qiskit versions and can be removed once Qiskit >= 2.1.0 is required.
-try:
-    import pickle  # ruff:ignore[suspicious-pickle-import]
-
-    from qiskit.primitives.containers.data_bin import DataBin
-
-    pickle.loads(pickle.dumps(DataBin()))  # ruff:ignore[suspicious-pickle-usage]
-except ImportError:
-    pass
-except NotImplementedError:
-    # Bypass the immutable __setattr__ restriction during unpickling
-    DataBin.__setattr__ = object.__setattr__

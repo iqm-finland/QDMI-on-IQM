@@ -19,9 +19,20 @@
 
 from __future__ import annotations
 
+import json
+from importlib.metadata import distribution
 from pathlib import Path
 
-from iqm.qdmi import IQM_QDMI_CMAKE_DIR, IQM_QDMI_INCLUDE_DIR, IQM_QDMI_LIBRARY_PATH, __version__
+from mqt.core.qdmi import builtin_driver
+
+from iqm.qdmi import (
+    IQM_QDMI_CMAKE_DIR,
+    IQM_QDMI_DEVICE_ID,
+    IQM_QDMI_INCLUDE_DIR,
+    IQM_QDMI_LIBRARY_PATH,
+    IQM_QDMI_PREFIX,
+    __version__,
+)
 
 
 def test_version_exists() -> None:
@@ -29,6 +40,12 @@ def test_version_exists() -> None:
     assert __version__
     assert isinstance(__version__, str)
     assert len(__version__) > 0
+
+
+def test_qdmi_device_metadata() -> None:
+    """Test the stable device metadata used by native and Python consumers."""
+    assert IQM_QDMI_DEVICE_ID == "iqm.default"
+    assert IQM_QDMI_PREFIX == "IQM"
 
 
 def test_include_dir_exists() -> None:
@@ -71,3 +88,28 @@ def test_paths_are_absolute() -> None:
     assert IQM_QDMI_INCLUDE_DIR.is_absolute()
     assert IQM_QDMI_CMAKE_DIR.is_absolute()
     assert IQM_QDMI_LIBRARY_PATH.is_absolute()
+
+
+def test_installed_manifest() -> None:
+    """Publish each Resonance preset and discover it without opening devices."""
+    entries = [entry for entry in distribution("iqm-qdmi").entry_points if entry.group == "mqt.core.qdmi.manifests"]
+    assert [(entry.name, entry.value) for entry in entries] == [("iqm", "iqm.qdmi")]
+    manifest = IQM_QDMI_LIBRARY_PATH.with_name("iqm-qdmi-device.qdmi.json")
+    devices = json.loads(manifest.read_text())["qdmi"]["devices"]
+    aliases = {
+        IQM_QDMI_DEVICE_ID: None,
+        "iqm.garnet": "garnet",
+        "iqm.garnet.mock": "garnet:mock",
+        "iqm.emerald": "emerald",
+        "iqm.emerald.mock": "emerald:mock",
+        "iqm.sirius": "sirius",
+        "iqm.sirius.mock": "sirius:mock",
+    }
+    assert len(devices) == len(aliases)
+    assert {device["id"] for device in devices} == set(aliases)
+    assert set(aliases) <= set(builtin_driver.registered_device_ids())
+    for device in devices:
+        assert device["prefix"] == IQM_QDMI_PREFIX
+        assert (manifest.parent / device["library"]).resolve() == IQM_QDMI_LIBRARY_PATH.resolve()
+        assert device["session"]["base-url"] == "https://resonance.iqm.tech"
+        assert device["session"].get("custom2") == aliases[device["id"]]

@@ -8,6 +8,9 @@ __pycache__/
 .ccache/
 cmake-build-*
 
+# SPANK plugin build dirs
+build-spank*/
+
 # Distribution / packaging
 .Python
 /build/
