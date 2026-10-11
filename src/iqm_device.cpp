@@ -70,7 +70,18 @@ struct IQM_QDMI_Site_impl_d;
 
 namespace {
 enum class IQM_QDMI_DEVICE_SESSION_STATUS : uint8_t { ALLOCATED, INITIALIZED };
-}
+
+/// @brief Custom program format 1 denotes a pulse-level program.
+/// @details The program is a serialized IQM `RunDefinition` protobuf, the same
+///          payload `iqm-pulla` submits, and is forwarded to the IQM Server
+///          byte for byte. QDMI has no program format of its own for
+///          pulse-level programs, so a device-defined one carries it.
+constexpr auto PULSE_PROGRAM_FORMAT = QDMI_PROGRAM_FORMAT_CUSTOM1;
+
+/// @brief Custom job result 2 exposes the raw `sweep_results` artifact.
+/// @details Custom result 1 is taken by the calibration set ID.
+constexpr auto PULSE_JOB_RESULT = QDMI_JOB_RESULT_CUSTOM2;
+} // namespace
 
 /**
  * @brief Implementation of the IQM_QDMI_Device_Session structure.
@@ -204,6 +215,10 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::vector<Program_results> results_;
   /// The new calibration set ID after a successful calibration.
   std::string new_calibration_set_id_;
+  /// @brief Raw `sweep_results` artifact of a pulse-level job.
+  /// @details Holds the protobuf bytes exactly as the server returned them.
+  ///          std::nullopt means not yet fetched.
+  std::optional<std::string> sweep_results_ = std::nullopt;
   /// The status of the job.
   QDMI_Job_Status status_ = QDMI_JOB_STATUS_CREATED;
   /// The number of jobs ahead while this job is queued.
@@ -1078,18 +1093,27 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
 
     const auto job_status_json =
         nlohmann::json::parse(job_status_response.text);
-    if (job_status_json.value("type", "circuit") != "circuit") {
+    const auto job_type = job_status_json.value("type", "circuit");
+    if (job_type != "circuit" && job_type != "run") {
       return QDMI_ERROR_NOTSUPPORTED;
     }
 
     auto retrieved_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
     retrieved_job->session_ = session;
     retrieved_job->job_id_ = job_id;
+    if (job_type == "run") {
+      retrieved_job->program_format_ = PULSE_PROGRAM_FORMAT;
+      retrieved_job->results_.resize(1);
+    }
     retrieved_job->retrieved_ = true;
     if (const auto status =
             Set_job_status(retrieved_job.get(), job_status_json);
         status != QDMI_SUCCESS) {
       return status;
+    }
+    if (job_type == "run") {
+      *job = retrieved_job.release();
+      return QDMI_SUCCESS;
     }
     const auto payload_response = iqm::http::Get(
         session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_PAYLOAD, job_id),
@@ -1176,6 +1200,9 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
   }
   switch (param) {
   case QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM:
+    if (job->program_format_ == PULSE_PROGRAM_FORMAT) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
     if (value != nullptr) {
       if (size != sizeof(size_t)) {
         return QDMI_ERROR_INVALIDARGUMENT;
@@ -1212,7 +1239,11 @@ int IQM_QDMI_device_job_set_programs(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (format != QDMI_PROGRAM_FORMAT_IQMJSON &&
-      format != QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
+      format != QDMI_PROGRAM_FORMAT_QIRBASESTRING &&
+      format != PULSE_PROGRAM_FORMAT) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (format == PULSE_PROGRAM_FORMAT && count != 1) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
   if (programs == nullptr) {
@@ -1225,8 +1256,9 @@ int IQM_QDMI_device_job_set_programs(IQM_QDMI_Device_Job job,
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     const auto *text = static_cast<const char *>(programs[i]);
-    if (text[sizes[i] - 1] != '\0' ||
-        std::memchr(text, '\0', sizes[i] - 1) != nullptr) {
+    if (format != PULSE_PROGRAM_FORMAT &&
+        (text[sizes[i] - 1] != '\0' ||
+         std::memchr(text, '\0', sizes[i] - 1) != nullptr)) {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     copied_programs.emplace_back(text, sizes[i]);
@@ -1312,6 +1344,10 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                               *job->queue_position_, prop, size, value,
                               size_ret)
   }
+  if (prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM &&
+      job->program_format_ == PULSE_PROGRAM_FORMAT) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
   if ((prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM ||
        prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT) &&
       job->results_.empty()) {
@@ -1342,6 +1378,30 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
 }
 
 namespace {
+/**
+ * @brief Whether an IQM error response reports a particular error code.
+ * @param response The raw response to a request that did not succeed.
+ * @param expected_code The IQM error code to find.
+ * @return @c true if the response reports @p expected_code.
+ */
+bool Reports_error_code(const cpr::Response &response,
+                        const std::string_view expected_code) {
+  const auto json = nlohmann::json::parse(response.text, nullptr, false);
+  if (json.is_discarded()) {
+    return false;
+  }
+  const auto reports_it = [expected_code](const nlohmann::json &error) {
+    const auto code = error.find("error_code");
+    return code != error.end() && code->is_string() &&
+           code->get<std::string>() == expected_code;
+  };
+  if (const auto errors = json.find("errors");
+      errors != json.end() && errors->is_array()) {
+    return std::ranges::any_of(*errors, reports_it);
+  }
+  return reports_it(json);
+}
+
 std::string_view Program_contents(const std::string &stored_program) {
   auto program = std::string_view{stored_program};
   if (program.ends_with('\0')) {
@@ -1380,7 +1440,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
-    return QDMI_ERROR_FATAL;
+    return status;
   }
   LOG_DEBUG("Job submission response:\n" + job_submission_response.text);
   const auto job_submission_json_response =
@@ -1395,6 +1455,53 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
 
   // Log queue position if available
   std::string log_message = "Submitted job with ID: " + job->job_id_;
+  if (const auto queue_position =
+          Submission_queue_position(job_submission_json_response);
+      queue_position.has_value()) {
+    log_message += " (queue position: " + std::to_string(*queue_position) + ")";
+  }
+  LOG_INFO(log_message);
+
+  return QDMI_SUCCESS;
+}
+
+int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
+  LOG_INFO("Submitting pulse-level job");
+  const auto job_submission_url =
+      job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_RUN_JOB,
+                                      *job->session_->quantum_computer_alias_);
+  // The program is a protobuf payload, so it goes out byte for byte. Running it
+  // through Program_contents() would drop a trailing zero byte that carries
+  // meaning here.
+  const auto token = job->session_->token_manager_->get_bearer_token();
+  job->status_ = QDMI_JOB_STATUS_FAILED;
+  const auto job_submission_response = iqm::http::Post(
+      job_submission_url, token, *job->session_->connection_pool_,
+      job->programs_.front(),
+      {{"Content-Type", "application/protobuf"}, {"Expect", "100-continue"}},
+      job->session_->request_timeout_, &job->session_->rate_limit_);
+  const auto status = iqm::http::Handle_response(job_submission_response);
+  if (status != QDMI_SUCCESS) {
+    job->status_ = QDMI_JOB_STATUS_FAILED;
+    return Reports_error_code(job_submission_response, "unsupported_job_type")
+               ? QDMI_ERROR_NOTSUPPORTED
+               : status;
+  }
+  const auto job_submission_json_response =
+      nlohmann::json::parse(job_submission_response.text, nullptr, false);
+  if (job_submission_json_response.is_discarded()) {
+    LOG_ERROR("Failed to parse the pulse-level job submission response");
+    return QDMI_ERROR_FATAL;
+  }
+  LOG_DEBUG("Pulse-level job submission response:\n" +
+            job_submission_json_response.dump());
+
+  job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->status_ = QDMI_JOB_STATUS_SUBMITTED;
+
+  // Log queue position if available
+  std::string log_message =
+      "Submitted pulse-level job with ID: " + job->job_id_;
   if (const auto queue_position =
           Submission_queue_position(job_submission_json_response);
       queue_position.has_value()) {
@@ -1438,7 +1545,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
-    return QDMI_ERROR_FATAL;
+    return status;
   }
   LOG_DEBUG("Calibration job submission response:\n" +
             job_submission_response.text);
@@ -1489,6 +1596,9 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
       job->program_format_ == QDMI_PROGRAM_FORMAT_QIRBASESTRING) {
     return IQM_QDMI_device_job_submit_circuit(job);
   }
+  if (job->program_format_ == PULSE_PROGRAM_FORMAT) {
+    return IQM_QDMI_device_job_submit_run(job);
+  }
   return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
 } catch (const iqm::ClientAuthenticationError &) {
   return QDMI_ERROR_PERMISSIONDENIED;
@@ -1497,37 +1607,6 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
 } catch (...) {
   return QDMI_ERROR_FATAL;
 }
-
-namespace {
-/**
- * @brief Whether a refused request reports that the job was in an illegal
- *        status for it.
- * @details The IQM Server refuses to cancel a job that has already reached a
- *          terminal status, and says so with an @c illegal_job_status error
- *          code alongside HTTP 403. That status code on its own is
- *          indistinguishable from an authorization failure, so the error code
- *          is what separates the two. It arrives either at the root of the
- *          response or inside an @c errors array.
- * @param response The raw response to a request that did not succeed.
- * @return @c true if the response reports an illegal job status.
- */
-bool Reports_illegal_job_status(const cpr::Response &response) {
-  const auto json = nlohmann::json::parse(response.text, nullptr, false);
-  if (json.is_discarded()) {
-    return false;
-  }
-  const auto reports_it = [](const nlohmann::json &error) {
-    const auto code = error.find("error_code");
-    return code != error.end() && code->is_string() &&
-           code->get<std::string>() == "illegal_job_status";
-  };
-  if (const auto errors = json.find("errors");
-      errors != json.end() && errors->is_array()) {
-    return std::ranges::any_of(*errors, reports_it);
-  }
-  return reports_it(json);
-}
-} // namespace
 
 int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   if (job == nullptr || job->status_ == QDMI_JOB_STATUS_DONE) {
@@ -1549,7 +1628,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
       &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {
-    if (Reports_illegal_job_status(job_abortion_response)) {
+    if (Reports_error_code(job_abortion_response, "illegal_job_status")) {
       // The job already reached a terminal status, so it can no longer be
       // canceled. QDMI documents QDMI_ERROR_INVALIDARGUMENT for that, which is
       // also what the guard at the top of this function returns when the
@@ -1801,6 +1880,44 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
   return QDMI_SUCCESS;
 }
 
+int IQM_QDMI_device_job_get_results_sweep_results(IQM_QDMI_Device_Job job,
+                                                  const size_t size, void *data,
+                                                  size_t *size_ret) {
+  // Fetch the remote artifact, if not already fetched
+  if (!job->sweep_results_.has_value()) {
+    LOG_INFO("Fetching sweep results for job " + job->job_id_);
+    const auto sweep_results_url = job->session_->api_config_->url(
+        iqm::API_ENDPOINT::GET_JOB_ARTIFACT_SWEEP_RESULTS, job->job_id_);
+    auto sweep_results_response = iqm::http::Get(
+        sweep_results_url, job->session_->token_manager_->get_bearer_token(),
+        *job->session_->connection_pool_, job->session_->request_timeout_);
+    const auto status = iqm::http::Handle_response(sweep_results_response);
+    if (status != QDMI_SUCCESS) {
+      // Only mark the job as failed for truly fatal errors, but always
+      // propagate the underlying status code to the caller.
+      if (status == QDMI_ERROR_FATAL) {
+        job->status_ = QDMI_JOB_STATUS_FAILED;
+      }
+      return status;
+    }
+    job->sweep_results_ = std::move(sweep_results_response.text);
+  }
+
+  // The artifact is protobuf, so it is handed out as raw bytes without a
+  // terminator.
+  const size_t req_size = job->sweep_results_->size();
+  if (size_ret != nullptr) {
+    *size_ret = req_size;
+  }
+  if (data != nullptr) {
+    if (size < req_size) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    std::ranges::copy(*job->sweep_results_, static_cast<char *>(data));
+  }
+  return QDMI_SUCCESS;
+}
+
 int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
                                                    const size_t size,
                                                    void *data,
@@ -1998,6 +2115,12 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
   if (program_index >= job->results_.size()) {
     return QDMI_ERROR_OUTOFRANGE;
   }
+  // A pulse-level job produces the sweep results artifact and nothing the
+  // measurement endpoints know about.
+  if (job->program_format_ == PULSE_PROGRAM_FORMAT &&
+      result != PULSE_JOB_RESULT) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
 
   switch (result) {
   case QDMI_JOB_RESULT_SHOTS:
@@ -2020,6 +2143,15 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
     // Custom result 1 is reserved for the calibration set ID
     return IQM_QDMI_device_job_get_results_calibration_id(job, size, data,
                                                           size_ret);
+  case PULSE_JOB_RESULT:
+    if (job->program_format_ != PULSE_PROGRAM_FORMAT) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    if (job->status_ != QDMI_JOB_STATUS_DONE) {
+      return QDMI_ERROR_BADSTATE;
+    }
+    return IQM_QDMI_device_job_get_results_sweep_results(job, size, data,
+                                                         size_ret);
   default:
     return QDMI_ERROR_NOTSUPPORTED;
   }
@@ -2033,7 +2165,8 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
 
 namespace {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
-    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON};
+    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
+    PULSE_PROGRAM_FORMAT};
 
 /// A device with at least this many queued jobs is reported as busy. The IQM
 /// on-demand queue is FIFO and executes one job at a time, so a single queued

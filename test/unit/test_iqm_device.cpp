@@ -3679,3 +3679,84 @@ TEST_F(DeviceIntegrationMockTest, SelectedCalibrationRejectsMismatch) {
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_ERROR_FATAL);
   EXPECT_EQ(http_stub.get_urls().size(), 3U);
 }
+
+TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
+  const std::string payload{"\x08\x00\x12\x00", 4};
+  const size_t size = payload.size();
+  const void *program = payload.data();
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             2, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, &size, &program),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  const void *invalid = nullptr;
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, &size, &invalid),
+            QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             1, nullptr, nullptr),
+            QDMI_SUCCESS);
+  std::string copied(size, '\0');
+  ASSERT_EQ(
+      IQM_QDMI_device_job_get_program(job, 0, size, copied.data(), nullptr),
+      QDMI_SUCCESS);
+  EXPECT_EQ(copied, payload);
+  http_stub.queue_post(200, R"({"id":"pulse-123"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1);
+  EXPECT_EQ(http_stub.post_bodies().front(), payload);
+  EXPECT_TRUE(http_stub.post_urls().front().ends_with("/run"));
+}
+
+TEST_F(DeviceJobMockTest, RetrievedPulseJobKeepsIndexedBinaryResults) {
+  const auto requests_before = http_stub.get_urls().size();
+  http_stub.queue_get(200, R"({"status":"ready","type":"run"})");
+  IQM_QDMI_Device_Job retrieved = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "pulse-123", &retrieved),
+            QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 1);
+  size_t count = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_query_property(
+                retrieved, QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, sizeof(count),
+                &count, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved, 1, QDMI_JOB_RESULT_CUSTOM2, 0, nullptr, nullptr),
+            QDMI_ERROR_OUTOFRANGE);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(retrieved, 0, QDMI_JOB_RESULT_SHOTS,
+                                            0, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  const std::string artifact{"\x08\x00", 2};
+  http_stub.queue_get(200, artifact,
+                      {{"Content-Type", "application/protobuf"}});
+  size_t size = 0;
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(
+                retrieved, 0, QDMI_JOB_RESULT_CUSTOM2, 0, nullptr, &size),
+            QDMI_SUCCESS);
+  std::string result(size, '\0');
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved, 0,
+                                            QDMI_JOB_RESULT_CUSTOM2, size,
+                                            result.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(result, artifact);
+  IQM_QDMI_device_job_free(retrieved);
+}
+
+TEST_F(DeviceJobMockTest, FailedPulseSubmissionCannotBeRepeated) {
+  const std::string payload{"\x08\x00", 2};
+  const size_t size = payload.size();
+  const void *program = payload.data();
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, &size, &program),
+            QDMI_SUCCESS);
+  http_stub.queue_post(400, R"({"error_code":"unsupported_job_type"})");
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_BADSTATE);
+  EXPECT_EQ(http_stub.post_urls().size(), 1);
+}

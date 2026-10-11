@@ -36,8 +36,9 @@ from qiskit.compiler import transpile
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 from iqm.qdmi.qiskit import IQMBackend
 
-# Every IQM quantum computer accepts these two.
-BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON}
+# Every IQM quantum computer accepts these three. Custom format 1 is this
+# device's pulse-level program format.
+BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON, ProgramFormat.CUSTOM1}
 
 
 def _skip_without_iqm_access() -> None:
@@ -84,7 +85,7 @@ def circuit() -> QuantumCircuit:
 
 
 def test_device_advertises_exactly_its_supported_formats(device: Device) -> None:
-    """The device advertises QIR and IQM JSON; calibration has a separate API."""
+    """The device advertises QIR, IQM JSON, and binary pulse programs."""
     formats = set(device.supported_program_formats())
 
     assert formats == BASE_PROGRAM_FORMATS
