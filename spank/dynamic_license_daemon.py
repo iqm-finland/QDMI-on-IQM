@@ -85,7 +85,7 @@ from typing import TYPE_CHECKING, ClassVar, Protocol
 import license_lock
 
 if TYPE_CHECKING:
-    from mqt.core.fomac import Device
+    from mqt.core.qdmi import Device
 
 LOGGER = logging.getLogger("iqm_dynamic_license_daemon")
 
@@ -432,13 +432,13 @@ def load_device(config: DaemonConfig) -> Device:
     """Load the packaged IQM QDMI device library and open a session for the target QC.
 
     Returns:
-        The initialized `mqt.core.fomac.Device` handle for the target QC.
+        The initialized `mqt.core.qdmi.Device` handle for the target QC.
 
     Raises:
         ImportError: If `mqt-core` (the `iqm-qdmi[qiskit]` extra) is not installed.
     """
     try:
-        from mqt.core.fomac import add_dynamic_device_library  # ruff: ignore[import-outside-top-level]
+        from mqt.core.qdmi.builtin_driver import open_device  # ruff: ignore[import-outside-top-level]
     except ImportError as e:
         msg = (
             "This daemon requires `mqt-core`, e.g. via `uv pip install iqm-qdmi[qiskit]`. "
@@ -446,11 +446,10 @@ def load_device(config: DaemonConfig) -> Device:
         )
         raise ImportError(msg) from e
 
-    from iqm.qdmi import IQM_QDMI_LIBRARY_PATH  # ruff: ignore[import-outside-top-level]
+    from iqm.qdmi import IQM_QDMI_DEVICE_ID  # ruff: ignore[import-outside-top-level]
 
-    return add_dynamic_device_library(
-        library_path=str(IQM_QDMI_LIBRARY_PATH),
-        prefix="IQM",
+    return open_device(
+        IQM_QDMI_DEVICE_ID,
         base_url=config.base_url,
         token=config.token,
         auth_file=config.tokens_file,

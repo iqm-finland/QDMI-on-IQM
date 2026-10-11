@@ -321,7 +321,7 @@ that split rather than around a single assumed-universal signal.
   concurrency control the most. Treat this API as cloud/Resonance-oriented until
   someone with on-prem API access confirms otherwise.
 - QDMI's own `QDMI_DEVICE_PROPERTY_STATUS` (exposed at the Python level via
-  `mqt.core.fomac.Device.status()`) remains **session-local**: `IDLE` at session
+  `mqt.core.qdmi.Device.status()`) remains **session-local**: `IDLE` at session
   init, `BUSY` only when *that same session* submits a job. It says nothing
   about other tenants and works identically (i.e., uselessly for this purpose)
   regardless of deployment type.
