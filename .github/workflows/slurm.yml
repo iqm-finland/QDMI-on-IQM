@@ -27,7 +27,7 @@ jobs:
         with:
           repository: munich-quantum-toolkit/core
           # Shared Slurm integration from MQT Core #2599 until it is merged.
-          ref: db1a6459c1667943fad1bac9c870babb16a6251f
+          ref: 24278155f13c58031efc9dfbf00d675c47f3dc2e
           fetch-depth: 0
           persist-credentials: false
           path: core

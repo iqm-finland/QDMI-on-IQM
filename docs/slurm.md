@@ -16,7 +16,9 @@ for token renewal and other credential sources.
 Save this workload as `bell.py`. It uses the allocated license as its catalogue
 ID, assuming one local license with a count of one (`ID` or `ID:1`):
 
-```python
+```{code-block} python
+:caption: bell.py
+
 import os
 
 from mqt.core.qdmi import builtin_driver as qdmi_driver
@@ -35,7 +37,7 @@ print(result.get_counts())
 
 Request the Emerald Resonance mock's license on the site's quantum partition:
 
-```console
+```bash
 srun --partition=quantum --licenses=iqm.emerald.mock python bell.py
 ```
 
@@ -55,7 +57,7 @@ adapter for these workloads.
 Install the [Python package](python_package.md) with its Qiskit adapter in the
 workload environment on login and quantum access nodes:
 
-```console
+```bash
 uv pip install 'iqm-qdmi[qiskit]'
 ```
 
@@ -82,8 +84,8 @@ IDs, aliases, and their precedence.
 
 [MQT Core's cluster playground](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html)
 is a concrete deployment with a shared quantum access partition and several
-device implementations. Its build instructions use current source revisions for
-the unreleased QDMI 1.4 and MQT Core 4.1 interfaces.
+device implementations. Follow its build instructions to install the current
+main branches for this development setup.
 
 The
 [Slurm smoke test](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/test/slurm)

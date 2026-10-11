@@ -8,8 +8,11 @@ It requires a valid `IQM_TOKEN` and network access to
 Use the MQT Core revision pinned in the Slurm workflow and build its Linux wheel
 with `uv build --wheel --out-dir "$CORE_DIST" -Ccmake.define.DEPLOY=ON` from
 that checkout. The wheel must match the host architecture and the cluster's
-Python interpreter. The example deploys Slurm 25.11 or newer through rootful
-Docker on a disposable Linux cgroup-v2 host.
+Python interpreter. Run the build and test commands on a Linux cgroup-v2 host
+with rootful Docker. On macOS, use the
+[Linux virtual machine setup](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm_cluster.html#prepare-a-linux-host-or-an-apple-silicon-mac)
+and run all commands inside that guest, including the wheel build. Keep the
+checkout in the guest filesystem; a macOS wheel cannot run in these containers.
 
 ```sh
 PROVIDER_INSTALL_MODE=native uv run --no-project \

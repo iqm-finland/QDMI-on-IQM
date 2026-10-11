@@ -56,8 +56,9 @@ releases may include breaking changes.
   Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
 - ♻️ Use MQT Core's shared Slurm cluster example, with one `quantum` partition
   and one environment for all QDMI device implementations. Slurm licenses
-  schedule access, and the cluster monitors device availability ([#265])
-  ([**@flowerthrower**], [**@burgholzer**]).
+  schedule access, and the cluster monitors device availability. Sampler and
+  estimator CLI help is available without initializing the optional Qiskit SDK
+  ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
   selection takes precedence over environment defaults. Temporary Core source

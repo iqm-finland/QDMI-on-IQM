@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import base64
 import pickle  # ruff:ignore[suspicious-pickle-import]
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -62,8 +64,20 @@ def test_sampler_cli_simulator(tmp_path: Path, script_runner: ScriptRunner, regi
     assert set(local_counts) <= {"100", "111"}
 
 
-def test_sampler_cli_help(script_runner: ScriptRunner) -> None:
-    """Test running the sampler CLI with the --help flag."""
-    result = script_runner.run(["iqm-sampler", "--help"])
-    assert result.success
+def test_sampler_cli_help() -> None:
+    """Help works without loading the optional Qiskit SDK."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import runpy, sys; sys.modules['qiskit'] = None; "
+                "runpy.run_module('iqm.qdmi.sampler', run_name='__main__')"
+            ),
+            "--help",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     assert "Sample a serialized QPY circuit" in result.stdout
