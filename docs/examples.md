@@ -205,9 +205,9 @@ Exercise the local DDSIM simulator without contacting an IQM Server:
 :::{note}
 MQT Core's registry discovers registered device definitions, not the quantum
 computers behind an IQM Server. This example uses `api/v1/quantum-computers` for
-that inventory, then `register_device_if_absent` and `open_device` to open fresh
-sessions by quantum computer ID. Using IDs avoids an ambient `IQM_QC_ID`
-overriding discovery.
+that inventory, then `builtin_driver.open_device` to open fresh sessions by
+quantum computer ID. Using IDs avoids an ambient `IQM_QC_ID` overriding
+discovery.
 :::
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm

@@ -53,7 +53,6 @@ def discovery(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module.requests, "get", Mock(side_effect=AssertionError("Unexpected server access")))
-    monkeypatch.setattr(module, "register_device_if_absent", Mock())
     return module
 
 

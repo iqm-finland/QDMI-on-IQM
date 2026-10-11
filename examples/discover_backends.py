@@ -20,7 +20,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "iqm-qdmi",
-#   "mqt-core~=4.0.0",
+#   "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
 #   "requests>=2.31",
 # ]
 # [tool.uv.sources]
@@ -49,9 +49,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import requests
-from mqt.core.qdmi.driver import DeviceDefinition, open_device, register_device_if_absent
+from mqt.core.qdmi.builtin_driver import open_device
 
-from iqm.qdmi import IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX
+from iqm.qdmi import IQM_QDMI_DEVICE_ID
 
 if TYPE_CHECKING:
     from mqt.core.qdmi import Device
@@ -196,7 +196,6 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
             qc.get("display_name"),
         )
 
-    register_device_if_absent(DeviceDefinition(IQM_QDMI_DEVICE_ID, IQM_QDMI_LIBRARY_PATH, IQM_QDMI_PREFIX))
     candidates: list[tuple[str, int, str]] = []
     for qc in quantum_computers:
         name = qc.get("alias") or qc["id"]
