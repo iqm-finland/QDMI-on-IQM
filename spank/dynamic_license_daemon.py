@@ -492,8 +492,12 @@ def is_available(signals: list[AvailabilitySignal]) -> bool:
     return False
 
 
-def apply_lastconsumed(config: DaemonConfig, *, available: bool) -> None:
-    """Run (or log, if `--dry-run`) the `sacctmgr` command reflecting `available`."""
+def apply_lastconsumed(config: DaemonConfig, *, available: bool) -> bool:
+    """Run (or log, if `--dry-run`) the `sacctmgr` command reflecting `available`.
+
+    Returns:
+        Whether the update succeeded or was logged in dry-run mode.
+    """
     lastconsumed = 0 if available else 1
     cmd = ["sacctmgr", "-i", "modify", "resource", config.resource_name]
     if config.cluster:
@@ -502,14 +506,16 @@ def apply_lastconsumed(config: DaemonConfig, *, available: bool) -> None:
 
     if config.dry_run:
         LOGGER.info("[dry-run] would run: %s", " ".join(cmd))
-        return
+        return True
 
     LOGGER.info("Running: %s", " ".join(cmd))
     result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)  # ruff: ignore[subprocess-without-shell-equals-true]
     if result.returncode != 0:
         LOGGER.error("sacctmgr failed (rc=%s): %s", result.returncode, result.stderr.strip())
-    elif result.stdout.strip():
+        return False
+    if result.stdout.strip():
         LOGGER.debug("sacctmgr output: %s", result.stdout.strip())
+    return True
 
 
 def run(config: DaemonConfig) -> None:
@@ -531,8 +537,8 @@ def run(config: DaemonConfig) -> None:
         available = is_available(signals)
 
         if available != last_applied:
-            apply_lastconsumed(config, available=available)
-            last_applied = available
+            if apply_lastconsumed(config, available=available):
+                last_applied = available
         else:
             LOGGER.debug("No status change (available=%s); skipping sacctmgr call", available)
 
