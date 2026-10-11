@@ -186,7 +186,7 @@ environment-pass = [
 ]
 test-command = "pytest test/python"
 test-groups = [ "test" ]
-test-sources = [ "test/python" ]
+test-sources = [ "test/python", "spank/license_lock.py", "spank/dynamic_license_daemon.py" ]
 overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 
 [tool.cibuildwheel.linux]
