@@ -129,6 +129,16 @@ private:
 
 } // namespace iqm
 
-#define LOG_ERROR(msg) (iqm::Logger::get_instance().error(msg))
-#define LOG_INFO(msg) (iqm::Logger::get_instance().info(msg))
-#define LOG_DEBUG(msg) (iqm::Logger::get_instance().debug(msg))
+/// Evaluate log messages only when their level is enabled.
+#define LOG_ERROR(msg)                                                         \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::ERROR            \
+       ? iqm::Logger::get_instance().error(msg)                                \
+       : static_cast<void>(0))
+#define LOG_INFO(msg)                                                          \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::INFO             \
+       ? iqm::Logger::get_instance().info(msg)                                 \
+       : static_cast<void>(0))
+#define LOG_DEBUG(msg)                                                         \
+  (iqm::Logger::get_instance().get_level() >= iqm::LOG_LEVEL::DEBUG            \
+       ? iqm::Logger::get_instance().debug(msg)                                \
+       : static_cast<void>(0))

@@ -27,6 +27,7 @@
 #include "logging.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cpr/bearer.h>
@@ -42,6 +43,7 @@
 #include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -50,6 +52,30 @@
 
 namespace iqm::http {
 namespace internal {
+
+std::string Resolve_ca_bundle() {
+  for (const auto *variable : {"CURL_CA_BUNDLE", "SSL_CERT_FILE"}) {
+    if (const auto *value = std::getenv(variable);
+        value != nullptr && *value != '\0') {
+      return value;
+    }
+  }
+
+#ifdef __linux__
+  constexpr std::array bundles{
+      "/etc/ssl/certs/ca-certificates.crt",
+      "/etc/pki/tls/certs/ca-bundle.crt",
+      "/etc/ssl/ca-bundle.pem",
+      "/etc/ssl/cert.pem",
+  };
+  for (const auto *bundle : bundles) {
+    if (const std::ifstream file{bundle}; file.good()) {
+      return bundle;
+    }
+  }
+#endif
+  return {};
+}
 
 namespace {
 
@@ -81,6 +107,9 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
       cpr::Timeout{Clamp_timeout_for_transport<CprTimeoutRep>(timeout)});
   session.SetRedirect(cpr::Redirect{true});
   session.SetVerifySsl(cpr::VerifySsl{true});
+  if (const auto bundle = Resolve_ca_bundle(); !bundle.empty()) {
+    session.SetSslOptions(cpr::Ssl(cpr::ssl::CaInfo{bundle}));
+  }
   if (bearer_token.has_value()) {
     session.SetBearer(*bearer_token);
   }

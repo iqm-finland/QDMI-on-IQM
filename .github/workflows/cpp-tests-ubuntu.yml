@@ -5,7 +5,7 @@ on:
       runs-on:
         description: >
           The ubuntu runner image to use. Defaults to 'ubuntu-latest'.
-          This can be any valid ubuntu runner image, such as 'ubuntu-22.04', 'ubuntu-24.04', or their ARM variants 'ubuntu-22.04-arm', 'ubuntu-24.04-arm'.
+          This can be any valid ubuntu runner image, such as 'ubuntu-22.04', 'ubuntu-26.04', or their ARM variants 'ubuntu-22.04-arm', 'ubuntu-26.04-arm'.
         default: "ubuntu-latest"
         type: string
       config:

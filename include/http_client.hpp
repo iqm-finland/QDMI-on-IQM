@@ -35,6 +35,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <string>
 #include <type_traits>
 
 namespace iqm::http {
@@ -123,6 +124,11 @@ QDMI_STATUS Handle_response(
     ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
 
 namespace internal {
+/// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
+/// bundle. An empty result leaves libcurl's platform default in place.
+/// Explicit paths are passed through even when invalid, so TLS fails closed.
+[[nodiscard]] std::string Resolve_ca_bundle();
+
 /**
  * @brief Clamp a logical timeout to the integer range used by a transport.
  *

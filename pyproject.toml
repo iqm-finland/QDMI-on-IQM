@@ -51,15 +51,17 @@ classifiers = [
 name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
+# Temporary Core #2373 source pin: replace with a release before publishing.
 [project.optional-dependencies]
 # 14.0.1 is the oldest Pulla release supported by this integration.
 pulla = [
   "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
 ]
 qiskit = [
-  "mqt-core~=3.10.0",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
+  "numpy>=2.5.2; python_version>='3.15'",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
 ]
@@ -76,6 +78,7 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 iqm-sampler = "iqm.qdmi.sampler:main"
 
 [project.entry-points]
+"mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
 # Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
 "mqt.core.qiskit.program_serializers".IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
@@ -110,7 +113,7 @@ pulla = [
   "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
 ]
 qiskit = [
-  "mqt-core~=3.10.0",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
   "numpy>=2.1",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
@@ -181,7 +184,6 @@ test-skip = [
   "cp3??t-*",      # no freethreading qiskit wheels
   "cp*-win_arm64", # no numpy, qiskit, ... wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
-  "cp315*",        # no 3.15 wheels yet
 ]
 archs = "auto64"
 build-frontend = "uv"
@@ -198,7 +200,14 @@ test-sources = [ "test/python" ]
 overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
 
 [tool.cibuildwheel.linux]
-before-all = "yum install -y openssl-devel"
+# Temporary: Core builds from the pinned development commit. Remove with the release pin.
+environment = { MLIR_DIR = "/opt/llvm-23.1.2/lib/cmake/mlir" }
+before-all = """
+set -e
+yum clean metadata
+yum install -y openssl-devel
+curl -LsSf https://github.com/munich-quantum-software/setup-mlir/releases/download/v1.4.2/setup-mlir.sh | bash -s -- -v 23.1.2 -p /opt/llvm-23.1.2
+"""
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
@@ -261,7 +270,6 @@ separate_root_table = "\n\n"
 extend-ignore-re = [
   "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",                      # ignore line
   "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on", # ignore block
-  "FoMaC"
 ]
 
 [tool.typos.default.extend-words]

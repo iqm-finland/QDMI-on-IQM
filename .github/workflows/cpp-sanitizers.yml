@@ -18,7 +18,7 @@ permissions:
 jobs:
   cpp-sanitizers:
     name: 🧪 ASan + UBSan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       CTEST_PARALLEL_LEVEL: 4

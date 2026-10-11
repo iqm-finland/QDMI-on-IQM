@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 from mqt.core.qdmi import Device, Job, ProgramFormat
-from mqt.core.qdmi.driver import open_device
+from mqt.core.qdmi.builtin_driver import open_device
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 
@@ -51,17 +51,16 @@ def _skip_without_iqm_access() -> None:
 
 @pytest.fixture
 def backend() -> IQMBackend:
-    """Returns the IQM backend, which also registers the device."""
+    """Returns an IQM backend from the installed device manifest."""
     _skip_without_iqm_access()
     return IQMBackend()
 
 
 @pytest.fixture
 def device(backend: IQMBackend) -> Device:
-    """Returns a fresh device session over the registration the backend made.
+    """Returns a fresh device session from the installed manifest.
 
-    Constructing the backend registers `iqm.default`, so opening it here needs
-    only the credentials. It resolves the same environment the backend resolves.
+    It resolves the same environment the backend resolves.
     """
     tokens_file = os.getenv("IQM_TOKENS_FILE")
     del backend
@@ -86,15 +85,10 @@ def circuit() -> QuantumCircuit:
 
 
 def test_device_advertises_exactly_its_supported_formats(device: Device) -> None:
-    """The device should advertise QIR, IQM JSON, and pulse, plus calibration where supported.
-
-    Calibration is the only optional format; the device advertises it when the
-    quantum computer's API reports calibration support. No test submits one,
-    because a calibration run is a real operation on shared hardware.
-    """
+    """The device advertises QIR, IQM JSON, and binary pulse programs."""
     formats = set(device.supported_program_formats())
 
-    assert formats in (BASE_PROGRAM_FORMATS, BASE_PROGRAM_FORMATS | {ProgramFormat.CALIBRATION})
+    assert formats == BASE_PROGRAM_FORMATS
 
 
 def test_device_reports_queue_length(device: Device) -> None:
@@ -105,11 +99,12 @@ def test_device_reports_queue_length(device: Device) -> None:
 
 
 def test_retrieve_job_by_id_reaches_a_job_from_another_session(
-    circuit: QuantumCircuit, backend: IQMBackend, device: Device
+    circuit: QuantumCircuit, backend: IQMBackend, device: Device, request: pytest.FixtureRequest
 ) -> None:
     """A submitted job should be retrievable by ID from a separate session."""
     transpiled_circuit = transpile(circuit, backend=backend)
     submitted = backend.run(transpiled_circuit, shots=8)
+    request.addfinalizer(submitted.cancel)
     job_id = submitted.job_id()
 
     retrieved = device.retrieve_job_by_id(job_id)
@@ -121,11 +116,12 @@ def test_retrieve_job_by_id_reaches_a_job_from_another_session(
 
 
 def test_queue_position_is_reported_only_while_a_job_is_queued(
-    circuit: QuantumCircuit, backend: IQMBackend, device: Device
+    circuit: QuantumCircuit, backend: IQMBackend, device: Device, request: pytest.FixtureRequest
 ) -> None:
     """Querying a job's queue position should never raise, queued or not."""
     transpiled_circuit = transpile(circuit, backend=backend)
     submitted = backend.run(transpiled_circuit, shots=8)
+    request.addfinalizer(submitted.cancel)
 
     retrieved = device.retrieve_job_by_id(submitted.job_id())
     queue_position = retrieved.queue_position

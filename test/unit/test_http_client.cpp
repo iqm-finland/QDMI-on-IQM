@@ -22,12 +22,15 @@
 #include "iqm_qdmi/constants.h"
 #include "logging.hpp"
 
+#include <array>
 #include <chrono>
 #include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
 #include <cstdint>
+#include <cstdlib>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
@@ -40,6 +43,63 @@
 #include <vector>
 
 namespace {
+
+/// Restore the caller's CA configuration after each test.
+class CaBundleTest : public testing::Test {
+protected:
+  void SetUp() override {
+    for (std::size_t i = 0; i < VARIABLES.size(); ++i) {
+      if (const auto *value = std::getenv(VARIABLES[i]); value != nullptr) {
+        previous_[i] = value;
+      }
+      set(VARIABLES[i], nullptr);
+    }
+  }
+
+  void TearDown() override {
+    for (std::size_t i = 0; i < VARIABLES.size(); ++i) {
+      set(VARIABLES[i], previous_[i] ? previous_[i]->c_str() : nullptr);
+    }
+  }
+
+  static void set(const char *name, const char *value) {
+#ifdef _WIN32
+    ASSERT_EQ(_putenv_s(name, value == nullptr ? "" : value), 0);
+#else
+    ASSERT_EQ(value == nullptr ? unsetenv(name) : setenv(name, value, 1), 0);
+#endif
+  }
+
+private:
+  static constexpr std::array VARIABLES{"CURL_CA_BUNDLE", "SSL_CERT_FILE"};
+  std::array<std::optional<std::string>, VARIABLES.size()> previous_;
+};
+
+TEST_F(CaBundleTest, ExplicitBundleTakesPrecedenceEvenWhenMissing) {
+  set("SSL_CERT_FILE", "/ssl-ca.pem");
+  set("CURL_CA_BUNDLE", "/missing-curl-ca.pem");
+  EXPECT_EQ(iqm::http::internal::Resolve_ca_bundle(), "/missing-curl-ca.pem");
+}
+
+TEST_F(CaBundleTest, UsesSslCertFileWhenCurlBundleIsUnsetOrEmpty) {
+  set("SSL_CERT_FILE", "/ssl-ca.pem");
+  EXPECT_EQ(iqm::http::internal::Resolve_ca_bundle(), "/ssl-ca.pem");
+  set("CURL_CA_BUNDLE", "");
+  EXPECT_EQ(iqm::http::internal::Resolve_ca_bundle(), "/ssl-ca.pem");
+}
+
+TEST_F(CaBundleTest, UsesPlatformTrustWhenOverridesAreUnsetOrEmpty) {
+  const auto bundle = iqm::http::internal::Resolve_ca_bundle();
+#ifdef __linux__
+  ASSERT_FALSE(bundle.empty());
+  EXPECT_TRUE(std::ifstream{bundle}.good());
+#else
+  EXPECT_TRUE(bundle.empty());
+#endif
+  set("CURL_CA_BUNDLE", "");
+  set("SSL_CERT_FILE", "");
+  EXPECT_EQ(iqm::http::internal::Resolve_ca_bundle(), bundle);
+}
 
 /**
  * @brief Captures logger output for assertions within a single test scope.

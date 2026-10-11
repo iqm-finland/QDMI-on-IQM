@@ -26,6 +26,7 @@
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
+#include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 #include "logging.hpp"
 
@@ -125,6 +126,9 @@ struct IQM_QDMI_Device_Session_impl_d {
   /// Quantum computer alias
   std::optional<std::string> quantum_computer_alias_ = std::nullopt;
 
+  /// Optional calibration selected before session initialization.
+  std::optional<std::string> requested_calibration_set_id_;
+
   /// Calibration set id
   std::string calibration_set_id_;
 
@@ -190,58 +194,25 @@ struct IQM_QDMI_Device_Job_impl_d {
   std::string job_id_;
   /// Whether this handle was opened for an existing remote job.
   bool retrieved_ = false;
+  /// Whether the job was submitted through the calibration extension.
+  bool calibration_ = false;
   /// The program format used for this job.
   QDMI_Program_Format program_format_ = QDMI_PROGRAM_FORMAT_IQMJSON;
-  /// The program to be executed.
-  std::string program_;
-  /// Whether a program has been set.
-  bool program_set_ = false;
+  /// Programs in submission order, each including its text terminator.
+  std::vector<std::string> programs_;
+  /// Whether the format can be recovered from a retrieved job.
+  bool format_known_ = true;
   /// The number of shots to execute for a quantum circuit job.
-  size_t num_shots_ = 0;
-  /// @brief Heralding mode for the job.
-  /// @details Valid values include "none" and "zeros".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 parameter.
-  std::string heralding_mode_ = "none";
-  /// @brief Move gate validation mode for the job.
-  /// @details Valid values include "strict", "allow_prx", and "none"
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM2 parameter.
-  std::string move_gate_validation_ = "strict";
-  /// @brief Move gate frame tracking mode for the job.
-  /// @details Valid values include "full", "no_detuning_correction", and
-  ///          "none".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM3 parameter.
-  std::string move_gate_frame_tracking_ = "full";
-  /// @brief Dynamical decoupling mode for the job.
-  /// @details Valid values include "disabled" and "enabled".
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 parameter.
-  std::string dd_mode_ = "disabled";
-  /// @brief Stores a mapping of logical qubit names to physical qubit names.
-  /// @details This mapping can be important for the execution of QIR programs.
-  ///          Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 parameter.
-  ///          This is transferred as a comma-separated list of pairs of
-  ///          logical and physical qubit names, for example,
-  ///              "alice:QB0,bob:QB1"
-  std::optional<std::vector<std::pair<std::string, std::string>>>
-      qubit_mapping_ = std::nullopt;
-  /// @brief The maximum duration of a circuit over T2 time.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+1 parameter.
-  std::optional<double> max_circuit_duration_over_t2_ = std::nullopt;
-  /// @brief The number of active reset cycles.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+2 parameter.
-  std::optional<size_t> active_reset_cycles_ = std::nullopt;
-  /// @brief The dynamical decoupling strategy to use for the job.
-  /// @details Can be set via the QDMI_DEVICE_JOB_PARAMETER_CUSTOM5+3 parameter.
-  ///          This is transferred as a JSON string according to the data model
-  ///          defined at
-  ///          https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791
-  std::optional<std::string> dd_strategy_ = std::nullopt;
-  /// The dictionary of results (histogram counts).
-  std::map<std::string, size_t> counts_;
-  /// Measurement keys in the order used by IQM's histogram bitstrings.
-  std::optional<std::vector<std::string>> measurement_keys_;
-  /// Individual shot measurement results as bitstrings. std::nullopt means not
-  /// yet fetched, empty vector means fetched but no shots.
-  std::optional<std::vector<std::string>> shots_;
+  size_t num_shots_ = 1;
+  /// Optional IQM run-request fields supplied through CUSTOM1.
+  nlohmann::json run_request_options_ = nlohmann::json::object();
+  /// Cached results for one circuit, independent of its siblings.
+  struct Program_results {
+    std::map<std::string, size_t> counts;
+    std::optional<std::vector<std::string>> measurement_keys;
+    std::optional<std::vector<std::string>> shots;
+  };
+  std::vector<Program_results> results_;
   /// The new calibration set ID after a successful calibration.
   std::string new_calibration_set_id_;
   /// @brief Raw `sweep_results` artifact of a pulse-level job.
@@ -326,6 +297,7 @@ struct IQM_QDMI_Operation_impl_d {
       return QDMI_SUCCESS;                                                     \
     }                                                                          \
   }
+
 // NOLINTEND(bugprone-macro-parentheses)
 
 int IQM_QDMI_device_initialize() { return QDMI_SUCCESS; }
@@ -361,10 +333,15 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
     session->base_url_ = *env_base_url;
   }
 
+  if (session->quantum_computer_id_.has_value() ||
+      session->quantum_computer_alias_.has_value()) {
+    return;
+  }
+
   const auto env_qc_id = Get_nonempty_env_var("IQM_QC_ID");
   LOG_DEBUG(std::string("IQM_QC_ID environment default is ") +
             (env_qc_id.has_value() ? "set" : "unset"));
-  if (!session->quantum_computer_id_.has_value() && env_qc_id.has_value()) {
+  if (env_qc_id.has_value()) {
     session->quantum_computer_id_ = env_qc_id;
   }
 
@@ -375,9 +352,8 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
   LOG_DEBUG(
       std::string("IQM_QUANTUM_COMPUTER/IQM_QC_ALIAS environment default is ") +
       (env_qc_alias.has_value() ? "set" : "unset"));
-  if (!session->quantum_computer_alias_.has_value() &&
-      env_qc_alias.has_value()) {
-    session->quantum_computer_alias_ = env_qc_alias;
+  if (env_qc_alias.has_value()) {
+    session->quantum_computer_alias_ = std::move(env_qc_alias);
   }
 }
 
@@ -394,13 +370,13 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       status != QDMI_SUCCESS) {
     return status;
   }
+  LOG_DEBUG("Received quantum computers response: " + qc_list_response.text);
   const auto json_response = nlohmann::json::parse(
       qc_list_response.text, nullptr, false); // NOLINT(misc-include-cleaner)
   if (json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the quantum computers response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Received quantum computers response: " + json_response.dump());
 
   // Extract the quantum_computers array from the response
   if (!json_response.contains("quantum_computers") ||
@@ -464,13 +440,13 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
       status != QDMI_SUCCESS) {
     return status;
   }
+  LOG_DEBUG("Received quantum architecture response: " + arch_response.text);
   const auto arch_array = nlohmann::json::parse(
       arch_response.text, nullptr, false); // NOLINT(misc-include-cleaner)
   if (arch_array.is_discarded()) {
     LOG_ERROR("Failed to parse the static quantum architecture response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Received quantum architecture response: " + arch_array.dump());
 
   // Extract first element from array (API returns array with single object)
   if (!arch_array.is_array() || arch_array.empty()) {
@@ -589,17 +565,24 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
       status != QDMI_SUCCESS) {
     return status;
   }
+  LOG_DEBUG("Received dynamic quantum architecture response: " +
+            dyn_arch_response.text);
   const auto dynamic_architecture =
       nlohmann::json::parse(dyn_arch_response.text, nullptr, false);
   if (dynamic_architecture.is_discarded()) {
     LOG_ERROR("Failed to parse the dynamic quantum architecture response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Received dynamic quantum architecture response: " +
-            dynamic_architecture.dump());
 
-  session->calibration_set_id_ =
+  const auto resolved_id =
       dynamic_architecture.at("calibration_set_id").get<std::string>();
+  if (resolved_id.empty() ||
+      (session->requested_calibration_set_id_.has_value() &&
+       resolved_id != *session->requested_calibration_set_id_)) {
+    LOG_ERROR("Server returned a different calibration set than requested");
+    return QDMI_ERROR_FATAL;
+  }
+  session->calibration_set_id_ = resolved_id;
   LOG_INFO("Using calibration set ID: " + session->calibration_set_id_);
 
   const auto &gates = dynamic_architecture.at("gates");
@@ -720,14 +703,14 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
       status != QDMI_SUCCESS) {
     return status;
   }
+  LOG_DEBUG("Received calibration set quality metrics response: " +
+            calibration_response.text);
   const auto calibration_json_response =
       nlohmann::json::parse(calibration_response.text, nullptr, false);
   if (calibration_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the calibration set quality metrics response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Received calibration set quality metrics response: " +
-            calibration_json_response.dump());
 
   const auto &observations = calibration_json_response.at("observations");
   auto metrics = std::unordered_map<std::string, double>{};
@@ -825,33 +808,6 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
-int IQM_QDMI_device_update_dynamic_quantum_architecture(
-    IQM_QDMI_Device_Session session,
-    const std::string &calibration_set_id = "default") {
-  if (session == nullptr || calibration_set_id.empty()) {
-    return QDMI_ERROR_INVALIDARGUMENT;
-  }
-  LOG_INFO("Updating dynamic quantum architecture with calibration set ID: " +
-           calibration_set_id);
-  session->calibration_set_id_ = calibration_set_id;
-  session->operations_.clear();
-  session->operations_ptr_.clear();
-  session->operations_map_.clear();
-  session->operations_sites_map_.clear();
-
-  if (const auto ret = Process_calibrated_gates(session); ret != QDMI_SUCCESS) {
-    return ret;
-  }
-
-  // Get the latest quality metrics
-  if (const auto ret = Process_calibration_metrics(session);
-      ret != QDMI_SUCCESS) {
-    return ret;
-  }
-
-  return QDMI_SUCCESS;
-}
-
 int Initialize_device_session(IQM_QDMI_Device_Session session) {
   LOG_INFO("Initializing device session");
   Apply_environment_session_defaults(session);
@@ -871,9 +827,12 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
     return ret;
   }
 
-  // Get the dynamic quantum architecture via a GET request
-  if (const auto ret =
-          IQM_QDMI_device_update_dynamic_quantum_architecture(session);
+  session->calibration_set_id_ =
+      session->requested_calibration_set_id_.value_or("default");
+  if (const auto ret = Process_calibrated_gates(session); ret != QDMI_SUCCESS) {
+    return ret;
+  }
+  if (const auto ret = Process_calibration_metrics(session);
       ret != QDMI_SUCCESS) {
     return ret;
   }
@@ -916,6 +875,8 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
       std::make_unique<cpr::ConnectionPool>(*session->connection_pool_);
   initialized.quantum_computer_id_ = session->quantum_computer_id_;
   initialized.quantum_computer_alias_ = session->quantum_computer_alias_;
+  initialized.requested_calibration_set_id_ =
+      session->requested_calibration_set_id_;
   if (const auto status = Initialize_device_session(&initialized);
       status != QDMI_SUCCESS) {
     return status;
@@ -945,12 +906,7 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
                                           const size_t size,
                                           const void *value) {
   if (session == nullptr || (value != nullptr && size == 0) ||
-      (param >= QDMI_DEVICE_SESSION_PARAMETER_MAX &&
-       param != QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1 &&
-       param != QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2 &&
-       param != QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3 &&
-       param != QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4 &&
-       param != QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5)) {
+      QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_SESSION_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::ALLOCATED) {
@@ -977,6 +933,29 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
   case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2:
     value_str = &session->quantum_computer_alias_;
     break;
+  case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4: {
+    if (value == nullptr) {
+      return QDMI_SUCCESS;
+    }
+    // Require a canonical UUID, avoiding path separators and mutable aliases.
+    if (size != 37 || static_cast<const char *>(value)[36] != '\0') {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    std::string id(static_cast<const char *>(value), 36);
+    for (size_t index = 0; index < id.size(); ++index) {
+      const char character = id[index];
+      if (index == 8 || index == 13 || index == 18 || index == 23) {
+        if (character != '-') {
+          return QDMI_ERROR_INVALIDARGUMENT;
+        }
+      } else if ((character < '0' || character > '9') &&
+                 (character < 'a' || character > 'f')) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+    }
+    session->requested_calibration_set_id_ = std::move(id);
+    return QDMI_SUCCESS;
+  }
   case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3: {
     if (value == nullptr) {
       return QDMI_SUCCESS;
@@ -1022,7 +1001,8 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
 }
 
 namespace {
-int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
+int Set_job_status(IQM_QDMI_Device_Job job, const nlohmann::json &response) {
+  const auto native_status = response.at("status").get<std::string>();
   if (native_status == "received") {
     job->status_ = QDMI_JOB_STATUS_SUBMITTED;
   } else if (native_status == "queued" || native_status == "waiting") {
@@ -1054,6 +1034,16 @@ int Set_job_status(IQM_QDMI_Device_Job job, const std::string &native_status) {
     job->status_ = QDMI_JOB_STATUS_CANCELED;
   } else if (native_status == "failed") {
     job->status_ = QDMI_JOB_STATUS_FAILED;
+    if (const auto errors = response.find("errors");
+        errors != response.end() && errors->is_array()) {
+      for (const auto &error : *errors) {
+        if (const auto message = error.find("message");
+            message != error.end() && message->is_string()) {
+          LOG_ERROR("Job " + job->job_id_ +
+                    " failed: " + message->get<std::string>());
+        }
+      }
+    }
   } else {
     LOG_ERROR("Unknown job status: " + native_status);
     return QDMI_ERROR_FATAL;
@@ -1113,14 +1103,43 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
     retrieved_job->job_id_ = job_id;
     if (job_type == "run") {
       retrieved_job->program_format_ = PULSE_PROGRAM_FORMAT;
+      retrieved_job->results_.resize(1);
     }
     retrieved_job->retrieved_ = true;
     if (const auto status =
-            Set_job_status(retrieved_job.get(),
-                           job_status_json.at("status").get<std::string>());
+            Set_job_status(retrieved_job.get(), job_status_json);
         status != QDMI_SUCCESS) {
       return status;
     }
+    if (job_type == "run") {
+      *job = retrieved_job.release();
+      return QDMI_SUCCESS;
+    }
+    const auto payload_response = iqm::http::Get(
+        session->api_config_->url(iqm::API_ENDPOINT::GET_JOB_PAYLOAD, job_id),
+        session->token_manager_->get_bearer_token(), *session->connection_pool_,
+        session->request_timeout_, &session->rate_limit_);
+    if (const auto status = iqm::http::Handle_response(payload_response);
+        status != QDMI_SUCCESS) {
+      return status;
+    }
+    const auto payload = nlohmann::json::parse(payload_response.text);
+    const auto &circuits = payload.at("circuits");
+    if (!circuits.is_array() || circuits.empty() ||
+        !std::ranges::all_of(circuits, [](const auto &circuit) {
+          return circuit.is_object() || circuit.is_string();
+        })) {
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    retrieved_job->format_known_ = std::ranges::all_of(
+        circuits, [](const auto &circuit) { return circuit.is_object(); });
+    retrieved_job->results_.resize(circuits.size());
+    const auto &shots = payload.at("shots");
+    if (!shots.is_number_unsigned() || shots == 0 ||
+        shots > std::numeric_limits<size_t>::max()) {
+      return QDMI_ERROR_FATAL;
+    }
+    retrieved_job->num_shots_ = shots.get<size_t>();
     LOG_INFO("Retrieved device job with ID: " + std::string{job_id});
     *job = retrieved_job.release();
     return QDMI_SUCCESS;
@@ -1140,19 +1159,39 @@ void IQM_QDMI_device_job_free(IQM_QDMI_Device_Job job) {
   delete job;
 }
 
+namespace {
+/// Store optional run-request fields only after validating the whole object.
+int Set_run_request_options(IQM_QDMI_Device_Job job, const size_t size,
+                            const void *value) {
+  try {
+    const auto *text = static_cast<const char *>(value);
+    if (text[size - 1] != '\0' ||
+        std::memchr(text, '\0', size - 1) != nullptr) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    auto options = nlohmann::json::parse(text, text + size - 1, nullptr, false);
+    if (!options.is_object() || options.contains("circuits") ||
+        options.contains("shots") || options.contains("calibration_set_id")) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    if (options.contains("heralding_mode") &&
+        options.at("heralding_mode") == "zeros") {
+      LOG_ERROR("Heralding is unsupported because it may discard shots");
+      return QDMI_ERROR_NOTSUPPORTED;
+    }
+    job->run_request_options_ = std::move(options);
+    return QDMI_SUCCESS;
+  } catch (const std::bad_alloc &) {
+    return QDMI_ERROR_OUTOFMEM;
+  }
+}
+} // namespace
+
 int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
                                       const QDMI_Device_Job_Parameter param,
                                       const size_t size, const void *value) {
   if (job == nullptr || (value != nullptr && size == 0) ||
-      (param >= QDMI_DEVICE_JOB_PARAMETER_MAX &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM1 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM2 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM3 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM4 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2 &&
-       param != QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3)) {
+      QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_JOB_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->status_ != QDMI_JOB_STATUS_CREATED) {
@@ -1160,133 +1199,123 @@ int IQM_QDMI_device_job_set_parameter(IQM_QDMI_Device_Job job,
     return QDMI_ERROR_BADSTATE;
   }
   switch (param) {
-  case QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT:
-    if (value != nullptr) {
-      const auto format = *static_cast<const QDMI_Program_Format *>(value);
-      if (format >= QDMI_PROGRAM_FORMAT_MAX &&
-          format != QDMI_PROGRAM_FORMAT_CUSTOM1 &&
-          format != QDMI_PROGRAM_FORMAT_CUSTOM2 &&
-          format != QDMI_PROGRAM_FORMAT_CUSTOM3 &&
-          format != QDMI_PROGRAM_FORMAT_CUSTOM4 &&
-          format != QDMI_PROGRAM_FORMAT_CUSTOM5) {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      if (format == QDMI_PROGRAM_FORMAT_IQMJSON ||
-          format == QDMI_PROGRAM_FORMAT_QIRBASESTRING ||
-          format == PULSE_PROGRAM_FORMAT ||
-          (job->session_->supports_calibration_jobs_ &&
-           format == QDMI_PROGRAM_FORMAT_CALIBRATION)) {
-        job->program_format_ = format;
-        return QDMI_SUCCESS;
-      }
-      return QDMI_ERROR_NOTSUPPORTED;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_PROGRAM:
-    if (value != nullptr) {
-      job->program_.assign(static_cast<const char *>(value), size);
-      job->program_set_ = true;
-    }
-    return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM:
     if (job->program_format_ == PULSE_PROGRAM_FORMAT) {
       return QDMI_ERROR_NOTSUPPORTED;
     }
     if (value != nullptr) {
-      job->num_shots_ = *static_cast<const size_t *>(value);
+      if (size != sizeof(size_t)) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      const auto shots = *static_cast<const size_t *>(value);
+      if (shots == 0) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      job->num_shots_ = shots;
     }
     return QDMI_SUCCESS;
   case QDMI_DEVICE_JOB_PARAMETER_CUSTOM1:
     if (value != nullptr) {
-      const std::string heralding_mode(static_cast<const char *>(value));
-      if (heralding_mode != "none" && heralding_mode != "zeros") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->heralding_mode_ = heralding_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM2:
-    if (value != nullptr) {
-      const std::string move_validation_mode(static_cast<const char *>(value));
-      if (move_validation_mode != "strict" &&
-          move_validation_mode != "allow_prx" &&
-          move_validation_mode != "none") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->move_gate_validation_ = move_validation_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM3:
-    if (value != nullptr) {
-      const std::string move_gate_frame_tracking_mode(
-          static_cast<const char *>(value));
-      if (move_gate_frame_tracking_mode != "full" &&
-          move_gate_frame_tracking_mode != "no_detuning_correction" &&
-          move_gate_frame_tracking_mode != "none") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->move_gate_frame_tracking_ = move_gate_frame_tracking_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM4:
-    if (value != nullptr) {
-      const std::string dynamic_decoupling_mode(
-          static_cast<const char *>(value));
-      if (dynamic_decoupling_mode != "disabled" &&
-          dynamic_decoupling_mode != "enabled") {
-        return QDMI_ERROR_INVALIDARGUMENT;
-      }
-      job->dd_mode_ = dynamic_decoupling_mode;
-    }
-    return QDMI_SUCCESS;
-  case QDMI_DEVICE_JOB_PARAMETER_CUSTOM5:
-    if (value != nullptr) {
-      std::string qubit_mapping_str(static_cast<const char *>(value));
-      std::vector<std::pair<std::string, std::string>> qubit_mapping;
-      size_t pos = 0;
-      while ((pos = qubit_mapping_str.find(',')) != std::string::npos) {
-        const auto pair = qubit_mapping_str.substr(0, pos);
-        const auto colon_pos = pair.find(':');
-        if (colon_pos == std::string::npos) {
-          return QDMI_ERROR_INVALIDARGUMENT;
-        }
-        qubit_mapping.emplace_back(pair.substr(0, colon_pos),
-                                   pair.substr(colon_pos + 1));
-        qubit_mapping_str.erase(0, pos + 1);
-      }
-      if (!qubit_mapping_str.empty()) {
-        const auto colon_pos = qubit_mapping_str.find(':');
-        if (colon_pos == std::string::npos) {
-          return QDMI_ERROR_INVALIDARGUMENT;
-        }
-        qubit_mapping.emplace_back(qubit_mapping_str.substr(0, colon_pos),
-                                   qubit_mapping_str.substr(colon_pos + 1));
-      }
-      job->qubit_mapping_ = qubit_mapping;
+      return Set_run_request_options(job, size, value);
     }
     return QDMI_SUCCESS;
   default:
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1) {
-      if (value != nullptr) {
-        job->max_circuit_duration_over_t2_ =
-            *static_cast<const double *>(value);
-      }
-      return QDMI_SUCCESS;
-    }
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2) {
-      if (value != nullptr) {
-        job->active_reset_cycles_ = *static_cast<const size_t *>(value);
-      }
-      return QDMI_SUCCESS;
-    }
-    if (static_cast<int>(param) == QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3) {
-      if (value != nullptr) {
-        job->dd_strategy_ = std::string(static_cast<const char *>(value));
-      }
-      return QDMI_SUCCESS;
-    }
     return QDMI_ERROR_NOTSUPPORTED;
   }
+}
+
+int IQM_QDMI_device_job_set_programs(IQM_QDMI_Device_Job job,
+                                     const QDMI_Program_Format format,
+                                     const size_t count, const size_t *sizes,
+                                     const void *const *programs) try {
+  if (job == nullptr || count == 0 ||
+      (programs != nullptr && sizes == nullptr)) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->status_ != QDMI_JOB_STATUS_CREATED) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  if (QDMI_IS_INVALID_ENUM_VALUE(format, QDMI_PROGRAM_FORMAT)) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (format != QDMI_PROGRAM_FORMAT_IQMJSON &&
+      format != QDMI_PROGRAM_FORMAT_QIRBASESTRING &&
+      format != PULSE_PROGRAM_FORMAT) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (format == PULSE_PROGRAM_FORMAT && count != 1) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (programs == nullptr) {
+    return QDMI_SUCCESS;
+  }
+  std::vector<std::string> copied_programs;
+  copied_programs.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    if (programs[i] == nullptr || sizes[i] == 0) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    const auto *text = static_cast<const char *>(programs[i]);
+    if (format != PULSE_PROGRAM_FORMAT &&
+        (text[sizes[i] - 1] != '\0' ||
+         std::memchr(text, '\0', sizes[i] - 1) != nullptr)) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    copied_programs.emplace_back(text, sizes[i]);
+  }
+  std::vector<IQM_QDMI_Device_Job_impl_d::Program_results> results(count);
+  job->programs_ = std::move(copied_programs);
+  job->results_ = std::move(results);
+  job->program_format_ = format;
+  return QDMI_SUCCESS;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
+}
+
+int IQM_QDMI_device_job_get_program(IQM_QDMI_Device_Job job,
+                                    const size_t program_index,
+                                    const size_t size, void *data,
+                                    size_t *size_ret) {
+  if (job == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->results_.empty()) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  if (program_index >= job->results_.size()) {
+    return QDMI_ERROR_OUTOFRANGE;
+  }
+  if (job->retrieved_) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  const auto &program = job->programs_[program_index];
+  if (data != nullptr) {
+    if (size < program.size()) {
+      return QDMI_ERROR_INVALIDARGUMENT;
+    }
+    std::memcpy(data, program.data(), program.size());
+  }
+  if (size_ret != nullptr) {
+    *size_ret = program.size();
+  }
+  return QDMI_SUCCESS;
+}
+
+int IQM_QDMI_device_job_get_program_status(IQM_QDMI_Device_Job job,
+                                           const size_t program_index,
+                                           QDMI_Job_Status * /*status*/) {
+  if (job == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->results_.empty()) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  if (program_index >= job->results_.size()) {
+    return QDMI_ERROR_OUTOFRANGE;
+  }
+  return QDMI_ERROR_NOTSUPPORTED;
 }
 
 int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
@@ -1294,12 +1323,7 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
                                        const size_t size, void *value,
                                        size_t *size_ret) {
   if (job == nullptr || (value != nullptr && size == 0) ||
-      (prop >= QDMI_DEVICE_JOB_PROPERTY_MAX &&
-       prop != QDMI_DEVICE_JOB_PROPERTY_CUSTOM1 &&
-       prop != QDMI_DEVICE_JOB_PROPERTY_CUSTOM2 &&
-       prop != QDMI_DEVICE_JOB_PROPERTY_CUSTOM3 &&
-       prop != QDMI_DEVICE_JOB_PROPERTY_CUSTOM4 &&
-       prop != QDMI_DEVICE_JOB_PROPERTY_CUSTOM5)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_DEVICE_JOB_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_ID, job->job_id_.c_str(), prop,
@@ -1324,17 +1348,30 @@ int IQM_QDMI_device_job_query_property(IQM_QDMI_Device_Job job,
       job->program_format_ == PULSE_PROGRAM_FORMAT) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
-  if (job->retrieved_) {
+  if ((prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM ||
+       prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT) &&
+      job->results_.empty()) {
+    return QDMI_ERROR_BADSTATE;
+  }
+  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM, size_t,
+                            job->results_.size(), prop, size, value, size_ret)
+  if ((job->calibration_ || !job->format_known_) &&
+      prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
+  if (job->calibration_ && prop == QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (job->retrieved_ && prop == QDMI_DEVICE_JOB_PROPERTY_CUSTOM1) {
+    // A retrieved job may have used a different calibration than this session.
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  ADD_STRING_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_CUSTOM1,
+                      job->session_->calibration_set_id_.c_str(), prop, size,
+                      value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
                             QDMI_Program_Format, job->program_format_, prop,
                             size, value, size_ret)
-  if (prop == QDMI_DEVICE_JOB_PROPERTY_PROGRAM && !job->program_set_) {
-    return QDMI_ERROR_BADSTATE;
-  }
-  ADD_LIST_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_PROGRAM, char, job->program_, prop,
-                    size, value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_JOB_PROPERTY_SHOTSNUM, size_t,
                             job->num_shots_, prop, size, value, size_ret)
   return QDMI_ERROR_NOTSUPPORTED;
@@ -1375,46 +1412,29 @@ std::string_view Program_contents(const std::string &stored_program) {
 
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
-  auto json_program = nlohmann::json();
+  auto json_program = job->run_request_options_;
   json_program["circuits"] = nlohmann::json::array();
-  const auto program = Program_contents(job->program_);
-  if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON) {
-    json_program["circuits"].emplace_back(
-        nlohmann::json::parse(program.begin(), program.end()));
-  } else {
-    json_program["circuits"].emplace_back(std::string{program});
+  for (const auto &stored_program : job->programs_) {
+    const auto program = Program_contents(stored_program);
+    if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON) {
+      json_program["circuits"].emplace_back(
+          nlohmann::json::parse(program.begin(), program.end()));
+    } else {
+      json_program["circuits"].emplace_back(std::string{program});
+    }
   }
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
-  json_program["heralding_mode"] = job->heralding_mode_;
-  json_program["move_gate_validation"] = job->move_gate_validation_;
-  json_program["move_gate_frame_tracking"] = job->move_gate_frame_tracking_;
-  json_program["dd_mode"] = job->dd_mode_;
-  if (job->qubit_mapping_) {
-    nlohmann::json qubit_mapping_json = nlohmann::json::array();
-    for (const auto &[logical, physical] : *job->qubit_mapping_) {
-      qubit_mapping_json.push_back(
-          {{"logical_name", logical}, {"physical_name", physical}});
-    }
-    json_program["qubit_mapping"] = qubit_mapping_json;
-  }
-  if (job->max_circuit_duration_over_t2_) {
-    json_program["max_circuit_duration_over_t2"] =
-        *job->max_circuit_duration_over_t2_;
-  }
-  if (job->active_reset_cycles_) {
-    json_program["active_reset_cycles"] = *job->active_reset_cycles_;
-  }
-  if (job->dd_strategy_) {
-    json_program["dd_strategy"] = nlohmann::json::parse(*job->dd_strategy_);
-  }
 
   const auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,
                                       *job->session_->quantum_computer_alias_);
+  const auto payload = json_program.dump();
+  const auto token = job->session_->token_manager_->get_bearer_token();
+  // A failed response can still represent an accepted remote job.
+  job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
-      job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      *job->session_->connection_pool_, json_program.dump(),
+      job_submission_url, token, *job->session_->connection_pool_, payload,
       {{"Expect", "100-continue"}}, job->session_->request_timeout_,
       &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
@@ -1422,13 +1442,13 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return status;
   }
+  LOG_DEBUG("Job submission response:\n" + job_submission_response.text);
   const auto job_submission_json_response =
       nlohmann::json::parse(job_submission_response.text, nullptr, false);
   if (job_submission_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the job submission response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Job submission response:\n" + job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response.at("id").get<std::string>();
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
@@ -1453,11 +1473,13 @@ int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
   // The program is a protobuf payload, so it goes out byte for byte. Running it
   // through Program_contents() would drop a trailing zero byte that carries
   // meaning here.
+  const auto token = job->session_->token_manager_->get_bearer_token();
+  job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
-      job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      *job->session_->connection_pool_, job->program_,
+      job_submission_url, token, *job->session_->connection_pool_,
+      job->programs_.front(),
       {{"Content-Type", "application/protobuf"}, {"Expect", "100-continue"}},
-      job->session_->request_timeout_);
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1490,34 +1512,52 @@ int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
   return QDMI_SUCCESS;
 }
 
-int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
+} // namespace
+
+int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
+  if (job == nullptr) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
+  if (job->status_ != QDMI_JOB_STATUS_CREATED || job->session_ == nullptr) {
+    return QDMI_ERROR_BADSTATE;
+  }
   if (!job->session_->supports_calibration_jobs_) {
-    LOG_ERROR("Calibration jobs are not supported by this device");
+    LOG_DEBUG("Calibration jobs are not supported by this device");
     return QDMI_ERROR_NOTSUPPORTED;
   }
+  if (job->programs_.empty()) {
+    return QDMI_ERROR_INVALIDARGUMENT;
+  }
   LOG_INFO("Submitting calibration job");
-  const auto program = std::string{Program_contents(job->program_)};
+  if (job->programs_.size() != 1) {
+    return QDMI_ERROR_NOTSUPPORTED;
+  }
+  const auto program = std::string{Program_contents(job->programs_.front())};
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
+  const auto token = job->session_->token_manager_->get_bearer_token();
+  // A failed response can still represent an accepted remote job.
+  job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
-      job_submission_url, job->session_->token_manager_->get_bearer_token(),
-      *job->session_->connection_pool_, program, {{"Expect", "100-continue"}},
-      job->session_->request_timeout_, &job->session_->rate_limit_);
+      job_submission_url, token, *job->session_->connection_pool_, program,
+      {{"Expect", "100-continue"}}, job->session_->request_timeout_,
+      &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
     return status;
   }
+  LOG_DEBUG("Calibration job submission response:\n" +
+            job_submission_response.text);
   const auto job_submission_json_response =
       nlohmann::json::parse(job_submission_response.text, nullptr, false);
   if (job_submission_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the calibration job submission response");
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Calibration job submission response:\n" +
-            job_submission_json_response.dump());
 
   job->job_id_ = job_submission_json_response.at("id").get<std::string>();
+  job->calibration_ = true;
   job->status_ = QDMI_JOB_STATUS_SUBMITTED;
 
   // Log queue position if available
@@ -1531,8 +1571,13 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) {
   LOG_INFO(log_message);
 
   return QDMI_SUCCESS;
+} catch (const iqm::ClientAuthenticationError &) {
+  return QDMI_ERROR_PERMISSIONDENIED;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
-} // namespace
 
 int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (job == nullptr) {
@@ -1544,7 +1589,7 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (job->session_ == nullptr) {
     return QDMI_ERROR_BADSTATE;
   }
-  if (!job->program_set_) {
+  if (job->programs_.empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON ||
@@ -1553,9 +1598,6 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   }
   if (job->program_format_ == PULSE_PROGRAM_FORMAT) {
     return IQM_QDMI_device_job_submit_run(job);
-  }
-  if (job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION) {
-    return IQM_QDMI_device_job_submit_calibration(job);
   }
   return QDMI_ERROR_INVALIDARGUMENT; // Unreachable; just a safety check
 } catch (const iqm::ClientAuthenticationError &) {
@@ -1575,7 +1617,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   }
   LOG_INFO("Canceling job with ID: " + job->job_id_);
   const auto job_abortion_url =
-      job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION
+      job->calibration_
           ? job->session_->api_config_->url(
                 iqm::API_ENDPOINT::ABORT_CALIBRATION_JOB, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::CANCEL_JOB,
@@ -1630,7 +1672,7 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   }
   LOG_DEBUG("Checking status for job with ID: " + job->job_id_);
   const auto job_status_url =
-      job->program_format_ == QDMI_PROGRAM_FORMAT_CALIBRATION
+      job->calibration_
           ? job->session_->api_config_->url(
                 iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
@@ -1649,17 +1691,17 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
               "; keeping its status at " + std::to_string(job->status_));
     return status_code;
   }
+  LOG_DEBUG("Job status response:\n" + job_status_response.text);
   const auto job_status_json_response =
       nlohmann::json::parse(job_status_response.text, nullptr, false);
   if (job_status_json_response.is_discarded()) {
     LOG_ERROR("Failed to parse the status response for job " + job->job_id_);
     return QDMI_ERROR_FATAL;
   }
-  LOG_DEBUG("Job status response:\n" + job_status_json_response.dump());
 
   const auto job_status =
       job_status_json_response.at("status").get<std::string>();
-  if (const auto update_status = Set_job_status(job, job_status);
+  if (const auto update_status = Set_job_status(job, job_status_json_response);
       update_status != QDMI_SUCCESS) {
     return update_status;
   }
@@ -1745,61 +1787,45 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
 
 namespace {
 int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
+                                         const size_t program_index,
                                          const QDMI_Job_Result result,
                                          const size_t size, void *data,
                                          size_t *size_ret) {
-  // Fetch the remote results, if not already fetched
-  if (job->counts_.empty()) {
-    // Optimization: if we already have shots, compute counts from them
-    if (job->shots_.has_value() && !job->shots_->empty()) {
-      LOG_INFO("Computing histogram counts from shots for job " + job->job_id_);
-      for (const auto &shot : *job->shots_) {
-        job->counts_[shot]++;
-      }
-    } else {
-      LOG_INFO("Fetching results for job " + job->job_id_);
-      const auto job_results_url = job->session_->api_config_->url(
-          iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS, job->job_id_);
-      const auto job_results_response = iqm::http::Get(
-          job_results_url, job->session_->token_manager_->get_bearer_token(),
-          *job->session_->connection_pool_, job->session_->request_timeout_,
-          &job->session_->rate_limit_);
-      const auto status = iqm::http::Handle_response(job_results_response);
-      if (status != QDMI_SUCCESS) {
-        // Only mark the job as failed for truly fatal errors, but always
-        // propagate the underlying status code to the caller.
-        if (status == QDMI_ERROR_FATAL) {
-          job->status_ = QDMI_JOB_STATUS_FAILED;
-        }
-        return status;
-      }
-      const auto job_results_json_response =
-          nlohmann::json::parse(job_results_response.text, nullptr, false);
-      if (job_results_json_response.is_discarded()) {
-        LOG_ERROR("Failed to parse the results response for job " +
-                  job->job_id_);
-        return QDMI_ERROR_FATAL;
-      }
-      LOG_DEBUG("Job results response:\n" + job_results_json_response.dump());
-
-      // Response is an array with one result for the submitted circuit.
-      if (!job_results_json_response.is_array() ||
-          job_results_json_response.empty()) {
-        LOG_ERROR("Expected a non-empty array of results for job " +
-                  job->job_id_);
-        return QDMI_ERROR_FATAL;
-      }
-      const auto &counts_result = job_results_json_response.at(0);
-      job->measurement_keys_ =
-          counts_result.at("measurement_keys").get<std::vector<std::string>>();
-      for (const auto &counts = counts_result.at("counts");
-           const auto &[bitstring, count] : counts.items()) {
-        job->counts_[bitstring] = count.get<size_t>();
-      }
+  auto &program_result = job->results_.at(program_index);
+  if (!program_result.measurement_keys.has_value()) {
+    const auto response = iqm::http::Get(
+        job->session_->api_config_->url(
+            iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
+            job->job_id_),
+        job->session_->token_manager_->get_bearer_token(),
+        *job->session_->connection_pool_, job->session_->request_timeout_,
+        &job->session_->rate_limit_);
+    if (const auto status = iqm::http::Handle_response(response);
+        status != QDMI_SUCCESS) {
+      return status;
+    }
+    const auto artifact = nlohmann::json::parse(response.text);
+    if (!artifact.is_array() || artifact.size() != job->results_.size()) {
+      return QDMI_ERROR_FATAL;
+    }
+    std::vector<IQM_QDMI_Device_Job_impl_d::Program_results> results;
+    results.reserve(artifact.size());
+    for (const auto &circuit : artifact) {
+      auto &entry = results.emplace_back();
+      entry.measurement_keys =
+          circuit.at("measurement_keys").get<std::vector<std::string>>();
+      entry.counts = circuit.at("counts").get<std::map<std::string, size_t>>();
+    }
+    /// Commit only complete, validated artifact data. Download failures leave
+    /// the execution outcome unchanged and can be retried without resubmitting.
+    for (size_t i = 0; i < results.size(); ++i) {
+      job->results_[i].counts = std::move(results[i].counts);
+      job->results_[i].measurement_keys =
+          std::move(results[i].measurement_keys);
     }
   }
   if (result == QDMI_JOB_RESULT_HIST_KEYS) {
-    if (job->counts_.empty()) {
+    if (program_result.counts.empty()) {
       constexpr size_t req_size = 1;
       if (size_ret != nullptr) {
         *size_ret = req_size;
@@ -1816,8 +1842,8 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       // measured from all of them. One extra byte per key covers its
       // separator, the last of which becomes the null terminator.
       const size_t req_size = std::transform_reduce(
-          job->counts_.begin(), job->counts_.end(), job->counts_.size(),
-          std::plus{},
+          program_result.counts.begin(), program_result.counts.end(),
+          program_result.counts.size(), std::plus{},
           [](const auto &entry) -> size_t { return entry.first.length(); });
       if (size_ret != nullptr) {
         *size_ret = req_size;
@@ -1827,7 +1853,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
           return QDMI_ERROR_INVALIDARGUMENT;
         }
         auto *data_ptr = static_cast<char *>(data);
-        for (const auto &bitstring : job->counts_ | std::views::keys) {
+        for (const auto &bitstring : program_result.counts | std::views::keys) {
           std::ranges::copy(bitstring, data_ptr);
           data_ptr += bitstring.length();
           *data_ptr++ = ',';
@@ -1837,7 +1863,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
     }
   } else {
     // case QDMI_JOB_RESULT_HIST_VALUES:
-    const size_t req_size = job->counts_.size() * sizeof(size_t);
+    const size_t req_size = program_result.counts.size() * sizeof(size_t);
     if (size_ret != nullptr) {
       *size_ret = req_size;
     }
@@ -1846,7 +1872,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         return QDMI_ERROR_INVALIDARGUMENT;
       }
       auto *data_ptr = static_cast<size_t *>(data);
-      for (const auto &count : job->counts_ | std::views::values) {
+      for (const auto &count : program_result.counts | std::views::values) {
         *data_ptr++ = count;
       }
     }
@@ -1914,6 +1940,8 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
       }
       return status;
     }
+    LOG_DEBUG("Calibration job status response:\n" +
+              job_calibration_response.text);
     const auto job_calibration_json_response =
         nlohmann::json::parse(job_calibration_response.text, nullptr, false);
     if (job_calibration_json_response.is_discarded()) {
@@ -1921,8 +1949,6 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
                 job->job_id_);
       return QDMI_ERROR_FATAL;
     }
-    LOG_DEBUG("Calibration job status response:\n" +
-              job_calibration_json_response.dump());
 
     const auto &calibration_result = job_calibration_json_response.at("result");
     if (!calibration_result.value("success", false)) {
@@ -1932,20 +1958,6 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
     }
     job->new_calibration_set_id_ =
         calibration_result.at("calibration_set_id").get<std::string>();
-
-    // Update the dynamic quantum architecture with the new calibration set ID
-    auto ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
-        job->session_, job->new_calibration_set_id_);
-    if (ret != QDMI_SUCCESS) {
-      LOG_INFO("Failed to update dynamic quantum architecture after "
-               "calibration request. Retrying in 120 seconds...");
-      std::this_thread::sleep_for(std::chrono::seconds(120));
-      ret = IQM_QDMI_device_update_dynamic_quantum_architecture(
-          job->session_, job->new_calibration_set_id_);
-      if (ret != QDMI_SUCCESS) {
-        return ret;
-      }
-    }
   }
 
   const size_t req_size = job->new_calibration_set_id_.length() + 1;
@@ -1964,193 +1976,77 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
 }
 
 int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
+                                          const size_t program_index,
                                           const size_t size, void *data,
                                           size_t *size_ret) {
-  // Fetch the remote results, if not already fetched
-  if (!job->shots_.has_value()) {
-    // IQM defines this metadata as the concatenation order of measurement
-    // results in histogram bitstrings. Use the same order for individual shots.
-    if (!job->measurement_keys_.has_value()) {
-      if (const auto status = IQM_QDMI_device_job_get_results_hist(
-              job, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, nullptr);
-          status != QDMI_SUCCESS) {
-        return status;
-      }
-    }
-
-    LOG_INFO("Fetching shot measurements for job " + job->job_id_);
-    const auto job_measurements_url = job->session_->api_config_->url(
-        iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_);
-    const auto job_measurements_response = iqm::http::Get(
-        job_measurements_url, job->session_->token_manager_->get_bearer_token(),
-        *job->session_->connection_pool_, job->session_->request_timeout_,
-        &job->session_->rate_limit_);
-    const auto status = iqm::http::Handle_response(job_measurements_response);
-    if (status != QDMI_SUCCESS) {
-      // Only mark the job as failed for truly fatal errors, but always
-      // propagate the underlying status code to the caller.
-      if (status == QDMI_ERROR_FATAL) {
-        job->status_ = QDMI_JOB_STATUS_FAILED;
-      }
+  auto &program_result = job->results_.at(program_index);
+  if (!program_result.shots.has_value()) {
+    if (const auto status = IQM_QDMI_device_job_get_results_hist(
+            job, program_index, QDMI_JOB_RESULT_HIST_KEYS, 0, nullptr, nullptr);
+        status != QDMI_SUCCESS) {
       return status;
     }
-
-    const auto job_measurements_json_response =
-        nlohmann::json::parse(job_measurements_response.text, nullptr, false);
-    if (job_measurements_json_response.is_discarded()) {
-      LOG_ERROR("Failed to parse the measurements response for job " +
-                job->job_id_);
+    const auto response = iqm::http::Get(
+        job->session_->api_config_->url(
+            iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_),
+        job->session_->token_manager_->get_bearer_token(),
+        *job->session_->connection_pool_, job->session_->request_timeout_,
+        &job->session_->rate_limit_);
+    if (const auto status = iqm::http::Handle_response(response);
+        status != QDMI_SUCCESS) {
+      return status;
+    }
+    const auto artifact = nlohmann::json::parse(response.text);
+    if (!artifact.is_array() ||
+        (!artifact.empty() && artifact.size() != job->results_.size())) {
       return QDMI_ERROR_FATAL;
     }
-    LOG_DEBUG("Job measurements response:\n" +
-              job_measurements_json_response.dump());
-
-    // API returns array format: [{"meas_key": [[0], [1], ...], ...}, ...]
-    // The outer array typically contains a single object.
-    // Each measurement key maps to an array of shot results.
-    // Each shot result contains one bit per measured qubit.
-    if (!job_measurements_json_response.is_array()) {
-      LOG_ERROR("Expected array of measurement objects for job " +
-                job->job_id_);
-      job->status_ = QDMI_JOB_STATUS_FAILED;
+    if (artifact.empty() &&
+        !std::ranges::all_of(job->results_, [](const auto &entry) {
+          return entry.measurement_keys->empty();
+        })) {
       return QDMI_ERROR_FATAL;
     }
-
-    // Initialize shots_ with an empty vector (marking as "fetched")
-    job->shots_ = std::vector<std::string>();
-
-    // Empty array means no shots
-    if (job_measurements_json_response.empty()) {
-      LOG_INFO("No shot measurements for job " + job->job_id_);
-    } else {
-      for (const auto &measurement_obj : job_measurements_json_response) {
-        if (!measurement_obj.is_object()) {
-          LOG_ERROR("Expected object in measurements array for job " +
-                    job->job_id_);
-          job->status_ = QDMI_JOB_STATUS_FAILED;
+    std::vector<std::vector<std::string>> results(job->results_.size());
+    for (size_t i = 0; i < artifact.size(); ++i) {
+      const auto &measurements = artifact[i];
+      const auto &keys = *job->results_[i].measurement_keys;
+      if (!measurements.is_object() || measurements.empty() ||
+          measurements.size() != keys.size()) {
+        return QDMI_ERROR_FATAL;
+      }
+      auto &shots = results[i];
+      /// Retrieved IQM jobs may retain fewer shots after heralding.
+      shots.resize(job->retrieved_ ? measurements.at(keys.front()).size()
+                                   : job->num_shots_);
+      for (const auto &key : keys) {
+        const auto &values = measurements.at(key);
+        if (!values.is_array() || values.size() != shots.size()) {
           return QDMI_ERROR_FATAL;
         }
-        if (measurement_obj.empty()) {
-          LOG_ERROR("Expected non-empty measurement object for job " +
-                    job->job_id_);
-          job->status_ = QDMI_JOB_STATUS_FAILED;
-          return QDMI_ERROR_FATAL;
-        }
-
-        const auto &keys = *job->measurement_keys_;
-        if (measurement_obj.size() != keys.size() ||
-            !std::ranges::all_of(keys, [&](const auto &key) {
-              return measurement_obj.contains(key);
-            })) {
-          LOG_ERROR(
-              "Measurement keys do not match histogram metadata for job " +
-              job->job_id_);
-          job->status_ = QDMI_JOB_STATUS_FAILED;
-          return QDMI_ERROR_FATAL;
-        }
-
-        // Determine the number of shots from the first key
-        size_t num_shots = 0;
-        if (!keys.empty()) {
-          const auto &first_key_results = measurement_obj[keys[0]];
-          if (!first_key_results.is_array()) {
-            LOG_ERROR("Expected array for measurement key '" + keys[0] +
-                      "' in job " + job->job_id_);
-            job->status_ = QDMI_JOB_STATUS_FAILED;
+        size_t width = 0;
+        for (size_t shot = 0; shot < shots.size(); ++shot) {
+          const auto &bits = values[shot];
+          if (!bits.is_array() || bits.empty() ||
+              (shot != 0 && bits.size() != width)) {
             return QDMI_ERROR_FATAL;
           }
-          num_shots = first_key_results.size();
-        }
-
-        // Validate that the number of shots matches what was requested
-        if (!job->retrieved_ && num_shots != job->num_shots_) {
-          LOG_ERROR(
-              "Number of shots in measurement response (" +
-              std::to_string(num_shots) + ") does not match requested shots (" +
-              std::to_string(job->num_shots_) + ") for job " + job->job_id_);
-          job->status_ = QDMI_JOB_STATUS_FAILED;
-          return QDMI_ERROR_FATAL;
-        }
-
-        // Pre-allocate shots
-        if (job->shots_->empty()) {
-          job->shots_->resize(num_shots);
-        }
-
-        // For each measurement key, process all shots
-        for (const auto &key : keys) {
-          const auto &key_results = measurement_obj[key];
-          if (!key_results.is_array()) {
-            LOG_ERROR("Expected array for measurement key '" + key +
-                      "' in job " + job->job_id_);
-            job->status_ = QDMI_JOB_STATUS_FAILED;
-            return QDMI_ERROR_FATAL;
-          }
-
-          if (key_results.size() != num_shots) {
-            LOG_ERROR("Inconsistent number of shots for measurement key '" +
-                      key + "': expected " + std::to_string(num_shots) +
-                      ", got " + std::to_string(key_results.size()) +
-                      " in job " + job->job_id_);
-            job->status_ = QDMI_JOB_STATUS_FAILED;
-            return QDMI_ERROR_FATAL;
-          }
-
-          std::optional<size_t> key_result_width;
-
-          // Process each shot for this measurement key
-          for (size_t shot_idx = 0; shot_idx < num_shots; ++shot_idx) {
-            const auto &qubit_result = key_results[shot_idx];
-            if (!qubit_result.is_array() || qubit_result.empty()) {
-              LOG_ERROR("Invalid qubit result format for measurement key '" +
-                        key + "', shot " + std::to_string(shot_idx) +
-                        " in job " + job->job_id_);
-              job->status_ = QDMI_JOB_STATUS_FAILED;
+          width = bits.size();
+          for (const auto &bit : bits) {
+            if (!bit.is_number_integer() || (bit != 0 && bit != 1)) {
               return QDMI_ERROR_FATAL;
             }
-
-            if (!key_result_width.has_value()) {
-              key_result_width = qubit_result.size();
-            } else if (qubit_result.size() != *key_result_width) {
-              LOG_ERROR(
-                  "Inconsistent qubit-result width for measurement key '" +
-                  key + "': expected " + std::to_string(*key_result_width) +
-                  ", got " + std::to_string(qubit_result.size()) +
-                  " for shot " + std::to_string(shot_idx) + " in job " +
-                  job->job_id_);
-              job->status_ = QDMI_JOB_STATUS_FAILED;
-              return QDMI_ERROR_FATAL;
-            }
-
-            for (const auto &bit : qubit_result) {
-              if (!bit.is_number_integer()) {
-                LOG_ERROR("Invalid qubit result value format for measurement "
-                          "key '" +
-                          key + "', shot " + std::to_string(shot_idx) +
-                          " in job " + job->job_id_);
-                job->status_ = QDMI_JOB_STATUS_FAILED;
-                return QDMI_ERROR_FATAL;
-              }
-
-              const auto value = bit.get<int>();
-              if (value < 0 || value > 1) {
-                LOG_ERROR("Invalid qubit value " + std::to_string(value) +
-                          " for measurement key '" + key + "', shot " +
-                          std::to_string(shot_idx) + " in job " + job->job_id_);
-                job->status_ = QDMI_JOB_STATUS_FAILED;
-                return QDMI_ERROR_FATAL;
-              }
-
-              // Preserve the qubit order within each measurement key.
-              (*job->shots_)[shot_idx] += std::to_string(value);
-            }
+            shots[shot] += bit == 0 ? '0' : '1';
           }
         }
       }
+    }
+    for (size_t i = 0; i < results.size(); ++i) {
+      job->results_[i].shots = std::move(results[i]);
     }
   }
 
-  if (!job->shots_.has_value() || job->shots_->empty()) {
+  if (!program_result.shots.has_value() || program_result.shots->empty()) {
     LOG_INFO("No shot measurements for job " + job->job_id_);
     constexpr size_t req_size = 1;
     if (size_ret != nullptr) {
@@ -2168,15 +2064,15 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
 
   // Calculate the exact serialized size, including separators and terminator.
   size_t req_size = 1;
-  for (size_t shot_idx = 0; shot_idx < job->shots_->size(); ++shot_idx) {
-    const auto &shot = (*job->shots_)[shot_idx];
+  for (size_t shot_idx = 0; shot_idx < program_result.shots->size();
+       ++shot_idx) {
+    const auto &shot = (*program_result.shots)[shot_idx];
     const size_t separator_size = shot_idx == 0 ? 0 : 1;
     if (separator_size > std::numeric_limits<size_t>::max() - req_size ||
         shot.size() >
             std::numeric_limits<size_t>::max() - req_size - separator_size) {
       LOG_ERROR("Serialized shot results exceed the supported size for job " +
                 job->job_id_);
-      job->status_ = QDMI_JOB_STATUS_FAILED;
       return QDMI_ERROR_FATAL;
     }
     req_size += separator_size + shot.size();
@@ -2192,9 +2088,10 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     }
 
     auto *data_ptr = static_cast<char *>(data);
-    for (auto it = job->shots_->begin(); it != job->shots_->end(); ++it) {
+    for (auto it = program_result.shots->begin();
+         it != program_result.shots->end(); ++it) {
       data_ptr = std::copy(it->begin(), it->end(), data_ptr);
-      if (std::next(it) != job->shots_->end()) {
+      if (std::next(it) != program_result.shots->end()) {
         *data_ptr++ = ','; // Add comma separator
       } else {
         *data_ptr++ = '\0'; // Add null terminator at the end
@@ -2207,16 +2104,17 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
 } // namespace
 
 int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
+                                    const size_t program_index,
                                     QDMI_Job_Result result, const size_t size,
                                     void *data, size_t *size_ret) try {
   if (job == nullptr || (data != nullptr && size == 0) ||
-      (result >= QDMI_JOB_RESULT_MAX && result != QDMI_JOB_RESULT_CUSTOM1 &&
-       result != QDMI_JOB_RESULT_CUSTOM2 && result != QDMI_JOB_RESULT_CUSTOM3 &&
-       result != QDMI_JOB_RESULT_CUSTOM4 &&
-       result != QDMI_JOB_RESULT_CUSTOM5)) {
+      QDMI_IS_INVALID_ENUM_VALUE(result, QDMI_JOB_RESULT)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
 
+  if (program_index >= job->results_.size()) {
+    return QDMI_ERROR_OUTOFRANGE;
+  }
   // A pulse-level job produces the sweep results artifact and nothing the
   // measurement endpoints know about.
   if (job->program_format_ == PULSE_PROGRAM_FORMAT &&
@@ -2227,19 +2125,20 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
   switch (result) {
   case QDMI_JOB_RESULT_SHOTS:
     if (job->status_ != QDMI_JOB_STATUS_DONE) {
-      return QDMI_ERROR_INVALIDARGUMENT;
+      return QDMI_ERROR_BADSTATE;
     }
-    return IQM_QDMI_device_job_get_results_shots(job, size, data, size_ret);
+    return IQM_QDMI_device_job_get_results_shots(job, program_index, size, data,
+                                                 size_ret);
   case QDMI_JOB_RESULT_HIST_KEYS:
   case QDMI_JOB_RESULT_HIST_VALUES:
     if (job->status_ != QDMI_JOB_STATUS_DONE) {
-      return QDMI_ERROR_INVALIDARGUMENT;
+      return QDMI_ERROR_BADSTATE;
     }
-    return IQM_QDMI_device_job_get_results_hist(job, result, size, data,
-                                                size_ret);
+    return IQM_QDMI_device_job_get_results_hist(job, program_index, result,
+                                                size, data, size_ret);
   case QDMI_JOB_RESULT_CUSTOM1:
     if (job->status_ != QDMI_JOB_STATUS_DONE) {
-      return QDMI_ERROR_INVALIDARGUMENT;
+      return QDMI_ERROR_BADSTATE;
     }
     // Custom result 1 is reserved for the calibration set ID
     return IQM_QDMI_device_job_get_results_calibration_id(job, size, data,
@@ -2249,7 +2148,7 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
       return QDMI_ERROR_NOTSUPPORTED;
     }
     if (job->status_ != QDMI_JOB_STATUS_DONE) {
-      return QDMI_ERROR_INVALIDARGUMENT;
+      return QDMI_ERROR_BADSTATE;
     }
     return IQM_QDMI_device_job_get_results_sweep_results(job, size, data,
                                                          size_ret);
@@ -2268,9 +2167,6 @@ namespace {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
     QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
     PULSE_PROGRAM_FORMAT};
-constexpr std::array SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION = {
-    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
-    PULSE_PROGRAM_FORMAT, QDMI_PROGRAM_FORMAT_CALIBRATION};
 
 /// A device with at least this many queued jobs is reported as busy. The IQM
 /// on-demand queue is FIFO and executes one job at a time, so a single queued
@@ -2432,12 +2328,7 @@ int IQM_QDMI_device_session_query_device_property(
     IQM_QDMI_Device_Session session, const QDMI_Device_Property prop,
     const size_t size, void *value, size_t *size_ret) try {
   if (session == nullptr || (value != nullptr && size == 0) ||
-      (prop >= QDMI_DEVICE_PROPERTY_MAX &&
-       prop != QDMI_DEVICE_PROPERTY_CUSTOM1 &&
-       prop != QDMI_DEVICE_PROPERTY_CUSTOM2 &&
-       prop != QDMI_DEVICE_PROPERTY_CUSTOM3 &&
-       prop != QDMI_DEVICE_PROPERTY_CUSTOM4 &&
-       prop != QDMI_DEVICE_PROPERTY_CUSTOM5)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_DEVICE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (session->session_status_ != IQM_QDMI_DEVICE_SESSION_STATUS::INITIALIZED) {
@@ -2481,28 +2372,13 @@ int IQM_QDMI_device_session_query_device_property(
   ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_COUPLINGMAP,
                     (std::pair<IQM_QDMI_Site, IQM_QDMI_Site>{}),
                     session->connectivity_, prop, size, value, size_ret)
-  // Recalibration is scheduled by IQM, and the IQM Server exposes no signal
-  // asking a client to trigger one.
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION, size_t, 0,
-                            prop, size, value, size_ret)
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONUNIT, "us", prop, size,
                       value, size_ret)
   ADD_SINGLE_VALUE_PROPERTY(QDMI_DEVICE_PROPERTY_DURATIONSCALEFACTOR, double,
                             1.0, prop, size, value, size_ret)
-  // IQM's pulse schedules address controller channels rather than sites, so
-  // channel is the level this device offers.
-  ADD_SINGLE_VALUE_PROPERTY(
-      QDMI_DEVICE_PROPERTY_PULSESUPPORT, QDMI_Device_Pulse_Support_Level,
-      QDMI_DEVICE_PULSE_SUPPORT_LEVEL_CHANNEL, prop, size, value, size_ret)
-  if (session->supports_calibration_jobs_) {
-    ADD_LIST_PROPERTY(
-        QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS, QDMI_Program_Format,
-        SUPPORTED_PROGRAM_FORMATS_WITH_CALIBRATION, prop, size, value, size_ret)
-  } else {
-    ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS,
-                      QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop,
-                      size, value, size_ret)
-  }
+  ADD_LIST_PROPERTY(QDMI_DEVICE_PROPERTY_SUPPORTEDPROGRAMFORMATS,
+                    QDMI_Program_Format, SUPPORTED_PROGRAM_FORMATS, prop, size,
+                    value, size_ret)
   // Custom device property 1 exposes the current calibration set ID.
   ADD_STRING_PROPERTY(QDMI_DEVICE_PROPERTY_CUSTOM1,
                       session->calibration_set_id_.c_str(), prop, size, value,
@@ -2523,11 +2399,7 @@ int IQM_QDMI_device_session_query_site_property(IQM_QDMI_Device_Session session,
                                                 size_t *size_ret) {
   if (session == nullptr || site == nullptr ||
       (value != nullptr && size == 0) ||
-      (prop >= QDMI_SITE_PROPERTY_MAX && prop != QDMI_SITE_PROPERTY_CUSTOM1 &&
-       prop != QDMI_SITE_PROPERTY_CUSTOM2 &&
-       prop != QDMI_SITE_PROPERTY_CUSTOM3 &&
-       prop != QDMI_SITE_PROPERTY_CUSTOM4 &&
-       prop != QDMI_SITE_PROPERTY_CUSTOM5)) {
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_SITE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   ADD_SINGLE_VALUE_PROPERTY(QDMI_SITE_PROPERTY_INDEX, uint64_t, site->id_, prop,
@@ -2554,12 +2426,7 @@ int IQM_QDMI_device_session_query_operation_property(
       (sites != nullptr && num_sites == 0) ||
       (params != nullptr && num_params == 0) ||
       (value != nullptr && size == 0) ||
-      (prop >= QDMI_OPERATION_PROPERTY_MAX &&
-       prop != QDMI_OPERATION_PROPERTY_CUSTOM1 &&
-       prop != QDMI_OPERATION_PROPERTY_CUSTOM2 &&
-       prop != QDMI_OPERATION_PROPERTY_CUSTOM3 &&
-       prop != QDMI_OPERATION_PROPERTY_CUSTOM4 &&
-       prop != QDMI_OPERATION_PROPERTY_CUSTOM5) ||
+      QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_OPERATION_PROPERTY) ||
       !session->operations_sites_map_.contains(operation) ||
       session->operations_sites_map_.at(operation).empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
