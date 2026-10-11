@@ -264,9 +264,8 @@ A retrieved job cannot be resubmitted, and its parameters cannot be changed.
 
 ## Temporary development dependencies
 
-This repository currently pins QDMI #509 and MQT Core #2373 commits to exercise
-native multi-program jobs and installed device discovery. Replace both pins with
-suitable releases and regenerate `uv.lock` before publishing. Remove the
-temporary LLVM/MLIR setup from Python CI and Linux wheel-test containers once
-Core wheels are available for these APIs. Native-only device builds do not
-require LLVM/MLIR.
+This repository pins the QDMI v1.4.0 release commit and a current MQT Core
+source commit. Replace the Core pin with a 4.1 release and regenerate `uv.lock`
+before publishing. Remove the temporary LLVM/MLIR setup from Python CI and Linux
+wheel-test containers once Core wheels are available for these APIs. Native-only
+device builds do not require LLVM/MLIR.
