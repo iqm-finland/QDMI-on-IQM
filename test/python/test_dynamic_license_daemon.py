@@ -21,19 +21,17 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-from mqt.core.qdmi import builtin_driver
-
-from iqm.qdmi import IQM_QDMI_DEVICE_ID
-
-if TYPE_CHECKING:
-    import pytest
+import pytest
 
 
 def test_load_device_uses_installed_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
     """Open an independent session with explicit daemon configuration."""
+    from mqt.core.qdmi import builtin_driver  # ruff: ignore[import-outside-top-level]
+
+    from iqm.qdmi import IQM_QDMI_DEVICE_ID  # ruff: ignore[import-outside-top-level]
+
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "spank"))
     daemon = importlib.import_module("dynamic_license_daemon")
     config = daemon.parse_args([
@@ -57,3 +55,24 @@ def test_load_device_uses_installed_manifest(monkeypatch: pytest.MonkeyPatch) ->
         custom1=config.qc_id,
         custom2=config.qc_alias,
     )
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_run_retries_failed_license_update(monkeypatch: pytest.MonkeyPatch, *, available: bool) -> None:
+    """Retry a failed update, then skip unchanged successful updates."""
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "spank"))
+    daemon = importlib.import_module("dynamic_license_daemon")
+    config = daemon.parse_args(["--qc-alias", "qc"])
+    signal = Mock()
+    signal.probe.return_value = available
+    monkeypatch.setattr(daemon, "build_signals", Mock(return_value=[signal]))
+    update = Mock(side_effect=[Mock(returncode=1, stderr="failed"), Mock(returncode=0, stdout="")])
+    monkeypatch.setattr(daemon.subprocess, "run", update)
+    monkeypatch.setattr(daemon.time, "sleep", Mock(side_effect=[None, None, KeyboardInterrupt]))
+
+    with pytest.raises(KeyboardInterrupt):
+        daemon.run(config)
+
+    assert signal.probe.call_count == 3
+    assert update.call_count == 2
+    assert update.call_args.args[0][-1] == f"lastconsumed={0 if available else 1}"
