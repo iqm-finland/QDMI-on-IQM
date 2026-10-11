@@ -17,9 +17,8 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-/** @file
- * @brief FoMaC Implementation for testing the IQM QDMI Device.
- */
+/// @file
+/// Test helper for the IQM QDMI Device interface.
 
 #pragma once
 
@@ -34,21 +33,26 @@
 #include <utility>
 #include <vector>
 
-class FoMaC {
+/// Test helper for the IQM QDMI Device interface.
+///
+/// Borrows the session owned by the test fixture.
+class QDMIClient {
   IQM_QDMI_Device_Session session_;
 
   static auto throw_if_error(int status, const std::string &message) -> void;
 
 public:
-  static IQM_QDMI_Device_Session
+  /// Initialize a device session and transfer ownership to the caller.
+  static auto
   get_iqm_session(const std::string &base_url,
                   const std::optional<std::string> &token = std::nullopt,
                   const std::optional<std::string> &tokens_file = std::nullopt,
                   const std::optional<std::string> &qc_id = std::nullopt,
-                  const std::optional<std::string> &qc_alias = std::nullopt);
+                  const std::optional<std::string> &qc_alias = std::nullopt)
+      -> IQM_QDMI_Device_Session;
 
-  FoMaC() = default;
-  explicit FoMaC(IQM_QDMI_Device_Session session) : session_(session) {
+  QDMIClient() = default;
+  explicit QDMIClient(IQM_QDMI_Device_Session session) : session_(session) {
     assert(session_ != nullptr);
   }
 
@@ -109,30 +113,16 @@ public:
   [[nodiscard]] auto get_supported_program_formats() const
       -> std::vector<QDMI_Program_Format>;
 
-  [[nodiscard]] auto submit_job(
-      const std::string &program, QDMI_Program_Format format,
-      size_t num_shots = 0, const std::string &heralding_mode = "none",
-      const std::string &move_validation_mode = "strict",
-      const std::string &move_gate_frame_tracking_mode = "full",
-      const std::string &dd_mode = "disabled",
-      const std::optional<std::map<std::string, std::string>> &qubit_mapping =
-          std::nullopt,
-      const std::optional<double> &max_circuit_duration_over_t2 = std::nullopt,
-      const std::optional<size_t> &num_active_reset_cycles = std::nullopt,
-      const std::optional<std::string> &dd_strategy = std::nullopt) const
-      -> IQM_QDMI_Device_Job;
-
-  static auto wait(IQM_QDMI_Device_Job job, size_t timeout = 0) -> void;
-
-  static auto cancel(IQM_QDMI_Device_Job job) -> void;
+  /// Submit one textual program and transfer job ownership to the caller.
+  [[nodiscard]] auto
+  submit_job(const std::string &program, QDMI_Program_Format format,
+             size_t num_shots = 1,
+             const std::optional<std::string> &run_request_options =
+                 std::nullopt) const -> IQM_QDMI_Device_Job;
 
   static auto get_job_id(IQM_QDMI_Device_Job job) -> std::string;
 
-  static auto get_job_shots_num(IQM_QDMI_Device_Job job) -> size_t;
-
-  [[nodiscard]] static auto get_status(IQM_QDMI_Device_Job job)
-      -> QDMI_Job_Status;
-
+  /// Read the histogram for the helper's single-program job.
   [[nodiscard]] static auto get_histogram(IQM_QDMI_Device_Job job)
       -> std::map<std::string, size_t>;
 

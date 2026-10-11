@@ -17,7 +17,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@fd3d75dece69c363989347869529a5e99cdcfffc # v2.5.1
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -172,11 +172,20 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@ace7363a2a8e036e5efc6717be67f1eda29a120e # v2.4.2
-    with:
-      check-stubs: false
-      enable-ty: true
-      enable-mypy: false
+    # Temporary local setup while Core PR #2373 requires a source build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
+        with:
+          llvm-version: 23.1.2
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uvx prek run -a ty
+      - run: uvx check-sdist --inject-junk
 
   examples:
     name: 🐍 End-to-End Examples

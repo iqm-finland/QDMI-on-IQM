@@ -29,8 +29,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Temporary: remove after replacing the Core source pin with a release.
+      - name: Set up LLVM/MLIR for source-built MQT Core
+        uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
+        if: ${{ !startsWith(inputs.runs-on, 'ubuntu') && inputs.runs-on != 'windows-11-arm' }}
+        with:
+          llvm-version: 23.1.2
+
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: ${{ !startsWith(inputs.runs-on, 'ubuntu') }}
           save-cache: ${{ github.ref == 'refs/heads/main' }}

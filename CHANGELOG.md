@@ -14,9 +14,28 @@ releases may include breaking changes.
 
 - 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
   Releases ([#270]) ([**@marcelwa**])
+- ✨ Select and pin an IQM calibration before target construction through
+  session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
+  effective UUID, and keep every session on its initial calibration when a
+  calibration job returns a new set ([#271]) ([**@burgholzer**],
+  [**@marcelwa**])
 - ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
   `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
   asks a client to trigger one ([#229]) ([**@marcelwa**])
+- ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
+  them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
+- ✨ Expose calibration submission through the IQM-specific
+  `IQM_QDMI_device_job_submit_calibration` function ([#266])
+  ([**@burgholzer**]).
+- ✨ Submit ordered circuit lists as one native IQM job with indexed results,
+  recoverable program counts, and indexed program queries ([#277])
+  ([**@burgholzer**]).
+- ✨ Forward optional IQM `CircuitJobDefinition` fields as one JSON object
+  through a standard QDMI custom job parameter, exposed on `IQMBackend` through
+  `run_request_options` in `set_options` and per-run overrides. Validate
+  complete JSON buffers and reject `heralding_mode="zeros"` before submission
+  because it may discard shots ([#272], [#293]) ([**@marcelwa**],
+  [**@burgholzer**])
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
@@ -32,6 +51,19 @@ releases may include breaking changes.
 
 ### Changed
 
+- ✨ Discover the installed QDMI manifest without loading provider code and open
+  independent sessions through the MQT Core QDMI driver. Explicit device
+  selection takes precedence over environment defaults. Temporary Core source
+  pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
+  ([**@burgholzer**]).
+- 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
+- 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
+  itself and does not require clients to trigger it ([#229], [#266])
+  ([**@marcelwa**], [**@burgholzer**]).
+- 💥 Drop the QDMI pulse-support property while preserving surviving enum values
+  for binary compatibility ([#266]) ([**@burgholzer**]).
+- 💥 Replace the removed program setter with `IQM_QDMI_device_job_set_programs`
+  ([#277]) ([**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
   default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
@@ -43,6 +75,12 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
+  operations, preserving physical site names during IQM JSON serialization
+  ([#293]) ([**@burgholzer**])
+- 🩹 Restrict Linux and macOS exports to the QDMI device ABI and IQM
+  calibration, preventing host libcurl interference on Linux and hiding bundled
+  dependencies on macOS ([#284]) ([**@marcelwa**])
 - 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
   warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
 - 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
@@ -266,8 +304,15 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
+[#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
+[#284]: https://github.com/iqm-finland/QDMI-on-IQM/pull/284
+[#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
+[#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#270]: https://github.com/iqm-finland/QDMI-on-IQM/pull/270
+[#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
+[#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
@@ -275,6 +320,7 @@ Compatible with QDMI `v1.3.0`.
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
+[#266]: https://github.com/iqm-finland/QDMI-on-IQM/pull/266
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
 [#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220

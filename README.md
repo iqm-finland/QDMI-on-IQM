@@ -19,7 +19,7 @@
 
 **QDMI on IQM** is IQM's official, production-ready implementation of the
 [Quantum Device Management Interface (QDMI)](https://github.com/Munich-Quantum-Software-Stack/qdmi)—a
-vendor-neutral C API for quantum hardware. It connects HPC schedulers,
+vendor-neutral C/C++ API for quantum hardware. It connects HPC schedulers,
 middleware, and Python toolchains to IQM processors through a single, stable
 interface, handling session management, calibration queries, and job lifecycle
 transparently.

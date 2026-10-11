@@ -66,7 +66,10 @@ def _resolve_library_dir() -> Path:
 
 IQM_QDMI_LIBRARY_DIR = _require_existing_path(_resolve_library_dir(), name="IQM_QDMI_LIBRARY_DIR")
 
-library_files = sorted(IQM_QDMI_LIBRARY_DIR.glob("*iqm-qdmi-device*"), key=lambda path: path.name)
+library_files = sorted(
+    (path for path in IQM_QDMI_LIBRARY_DIR.glob("*iqm-qdmi-device*") if path.name != "iqm-qdmi-device.qdmi.json"),
+    key=lambda path: path.name,
+)
 if not library_files:
     msg = f"No IQM QDMI library found in: {IQM_QDMI_LIBRARY_DIR}"
     raise FileNotFoundError(msg)
