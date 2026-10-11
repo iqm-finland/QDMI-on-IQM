@@ -49,6 +49,8 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
+  Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
   selection takes precedence over environment defaults. Temporary Core source
@@ -302,6 +304,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
 [#284]: https://github.com/iqm-finland/QDMI-on-IQM/pull/284
