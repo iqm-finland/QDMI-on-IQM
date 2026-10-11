@@ -582,7 +582,8 @@ name = "dependency-groups"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b5/16/65e61d8e837e0d70a99a0d4dd76e2af53357c3a03ed1db8ad9b5786d7f25/dependency_groups-1.3.2.tar.gz", hash = "sha256:c81831f43828dbc3987ee247eb198241a0152b8e7ceab10977cc3808eb388ac7", size = 13309, upload-time = "2026-08-22T02:43:30.137Z" }
 wheels = [
@@ -803,7 +804,8 @@ dependencies = [
     { name = "jupyter-core" },
     { name = "matplotlib-inline" },
     { name = "nest-asyncio2" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "pyzmq" },
     { name = "tornado" },
     { name = "traitlets" },
@@ -848,6 +850,24 @@ wheels = [
 ]
 
 [[package]]
+name = "iqm-client"
+version = "35.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "iqm-pulse" },
+    { name = "iqm-station-control-client" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or python_full_version >= '3.15'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "pydantic" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/d2/a12af4608f70d2b3ea3cd854cb0cae42af754f18964877a95cf7167d03b7/iqm_client-35.0.3.tar.gz", hash = "sha256:0363cd5afe5e4e4ac153e9032138f2d76e6d1d7157a3f53456b9dfa3d7c7e2be", size = 197097, upload-time = "2026-09-07T09:42:32.489Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bf/1e/d130c0a49ef1ba3c007de83853f588a8ba230bdafe8661ee02fdb737c0bf/iqm_client-35.0.3-py3-none-any.whl", hash = "sha256:1c4de62171d6222a8ff04996fa4bde146c71c99020ef61f5204b42b45970c98e", size = 251050, upload-time = "2026-09-07T09:42:29.881Z" },
+]
+
+[[package]]
 name = "iqm-data-definitions"
 version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -868,7 +888,7 @@ wheels = [
 
 [[package]]
 name = "iqm-exa-common"
-version = "29.0.0"
+version = "28.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "iqm-data-definitions" },
@@ -882,20 +902,20 @@ dependencies = [
     { name = "six" },
     { name = "types-requests" },
     { name = "types-six" },
-    { name = "typing-extensions" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/35/7a/bcd1b7abd28e2d69fba8982bb726645d7e2a3c34e32d87b987561f9f3026/iqm_exa_common-29.0.0.tar.gz", hash = "sha256:4410cf8aaa4a1fc97d077123c4b3bafeee4b7e1a142539c1ed1db15849cdb5f9", size = 75935, upload-time = "2026-10-08T14:07:19.088Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/a2/0b722f38f61dcd657699dd54dfc325a91908f3643d1597d38fc4fc47aaaf/iqm_exa_common-28.0.3.tar.gz", hash = "sha256:24c05c6a1c1c6e72534677cafa053d448e9c89e349e5aed1ba9c73a0c2dde3e9", size = 70408, upload-time = "2026-09-07T09:42:39.677Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/0e/46d0cab284f366a443c8dc33d34601051c0a1a7a641629a56c5b8ce8b1c9/iqm_exa_common-29.0.0-py3-none-any.whl", hash = "sha256:b05de3223f915c0d5fc9d5b51616d7892fccc7efbb98a30e3363493c7d0d74d1", size = 106151, upload-time = "2026-10-08T14:07:17.619Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/55/f468321268c7a8b5599d6160c8951ed2eca23a3fbf9ea883e7acfdf24c69/iqm_exa_common-28.0.3-py3-none-any.whl", hash = "sha256:e639761ac013aa278237a2c2f5c9fca161ff2c2adef538e8bd60e4447d8c84db", size = 99324, upload-time = "2026-09-07T09:42:38.323Z" },
 ]
 
 [[package]]
 name = "iqm-pulla"
-version = "15.0.0"
+version = "14.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython" },
+    { name = "iqm-client" },
     { name = "iqm-data-definitions" },
     { name = "iqm-exa-common" },
     { name = "iqm-pulse" },
@@ -907,14 +927,14 @@ dependencies = [
     { name = "scipy-stubs", version = "1.18.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/ef/66ff222a83395b5e7f68b7700f952a0c2aa9f72e02dff3d656008ebdab68/iqm_pulla-15.0.0.tar.gz", hash = "sha256:be079df8303b1e64ff723d4f65306f8aa846d5527aa1cdd7d9ea99e2f3c1d9f0", size = 143144, upload-time = "2026-10-08T14:07:23.529Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/af/12fc247f8c1efba27facf34adf11b918d14e83872ac248fb03b02bee94d7/iqm_pulla-14.0.3.tar.gz", hash = "sha256:f404f1d90199cdd05a0220ac5991fcac21a65d27f43110d5b9a5bb5e943de473", size = 144021, upload-time = "2026-09-07T09:42:43.968Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/b0/19ae7cce9a9a47254fc186c15dd7c9f930da00d0669a74c7739e1551f915/iqm_pulla-15.0.0-py3-none-any.whl", hash = "sha256:7b8bf9291892f9cbabc917ae2f285e958306913a3f727f02e3dc521d92e150cb", size = 151273, upload-time = "2026-10-08T14:07:20.881Z" },
+    { url = "https://files.pythonhosted.org/packages/28/53/59500cdcfdbe9db3197355d08d161550d796f791df8e948d641a2948c210/iqm_pulla-14.0.3-py3-none-any.whl", hash = "sha256:d9e6ce7ac0832fe6bfaadbfab6e324cef1bd633054d23ed5d5ba93db82c9e26c", size = 155303, upload-time = "2026-09-07T09:42:41.926Z" },
 ]
 
 [[package]]
 name = "iqm-pulse"
-version = "15.0.0"
+version = "14.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "iqm-data-definitions" },
@@ -927,11 +947,10 @@ dependencies = [
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
     { name = "scipy-stubs", version = "1.17.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or python_full_version >= '3.15'" },
     { name = "scipy-stubs", version = "1.18.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/03/9e42099d01df10d018c0ea50bdeea8ee2767adfa23106463c3ceb1d24f22/iqm_pulse-15.0.0.tar.gz", hash = "sha256:765f8c5eaa46cd18f28cfa6035aaa229941a0e69711c7cbfa64211a11ce0ca61", size = 424586, upload-time = "2026-10-08T14:07:27.782Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/f6/34c66f26dec4929342eeda5913b3b7495f3dec261f8bce24a4d1822e8598/iqm_pulse-14.0.3.tar.gz", hash = "sha256:4ba5e28ceede52bd3064aef1ee9587c7aff212802e7c0cf0d7d15e1478a7c431", size = 419440, upload-time = "2026-09-07T09:42:47.881Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/34/e55b7e2fbb91c5f1e39ddc7d8312da5e09cea8a1894b4a32472f1c568ba2/iqm_pulse-15.0.0-py3-none-any.whl", hash = "sha256:4cb1681d19f5b49d95f03fd21e7ba58c349689b8e60acb926d7990934131269b", size = 446869, upload-time = "2026-10-08T14:07:25.573Z" },
+    { url = "https://files.pythonhosted.org/packages/28/f3/1f602285a5ceaaf8d8387b35813b0c15ee566132cb1869f6609d946830bf/iqm_pulse-14.0.3-py3-none-any.whl", hash = "sha256:39a1177f8e57b190af684f8f62e8b2a503ca75be41bd30821ebbdea8aa0772d9", size = 443249, upload-time = "2026-09-07T09:42:46.262Z" },
 ]
 
 [[package]]
@@ -1002,7 +1021,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15' and extra == 'pulla'", specifier = ">=14.0.1" },
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15' and extra == 'pulla'", specifier = ">=14.0.1,<15" },
     { name = "mqt-core", marker = "extra == 'qiskit'", git = "https://github.com/munich-quantum-toolkit/core.git?rev=5f3fc6620f6a731067863ce0a8f2b1afc6f66058" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
@@ -1014,7 +1033,7 @@ provides-extras = ["pulla", "qiskit"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1" },
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1,<15" },
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=5f3fc6620f6a731067863ce0a8f2b1afc6f66058" },
     { name = "nox", specifier = ">=2026.4.10" },
     { name = "numpy", specifier = ">=2.1" },
@@ -1036,7 +1055,7 @@ docs = [
     { name = "sphinx-design", specifier = ">=0.7" },
     { name = "sphinx-llm", specifier = ">=1" },
 ]
-pulla = [{ name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1" }]
+pulla = [{ name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1,<15" }]
 qiskit = [
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=5f3fc6620f6a731067863ce0a8f2b1afc6f66058" },
     { name = "numpy", specifier = ">=2.1" },
@@ -1044,7 +1063,7 @@ qiskit = [
     { name = "qiskit-algorithms", specifier = ">=0.4" },
 ]
 test = [
-    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1" },
+    { name = "iqm-pulla", marker = "python_full_version >= '3.11' and python_full_version < '3.15'", specifier = ">=14.0.1,<15" },
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=5f3fc6620f6a731067863ce0a8f2b1afc6f66058" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "pytest", specifier = ">=9.0.1" },
@@ -1058,7 +1077,7 @@ test = [
 
 [[package]]
 name = "iqm-station-control-client"
-version = "14.0.0"
+version = "13.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grpcio" },
@@ -1074,9 +1093,9 @@ dependencies = [
     { name = "types-requests" },
     { name = "types-tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/c9/1fb496855a0cb49f52a0d4bfa3f7f60ddbce0f19cdd18e74c2bf34ad7ca1/iqm_station_control_client-14.0.0.tar.gz", hash = "sha256:b0c31a50c41dc64f54a325e5c6a99040cc0aa800bb1a0ace5a58dd7595f59784", size = 85308, upload-time = "2026-10-08T14:07:39.455Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/6c/68a10472366eb0172fab31b4a80a2f50373cd1ca2907ce4379bb61cef438/iqm_station_control_client-13.0.3.tar.gz", hash = "sha256:6dcd34f54df406c27ddc15937280f0b283de7f6431d5793820cee976a620ed16", size = 63997, upload-time = "2026-09-07T09:42:58.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/a6/b70079bdf6c72e2018c4eecd9865406ba073aef16485ea822329c5c4698e/iqm_station_control_client-14.0.0-py3-none-any.whl", hash = "sha256:237128d1e33e334b6054cfc2dcdd1fa8a80a9f35d070dcb744aadc5c3a89b225", size = 104881, upload-time = "2026-10-08T14:07:37.774Z" },
+    { url = "https://files.pythonhosted.org/packages/06/2f/1564ca048bf291c3644d6c54ce1bcf383ad4bcdce703eaae563e85b8dd3a/iqm_station_control_client-13.0.3-py3-none-any.whl", hash = "sha256:91d24c7bc6968c3e20699262e0b22cf0a03111af46425cff4aa988d4a1828da0", size = 84120, upload-time = "2026-09-07T09:42:57.466Z" },
 ]
 
 [[package]]
@@ -1498,7 +1517,8 @@ dependencies = [
     { name = "colorlog" },
     { name = "dependency-groups" },
     { name = "humanize" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "platformdirs" },
     { name = "python-discovery" },
     { name = "virtualenv" },
@@ -1929,8 +1949,34 @@ numpy = [
 
 [[package]]
 name = "packaging"
+version = "24.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
+    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d0/63/68dbb6eb2de9cb10ee4c9c14a0148804425e13c4fb20d61cce69f53106da/packaging-24.2.tar.gz", hash = "sha256:c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f", size = 163950, upload-time = "2024-11-08T09:47:47.202Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/ef/eb23f262cca3c0c4eb7ab1933c3b1f03d021f2c48f54763065b6f0e321be/packaging-24.2-py3-none-any.whl", hash = "sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759", size = 65451, upload-time = "2024-11-08T09:47:44.722Z" },
+]
+
+[[package]]
+name = "packaging"
 version = "26.3"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.15'",
+]
 sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
@@ -2265,7 +2311,8 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "iniconfig" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "pluggy" },
     { name = "pygments" },
 ]
@@ -3069,7 +3116,7 @@ dependencies = [
     { name = "docutils" },
     { name = "imagesize" },
     { name = "jinja2" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" } },
     { name = "pygments" },
     { name = "requests" },
     { name = "roman-numerals" },
@@ -3109,7 +3156,8 @@ dependencies = [
     { name = "docutils" },
     { name = "imagesize" },
     { name = "jinja2" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "pygments" },
     { name = "requests" },
     { name = "roman-numerals" },
@@ -3565,7 +3613,8 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "distlib" },
     { name = "filelock" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "packaging", version = "26.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "platformdirs" },
     { name = "python-discovery" },
 ]
@@ -3617,7 +3666,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or python_full_version >= '3.15'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
-    { name = "packaging" },
+    { name = "packaging", version = "24.2", source = { registry = "https://pypi.org/simple" } },
     { name = "pandas" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ff/f5/781c70b234f54e0401f4f7c4427a7486da38d50dbb138c7d7c55144b3d86/xarray-2026.9.0.tar.gz", hash = "sha256:6abc69694c22fa1f0fb2f357ff4e41d88beb4477ed71091f944b7dbf67ed54fe", size = 3176922, upload-time = "2026-09-29T23:06:25.807Z" }

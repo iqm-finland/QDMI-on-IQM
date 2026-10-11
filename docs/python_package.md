@@ -275,6 +275,9 @@ uv pip install iqm-qdmi[pulla,qiskit]
 ```
 
 :::{important}
+The pulse adapter uses `iqm-pulla` 14; version 15 changed its compiler and
+result APIs.
+
 `iqm-pulla` supports Python 3.11 to 3.14, a narrower range than `iqm-qdmi`
 itself. Outside that range the extra installs nothing and
 {py:mod}`iqm.qdmi.pulse` raises an {py:exc}`ImportError`.

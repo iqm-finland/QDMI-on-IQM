@@ -55,7 +55,7 @@ email = "developers@iqm.tech"
 [project.optional-dependencies]
 # 14.0.1 is the oldest Pulla release supported by this integration.
 pulla = [
-  "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
+  "iqm-pulla>=14.0.1,<15; python_version>='3.11' and python_version<'3.15'",
 ]
 qiskit = [
   "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
@@ -110,7 +110,7 @@ docs = [
 # The marker leaves this out where iqm-pulla cannot install, and
 # `test/python/test_pulse.py` skips itself there.
 pulla = [
-  "iqm-pulla>=14.0.1; python_version>='3.11' and python_version<'3.15'",
+  "iqm-pulla>=14.0.1,<15; python_version>='3.11' and python_version<'3.15'",
 ]
 qiskit = [
   "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
