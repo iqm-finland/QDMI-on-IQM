@@ -47,10 +47,9 @@ combined (a QC is reported unavailable if *any* enabled source says so):
   that is wired up for a given cluster, the lock is simply never held and
   this source always reports "available".
 - `qdmi-status` (legacy, off by default): polls
-  `QDMI_DEVICE_PROPERTY_STATUS`. This is a **session-local** signal -- see
-  `is_available()`'s docstring -- and does not reflect other tenants' usage
-  of the QC. Kept for backwards compatibility and as an optional
-  supplementary check, not recommended as the sole source.
+  `QDMI_DEVICE_PROPERTY_STATUS`, derived from server health and queue
+  availability. This observation does not reserve the QC. Use it as an
+  optional supplementary check alongside the Slurm lease lock.
 - `queue-length` (**experimental, off by default, cloud/pay-as-you-go QCs
   only**): best-effort polling of an IQM Server API queue-status endpoint
   that reports a real, cross-tenant `queue_length`. The exact endpoint path
@@ -329,8 +328,8 @@ class LockSignal:
 class QdmiStatusSignal:
     """Legacy/secondary signal: QDMI's `QDMI_DEVICE_PROPERTY_STATUS`.
 
-    Kept open for the daemon's lifetime: `Device.status()` is a cheap, local
-    property read, so there is no need to reopen a session on every poll.
+    Keep the session open for the daemon's lifetime. `Device.status()`
+    refreshes server health and queue availability on each poll.
     """
 
     name: ClassVar[str] = "qdmi-status"
@@ -341,10 +340,8 @@ class QdmiStatusSignal:
 
         Returns:
             `True` if the device reports `IDLE`, `False` for any other
-            status. **This is a session-local signal**: it reflects only
-            whether *this daemon's own* session has an outstanding job (it
-            never submits one), not whether other tenants are using the QC.
-            See the module docstring and `docs/spank_plugin.md`.
+            unavailable status. Server observations do not reserve the QC;
+            see the module docstring and `docs/spank_plugin.md`.
         """
         status = self.device.status()
         unavailable = status.name in _UNAVAILABLE_STATUS_NAMES

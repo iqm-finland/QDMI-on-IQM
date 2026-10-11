@@ -321,10 +321,9 @@ that split rather than around a single assumed-universal signal.
   concurrency control the most. Treat this API as cloud/Resonance-oriented until
   someone with on-prem API access confirms otherwise.
 - QDMI's own `QDMI_DEVICE_PROPERTY_STATUS` (exposed at the Python level via
-  `mqt.core.qdmi.Device.status()`) remains **session-local**: `IDLE` at session
-  init, `BUSY` only when *that same session* submits a job. It says nothing
-  about other tenants and works identically (i.e., uselessly for this purpose)
-  regardless of deployment type.
+  `mqt.core.qdmi.Device.status()`) now refreshes server health and queue
+  availability. It observes other tenants' queued work but cannot reserve the
+  QC, so an idle observation does not prevent a later competing submission.
 
 **Design response: don't build the enforcement mechanism on a signal that might
 not exist (on-prem) or that we can't yet confirm the shape of (cloud).**
@@ -360,10 +359,9 @@ if *any* enabled source says so):
   Prolog/Epilog calls above, the lock is simply never held and this source
   always reports "available"; that is an explicit, logged no-op-by-default
   rather than a silent lie.
-- **`qdmi-status` (legacy, off by default)**: the original session-local QDMI
-  probe from an earlier revision of this prototype. Kept for backwards
-  compatibility and as an optional supplementary check; not recommended as the
-  sole source, for the reasons above.
+- **`qdmi-status` (legacy, off by default)**: queries the device's current
+  server-derived status. Use it as an optional supplementary check alongside the
+  lease lock; an idle status does not reserve the QC.
 - **`queue-length` (experimental, off by default, cloud/pay-as-you-go QCs
   only)**: best-effort polling of the queue-status endpoint described above.
   Because the exact path is unconfirmed, this source requires an explicit
