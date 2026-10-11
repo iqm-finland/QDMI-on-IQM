@@ -198,8 +198,8 @@ releases may include breaking changes.
   mirroring a Slurm-mediated job's claim on an IQM QC (via a file-based lease
   lock, `spank/license_lock.py`, with QDMI status and an experimental IQM Server
   API queue-depth probe as optional supplementary signals) into a Slurm Dynamic
-  License via `sacctmgr`, plus documentation of its design and open questions
-  ([#145]) ([**@marcelwa**])
+  License via `sacctmgr`, retrying failed updates on the next poll, plus
+  documentation of its design and open questions ([#145]) ([**@marcelwa**])
 - 📝 Add an integration scenarios analysis comparing IQM integration paths
   (direct C++/Python usage, Slurm + SPANK offloading, Spack install, and
   non-Slurm schedulers as forward-looking guidance) and an administrator guide
