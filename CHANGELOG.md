@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
+  Releases ([#270]) ([**@marcelwa**])
 - ✨ Select and pin an IQM calibration before target construction through
   session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
   effective UUID, and keep every session on its initial calibration when a
@@ -311,6 +313,7 @@ Compatible with QDMI `v1.3.0`.
 [#277]: https://github.com/iqm-finland/QDMI-on-IQM/pull/277
 [#274]: https://github.com/iqm-finland/QDMI-on-IQM/pull/274
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
+[#270]: https://github.com/iqm-finland/QDMI-on-IQM/pull/270
 [#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
