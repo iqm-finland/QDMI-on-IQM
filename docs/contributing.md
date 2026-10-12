@@ -177,6 +177,11 @@ perfect. We will guide you through the process.
 Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer.
 
+CI runs the native integration tests and documentation notebooks with
+`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
+Slurm smoke test submits eight shots per installation mode to the Emerald
+Resonance mock.
+
 ### Configure and Build
 
 This project uses CMake as the main build configuration tool. Building a project

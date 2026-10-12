@@ -1,37 +1,21 @@
-# Version Control
-.git
-.github
-.gitignore
-
-# Editor & IDE Configs
-.idea/
-.vscode/
-.vs/
-*~
-*.swp
-
-# Python / Package Managers / Environments
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-env/
-.uv-cache/
-
-# Build, Tests & Cache
-build/
-dist/
-.tox/
-.nox/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-.coverage.*
-htmlcov/
-
-# Documentation Builds
-docs/_build/
-docs/api/
-docs/**/build
+# Keep local build output and credentials out of Docker workload contexts.
+**/.git
+**/.github
+**/.env*
+**/build
+**/build-*
+**/cmake-build-*
+**/.cache
+**/.ccache
+**/.venv*
+**/.nox
+**/CMakeUserPresets.json
+**/.ruff_cache
+**/.rumdl_cache
+**/.pytest_cache
+**/.mypy_cache
+**/__pycache__
+**/*.py[cod]
+**/dist
+docs/_build
+test/slurm/runtime

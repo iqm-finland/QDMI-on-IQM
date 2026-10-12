@@ -20,6 +20,8 @@ permissions:
 
 jobs:
   build-documentation:
+    # Fork PRs do not receive the upstream token for these notebooks.
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id
     runs-on: ubuntu-26.04
 
     steps:
