@@ -51,14 +51,13 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
-  Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
+- ⬆️ Pin QDMI v1.4.0 and require MQT Core 4.1.0 ([#298], [#302])
+  ([**@burgholzer**], [**@denialhaag**]).
 - ♻️ Use MQT Core's shared Slurm deployment and device-wheel discovery in one
   environment ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
-  selection takes precedence over environment defaults. Temporary Core source
-  pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
+  selection takes precedence over environment defaults ([#274])
   ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
@@ -318,6 +317,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
