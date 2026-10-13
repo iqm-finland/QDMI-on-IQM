@@ -18,7 +18,9 @@ releases may include breaking changes.
 - ⚡️ Avoid copying submission bodies across synchronous requests and rate-limit
   retries ([#311]) ([**@burgholzer**]).
 - 📦 Link CPR statically; use Apple's system curl on macOS and static curl on
-  Linux and Windows ([#311]) ([**@burgholzer**]).
+  Linux and Windows. Ship the CPR, curl and JSON license texts with the packages
+  and fix README license links on PyPI ([#301], [#311])
+  ([**@marcelwa**], [**@burgholzer**]).
 - ♻️ Use Windows Schannel and installed OpenSSL 3 on Linux with available system
   compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
@@ -347,6 +349,7 @@ Compatible with QDMI `v1.3.0`.
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
+[#301]: https://github.com/iqm-finland/QDMI-on-IQM/pull/301
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
