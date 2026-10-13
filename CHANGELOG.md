@@ -84,6 +84,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 📦 Include bundled-library license notices in Python packages and fix the
+  license links on PyPI ([#301]) ([**@marcelwa**]).
 - 🐛 Show sampler and estimator CLI help without importing the optional Qiskit
   SDK ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - 🐛 Pass the offloader's quantum computer selection to the IQM worker instead
@@ -318,6 +320,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#301]: https://github.com/iqm-finland/QDMI-on-IQM/pull/301
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
