@@ -25,8 +25,8 @@ name = "iqm-qdmi"
 version = "1.4.0"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
-license = "Apache-2.0 WITH LLVM-exception"
-license-files = [ "LICENSE" ]
+# Bundled licenses differ by platform; see licenses/README.md.
+license-files = [ "LICENSE", "licenses/*" ]
 requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 5 - Production/Stable",

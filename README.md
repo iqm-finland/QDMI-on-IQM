@@ -10,7 +10,7 @@
 # QDMI on IQM
 
 [![PyPI](https://img.shields.io/pypi/v/iqm-qdmi?logo=pypi&style=flat-square)](https://pypi.org/project/iqm-qdmi/)
-[![Apache 2.0 with LLVM exception](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0%20with%20LLVM%20exception&color=informational&style=flat-square)](LICENSE)
+[![Apache 2.0 with LLVM exception](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0%20with%20LLVM%20exception&color=informational&style=flat-square)](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/iqm-finland/QDMI-on-IQM/CI.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/iqm-finland/QDMI-on-IQM/actions/workflows/CI.yml)
@@ -64,4 +64,8 @@ for the development workflow, coding standards, and pull request process.
 ## License
 
 This project is licensed under the **Apache License 2.0 with LLVM exception**.
-See [LICENSE](LICENSE) for the license text.
+See [LICENSE](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE) for
+the license text. Binary wheels also contain third-party libraries under their
+own licenses. Their
+[notices](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/licenses/README.md)
+and license texts are included in the package's `.dist-info/licenses` directory.
