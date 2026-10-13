@@ -171,5 +171,5 @@ repos:
     rev: v0.0.84
     hooks:
       - id: ty
-        args: [--isolated, --only-dev]
+        args: [--isolated, --no-install-project]
         priority: 8

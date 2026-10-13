@@ -831,6 +831,9 @@ dev = [
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=ee1e8911a90b3d1d006f2fc26bc02b655f5313b2" },
     { name = "nox", specifier = ">=2026.4.10" },
     { name = "numpy", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
+    { name = "numpy", marker = "python_full_version >= '3.15'", specifier = ">=2.5.2" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "pytest-console-scripts", specifier = ">=1.4.1" },
     { name = "pytest-cov", specifier = ">=7.1" },
@@ -852,12 +855,18 @@ docs = [
 qiskit = [
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=ee1e8911a90b3d1d006f2fc26bc02b655f5313b2" },
     { name = "numpy", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
+    { name = "numpy", marker = "python_full_version >= '3.15'", specifier = ">=2.5.2" },
     { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.1" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
 ]
 test = [
     { name = "mqt-core", git = "https://github.com/munich-quantum-toolkit/core.git?rev=ee1e8911a90b3d1d006f2fc26bc02b655f5313b2" },
     { name = "numpy", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
+    { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
+    { name = "numpy", marker = "python_full_version >= '3.15'", specifier = ">=2.5.2" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "pytest-console-scripts", specifier = ">=1.4.1" },
     { name = "pytest-cov", specifier = ">=7.1" },
