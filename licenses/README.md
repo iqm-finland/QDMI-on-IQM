@@ -19,10 +19,11 @@ images change, including the libraries added by wheel repair.
 | OpenSSL       | 3.5.9   | musllinux wheels, `libssl` and `libcrypto`   | [Apache-2.0](LICENSE-openssl-3)                                          |
 | GCC runtime   | 14.2.0  | musllinux wheels, `libgcc_s` and `libstdc++` | [GPL-3.0](LICENSE-gpl-3.0) with [GCC exception 3.1](LICENSE-gcc-runtime) |
 
-macOS wheels link to Apple's system curl. Windows wheels use Schannel. Linux
-wheels link to the system zlib; it is not bundled. CPR configures zlib-ng 2.1.3
-during the build, but it is not linked into these wheels. QDMI 1.4.0 headers
-retain their Apache-2.0 WITH LLVM-exception notices and use the project's
+macOS wheels link to Apple's system curl. Windows wheels use Schannel, and wheel
+repair adds no DLLs on either Windows architecture. Linux wheels link to the
+system zlib; it is not bundled. CPR configures zlib-ng 2.1.3 during the build,
+but it is not linked into these wheels. QDMI 1.4.0 headers retain their
+Apache-2.0 WITH LLVM-exception notices and use the project's
 [license text](../LICENSE).
 
 ## Sources
