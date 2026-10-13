@@ -176,7 +176,7 @@ later can copy the device library and manifest beside their executables. This
 integration requires CMake 3.28 or later:
 
 ```cmake
-find_package(mqt-core 4.1.0 CONFIG REQUIRED)
+find_package(mqt-core 4.1.1 CONFIG REQUIRED)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)
