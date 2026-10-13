@@ -22,7 +22,7 @@ requires = [ "scikit-build-core>=1.1" ]
 
 [project]
 name = "iqm-qdmi"
-version = "1.4.0"
+version = "1.5.0"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 license = "Apache-2.0 WITH LLVM-exception"
