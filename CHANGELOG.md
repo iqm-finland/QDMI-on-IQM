@@ -19,9 +19,6 @@ releases may include breaking changes.
   effective UUID, and keep every session on its initial calibration when a
   calibration job returns a new set ([#271]) ([**@burgholzer**],
   [**@marcelwa**])
-- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
-  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
-  asks a client to trigger one ([#229]) ([**@marcelwa**])
 - ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
   them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
@@ -395,6 +392,7 @@ Compatible with QDMI `v1.3.0`.
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm
 [**@denialhaag**]: https://github.com/denialhaag
+[**@flowerthrower**]: https://github.com/flowerthrower
 
 <!-- General links -->
 
