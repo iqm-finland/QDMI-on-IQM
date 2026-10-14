@@ -10,6 +10,8 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-14
+
 ### Added
 
 - 🧪 Run an authenticated eight-shot Qiskit job on the Emerald Resonance mock in
@@ -19,9 +21,6 @@ releases may include breaking changes.
   effective UUID, and keep every session on its initial calibration when a
   calibration job returns a new set ([#271]) ([**@burgholzer**],
   [**@marcelwa**])
-- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
-  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
-  asks a client to trigger one ([#229]) ([**@marcelwa**])
 - ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
   them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
@@ -51,14 +50,14 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
-  Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
+- ⬆️ Update MQT Core to 4.1.1 ([#298], [#302]) ([**@burgholzer**],
+  [**@denialhaag**]).
+- ⬆️ Update QDMI to 1.4.0 ([#298]) ([**@burgholzer**]).
 - ♻️ Use MQT Core's shared Slurm deployment and device-wheel discovery in one
   environment ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
-  selection takes precedence over environment defaults. Temporary Core source
-  pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
+  selection takes precedence over environment defaults ([#274])
   ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
@@ -307,7 +306,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
@@ -318,6 +318,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
@@ -395,6 +396,7 @@ Compatible with QDMI `v1.3.0`.
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm
 [**@denialhaag**]: https://github.com/denialhaag
+[**@flowerthrower**]: https://github.com/flowerthrower
 
 <!-- General links -->
 
