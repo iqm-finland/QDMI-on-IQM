@@ -173,10 +173,14 @@ The installed CMake target identifies its device manifest through
 `QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
 the symbol prefix and relative library path. Applications using MQT Core 4.1 or
 later can copy the device library and manifest beside their executables. This
-integration requires CMake 3.28 or later:
+integration requires CMake 3.28 or later.
+
+The C++ example requires MQT Core installed from source, with its `Development`
+component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
+the build and install steps.
 
 ```cmake
-find_package(mqt-core 4.1.1 CONFIG REQUIRED)
+find_package(mqt-core 4.1.1 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)
@@ -677,3 +681,5 @@ instead. The wait comes out of the timeout of the request that triggered it; a
 request with less time than that left proceeds without waiting. Other clients
 using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
+
+[MQT Core installation guide]: https://mqt.readthedocs.io/projects/core/en/latest/installation.html#integrating-mqt-core-into-your-project
