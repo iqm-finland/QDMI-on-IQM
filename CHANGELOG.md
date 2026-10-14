@@ -50,8 +50,9 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Pin QDMI v1.4.0 and require MQT Core 4.1.0 ([#298], [#302])
-  ([**@burgholzer**], [**@denialhaag**]).
+- ⬆️ Update MQT Core to 4.1.1 ([#298], [#302]) ([**@burgholzer**],
+  [**@denialhaag**]).
+- ⬆️ Update QDMI to 1.4.0 ([#298]) ([**@burgholzer**]).
 - ♻️ Use MQT Core's shared Slurm deployment and device-wheel discovery in one
   environment ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
