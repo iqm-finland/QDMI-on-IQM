@@ -163,17 +163,35 @@ def test_move_gate(backend: Callable[[int], StubBackend]) -> None:
     assert move["args"] == {}
 
 
-def test_measure_keys_are_unique(backend: Callable[[int], StubBackend]) -> None:
-    """Each measurement carries a key derived from its classical register position."""
-    qc = QuantumCircuit(2, 2)
+def test_measurements_follow_classical_bit_order(backend: Callable[[int], StubBackend]) -> None:
+    """Output positions follow classical bits across permuted register names."""
+    qc = QuantumCircuit(QuantumRegister(3), ClassicalRegister(2, "zeta"), ClassicalRegister(1, "alpha"))
     qc.cz(0, 1)
-    qc.measure([0, 1], [0, 1])
+    qc.measure([0, 1, 2], [2, 0, 1])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
+    program = json.loads(qiskit_to_iqm_json(qc, backend(3)))  # ty: ignore[invalid-argument-type]
 
-    keys = [instr["args"]["key"] for instr in program["instructions"] if instr["name"] == "measure"]
-    assert len(keys) == 2
-    assert len(set(keys)) == 2
+    measurements = [instr for instr in program["instructions"] if instr["name"] == "measure"]
+    assert [instr["args"]["key"] for instr in measurements] == ["zeta_2_0_0", "zeta_2_0_1", "alpha_1_1_0"]
+    assert [instr["locus"] for instr in measurements] == [["QB2"], ["QB3"], ["QB1"]]
+
+
+@pytest.mark.parametrize("layout", ["missing", "overwritten", "nonterminal", "barrier"])
+def test_measurement_layout_requires_direct_readout(backend: Callable[[int], StubBackend], layout: str) -> None:
+    """Reject source outputs that cannot be represented by ordered native readout."""
+    qc = QuantumCircuit(2, 2)
+    qc.measure(0, 0)
+    if layout == "overwritten":
+        qc.measure(1, 0)
+    elif layout == "nonterminal":
+        qc.r(0.5, 0, 1)
+        qc.measure(1, 1)
+    elif layout == "barrier":
+        qc.barrier()
+        qc.measure(1, 1)
+
+    with pytest.raises(TranslationError, match="IQM JSON direct readout"):
+        qiskit_to_iqm_json(qc, backend(2))  # ty: ignore[invalid-argument-type]
 
 
 def test_circuit_name_is_preserved(backend: Callable[[int], StubBackend]) -> None:

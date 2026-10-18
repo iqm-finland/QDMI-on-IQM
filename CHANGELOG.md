@@ -10,6 +10,14 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- 🐛 Preserve native IQM JSON measurement-instruction and locus order in shots
+  and histograms, including circuit batches and reopened jobs, with QDMI bit
+  zero on the right. Emit Qiskit terminal measurements in classical-bit order
+  and reject layouts requiring source-result reconstruction ([#276])
+  ([**@burgholzer**]).
+
 ## [1.5.0] - 2026-10-14
 
 ### Added
@@ -392,6 +400,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Contributor -->
 
+[#276]: https://github.com/iqm-finland/QDMI-on-IQM/pull/276
 [**@burgholzer**]: https://github.com/burgholzer
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm

@@ -535,6 +535,26 @@ std::string shots(shots_buffer.data());
 Each bitstring in the result represents the measurement outcome for one shot.
 The bitstrings are ordered chronologically (shot 1, shot 2, shot 3, etc.).
 
+For native IQM JSON, output bit indices follow measurement-instruction order,
+then each instruction's `locus` order. Bit zero appears on the right in both
+shots and histogram keys, with leading zeros retained. For example, a single
+measurement with `locus: ["QB2", "QB1"]` and backend columns `[1, 0]` produces
+`"01"`. Measurement keys identify result columns; their spelling, dictionary
+order, and physical site names do not determine output positions. The provider
+uses the counts artifact's `measurement_keys` metadata to reorder histogram
+columns and rejects missing, duplicate, or unknown keys and mismatched widths.
+This also applies to circuit batches and jobs reopened by ID.
+
+Native IQM JSON does not encode source-language classical destinations. Its
+producer must arrange measurements in the desired output order or reconstruct
+source results separately. The legacy direct-QIR result path is unchanged.
+
+The Qiskit serializer emits terminal measurements in circuit-wide classical-bit
+order, including across registers with permuted measurement destinations. It
+requires every classical bit to be measured exactly once and rejects gates or
+barriers after readout begins. Unused classical bits and overwritten
+destinations are rejected because they require source-result reconstruction.
+
 ### Unsupported Result Formats
 
 The following QDMI standard result formats (see {cpp:enum}`QDMI_JOB_RESULT_T`)

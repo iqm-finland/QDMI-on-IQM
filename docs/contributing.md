@@ -604,7 +604,10 @@ The implementation expects JSON responses in specific formats:
   `[{"m_pair": [[0, 1], [1, 0]], "m_single": [[0], [1]]}]` represents two shots,
   with `m_pair` measuring two qubits and `m_single` one qubit. The
   `measurement_keys` metadata from the corresponding counts artifact determines
-  how these per-key arrays are concatenated into each result bitstring.
+  how these per-key arrays are concatenated in the backend's histogram keys. For
+  native IQM JSON, the provider matches these keys to the circuit's measurement
+  instructions and their locus widths, then returns QDMI bitstrings in
+  instruction/locus order with bit zero on the right.
 
 For more details, see the implementation in `iqm_device.cpp` and the API
 configuration in `iqm_api_config.hpp`/`.cpp`.

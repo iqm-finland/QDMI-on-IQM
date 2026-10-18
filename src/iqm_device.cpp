@@ -197,6 +197,8 @@ struct IQM_QDMI_Device_Job_impl_d {
   nlohmann::json run_request_options_ = nlohmann::json::object();
   /// Cached results for one circuit, independent of its siblings.
   struct Program_results {
+    /// Native measurement keys and widths in instruction/locus order.
+    std::optional<std::vector<std::pair<std::string, size_t>>> output_layout;
     std::map<std::string, size_t> counts;
     std::optional<std::vector<std::string>> measurement_keys;
     std::optional<std::vector<std::string>> shots;
@@ -1050,6 +1052,31 @@ Submission_queue_position(const nlohmann::json &response) {
   }
   return position->get<size_t>();
 }
+
+/// Recover the native circuit's output positions without using physical IDs.
+bool Set_output_layout(IQM_QDMI_Device_Job_impl_d::Program_results &result,
+                       const nlohmann::json &circuit) {
+  const auto &instructions = circuit.at("instructions");
+  if (!instructions.is_array()) {
+    return false;
+  }
+  std::vector<std::pair<std::string, size_t>> layout;
+  for (const auto &instruction : instructions) {
+    if (instruction.at("name") != "measure") {
+      continue;
+    }
+    const auto key = instruction.at("args").at("key").get<std::string>();
+    const auto &locus = instruction.at("locus");
+    if (key.empty() || !locus.is_array() || locus.empty() ||
+        std::ranges::any_of(
+            layout, [&](const auto &field) { return field.first == key; })) {
+      return false;
+    }
+    layout.emplace_back(key, locus.size());
+  }
+  result.output_layout = std::move(layout);
+  return true;
+}
 } // namespace
 
 int IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1110,6 +1137,12 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
     retrieved_job->format_known_ = std::ranges::all_of(
         circuits, [](const auto &circuit) { return circuit.is_object(); });
     retrieved_job->results_.resize(circuits.size());
+    for (size_t i = 0; i < circuits.size(); ++i) {
+      if (circuits[i].is_object() &&
+          !Set_output_layout(retrieved_job->results_[i], circuits[i])) {
+        return QDMI_ERROR_FATAL;
+      }
+    }
     const auto &shots = payload.at("shots");
     if (!shots.is_number_unsigned() || shots == 0 ||
         shots > std::numeric_limits<size_t>::max()) {
@@ -1354,11 +1387,14 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
   auto json_program = job->run_request_options_;
   json_program["circuits"] = nlohmann::json::array();
-  for (const auto &stored_program : job->programs_) {
-    const auto program = Program_contents(stored_program);
+  for (size_t i = 0; i < job->programs_.size(); ++i) {
+    const auto program = Program_contents(job->programs_[i]);
     if (job->program_format_ == QDMI_PROGRAM_FORMAT_IQMJSON) {
-      json_program["circuits"].emplace_back(
-          nlohmann::json::parse(program.begin(), program.end()));
+      auto circuit = nlohmann::json::parse(program.begin(), program.end());
+      if (!Set_output_layout(job->results_[i], circuit)) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+      json_program["circuits"].push_back(std::move(circuit));
     } else {
       json_program["circuits"].emplace_back(std::string{program});
     }
@@ -1731,11 +1767,46 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
     }
     std::vector<IQM_QDMI_Device_Job_impl_d::Program_results> results;
     results.reserve(artifact.size());
-    for (const auto &circuit : artifact) {
+    for (size_t i = 0; i < artifact.size(); ++i) {
+      const auto &circuit = artifact[i];
       auto &entry = results.emplace_back();
       entry.measurement_keys =
           circuit.at("measurement_keys").get<std::vector<std::string>>();
       entry.counts = circuit.at("counts").get<std::map<std::string, size_t>>();
+      if (const auto &layout = job->results_[i].output_layout; layout) {
+        std::map<std::string, size_t> offsets;
+        size_t width = 0;
+        for (const auto &key : *entry.measurement_keys) {
+          const auto field = std::ranges::find_if(
+              *layout, [&](const auto &item) { return item.first == key; });
+          if (field == layout->end() || !offsets.emplace(key, width).second) {
+            return QDMI_ERROR_FATAL;
+          }
+          width += field->second;
+        }
+        if (offsets.size() != layout->size()) {
+          return QDMI_ERROR_FATAL;
+        }
+        std::map<std::string, size_t> counts;
+        for (const auto &[outcome, count] : entry.counts) {
+          if (outcome.size() != width ||
+              outcome.find_first_not_of("01") != std::string::npos) {
+            return QDMI_ERROR_FATAL;
+          }
+          std::string normalized;
+          normalized.reserve(width);
+          for (const auto &[key, key_width] : *layout) {
+            normalized.append(outcome, offsets.at(key), key_width);
+          }
+          std::ranges::reverse(normalized);
+          counts.emplace(std::move(normalized), count);
+        }
+        entry.counts = std::move(counts);
+        entry.measurement_keys->clear();
+        for (const auto &[key, key_width] : *layout) {
+          entry.measurement_keys->push_back(key);
+        }
+      }
     }
     /// Commit only complete, validated artifact data. Download failures leave
     /// the execution outcome unchanged and can be retried without resubmitting.
@@ -1894,6 +1965,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
     for (size_t i = 0; i < artifact.size(); ++i) {
       const auto &measurements = artifact[i];
       const auto &keys = *job->results_[i].measurement_keys;
+      const auto &layout = job->results_[i].output_layout;
       if (!measurements.is_object() || measurements.empty() ||
           measurements.size() != keys.size()) {
         return QDMI_ERROR_FATAL;
@@ -1902,7 +1974,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
       /// Retrieved IQM jobs may retain fewer shots after heralding.
       shots.resize(job->retrieved_ ? measurements.at(keys.front()).size()
                                    : job->num_shots_);
-      for (const auto &key : keys) {
+      for (size_t key_index = 0; key_index < keys.size(); ++key_index) {
+        const auto &key = keys[key_index];
         const auto &values = measurements.at(key);
         if (!values.is_array() || values.size() != shots.size()) {
           return QDMI_ERROR_FATAL;
@@ -1911,7 +1984,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         for (size_t shot = 0; shot < shots.size(); ++shot) {
           const auto &bits = values[shot];
           if (!bits.is_array() || bits.empty() ||
-              (shot != 0 && bits.size() != width)) {
+              (shot != 0 && bits.size() != width) ||
+              (layout && bits.size() != (*layout)[key_index].second)) {
             return QDMI_ERROR_FATAL;
           }
           width = bits.size();
@@ -1921,6 +1995,11 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
             }
             shots[shot] += bit == 0 ? '0' : '1';
           }
+        }
+      }
+      if (layout) {
+        for (auto &shot : shots) {
+          std::ranges::reverse(shot);
         }
       }
     }

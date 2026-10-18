@@ -105,6 +105,9 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         The serialization currently supports only operations that are natively
         supported by the IQM hardware. Unsupported operations will raise
         :class:`~mqt.core.plugins.qiskit.exceptions.UnsupportedOperationError`.
+        Measurements must form the final instruction suffix and write every
+        classical bit exactly once. They are emitted in classical-bit order so native QDMI
+        results preserve the source layout.
 
     Args:
         circuit: The Qiskit quantum circuit to serialize.
@@ -127,7 +130,7 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         >>> qc = QuantumCircuit(2, 2)
         >>> qc.r(np.pi / 2, 0, 0)
         >>> qc.cz(0, 1)
-        >>> qc.measure_all()
+        >>> qc.measure([0, 1], [0, 1])
         >>> json_str = qiskit_to_iqm_json(qc, backend)
     """
 
@@ -155,9 +158,12 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         if isinstance(backend, IQMBackend):
             sites = [sites[index] for index in backend.physical_qubits]
         instructions: list[dict[str, Any]] = []
+        measurements: dict[int, dict[str, Any]] = {}
 
         for instruction in circuit.data:
             operation, qargs, cargs = instruction.operation, instruction.qubits, instruction.clbits
+            if measurements and not isinstance(operation, Measure):
+                _raise_error(TranslationError, "IQM JSON direct readout requires terminal measurements.")
 
             # R gate (PRX in IQM terminology)
             if isinstance(operation, RGate):
@@ -200,6 +206,8 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
             elif isinstance(operation, Measure):
                 clbit = cargs[0]
                 bitloc = circuit.find_bit(clbit)
+                if bitloc.index in measurements:
+                    _raise_error(TranslationError, "IQM JSON direct readout cannot overwrite classical bits.")
 
                 # Check if classical bit is part of a register
                 if not bitloc.registers:
@@ -214,18 +222,22 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
                 clbit_index = bitloc.registers[0][1]
                 key = f"{creg.name}_{len(creg)}_{creg_idx}_{clbit_index}"
                 qubit_index = circuit.find_bit(qargs[0]).index
-                instructions.append({
+                measurements[bitloc.index] = {
                     "name": "measure",
                     "locus": [sites[qubit_index].name()],
                     "args": {
                         "key": key,
                     },
-                })
+                }
 
             # Unsupported operation
             else:
                 msg = f"Operation '{operation.name}' is not supported in IQM JSON format"
                 _raise_error(UnsupportedOperationError, msg)
+
+        if len(measurements) != circuit.num_clbits:
+            _raise_error(TranslationError, "IQM JSON direct readout must measure every classical bit.")
+        instructions.extend(measurements[index] for index in range(circuit.num_clbits))
 
         program: dict[str, Any] = {
             "name": circuit.name or "circuit",
