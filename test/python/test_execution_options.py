@@ -81,7 +81,7 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
     cases: list[tuple[object, dict[str, Any], object]] = [
         (None, {}, None),
         ({"heralding_mode": "none"}, {}, {"heralding_mode": "none"}),
-        (defaults, {}, defaults),
+        (defaults, {"memory": False}, defaults),
         (defaults, {"run_request_options": {"active_reset_cycles": 2}}, {"active_reset_cycles": 2}),
         (defaults, {"run_request_options": None}, None),
         (defaults, {"run_request_options": {}}, {}),
@@ -95,4 +95,5 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
         params = submission.call_args.kwargs
         assert (json.loads(params["custom1"]) if params else None) == expected
         assert iqm_backend.options.run_request_options == default
+        assert iqm_backend.options.memory is True
         submission.reset_mock()
