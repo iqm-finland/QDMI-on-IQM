@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Exclude Qiskit 2.6.0 from the QSCI/H2 example because its static
+  thread-local storage regression prevents PySCF from loading on Linux ([#306])
+  ([**@burgholzer**]).
 - 🐛 Preserve native IQM JSON measurement-instruction and locus order in shots
   and histograms, including circuit batches and reopened jobs, with QDMI bit
   zero on the right. Emit Qiskit terminal measurements in classical-bit order

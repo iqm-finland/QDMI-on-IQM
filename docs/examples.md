@@ -96,6 +96,9 @@ circuit.
 :::{note}
 The QSCI example depends on PySCF for classical chemistry calculations, and
 [PySCF is not supported on Windows](https://pyscf.org/user/install.html).
+Its standalone dependencies exclude Qiskit 2.6.0 because its
+[static thread-local storage regression](https://github.com/Qiskit/qiskit/issues/17213)
+can prevent PySCF's OpenMP runtime from loading on Linux.
 :::
 
 The QSCI example uses native Qiskit sampler and estimator primitives. Its
