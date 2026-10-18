@@ -80,6 +80,19 @@ device site indices; the IQM JSON serializer uses this mapping for instruction
 loci. The underlying QDMI device and generic MQT Core `QDMIBackend` expose
 physical site indices.
 
+## Measurement results
+
+Counts and memory preserve Qiskit's classical-bit destinations and register
+widths, including unmeasured bits initialized to zero. The serializer preserves
+measurement and barrier order and supports repeated measurements of a qubit into
+distinct classical bits. Measuring the same classical bit twice is rejected
+because IQM requires unique measurement keys. A circuit with classical bits must
+contain at least one measurement. Request `memory=True` for ordered samples.
+
+This backend provides the shared MQT Core Qiskit API. It does not implement all
+IQM Client options, job retrieval APIs, or native serializers for delay, reset,
+and conditional operations. IQM request options are described below.
+
 ## Circuit Metadata
 
 The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native

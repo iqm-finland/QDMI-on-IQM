@@ -17,8 +17,8 @@ releases may include breaking changes.
   ([**@burgholzer**]).
 - 🐛 Preserve native IQM JSON measurement-instruction and locus order in shots
   and histograms, including circuit batches and reopened jobs, with QDMI bit
-  zero on the right. Emit Qiskit terminal measurements in classical-bit order
-  and reject layouts requiring source-result reconstruction ([#306])
+  zero on the right. Preserve Qiskit instruction order and reconstruct classical
+  destinations and unused bits through MQT Core's result mapping ([#306])
   ([**@burgholzer**]).
 
 ## [1.5.0] - 2026-10-14

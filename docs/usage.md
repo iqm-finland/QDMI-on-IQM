@@ -549,11 +549,13 @@ Native IQM JSON does not encode source-language classical destinations. Its
 producer must arrange measurements in the desired output order or reconstruct
 source results separately. The legacy direct-QIR result path is unchanged.
 
-The Qiskit serializer emits terminal measurements in circuit-wide classical-bit
-order, including across registers with permuted measurement destinations. It
-requires every classical bit to be measured exactly once and rejects gates or
-barriers after readout begins. Unused classical bits and overwritten
-destinations are rejected because they require source-result reconstruction.
+The registered Qiskit serializer preserves instruction order and supplies MQT
+Core with a separate classical-bit mapping. Counts and ordered memory use this
+mapping to restore measurement destinations and initialize unused bits to zero,
+including entirely unused registers. Barriers and supported gates may occur
+between measurements; repeated measurements of one qubit into distinct classical
+bits retain their order. Overwritten destinations are rejected, as are circuits
+with classical bits but no measurement.
 
 ### Unsupported Result Formats
 
