@@ -164,7 +164,7 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@fd3d75dece69c363989347869529a5e99cdcfffc # v2.5.1
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@7ab5cc4d9071643e94a51125ae60fc2c720de72c # install sccache for source dependencies
     with:
       enable-ty: true
       enable-mypy: false
