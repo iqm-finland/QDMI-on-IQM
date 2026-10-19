@@ -24,9 +24,9 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from mqt.core.plugins.qiskit import CircuitValidationError
+from mqt.core.plugins.qiskit import CircuitValidationError, QDMIBackend
 from mqt.core.qdmi import Device, Job, ProgramFormat
-from qiskit.circuit import Measure, QuantumCircuit
+from qiskit.circuit import ClassicalRegister, Measure, QuantumCircuit, QuantumRegister
 from qiskit.transpiler import Target
 
 from iqm.qdmi.qiskit import IQMBackend
@@ -44,8 +44,8 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:
     device.operations.return_value = [operation]
     device.supported_program_formats.return_value = [ProgramFormat.IQM_JSON]
     device.try_submit_job.return_value = Mock(spec=Job)
-    target = Target(num_qubits=1)
-    target.add_instruction(Measure(), {(0,): None})
+    target = Target(num_qubits=3)
+    target.add_instruction(Measure(), {(0,): None, (1,): None, (2,): None})
     monkeypatch.setattr(IQMBackend, "_build_target", lambda _self: target)
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", lambda *_args: ("{}", ProgramFormat.IQM_JSON))
     return IQMBackend(device=device), device
@@ -97,3 +97,32 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
         assert iqm_backend.options.run_request_options == default
         assert iqm_backend.options.memory is True
         submission.reset_mock()
+
+
+@pytest.mark.parametrize("memory", [False, True])
+def test_classical_result_destinations(
+    backend: tuple[IQMBackend, Mock], monkeypatch: pytest.MonkeyPatch, *, memory: bool
+) -> None:
+    """Normalized readout uses Core's counts and memory decoding unchanged."""
+    iqm_backend, device = backend
+    monkeypatch.setattr(IQMBackend, "_serialize_circuit", QDMIBackend._serialize_circuit)  # ruff:ignore[private-member-access]
+    monkeypatch.setattr(IQMBackend, "physical_qubits", property(lambda _self: (0, 1, 2)))
+    sites = [Mock() for _ in range(3)]
+    for index, site in enumerate(sites):
+        site.name.return_value = f"QB{index + 1}"
+    device.sites.return_value = sites
+    handle = Mock(spec=Job)
+    handle.get_program_status.return_value = None
+    handle.check.return_value = Job.Status.DONE
+    handle.get_shots.return_value = ["101", "010", "101"]
+    handle.get_counts.return_value = {"101": 2, "010": 1}
+    device.submit_job.return_value = handle
+    circuit = QuantumCircuit(QuantumRegister(3), ClassicalRegister(2, "left"), ClassicalRegister(1, "right"))
+    circuit.measure([0, 1, 2], [2, 0, 1])
+
+    result = iqm_backend.run(circuit, shots=3, memory=memory).result()
+    program = json.loads(device.submit_job.call_args.args[0])
+    assert [instruction["locus"] for instruction in program["instructions"]] == [["QB2"], ["QB3"], ["QB1"]]
+    assert result.get_counts() == {"1 01": 2, "0 10": 1}
+    if memory:
+        assert result.get_memory() == ["1 01", "0 10", "1 01"]

@@ -101,6 +101,11 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
     Metadata that cannot be encoded is dropped with a warning; the circuit and
     its metadata are not modified.
 
+    Measurements must be terminal and write each classical bit exactly once.
+    Each qubit may be measured once. Measurements are emitted in classical-bit
+    order so counts and memory use the circuit's register layout. Barriers in
+    the readout suffix are emitted before the measurements.
+
     Note:
         The serialization currently supports only operations that are natively
         supported by the IQM hardware. Unsupported operations will raise
@@ -127,7 +132,7 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         >>> qc = QuantumCircuit(2, 2)
         >>> qc.r(np.pi / 2, 0, 0)
         >>> qc.cz(0, 1)
-        >>> qc.measure_all()
+        >>> qc.measure([0, 1], [0, 1])
         >>> json_str = qiskit_to_iqm_json(qc, backend)
     """
 
@@ -155,9 +160,14 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         if isinstance(backend, IQMBackend):
             sites = [sites[index] for index in backend.physical_qubits]
         instructions: list[dict[str, Any]] = []
+        measurements: dict[int, dict[str, Any]] = {}
+        measured_qubits: set[int] = set()
 
         for instruction in circuit.data:
             operation, qargs, cargs = instruction.operation, instruction.qubits, instruction.clbits
+
+            if measurements and not isinstance(operation, Measure | Barrier):
+                _raise_error(UnsupportedOperationError, "IQM JSON requires terminal measurements.")
 
             # R gate (PRX in IQM terminology)
             if isinstance(operation, RGate):
@@ -214,18 +224,25 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
                 clbit_index = bitloc.registers[0][1]
                 key = f"{creg.name}_{len(creg)}_{creg_idx}_{clbit_index}"
                 qubit_index = circuit.find_bit(qargs[0]).index
-                instructions.append({
+                if bitloc.index in measurements or qubit_index in measured_qubits:
+                    _raise_error(TranslationError, "Each qubit and classical bit may be measured only once.")
+                measured_qubits.add(qubit_index)
+                measurements[bitloc.index] = {
                     "name": "measure",
                     "locus": [sites[qubit_index].name()],
                     "args": {
                         "key": key,
                     },
-                })
+                }
 
             # Unsupported operation
             else:
                 msg = f"Operation '{operation.name}' is not supported in IQM JSON format"
                 _raise_error(UnsupportedOperationError, msg)
+
+        if len(measurements) != circuit.num_clbits:
+            _raise_error(TranslationError, "Every classical bit must be measured exactly once.")
+        instructions.extend(measurements[index] for index in range(circuit.num_clbits))
 
         program: dict[str, Any] = {
             "name": circuit.name or "circuit",
