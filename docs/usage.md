@@ -535,27 +535,13 @@ std::string shots(shots_buffer.data());
 Each bitstring in the result represents the measurement outcome for one shot.
 The bitstrings are ordered chronologically (shot 1, shot 2, shot 3, etc.).
 
-For native IQM JSON, output bit indices follow measurement-instruction order,
-then each instruction's `locus` order. Bit zero appears on the right in both
-shots and histogram keys, with leading zeros retained. For example, a single
-measurement with `locus: ["QB2", "QB1"]` and backend columns `[1, 0]` produces
-`"01"`. Measurement keys identify result columns; their spelling, dictionary
-order, and physical site names do not determine output positions. The provider
-uses the counts artifact's `measurement_keys` metadata to reorder histogram
-columns and rejects missing, duplicate, or unknown keys and mismatched widths.
-This also applies to circuit batches and jobs reopened by ID.
-
-Native IQM JSON does not encode source-language classical destinations. Its
-producer must arrange measurements in the desired output order or reconstruct
-source results separately. The legacy direct-QIR result path is unchanged.
-
-The registered Qiskit serializer preserves instruction order and supplies MQT
-Core with a separate classical-bit mapping. Counts and ordered memory use this
-mapping to restore measurement destinations and initialize unused bits to zero,
-including entirely unused registers. Barriers and supported gates may occur
-between measurements; repeated measurements of one qubit into distinct classical
-bits retain their order. Overwritten destinations are rejected, as are circuits
-with classical bits but no measurement.
+For IQM JSON, output bits follow measurement-instruction order, then each
+instruction's `locus` order. Bit zero appears on the right, and leading zeros
+are retained. For example, measuring `locus: ["QB2", "QB1"]` with backend
+columns `[1, 0]` produces `"01"`. This order applies to shots and histogram
+keys, including circuit batches and jobs retrieved by ID. Measurement keys
+identify columns; their spelling and physical site names do not determine output
+positions.
 
 ### Unsupported Result Formats
 

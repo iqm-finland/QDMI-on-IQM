@@ -82,17 +82,9 @@ physical site indices.
 
 ## Measurement results
 
-Counts and memory preserve Qiskit's classical-bit destinations and register
-widths, including unmeasured bits initialized to zero. The serializer preserves
-measurement and barrier order and supports repeated measurements of a qubit into
-distinct classical bits. Measuring the same classical bit twice is rejected
-because IQM requires unique measurement keys. A circuit with classical bits must
-contain at least one measurement. Ordered samples are included by default
-(`memory=True`); pass `memory=False` to return counts only.
-
-This backend provides the shared MQT Core Qiskit API. It does not implement all
-IQM Client options, job retrieval APIs, or native serializers for delay, reset,
-and conditional operations. IQM request options are described below.
+Ordered samples are included by default (`memory=True`). Use
+`result.get_memory()` to access them, or pass `memory=False` to return counts
+only.
 
 ## Circuit Metadata
 

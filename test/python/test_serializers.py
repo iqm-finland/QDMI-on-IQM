@@ -29,7 +29,7 @@ from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOper
 from qiskit.circuit import ClassicalRegister, Clbit, Parameter, QuantumCircuit, QuantumRegister
 
 from iqm.qdmi.gates import MoveGate
-from iqm.qdmi.serializers import qiskit_to_iqm_json, serialize_qiskit_circuit
+from iqm.qdmi.serializers import qiskit_to_iqm_json
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -163,56 +163,17 @@ def test_move_gate(backend: Callable[[int], StubBackend]) -> None:
     assert move["args"] == {}
 
 
-def test_measurements_preserve_instruction_order(backend: Callable[[int], StubBackend]) -> None:
-    """A result mapping preserves destinations without reordering measurements."""
-    qc = QuantumCircuit(QuantumRegister(3), ClassicalRegister(2, "zeta"), ClassicalRegister(1, "alpha"))
+def test_measure_keys_are_unique(backend: Callable[[int], StubBackend]) -> None:
+    """Each measurement carries a key derived from its classical register position."""
+    qc = QuantumCircuit(2, 2)
     qc.cz(0, 1)
-    qc.measure([0, 1, 2], [2, 0, 1])
+    qc.measure([0, 1], [0, 1])
 
-    program = json.loads(qiskit_to_iqm_json(qc, backend(3)))  # ty: ignore[invalid-argument-type]
+    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
 
-    measurements = [instr for instr in program["instructions"] if instr["name"] == "measure"]
-    assert [instr["args"]["key"] for instr in measurements] == ["alpha_1_1_0", "zeta_2_0_0", "zeta_2_0_1"]
-    assert [instr["locus"] for instr in measurements] == [["QB1"], ["QB2"], ["QB3"]]
-    serialized = serialize_qiskit_circuit(qc, backend(3))  # ty: ignore[invalid-argument-type]
-    assert serialized.payload == json.dumps(program)
-    assert serialized.output_width == 3
-    assert serialized.clbit_indices == (1, 2, 0)
-
-
-@pytest.mark.parametrize("layout", ["missing", "idle-register", "nonterminal", "barrier", "repeat-qubit"])
-def test_measurement_layout_mapping(backend: Callable[[int], StubBackend], layout: str) -> None:
-    """Idle bits and interspersed operations retain source order and destinations."""
-    qc = QuantumCircuit(2, 3)
-    qc.measure(0, 2)
-    if layout == "idle-register":
-        qc.add_register(ClassicalRegister(2, "idle"))
-    if layout == "nonterminal":
-        qc.r(0.5, 0, 0)
-    if layout == "barrier":
-        qc.barrier()
-    if layout != "missing":
-        qc.measure(0 if layout in {"nonterminal", "repeat-qubit"} else 1, 0)
-
-    serialized = serialize_qiskit_circuit(qc, backend(2))  # ty: ignore[invalid-argument-type]
-    program = json.loads(serialized.payload)
-    assert [instruction["name"] for instruction in program["instructions"]] == [
-        "prx" if instruction.operation.name == "r" else instruction.operation.name for instruction in qc.data
-    ]
-    assert serialized.output_width == (1 if layout == "missing" else 2)
-    assert serialized.clbit_indices == ((None, None, 0) if layout == "missing" else (1, None, 0)) + (
-        (None, None) if layout == "idle-register" else ()
-    )
-
-
-@pytest.mark.parametrize("overwritten", [False, True])
-def test_unavailable_readout_is_rejected(backend: Callable[[int], StubBackend], *, overwritten: bool) -> None:
-    """IQM requires unique measurement keys and a readout for classical results."""
-    qc = QuantumCircuit(2, 1)
-    if overwritten:
-        qc.measure([0, 1], [0, 0])
-    with pytest.raises(TranslationError, match=r"overwrite|at least one measurement"):
-        qiskit_to_iqm_json(qc, backend(2))  # ty: ignore[invalid-argument-type]
+    keys = [instr["args"]["key"] for instr in program["instructions"] if instr["name"] == "measure"]
+    assert len(keys) == 2
+    assert len(set(keys)) == 2
 
 
 def test_circuit_name_is_preserved(backend: Callable[[int], StubBackend]) -> None:
@@ -289,7 +250,7 @@ def test_serializer_is_advertised_to_mqt_core() -> None:
     from mqt.core.plugins.qiskit import program_serializer  # ruff:ignore[import-outside-top-level]
     from mqt.core.qdmi import ProgramFormat  # ruff:ignore[import-outside-top-level]
 
-    assert program_serializer(ProgramFormat.IQM_JSON) is serialize_qiskit_circuit
+    assert program_serializer(ProgramFormat.IQM_JSON) is qiskit_to_iqm_json
 
 
 def test_nested_metadata_is_preserved(backend: Callable[[int], StubBackend]) -> None:

@@ -10,16 +10,17 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
+  ([**@burgholzer**]).
+
 ### Fixed
 
-- 🐛 Exclude Qiskit 2.6.0 from the QSCI/H2 example because its static
-  thread-local storage regression prevents PySCF from loading on Linux ([#306])
+- 🐛 Preserve IQM JSON measurement order in shots and histograms ([#306])
   ([**@burgholzer**]).
-- 🐛 Preserve native IQM JSON measurement-instruction and locus order in shots
-  and histograms, including circuit batches and reopened jobs, with QDMI bit
-  zero on the right. Preserve Qiskit instruction order and reconstruct classical
-  destinations and unused bits through MQT Core's result mapping. Return ordered
-  Qiskit samples by default (`memory=True`) ([#306]) ([**@burgholzer**]).
+- 🐛 Exclude Qiskit 2.6.0 from the QSCI example to avoid its Linux PySCF loading
+  failure ([#306]) ([**@burgholzer**]).
 
 ## [1.5.0] - 2026-10-14
 
