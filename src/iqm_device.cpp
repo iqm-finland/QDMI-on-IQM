@@ -2201,8 +2201,10 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
 
 namespace {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
-    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON,
-    PULSE_PROGRAM_FORMAT};
+    QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+    QDMI_PROGRAM_FORMAT_IQMJSON,
+    PULSE_PROGRAM_FORMAT,
+};
 
 /// A device with at least this many queued jobs is reported as busy. The IQM
 /// on-demand queue is FIFO and executes one job at a time, so a single queued

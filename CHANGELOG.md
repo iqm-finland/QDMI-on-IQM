@@ -15,6 +15,8 @@ releases may include breaking changes.
 - ✨ Submit pulse-level `RunDefinition` programs and retrieve raw sweep results,
   including after reopening a job by ID ([#200]) ([**@marcelwa**],
   [**@burgholzer**]).
+- ✨ Add a PulLA 15 example for compiling and executing pulse programs ([#200])
+  ([**@marcelwa**], [**@burgholzer**]).
 
 ### Changed
 

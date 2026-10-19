@@ -40,8 +40,10 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
      "api/v1/jobs/%s/artifacts/measurement_counts"},
     {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,
      "api/v1/jobs/%s/artifacts/measurements"},
-    {API_ENDPOINT::GET_JOB_ARTIFACT_SWEEP_RESULTS,
-     "api/v1/jobs/%s/artifacts/sweep_results"},
+    {
+        API_ENDPOINT::GET_JOB_ARTIFACT_SWEEP_RESULTS,
+        "api/v1/jobs/%s/artifacts/sweep_results",
+    },
     {API_ENDPOINT::CANCEL_JOB, "api/v1/jobs/%s/cancel"},
 
     // Quantum computer endpoints
