@@ -18,7 +18,7 @@ permissions:
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@fd3d75dece69c363989347869529a5e99cdcfffc # v2.5.1
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@6c933678406ab1887a137839dfd0e290f12917da # v2.5.2
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
