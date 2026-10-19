@@ -80,6 +80,12 @@ device site indices; the IQM JSON serializer uses this mapping for instruction
 loci. The underlying QDMI device and generic MQT Core `QDMIBackend` expose
 physical site indices.
 
+## Measurement results
+
+Ordered samples are included by default (`memory=True`). Use
+`result.get_memory()` to access them, or pass `memory=False` to return counts
+only.
+
 ## Circuit Metadata
 
 The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native

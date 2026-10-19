@@ -535,6 +535,14 @@ std::string shots(shots_buffer.data());
 Each bitstring in the result represents the measurement outcome for one shot.
 The bitstrings are ordered chronologically (shot 1, shot 2, shot 3, etc.).
 
+For IQM JSON, output bits follow measurement-instruction order, then each
+instruction's `locus` order. Bit zero appears on the right, and leading zeros
+are retained. For example, measuring `locus: ["QB2", "QB1"]` with backend
+columns `[1, 0]` produces `"01"`. This order applies to shots and histogram
+keys, including circuit batches and jobs retrieved by ID. Measurement keys
+identify columns; their spelling and physical site names do not determine output
+positions.
+
 ### Unsupported Result Formats
 
 The following QDMI standard result formats (see {cpp:enum}`QDMI_JOB_RESULT_T`)

@@ -10,6 +10,18 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
+  ([**@burgholzer**]).
+
+### Fixed
+
+- 🐛 Preserve IQM JSON measurement order in shots and histograms ([#306])
+  ([**@burgholzer**]).
+- 🐛 Exclude Qiskit 2.6.0 from the QSCI example to avoid its Linux PySCF loading
+  failure ([#306]) ([**@burgholzer**]).
+
 ## [1.5.0] - 2026-10-14
 
 ### Added
@@ -318,6 +330,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
