@@ -3724,7 +3724,8 @@ TEST_F(DeviceIntegrationMockTest, SelectedCalibrationRejectsMismatch) {
 }
 
 TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
-  const std::string payload{"\x08\x00\x12\x00", 4};
+  std::string payload{"\x08\x00\x12\x00", 4};
+  const auto expected = payload;
   const size_t size = payload.size();
   const void *program = payload.data();
   constexpr size_t shots = 1;
@@ -3754,6 +3755,7 @@ TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
   ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
                                              1, &size, &program),
             QDMI_SUCCESS);
+  std::ranges::fill(payload, 'x');
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, 0, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
@@ -3774,11 +3776,11 @@ TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
   ASSERT_EQ(
       IQM_QDMI_device_job_get_program(job, 0, size, copied.data(), nullptr),
       QDMI_SUCCESS);
-  EXPECT_EQ(copied, payload);
+  EXPECT_EQ(copied, expected);
   http_stub.queue_post(200, R"({"id":"pulse-123"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   ASSERT_EQ(http_stub.post_bodies().size(), 1);
-  EXPECT_EQ(http_stub.post_bodies().front(), payload);
+  EXPECT_EQ(http_stub.post_bodies().front(), expected);
   EXPECT_TRUE(http_stub.post_urls().front().ends_with("/run"));
 }
 
@@ -3809,7 +3811,12 @@ TEST_F(DeviceJobMockTest, RetrievedPulseJobKeepsIndexedBinaryResults) {
   ASSERT_EQ(IQM_QDMI_device_job_get_results(
                 retrieved, 0, QDMI_JOB_RESULT_CUSTOM2, 0, nullptr, &size),
             QDMI_SUCCESS);
+  EXPECT_EQ(size, artifact.size());
   std::string result(size, '\0');
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(retrieved, 0,
+                                            QDMI_JOB_RESULT_CUSTOM2, size - 1,
+                                            result.data(), nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
   ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved, 0,
                                             QDMI_JOB_RESULT_CUSTOM2, size,
                                             result.data(), nullptr),

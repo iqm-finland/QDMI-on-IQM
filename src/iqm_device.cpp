@@ -1516,7 +1516,6 @@ int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
       job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
-    job->status_ = QDMI_JOB_STATUS_FAILED;
     return Reports_error_code(job_submission_response, "unsupported_job_type")
                ? QDMI_ERROR_NOTSUPPORTED
                : status;

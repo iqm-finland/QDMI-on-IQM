@@ -55,7 +55,6 @@ email = "developers@iqm.tech"
 [project.optional-dependencies]
 pulla = [
   "iqm-client>=36,<37; python_version<'3.15'",
-  "iqm-pulla>=15,<16; python_version<'3.15'",
   "mqt-core~=4.1.1",
 ]
 qiskit = [
