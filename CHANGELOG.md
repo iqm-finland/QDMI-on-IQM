@@ -18,7 +18,7 @@ releases may include breaking changes.
 ### Fixed
 
 - 🐛 Confine TLS verification to the selected CA bundle ([#309])
-  ([**@marcelwa**]).
+  ([**@marcelwa**], [**@burgholzer**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
   complete terminal Qiskit readout to classical-bit order ([#306], [#308])
   ([**@burgholzer**]).

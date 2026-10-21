@@ -133,7 +133,7 @@ namespace internal {
 /// Explicit paths are passed through even when invalid, so TLS fails closed.
 [[nodiscard]] std::string Resolve_ca_bundle();
 
-/// Apply a selected CA bundle to a native HTTP session.
+/// Apply a selected CA bundle to a fresh native HTTP session.
 void Configure_ca_bundle(cpr::Session &session, const std::string &bundle);
 
 /**

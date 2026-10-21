@@ -56,16 +56,14 @@ namespace internal {
 
 void Configure_ca_bundle(cpr::Session &session, const std::string &bundle) {
   auto *handle = session.GetCurlHolder()->handle;
-  // A selected bundle must not gain roots from CPR's native-CA option or
-  // CAPATH. NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+  // SetSslOptions enables native roots; configure the fresh session directly.
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
   const auto ca_info = curl_easy_setopt(handle, CURLOPT_CAINFO, bundle.c_str());
   const auto ca_path = curl_easy_setopt(handle, CURLOPT_CAPATH,
                                         static_cast<const char *>(nullptr));
-  const auto ssl_options = curl_easy_setopt(handle, CURLOPT_SSL_OPTIONS, 0L);
   // NOLINTEND(cppcoreguidelines-pro-type-vararg)
   if (ca_info != CURLE_OK ||
-      (ca_path != CURLE_OK && ca_path != CURLE_NOT_BUILT_IN) ||
-      ssl_options != CURLE_OK) {
+      (ca_path != CURLE_OK && ca_path != CURLE_NOT_BUILT_IN)) {
     throw std::runtime_error("Cannot configure the selected CA bundle");
   }
 }
