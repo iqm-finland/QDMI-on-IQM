@@ -17,8 +17,6 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🐛 Confine TLS verification to the selected CA bundle ([#309])
-  ([**@marcelwa**], [**@burgholzer**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
   complete terminal Qiskit readout to classical-bit order ([#306], [#308])
   ([**@burgholzer**]).
@@ -333,7 +331,6 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#309]: https://github.com/iqm-finland/QDMI-on-IQM/pull/309
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302

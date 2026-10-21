@@ -43,8 +43,8 @@ libcurl's native defaults.
 For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
 bundle before making requests. `SSL_CERT_FILE` is also supported when
 `CURL_CA_BUNDLE` is unset or empty. Invalid explicit paths cause requests to
-fail. A selected bundle excludes native roots and CA directories; certificate
-and hostname verification remain enabled for native and Python clients.
+fail; certificate and hostname verification remain enabled. This applies to both
+native and Python clients.
 
 ### Session Configuration
 

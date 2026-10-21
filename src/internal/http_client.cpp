@@ -38,35 +38,20 @@
 #include <cpr/redirect.h>
 #include <cpr/response.h>
 #include <cpr/session.h>
+#include <cpr/ssl_options.h>
 #include <cpr/timeout.h>
 #include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
-#include <curl/curl.h>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
 
 namespace iqm::http {
 namespace internal {
-
-void Configure_ca_bundle(cpr::Session &session, const std::string &bundle) {
-  auto *handle = session.GetCurlHolder()->handle;
-  // SetSslOptions enables native roots; configure the fresh session directly.
-  // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
-  const auto ca_info = curl_easy_setopt(handle, CURLOPT_CAINFO, bundle.c_str());
-  const auto ca_path = curl_easy_setopt(handle, CURLOPT_CAPATH,
-                                        static_cast<const char *>(nullptr));
-  // NOLINTEND(cppcoreguidelines-pro-type-vararg)
-  if (ca_info != CURLE_OK ||
-      (ca_path != CURLE_OK && ca_path != CURLE_NOT_BUILT_IN)) {
-    throw std::runtime_error("Cannot configure the selected CA bundle");
-  }
-}
 
 std::string Resolve_ca_bundle() {
   for (const auto *variable : {"CURL_CA_BUNDLE", "SSL_CERT_FILE"}) {
@@ -123,7 +108,7 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
   session.SetRedirect(cpr::Redirect{true});
   session.SetVerifySsl(cpr::VerifySsl{true});
   if (const auto bundle = Resolve_ca_bundle(); !bundle.empty()) {
-    Configure_ca_bundle(session, bundle);
+    session.SetSslOptions(cpr::Ssl(cpr::ssl::CaInfo{bundle}));
   }
   if (bearer_token.has_value()) {
     session.SetBearer(*bearer_token);
