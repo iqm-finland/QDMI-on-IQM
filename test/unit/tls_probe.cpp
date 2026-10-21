@@ -39,9 +39,9 @@ std::size_t Discard(char * /*data*/, std::size_t size, std::size_t count,
 int main(int argc, char **argv) try {
   std::cout << curl_version() << '\n';
   if (argc == 2) {
-    const auto response =
-        iqm::http::Get(cpr::Url{argv[1]}, std::nullopt, cpr::ConnectionPool{},
-                       std::chrono::seconds{10});
+    const cpr::ConnectionPool pool;
+    const auto response = iqm::http::Get(cpr::Url{argv[1]}, std::nullopt, pool,
+                                         std::chrono::seconds{10});
     std::cout << response.status_code << ' '
               << static_cast<int>(response.error.code) << ' '
               << response.error.message << '\n';

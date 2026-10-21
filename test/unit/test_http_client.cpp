@@ -28,6 +28,7 @@
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
+#include <cpr/session.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -36,6 +37,7 @@
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
 #include <string_view>
@@ -74,6 +76,15 @@ private:
   static constexpr std::array VARIABLES{"CURL_CA_BUNDLE", "SSL_CERT_FILE"};
   std::array<std::optional<std::string>, VARIABLES.size()> previous_;
 };
+
+TEST(CaBundleConfigurationTest, RejectsTransportConfigurationFailure) {
+  cpr::Session session;
+  // libcurl rejects strings larger than its input limit before network I/O.
+  const std::string oversized_bundle(16 * 1024 * 1024, 'x');
+  EXPECT_THROW(
+      iqm::http::internal::Configure_ca_bundle(session, oversized_bundle),
+      std::runtime_error);
+}
 
 TEST_F(CaBundleTest, ExplicitBundleTakesPrecedenceEvenWhenMissing) {
   set("SSL_CERT_FILE", "/ssl-ca.pem");
