@@ -21,7 +21,6 @@
     "Dockerfile": "POUND_STYLE"
   },
   "exclude": [
-    "^test/fixtures/tls/.*\\.(pem|key)$",
     "^\\.[^/]+",
     "/\\.[^/]+",
     ".*\\.qasm",

@@ -17,8 +17,6 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🐛 Confine origin TLS verification to the selected CA bundle so other trust
-  stores cannot bypass a patched bundle ([#309]) ([**@marcelwa**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms ([#306])
   ([**@burgholzer**]).
 - 🐛 Exclude Qiskit 2.6.0 from the QSCI example to avoid its Linux PySCF loading
@@ -406,8 +404,6 @@ Compatible with QDMI `v1.3.0`.
 [#37]: https://github.com/iqm-finland/QDMI-on-IQM/pull/37
 
 <!-- Contributor -->
-
-[#309]: https://github.com/iqm-finland/QDMI-on-IQM/pull/309
 
 [**@burgholzer**]: https://github.com/burgholzer
 [**@marcelwa**]: https://github.com/marcelwa
