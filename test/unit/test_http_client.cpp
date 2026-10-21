@@ -80,7 +80,8 @@ private:
 TEST(CaBundleConfigurationTest, RejectsTransportConfigurationFailure) {
   cpr::Session session;
   // libcurl rejects strings larger than its input limit before network I/O.
-  const std::string oversized_bundle(16 * 1024 * 1024, 'x');
+  // NOLINTNEXTLINE(bugprone-string-constructor)
+  const std::string oversized_bundle(16'777'216, 'x');
   EXPECT_THROW(
       iqm::http::internal::Configure_ca_bundle(session, oversized_bundle),
       std::runtime_error);
