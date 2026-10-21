@@ -21,8 +21,8 @@ uv pip install iqm-qdmi[qiskit]
 ```
 
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from
-{py:mod}`iqm.qdmi.qiskit` and used as a drop-in replacement for any Qiskit
-backend.
+{py:mod}`iqm.qdmi.qiskit` and used with Qiskit's transpilation and execution
+interfaces.
 
 ```{code-cell} ipython3
 from iqm.qdmi.qiskit import IQMBackend
@@ -85,6 +85,13 @@ physical site indices.
 Ordered samples are included by default (`memory=True`). Use
 `result.get_memory()` to access them, or pass `memory=False` to return counts
 only.
+
+Measurements must follow all gates and write every classical bit exactly once;
+each qubit may be measured once. The serializer orders terminal measurements by
+classical-bit index, including across registers, so counts and memory use the
+Qiskit register layout. Barriers in the readout suffix precede the serialized
+measurements. Circuits with unused classical bits or intermediate measurements
+are rejected before submission.
 
 ## Circuit Metadata
 

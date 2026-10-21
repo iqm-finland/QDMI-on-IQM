@@ -20,13 +20,15 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from mqt.core.plugins.qiskit import CircuitValidationError
+from mqt.core.plugins.qiskit import CircuitValidationError, QDMIBackend
 from mqt.core.qdmi import Device, Job, ProgramFormat
-from qiskit.circuit import Measure, QuantumCircuit
+from qiskit.circuit import ClassicalRegister, Measure, Parameter, QuantumCircuit, QuantumRegister
+from qiskit.circuit.library import RGate
 from qiskit.transpiler import Target
 
 from iqm.qdmi.qiskit import IQMBackend
@@ -38,14 +40,16 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:
     device = Mock(spec=Device)
     device.name.return_value = "IQM option test"
     device.version.return_value = "test"
-    operation = Mock()
-    operation.name.return_value = "measure"
-    operation.is_zoned.return_value = False
-    device.operations.return_value = [operation]
+    operations = [Mock(), Mock()]
+    for operation, name in zip(operations, ["measure", "prx"], strict=True):
+        operation.name.return_value = name
+        operation.is_zoned.return_value = False
+    device.operations.return_value = operations
     device.supported_program_formats.return_value = [ProgramFormat.IQM_JSON]
     device.try_submit_job.return_value = Mock(spec=Job)
-    target = Target(num_qubits=1)
-    target.add_instruction(Measure(), {(0,): None})
+    target = Target(num_qubits=4)
+    target.add_instruction(Measure(), {(index,): None for index in range(4)})
+    target.add_instruction(RGate(Parameter("theta"), Parameter("phi")), {(index,): None for index in range(4)})
     monkeypatch.setattr(IQMBackend, "_build_target", lambda _self: target)
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", lambda *_args: ("{}", ProgramFormat.IQM_JSON))
     return IQMBackend(device=device), device
@@ -97,3 +101,39 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
         assert iqm_backend.options.run_request_options == default
         assert iqm_backend.options.memory is True
         submission.reset_mock()
+
+
+@pytest.mark.parametrize("memory", [False, True])
+def test_classical_result_destinations(
+    backend: tuple[IQMBackend, Mock], monkeypatch: pytest.MonkeyPatch, *, memory: bool
+) -> None:
+    """Normalized readout uses Core's counts and memory decoding unchanged."""
+    iqm_backend, device = backend
+    monkeypatch.setattr(IQMBackend, "_serialize_circuit", QDMIBackend._serialize_circuit)  # ruff:ignore[private-member-access]
+    monkeypatch.setattr(IQMBackend, "physical_qubits", property(lambda _self: (0, 1, 2, 3)))
+    sites = [Mock() for _ in range(4)]
+    for site, name in zip(sites, ["QB7", "QB2", "QB11", "QB5"], strict=True):
+        site.name.return_value = name
+    device.sites.return_value = sites
+    handle = Mock(spec=Job)
+    handle.get_program_status.return_value = None
+    handle.check.return_value = Job.Status.DONE
+    handle.get_shots.return_value = ["1100"] * 3
+    handle.get_counts.return_value = {"1100": 3}
+    device.submit_job.return_value = handle
+    circuit = QuantumCircuit(QuantumRegister(4), ClassicalRegister(3, "zeta"), ClassicalRegister(1, "alpha"))
+    circuit.r(math.pi, 0, [0, 2])
+    circuit.measure([0, 1, 2, 3], [2, 0, 3, 1])
+
+    result = iqm_backend.run(circuit, shots=3, memory=memory).result()
+    program = json.loads(device.submit_job.call_args.args[0])
+    assert [instruction["locus"] for instruction in program["instructions"] if instruction["name"] == "measure"] == [
+        ["QB2"],
+        ["QB5"],
+        ["QB7"],
+        ["QB11"],
+    ]
+    # Only q[0] and q[2] are one: zeta[2] = alpha[0] = 1.
+    assert result.get_counts() == {"1 100": 3}
+    if memory:
+        assert result.get_memory() == ["1 100"] * 3
