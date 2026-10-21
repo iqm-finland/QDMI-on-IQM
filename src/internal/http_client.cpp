@@ -34,7 +34,6 @@
 #include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
-#include <cpr/curlholder.h>
 #include <cpr/error.h>
 #include <cpr/redirect.h>
 #include <cpr/response.h>
@@ -44,7 +43,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <curl/curl.h>
-#include <curl/easy.h>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>

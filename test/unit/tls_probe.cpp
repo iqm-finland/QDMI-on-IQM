@@ -20,7 +20,6 @@
 #include "http_client.hpp"
 
 #include <cpr/connection_pool.h>
-#include <cpr/curlholder.h>
 #include <cpr/session.h>
 #include <cstddef>
 #include <curl/curl.h>
