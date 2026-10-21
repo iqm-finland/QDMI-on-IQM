@@ -46,6 +46,41 @@ bundle before making requests. `SSL_CERT_FILE` is also supported when
 fail; certificate and hostname verification remain enabled. This applies to both
 native and Python clients.
 
+#### Urgent: eMudhra CA compromise (October 2026)
+
+Update the CA trust stores on every host and container running this device
+before sending credentials or jobs. The [eMudhra incident advisory] describes
+compromised intermediate CA keys that allow server impersonation. Deployments
+that still trust these chains can expose authentication tokens and workload
+data, even with certificate and hostname verification enabled.
+
+Install your operating system's patched `ca-certificates` package, including its
+regenerated CA directories. Update Windows or macOS trust data on those
+platforms. Replace any custom PEM bundles selected through `CURL_CA_BUNDLE` or
+`SSL_CERT_FILE`, including copies mounted into containers or compute nodes. The
+advisory lists patched package versions; the [curl CA bundle] dated
+**2026-10-20** removes the affected trust anchors. Obtain updates through a
+trusted channel and keep private CA certificates required by your site.
+
+Update every trust source, then restart device processes and workers to discard
+cached TLS connections and sessions. Selecting a patched PEM file alone is not
+sufficient: libcurl can also consult a configured CA directory, and this
+device's CPR SSL options enable native CA trust on supported backends. Updating
+a browser, reinstalling a wheel, or upgrading Python CA packages alone does not
+update these native trust sources.
+
+Use the advisory's twelve test chains to check the runtime trust stores without
+device credentials. Its offline OpenSSL checks test chain validation without
+contacting IQM. Acceptance means the tested store remains affected; rejection
+must report an untrusted issuer, rather than an unrelated error such as expiry.
+A standalone `curl` or browser can use a different TLS backend or store, so its
+result alone does not establish that the device is protected. If patched
+packages are unavailable, follow the advisory's platform-specific distrust
+workaround with your administrator. Never disable TLS verification.
+
+[eMudhra incident advisory]: https://emudhra.we-have-a-problem.com/
+[curl CA bundle]: https://curl.se/docs/caextract.html
+
 ### Session Configuration
 
 The internal `QDMIClient` test helper configures a device session as shown
