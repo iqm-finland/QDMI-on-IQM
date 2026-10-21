@@ -38,6 +38,10 @@
 #include <string>
 #include <type_traits>
 
+namespace cpr {
+class Session;
+}
+
 namespace iqm::http {
 
 /**
@@ -128,6 +132,9 @@ namespace internal {
 /// bundle. An empty result leaves libcurl's platform default in place.
 /// Explicit paths are passed through even when invalid, so TLS fails closed.
 [[nodiscard]] std::string Resolve_ca_bundle();
+
+/// Apply a selected CA bundle to a native HTTP session.
+void Configure_ca_bundle(cpr::Session &session, const std::string &bundle);
 
 /**
  * @brief Clamp a logical timeout to the integer range used by a transport.

@@ -31,3 +31,20 @@ target_link_libraries(
                      iqm::qdmi_device_internals nlohmann_json::nlohmann_json)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
+
+find_package(
+  Python
+  COMPONENTS Interpreter
+  QUIET)
+if(Python_Interpreter_FOUND)
+  add_executable(tls_probe tls_probe.cpp)
+  target_compile_features(tls_probe PRIVATE cxx_std_20)
+  target_link_libraries(tls_probe PRIVATE iqm::qdmi_device_internals
+                                          qdmi::qdmi_project_warnings)
+  add_test(
+    NAME Transport.CaBundle
+    COMMAND
+      ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_tls_bundle.py
+      $<TARGET_FILE:tls_probe>)
+  set_tests_properties(Transport.CaBundle PROPERTIES SKIP_RETURN_CODE 77)
+endif()

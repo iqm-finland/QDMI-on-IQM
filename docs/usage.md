@@ -43,8 +43,9 @@ libcurl's native defaults.
 For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
 bundle before making requests. `SSL_CERT_FILE` is also supported when
 `CURL_CA_BUNDLE` is unset or empty. Invalid explicit paths cause requests to
-fail; certificate and hostname verification remain enabled. This applies to both
-native and Python clients.
+fail. A selected bundle replaces the origin server's CA directory and native
+roots; certificate and hostname verification remain enabled. This applies to
+both native and Python clients.
 
 #### Urgent: eMudhra CA compromise (October 2026)
 
@@ -63,11 +64,11 @@ advisory lists patched package versions; the [curl CA bundle] dated
 trusted channel and keep private CA certificates required by your site.
 
 Update every trust source, then restart device processes and workers to discard
-cached TLS connections and sessions. Selecting a patched PEM file alone is not
-sufficient: libcurl can also consult a configured CA directory, and this
-device's CPR SSL options enable native CA trust on supported backends. Updating
-a browser, reinstalling a wheel, or upgrading Python CA packages alone does not
-update these native trust sources.
+cached TLS connections and sessions. This version confines origin verification
+to the selected PEM bundle. Older versions can also consult a configured CA
+directory and native roots even when a bundle is selected. Updating a browser,
+reinstalling a wheel, or upgrading Python CA packages alone does not update the
+device's default trust sources.
 
 Use the advisory's twelve test chains to check the runtime trust stores without
 device credentials. Its offline OpenSSL checks test chain validation without
