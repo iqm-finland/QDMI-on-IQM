@@ -106,6 +106,10 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
     order so counts and memory use the circuit's register layout. Barriers in
     the readout suffix are emitted before the measurements.
 
+    Qiskit initializes untouched classical bits to zero, but the IQM JSON result
+    path does not reconstruct those slots. When using ``measure_all()``, create
+    the circuit without preallocated classical bits, as in the example below.
+
     Note:
         The serialization currently supports only operations that are natively
         supported by the IQM hardware. Unsupported operations will raise
@@ -129,10 +133,10 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         >>> from qiskit import QuantumCircuit
         >>> import numpy as np
         >>> from iqm.qdmi.serializers import qiskit_to_iqm_json
-        >>> qc = QuantumCircuit(2, 2)
+        >>> qc = QuantumCircuit(2)
         >>> qc.r(np.pi / 2, 0, 0)
         >>> qc.cz(0, 1)
-        >>> qc.measure([0, 1], [0, 1])
+        >>> qc.measure_all()
         >>> json_str = qiskit_to_iqm_json(qc, backend)
     """
 
