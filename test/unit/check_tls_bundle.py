@@ -57,6 +57,7 @@ def main() -> int:
     """
     fixtures = Path(__file__).resolve().parents[1] / "fixtures" / "tls"
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(fixtures / "server.pem", fixtures / "server.key")
     with tempfile.TemporaryDirectory() as directory, ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
         capath = Path(directory)
