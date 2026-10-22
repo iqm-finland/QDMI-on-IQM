@@ -2,6 +2,8 @@
 file_format: mystnb
 kernelspec:
   name: python3
+language_info:
+  name: python
 mystnb:
   number_source_lines: true
 ---
@@ -52,10 +54,13 @@ the following variables are set as needed:
 
 For the full set of authentication options available when configuring C++
 sessions directly, see [Authentication Methods](usage.md#authentication-methods)
-in the Usage Guide.
+in the Usage Guide. Its
+[session configuration example](usage.md#session-configuration) is taken from
+the internal C++ test helper; it is not an installed client API.
 
 You can either run the full suite of examples using the dedicated `nox` session
-or individually execute the scripts from the command line.
+or individually execute the scripts from the command line. For cluster jobs, see
+[IQM on Slurm](slurm.md) for explicit device selection and license requests.
 
 ```console
 # Run the entire suite
@@ -91,6 +96,9 @@ circuit.
 :::{note}
 The QSCI example depends on PySCF for classical chemistry calculations, and
 [PySCF is not supported on Windows](https://pyscf.org/user/install.html).
+Its standalone dependencies exclude Qiskit 2.6.0 because its
+[static thread-local storage regression](https://github.com/Qiskit/qiskit/issues/17213)
+can prevent PySCF's OpenMP runtime from loading on Linux.
 :::
 
 The QSCI example uses native Qiskit sampler and estimator primitives. Its

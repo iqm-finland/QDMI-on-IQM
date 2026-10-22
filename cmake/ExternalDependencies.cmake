@@ -27,7 +27,7 @@ else()
       CACHE STRING "Minimum QDMI version")
   set(QDMI_VERSION 1.4.0
       CACHE STRING "QDMI version")
-  set(QDMI_REV "613d177679a03449753aaacf971a19e632d1ee6f"
+  set(QDMI_REV "9b9d2743df6a7449662d6c8bffb1133536fb06c8"
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -78,26 +78,6 @@ FetchContent_Declare(
   GIT_TAG 1.14.2
   FIND_PACKAGE_ARGS 1.14.2)
 list(APPEND FETCH_PACKAGES cpr)
-
-if(BUILD_IQM_SPANK)
-  find_path(
-    SLURM_SPANK_INCLUDE_DIR
-    NAMES spank.h
-    PATH_SUFFIXES slurm
-    HINTS /opt/slurm/include
-    DOC "Path to Slurm SPANK headers")
-
-  if(NOT SLURM_SPANK_INCLUDE_DIR)
-    message(
-      FATAL_ERROR
-        "BUILD_IQM_SPANK is ON but Slurm SPANK headers were not "
-        "found. Please install Slurm development headers "
-        "(e.g. slurm-devel or libslurm-dev), or provide "
-        "SLURM_SPANK_INCLUDE_DIR.")
-  endif()
-
-  mark_as_advanced(SLURM_SPANK_INCLUDE_DIR)
-endif()
 
 if(BUILD_IQM_QDMI_TESTS)
   set(gtest_force_shared_crt

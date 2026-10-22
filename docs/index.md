@@ -21,7 +21,7 @@ alongside a Python wrapper for straightforward installation via `pip` or `uv`.
 | Run quantum circuits on IQM hardware from **Python / Qiskit**    | [Qiskit Integration](qiskit.md)                            |
 | Run end-to-end example workloads (benchmarks, quantum chemistry) | [Examples](examples.md)                                    |
 | Integrate the C++ library directly                               | [Usage Guide](usage.md)                                    |
-| Integrate with **Slurm** on an HPC cluster                       | [SPANK Plugin Guide](spank_plugin.md)                      |
+| Integrate with **Slurm** on an HPC cluster                       | [IQM on Slurm](slurm.md)                                   |
 | Install via **Spack** on an HPC cluster                          | [Spack Guide](spack_guide.md)                              |
 | Understand the Python package and its entry points               | [Python Package](python_package.md)                        |
 | Compare integration options for my HPC site                      | [Integration Scenarios Analysis](integration_scenarios.md) |
@@ -30,10 +30,10 @@ alongside a Python wrapper for straightforward installation via `pip` or `uv`.
 
 ## API Reference
 
-The generated API references cover both the C++ library and the Python package:
-the {doc}`C++ API reference <capi/index>` documents all public QDMI functions
+The generated API references cover both the C/C++ API and the Python package:
+the {doc}`C/C++ API reference <capi/index>` documents all public QDMI functions
 and types exposed by the library, while the
-{doc}`C++ API reference <api/iqm/qdmi/index>` covers the `iqm-qdmi` package
+{doc}`Python API reference <api/iqm/qdmi/index>` covers the `iqm-qdmi` package
 including the Qiskit backend and its sampler and estimator primitives.
 
 ```{toctree}
@@ -44,7 +44,7 @@ examples
 qiskit
 usage
 python_package
-spank_plugin
+slurm
 
 spack_guide
 

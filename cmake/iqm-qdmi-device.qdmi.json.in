@@ -1,0 +1,69 @@
+{
+  "schema-version": 1,
+  "qdmi": {
+    "devices": [
+      {
+        "id": "iqm.default",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech"
+        }
+      },
+      {
+        "id": "iqm.garnet",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "garnet"
+        }
+      },
+      {
+        "id": "iqm.garnet.mock",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "garnet:mock"
+        }
+      },
+      {
+        "id": "iqm.emerald",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "emerald"
+        }
+      },
+      {
+        "id": "iqm.emerald.mock",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "emerald:mock"
+        }
+      },
+      {
+        "id": "iqm.sirius",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "sirius"
+        }
+      },
+      {
+        "id": "iqm.sirius.mock",
+        "library": "@IQM_QDMI_LIBRARY_FILE@",
+        "prefix": "@QDMI_PREFIX@",
+        "session": {
+          "base-url": "https://resonance.iqm.tech",
+          "custom2": "sirius:mock"
+        }
+      }
+    ]
+  }
+}

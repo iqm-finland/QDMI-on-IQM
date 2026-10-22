@@ -17,9 +17,9 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "fomac.hpp"
 #include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
+#include "qdmi_client.hpp"
 
 #include <algorithm>
 #include <array>
@@ -31,6 +31,9 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <map>
+// NOLINTNEXTLINE(misc-include-cleaner)
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -51,7 +54,7 @@ namespace {
 class QDMIIntegrationTest : public testing::Test {
 protected:
   IQM_QDMI_Device_Session session = nullptr;
-  FoMaC fomac{};
+  QDMIClient client{};
   /// TearDown owns cleanup, including fatal assertions and skipped tests.
   std::vector<IQM_QDMI_Device_Job> jobs;
   std::optional<std::string> requested_qc_alias = std::nullopt;
@@ -88,9 +91,9 @@ protected:
             : std::nullopt;
     requested_qc_alias = qc_alias;
 
-    session =
-        FoMaC::get_iqm_session(base_url, token, tokens_file, qc_id, qc_alias);
-    fomac = FoMaC{session};
+    session = QDMIClient::get_iqm_session(base_url, token, tokens_file, qc_id,
+                                          qc_alias);
+    client = QDMIClient{session};
   }
 
   void TearDown() override {
@@ -119,8 +122,8 @@ protected:
 
   [[nodiscard]] auto get_qubit_sites() const -> std::vector<IQM_QDMI_Site> {
     std::vector<IQM_QDMI_Site> qubit_sites;
-    for (const auto &site : fomac.get_sites()) {
-      if (is_qubit_site_name(fomac.get_site_name(site))) {
+    for (const auto &site : client.get_sites()) {
+      if (is_qubit_site_name(client.get_site_name(site))) {
         qubit_sites.emplace_back(site);
       }
     }
@@ -128,18 +131,18 @@ protected:
   }
 
   [[nodiscard]] auto build_iqm_json_test_circuit() const -> std::string {
-    const auto ops = fomac.get_operation_map();
+    const auto ops = client.get_operation_map();
     const auto prx_it = ops.find("prx");
     const auto measure_it = ops.find("measure");
     if (prx_it == ops.end() || measure_it == ops.end()) {
       throw std::runtime_error("Missing mandatory operations (prx/measure).");
     }
 
-    const auto prx_sites = fomac.get_operation_sites(prx_it->second);
-    const auto measure_sites = fomac.get_operation_sites(measure_it->second);
+    const auto prx_sites = client.get_operation_sites(prx_it->second);
+    const auto measure_sites = client.get_operation_sites(measure_it->second);
     std::vector<IQM_QDMI_Site> eligible_single_sites;
     for (const auto &site : prx_sites) {
-      if (!is_qubit_site_name(fomac.get_site_name(site))) {
+      if (!is_qubit_site_name(client.get_site_name(site))) {
         continue;
       }
       if (std::ranges::find(measure_sites, site) != measure_sites.end()) {
@@ -151,7 +154,7 @@ protected:
     }
 
     auto *const q1 = eligible_single_sites.front();
-    const auto q1_name = fomac.get_site_name(q1);
+    const auto q1_name = client.get_site_name(q1);
 
     auto build_single_qubit = [&] {
       std::ostringstream circuit;
@@ -170,15 +173,15 @@ protected:
       return build_single_qubit();
     }
 
-    const auto cz_sites_flat = fomac.get_operation_sites(cz_it->second);
+    const auto cz_sites_flat = client.get_operation_sites(cz_it->second);
     std::vector<std::pair<IQM_QDMI_Site, IQM_QDMI_Site>> cz_pairs;
     for (size_t i = 0; i + 1 < cz_sites_flat.size(); i += 2) {
       cz_pairs.emplace_back(cz_sites_flat[i], cz_sites_flat[i + 1]);
     }
 
     for (const auto &[a, b] : cz_pairs) {
-      const auto a_name = fomac.get_site_name(a);
-      const auto b_name = fomac.get_site_name(b);
+      const auto a_name = client.get_site_name(a);
+      const auto b_name = client.get_site_name(b);
       if (!is_qubit_site_name(a_name) || !is_qubit_site_name(b_name)) {
         continue;
       }
@@ -211,7 +214,7 @@ protected:
     }
 
     if (const auto move_it = ops.find("move"); move_it != ops.end()) {
-      const auto move_sites_flat = fomac.get_operation_sites(move_it->second);
+      const auto move_sites_flat = client.get_operation_sites(move_it->second);
       std::vector<std::pair<IQM_QDMI_Site, IQM_QDMI_Site>> move_pairs;
       for (size_t i = 0; i + 1 < move_sites_flat.size(); i += 2) {
         move_pairs.emplace_back(move_sites_flat[i], move_sites_flat[i + 1]);
@@ -220,8 +223,8 @@ protected:
       for (const auto &[cz_first, cz_second] : cz_pairs) {
         IQM_QDMI_Site qubit = nullptr;
         IQM_QDMI_Site resonator = nullptr;
-        const auto first_name = fomac.get_site_name(cz_first);
-        const auto second_name = fomac.get_site_name(cz_second);
+        const auto first_name = client.get_site_name(cz_first);
+        const auto second_name = client.get_site_name(cz_second);
         if (is_qubit_site_name(first_name) &&
             !is_qubit_site_name(second_name)) {
           qubit = cz_first;
@@ -241,10 +244,10 @@ protected:
         for (const auto &[fst, snd] : move_pairs) {
           IQM_QDMI_Site second_qubit = nullptr;
           if (fst == resonator &&
-              is_qubit_site_name(fomac.get_site_name(snd))) {
+              is_qubit_site_name(client.get_site_name(snd))) {
             second_qubit = snd;
           } else if (snd == resonator &&
-                     is_qubit_site_name(fomac.get_site_name(fst))) {
+                     is_qubit_site_name(client.get_site_name(fst))) {
             second_qubit = fst;
           }
           if (second_qubit == nullptr || second_qubit == qubit ||
@@ -254,9 +257,9 @@ protected:
             continue;
           }
 
-          const auto qubit_name = fomac.get_site_name(qubit);
-          const auto second_qubit_name = fomac.get_site_name(second_qubit);
-          const auto resonator_name = fomac.get_site_name(resonator);
+          const auto qubit_name = client.get_site_name(qubit);
+          const auto second_qubit_name = client.get_site_name(second_qubit);
+          const auto resonator_name = client.get_site_name(resonator);
           std::ostringstream circuit;
           circuit << R"({"name":"test_circuit","instructions":[)";
           circuit
@@ -369,44 +372,44 @@ attributes #1 = { "irreversible" }
 } // namespace
 
 TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
-  const auto device_name = fomac.get_name();
+  const auto device_name = client.get_name();
   ASSERT_FALSE(device_name.empty()) << "Device must provide a name";
   if (requested_qc_alias.has_value()) {
     EXPECT_EQ(device_name, *requested_qc_alias)
         << "Device name must match the selected QC alias";
   }
 
-  const auto version = fomac.get_version();
+  const auto version = client.get_version();
   ASSERT_FALSE(version.empty()) << "Device must provide a version";
 
-  const auto library_version = fomac.get_library_version();
+  const auto library_version = client.get_library_version();
   ASSERT_FALSE(library_version.empty())
       << "Device must provide a library version";
 
-  ASSERT_GT(fomac.get_qubits_num(), 0);
+  ASSERT_GT(client.get_qubits_num(), 0);
 
-  const auto gates = fomac.get_operation_map();
+  const auto gates = client.get_operation_map();
   ASSERT_GT(gates.size(), 0);
   for (const auto &[op_name, op] : gates) {
     ASSERT_FALSE(op_name.empty());
-    const auto name = fomac.get_operation_name(op);
+    const auto name = client.get_operation_name(op);
     EXPECT_EQ(op_name, name);
   }
 
-  const auto coupling_map = fomac.get_coupling_map();
-  if (const auto num_qubits = fomac.get_qubits_num(); num_qubits == 1) {
+  const auto coupling_map = client.get_coupling_map();
+  if (const auto num_qubits = client.get_qubits_num(); num_qubits == 1) {
     ASSERT_TRUE(coupling_map.empty());
   } else {
     ASSERT_GT(coupling_map.size(), 0);
   }
 
-  const auto duration_unit = fomac.get_duration_unit();
+  const auto duration_unit = client.get_duration_unit();
   ASSERT_FALSE(duration_unit.empty());
 
-  const auto duration_scale_factor = fomac.get_duration_scale_factor();
+  const auto duration_scale_factor = client.get_duration_scale_factor();
   ASSERT_GT(duration_scale_factor, 0.0);
 
-  const auto calibration_set_id = fomac.get_calibration_set_id();
+  const auto calibration_set_id = client.get_calibration_set_id();
   ASSERT_FALSE(calibration_set_id.empty())
       << "Device must provide a calibration set ID";
 
@@ -453,7 +456,7 @@ TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
   jobs.reserve(jobs_num);
   for (size_t i = 0; i < jobs_num; ++i) {
     jobs.emplace_back(
-        fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num));
+        client.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num));
   }
 
   // Poll the final job for as long as it plausibly sits in Garnet's queue.
@@ -504,25 +507,25 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
   // The site list covers the qubits and, on Star-topology devices, the
   // computational resonators as well, so it is at least as long as the qubit
   // count and longer whenever the device has resonators.
-  const auto sites = fomac.get_sites();
-  const auto qubits_num = fomac.get_qubits_num();
+  const auto sites = client.get_sites();
+  const auto qubits_num = client.get_qubits_num();
   EXPECT_GE(sites.size(), qubits_num);
 
-  const auto duration_scale_factor = fomac.get_duration_scale_factor();
+  const auto duration_scale_factor = client.get_duration_scale_factor();
   ASSERT_GT(duration_scale_factor, 0.0);
 
   // Site IDs index the site list, so they are bounded by its size rather than
   // by the qubit count.
   for (const auto &site : sites) {
-    const auto site_id = fomac.get_site_index(site);
+    const auto site_id = client.get_site_index(site);
     EXPECT_LT(site_id, sites.size());
-    const auto site_name = fomac.get_site_name(site);
+    const auto site_name = client.get_site_name(site);
     EXPECT_FALSE(site_name.empty());
 
     // T1 and T2 properties are optional
     try {
       const auto t1 =
-          static_cast<double>(fomac.get_site_t1(site)) * duration_scale_factor;
+          static_cast<double>(client.get_site_t1(site)) * duration_scale_factor;
       EXPECT_GT(t1, 0.0) << "T1 should be positive when available";
     } catch (const std::runtime_error &) {
       // T1 property is not supported - this is acceptable
@@ -531,7 +534,7 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
 
     try {
       const auto t2 =
-          static_cast<double>(fomac.get_site_t2(site)) * duration_scale_factor;
+          static_cast<double>(client.get_site_t2(site)) * duration_scale_factor;
       EXPECT_GT(t2, 0.0) << "T2 should be positive when available";
     } catch (const std::runtime_error &) {
       // T2 property is not supported - this is acceptable
@@ -568,13 +571,13 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
 }
 
 TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
-  const auto ops = fomac.get_operation_map();
-  const auto coupling_map = fomac.get_coupling_map();
+  const auto ops = client.get_operation_map();
+  const auto coupling_map = client.get_coupling_map();
 
   for (const auto &op : ops | std::views::values) {
-    const auto gate_name = fomac.get_operation_name(op);
-    const auto gate_num_qubits = fomac.get_operation_operands_num(op);
-    const auto gate_num_params = fomac.get_operation_parameters_num(op);
+    const auto gate_name = client.get_operation_name(op);
+    const auto gate_num_qubits = client.get_operation_operands_num(op);
+    const auto gate_num_params = client.get_operation_parameters_num(op);
 
     if (gate_name == "prx_12") {
       continue; // The mock device does not expose calibration data for this
@@ -589,7 +592,7 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
     }
 
     // Query the supported sites for the operation
-    const auto supported_sites = fomac.get_operation_sites(op);
+    const auto supported_sites = client.get_operation_sites(op);
     EXPECT_FALSE(supported_sites.empty())
         << "Operation " + gate_name + " must support at least one site set";
 
@@ -598,7 +601,7 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         // Fidelity property is optional
         try {
           const auto fidelity =
-              fomac.get_operation_fidelity(op, {site}, params);
+              client.get_operation_fidelity(op, {site}, params);
           EXPECT_GE(fidelity, 0.0)
               << "Fidelity should be between 0 and 1 when available";
           EXPECT_LE(fidelity, 1.0)
@@ -606,13 +609,13 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         } catch (const std::invalid_argument &) {
           GTEST_LOG_(INFO) << "Fidelity property not available for operation " +
                                   gate_name + " on site " +
-                                  fomac.get_site_name(site);
+                                  client.get_site_name(site);
         } catch (const std::runtime_error &) {
           // Fidelity property is not supported - this is acceptable
           try {
             GTEST_LOG_(INFO)
                 << "Fidelity property not supported for operation " +
-                       gate_name + " on site " + fomac.get_site_name(site);
+                       gate_name + " on site " + client.get_site_name(site);
           } catch (...) {
             // If we can't get site names, just log without them
             GTEST_LOG_(INFO)
@@ -623,19 +626,19 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         // Duration property is optional
         try {
           const auto duration =
-              fomac.get_operation_duration(op, {site}, params);
+              client.get_operation_duration(op, {site}, params);
           EXPECT_GT(duration, 0.0)
               << "Duration should be positive when available";
         } catch (const std::invalid_argument &) {
           GTEST_LOG_(INFO) << "Duration property not available for operation " +
                                   gate_name + " on site " +
-                                  fomac.get_site_name(site);
+                                  client.get_site_name(site);
         } catch (const std::runtime_error &) {
           // Duration property is not supported - this is acceptable
           try {
             GTEST_LOG_(INFO)
                 << "Duration property not supported for operation " +
-                       gate_name + " on site " + fomac.get_site_name(site);
+                       gate_name + " on site " + client.get_site_name(site);
           } catch (...) {
             // If we can't get site names, just log without them
             GTEST_LOG_(INFO)
@@ -661,8 +664,8 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
           // Try to get site names for better error message
           try {
             FAIL() << "Operation " + gate_name + " supports site pair (" +
-                          fomac.get_site_name(control) + ", " +
-                          fomac.get_site_name(target) +
+                          client.get_site_name(control) + ", " +
+                          client.get_site_name(target) +
                           ") which is not in the coupling map";
           } catch (...) {
             // If we can't get site names, fail without them
@@ -688,7 +691,7 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         // Fidelity property is optional
         try {
           const auto fidelity =
-              fomac.get_operation_fidelity(op, {control, target}, params);
+              client.get_operation_fidelity(op, {control, target}, params);
           EXPECT_GE(fidelity, 0.0)
               << "Fidelity should be between 0 and 1 when available";
           EXPECT_LE(fidelity, 1.0)
@@ -701,8 +704,9 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
           try {
             GTEST_LOG_(INFO)
                 << "Fidelity property not supported for operation " +
-                       gate_name + " on sites " + fomac.get_site_name(control) +
-                       ", " + fomac.get_site_name(target);
+                       gate_name + " on sites " +
+                       client.get_site_name(control) + ", " +
+                       client.get_site_name(target);
           } catch (...) {
             // If we can't get site names, just log without them
             GTEST_LOG_(INFO)
@@ -722,7 +726,7 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         // Duration property is optional
         try {
           const auto duration =
-              fomac.get_operation_duration(op, {control, target}, params);
+              client.get_operation_duration(op, {control, target}, params);
           EXPECT_GT(duration, 0.0)
               << "Duration should be positive when available";
         } catch (const std::invalid_argument &e) {
@@ -733,8 +737,9 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
           try {
             GTEST_LOG_(INFO)
                 << "Duration property not supported for operation " +
-                       gate_name + " on sites " + fomac.get_site_name(control) +
-                       ", " + fomac.get_site_name(target);
+                       gate_name + " on sites " +
+                       client.get_site_name(control) + ", " +
+                       client.get_site_name(target);
           } catch (...) {
             // If we can't get site names, just log without them
             GTEST_LOG_(INFO)
@@ -787,8 +792,8 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
   auto &job = jobs.emplace_back();
-  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
-  const auto job_id = FoMaC::get_job_id(job);
+  job = client.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  const auto job_id = QDMIClient::get_job_id(job);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     GTEST_SKIP()
@@ -798,7 +803,7 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   }
   ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
 
-  const auto counts = FoMaC::get_histogram(job);
+  const auto counts = QDMIClient::get_histogram(job);
 
   size_t sum = 0;
   std::cout << "Counts: {\n";
@@ -810,38 +815,38 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   ASSERT_EQ(sum, shots_num);
 
   size_t size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS, 0,
-                                            nullptr, &size),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &size),
             QDMI_SUCCESS);
   std::vector<char> buffer(size - 1); // Buffer too small
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             buffer.size(), buffer.data(),
                                             nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   size_t size2 = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES, 0,
-                                            nullptr, &size2),
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
+                                            0, nullptr, &size2),
             QDMI_SUCCESS);
   std::vector<char> buffer2(size2 - 1); // Buffer too small
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                             buffer2.size(), buffer2.data(),
                                             nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   // The MAX parameter is not a valid value for any device
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_MAX, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_MAX, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
   size_t shots_size{};
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
                                             nullptr, &shots_size),
             QDMI_SUCCESS);
   // shots_size > 1 means there's actual data beyond the null terminator
   if (shots_size > 1) {
     std::vector<char> shots_buffer(shots_size);
-    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+    EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                               shots_size, shots_buffer.data(),
                                               nullptr),
               QDMI_SUCCESS);
@@ -851,34 +856,35 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
 
   // The IQM device does not support statevector or probability results
   EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_STATEVECTOR_DENSE, 0, nullptr, nullptr),
+                job, 0, QDMI_JOB_RESULT_STATEVECTOR_DENSE, 0, nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(
       IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS, 0, nullptr, nullptr),
-      QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(
-      IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES, 0, nullptr, nullptr),
+          job, 0, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_KEYS, 0, nullptr, nullptr),
       QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_PROBABILITIES_DENSE, 0, nullptr, nullptr),
-            QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(
-      IQM_QDMI_device_job_get_results(
-          job, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS, 0, nullptr, nullptr),
-      QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(
-                job, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES, 0, nullptr,
+                job, 0, QDMI_JOB_RESULT_STATEVECTOR_SPARSE_VALUES, 0, nullptr,
                 nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM3, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0,
+                                            QDMI_JOB_RESULT_PROBABILITIES_DENSE,
+                                            0, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                job, 0, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_KEYS, 0, nullptr,
+                nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(
+                job, 0, QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES, 0, nullptr,
+                nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM3, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM4, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM4, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
-  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_CUSTOM5, 0,
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM5, 0,
                                             nullptr, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
 
@@ -887,10 +893,10 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, job_id.c_str(), &retrieved_job),
             QDMI_SUCCESS);
-  EXPECT_EQ(FoMaC::get_job_id(retrieved_job), job_id);
+  EXPECT_EQ(QDMIClient::get_job_id(retrieved_job), job_id);
   EXPECT_EQ(IQM_QDMI_device_job_submit(retrieved_job), QDMI_ERROR_BADSTATE);
   EXPECT_EQ(wait_for_done(retrieved_job), QDMI_JOB_STATUS_DONE);
-  const auto retrieved_counts = FoMaC::get_histogram(retrieved_job);
+  const auto retrieved_counts = QDMIClient::get_histogram(retrieved_job);
   const auto retrieved_sum =
       std::accumulate(retrieved_counts.begin(), retrieved_counts.end(),
                       size_t{0}, [](const size_t total, const auto &entry) {
@@ -899,14 +905,14 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
   EXPECT_EQ(retrieved_sum, shots_num);
 
   size_t retrieved_shots_size = 0;
-  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job,
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(retrieved_job, 0,
                                             QDMI_JOB_RESULT_SHOTS, 0, nullptr,
                                             &retrieved_shots_size),
             QDMI_SUCCESS);
   ASSERT_GT(retrieved_shots_size, 1U);
   std::vector<char> retrieved_shots(retrieved_shots_size);
   ASSERT_EQ(IQM_QDMI_device_job_get_results(
-                retrieved_job, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
+                retrieved_job, 0, QDMI_JOB_RESULT_SHOTS, retrieved_shots.size(),
                 retrieved_shots.data(), nullptr),
             QDMI_SUCCESS);
   EXPECT_EQ(static_cast<size_t>(std::ranges::count(retrieved_shots, ',')) + 1,
@@ -917,7 +923,7 @@ TEST_F(QDMIIntegrationTest, JobCancellation) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
   auto &job = jobs.emplace_back();
-  job = fomac.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
+  job = client.submit_job(circuit, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num);
 
   // A mock job of this size can reach a terminal status before the cancellation
   // request lands, and a job that is no longer running can no longer be
@@ -951,16 +957,13 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
             QDMI_SUCCESS);
 
   // The MAX parameter is not a valid program format for any device
-  QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_MAX;
-  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                sizeof(QDMI_Program_Format), &format),
+  constexpr QDMI_Program_Format format = QDMI_PROGRAM_FORMAT_MAX;
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, format, 1, nullptr, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
-  for (const auto &program_format : fomac.get_supported_program_formats()) {
-    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                  job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                  sizeof(QDMI_Program_Format), &program_format),
+  for (const auto &program_format : client.get_supported_program_formats()) {
+    ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, program_format, 1, nullptr,
+                                               nullptr),
               QDMI_SUCCESS);
   }
 
@@ -978,9 +981,8 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
       QDMI_PROGRAM_FORMAT_CUSTOM5};
 
   for (const auto &unsupported_format : unsupported_formats) {
-    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                  job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT,
-                  sizeof(QDMI_Program_Format), &unsupported_format),
+    EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, unsupported_format, 1,
+                                               nullptr, nullptr),
               QDMI_ERROR_NOTSUPPORTED);
   }
 
@@ -1012,30 +1014,19 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
 
 TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   constexpr size_t shots_num = 64;
-  const std::string heralding_mode = "none";
-  const std::string move_validation_mode = "allow_prx";
-  const std::string move_gate_frame_tracking_mode = "no_detuning_correction";
-  const std::string dd_mode = "enabled";
   const auto qubit_sites = get_qubit_sites();
   ASSERT_GE(qubit_sites.size(), 2U);
-  const auto first_qubit_name = fomac.get_site_name(qubit_sites[0]);
-  const auto second_qubit_name = fomac.get_site_name(qubit_sites[1]);
+  const auto first_qubit_name = client.get_site_name(qubit_sites[0]);
+  const auto second_qubit_name = client.get_site_name(qubit_sites[1]);
   const auto qubit_mapping = std::map<std::string, std::string>{
       {"alice", first_qubit_name}, {"bob", second_qubit_name}};
-  constexpr double max_circuit_duration_over_t2 = 0;
-  constexpr size_t num_active_reset_cycles = 1;
-  const std::string dd_strategy = R"({
-    "merge_contiguous_waits": true,
-    "target_qubits": [")" + first_qubit_name +
-                                  "\",\n\"" + second_qubit_name + "\"\n]," +
-                                  R"("skip_leading_wait": true,
-    "skip_trailing_wait": true,
-    "gate_sequences": [
-      [9, "XYXYYXYX", "asap"],
-      [5, "YXYX", "asap"],
-      [2, "XX", "center"]
-    ]
-  })";
+  const auto dd_strategy = nlohmann::json{
+      {"merge_contiguous_waits", true},
+      {"target_qubits", {first_qubit_name, second_qubit_name}},
+      {"skip_leading_wait", true},
+      {"skip_trailing_wait", true},
+      {"gate_sequences",
+       {{9, "XYXYYXYX", "asap"}, {5, "YXYX", "asap"}, {2, "XX", "center"}}}};
 
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
@@ -1060,12 +1051,25 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
       pos += key.length();
     }
   }
+  const auto run_request_options =
+      nlohmann::json{
+          {"heralding_mode", "none"},
+          {"move_gate_validation", "allow_prx"},
+          {"move_gate_frame_tracking", "no_detuning_correction"},
+          {"dd_mode", "enabled"},
+          {"qubit_mapping",
+           nlohmann::json::array({{{"logical_name", "alice"},
+                                   {"physical_name", first_qubit_name}},
+                                  {{"logical_name", "bob"},
+                                   {"physical_name", second_qubit_name}}})},
+          {"max_circuit_duration_over_t2", 0.0},
+          {"active_reset_cycles", 1},
+          {"dd_strategy", dd_strategy},
+      }
+          .dump();
   auto &job = jobs.emplace_back();
-  job = fomac.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
-                         heralding_mode, move_validation_mode,
-                         move_gate_frame_tracking_mode, dd_mode, qubit_mapping,
-                         max_circuit_duration_over_t2, num_active_reset_cycles,
-                         dd_strategy);
+  job = client.submit_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots_num,
+                          run_request_options);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     GTEST_SKIP()
@@ -1075,7 +1079,7 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   }
   ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
 
-  const auto counts = FoMaC::get_histogram(job);
+  const auto counts = QDMIClient::get_histogram(job);
   size_t sum = 0;
   std::cout << "Counts: {\n";
   for (const auto &[key, count] : counts) {
@@ -1093,8 +1097,8 @@ TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   constexpr size_t shots_num = 64;
   const auto qir_program = build_qir_test_circuit();
   auto &job = jobs.emplace_back();
-  job = fomac.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
-                         shots_num);
+  job = client.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+                          shots_num);
   const auto status = wait_for_done(job);
   if (should_skip_for_expected_mock_failure(status)) {
     GTEST_SKIP()
@@ -1104,7 +1108,7 @@ TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   }
   ASSERT_EQ(status, QDMI_JOB_STATUS_DONE);
 
-  const auto counts = FoMaC::get_histogram(job);
+  const auto counts = QDMIClient::get_histogram(job);
 
   size_t sum = 0;
   std::cout << "Counts: {\n";
@@ -1122,19 +1126,16 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
   auto ret = IQM_QDMI_device_session_create_device_job(session, &job);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  ASSERT_EQ(ret, QDMI_SUCCESS);
   const auto failed_job_program = build_iqm_json_test_circuit();
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, failed_job_program.size() + 1,
-      failed_job_program.c_str());
+  const size_t program_size = failed_job_program.size() + 1;
+  const void *program_data = failed_job_program.c_str();
+  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
+                                         &program_data);
   ASSERT_EQ(ret, QDMI_SUCCESS);
-  constexpr auto num_shots_invalid = static_cast<size_t>(0);
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
-                                        sizeof(size_t), &num_shots_invalid);
+  constexpr auto invalid_options = R"({"dd_mode":"invalid"})";
+  ret = IQM_QDMI_device_job_set_parameter(
+      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, strlen(invalid_options) + 1,
+      invalid_options);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   ret = IQM_QDMI_device_job_submit(job);
   ASSERT_EQ(ret, QDMI_ERROR_FATAL);
@@ -1161,17 +1162,19 @@ TEST_F(QDMIIntegrationTest, CalibrationJob) {
 
   GTEST_SKIP() << "Skipping calibration job per default to avoid changing"
                   " device calibration state during regular tests.";
-  ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                strlen(TEST_CALIBRATION_CONFIG) + 1, TEST_CALIBRATION_CONFIG),
-            QDMI_SUCCESS);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  const size_t config_size = strlen(TEST_CALIBRATION_CONFIG) + 1;
+  const void *config = TEST_CALIBRATION_CONFIG;
+  ASSERT_EQ(
+      IQM_QDMI_device_job_set_programs(job, format, 1, &config_size, &config),
+      QDMI_SUCCESS);
 
   // Try to submit the calibration job
   const auto submit_result = IQM_QDMI_device_job_submit_calibration(job);
   ASSERT_EQ(submit_result, QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, DEFAULT_JOB_WAIT_TIMEOUT),
             QDMI_SUCCESS);
-  const auto calibration_set_id = FoMaC::get_calibration_set_id(job);
+  const auto calibration_set_id = QDMIClient::get_calibration_set_id(job);
   EXPECT_FALSE(calibration_set_id.empty())
       << "Calibration job must return a valid calibration set ID";
 }

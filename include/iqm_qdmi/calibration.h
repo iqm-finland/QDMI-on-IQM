@@ -32,8 +32,9 @@ extern "C" {
 /**
  * @brief Submit an IQM calibration job.
  * @details Create the job with IQM_QDMI_device_session_create_device_job and
- * set QDMI_DEVICE_JOB_PARAMETER_PROGRAM to an IQM Server calibration
- * configuration encoded as a JSON string. A terminating null byte is optional.
+ * use IQM_QDMI_device_job_set_programs to set one program in
+ * QDMI_PROGRAM_FORMAT_IQMJSON containing the IQM Server calibration
+ * configuration as a JSON string with exactly one trailing NUL byte.
  * The program format, shot count, and circuit-specific parameters are ignored.
  * Calibration support is checked during session initialization.
  *
@@ -47,7 +48,8 @@ extern "C" {
  * @return QDMI_SUCCESS if the job was submitted; QDMI_ERROR_INVALIDARGUMENT
  * for a null job or an unset program; QDMI_ERROR_BADSTATE for a job that is not
  * in QDMI_JOB_STATUS_CREATED; QDMI_ERROR_NOTSUPPORTED if calibration is
- * unavailable; QDMI_ERROR_PERMISSIONDENIED for an authentication failure;
+ * unavailable or the job contains multiple programs;
+ * QDMI_ERROR_PERMISSIONDENIED for an authentication failure;
  * QDMI_ERROR_OUTOFMEM for an allocation failure; QDMI_ERROR_FATAL otherwise.
  */
 IQM_QDMI_EXPORT int

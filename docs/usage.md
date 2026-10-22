@@ -48,65 +48,19 @@ native and Python clients.
 
 ### Session Configuration
 
-To initiate a session with a particular endpoint and authentication method, the
-following code snippet can be used:
+The internal `QDMIClient` test helper configures a device session as shown
+below. It calls the IQM QDMI Device interface directly and is not part of the
+installed API. Each failed call throws; the helper frees the session on failure
+and transfers ownership to the caller on success.
 
-```cpp
-IQM_QDMI_Device_Session
-FoMaC::get_iqm_session(const std::string &base_url,
-                       const std::optional<std::string> &quantum_computer_id,
-                       const std::optional<std::string> &quantum_computer_alias,
-                       const std::optional<std::string> &token,
-                       const std::optional<std::string> &tokens_file) {
-  IQM_QDMI_Device_Session session = nullptr;
-  auto ret = IQM_QDMI_device_session_alloc(&session);
-
-  // Set the base URL for the IQM server
-  ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL, base_url.size() + 1,
-      base_url.c_str());
-
-  // Optionally specify which quantum computer to use by ID
-  if (quantum_computer_id.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM1,
-        quantum_computer_id->size() + 1, quantum_computer_id->c_str());
-  }
-
-  // Optionally specify which quantum computer to use by alias
-  if (quantum_computer_alias.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2,
-        quantum_computer_alias->size() + 1, quantum_computer_alias->c_str());
-  }
-
-  // Set authentication token if provided
-  if (token.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN, token->size() + 1,
-        token->c_str());
-  }
-
-  // Set tokens file path if provided
-  if (tokens_file.has_value()) {
-    ret = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_AUTHFILE,
-        tokens_file->size() + 1, tokens_file->c_str());
-  }
-
-  // Optionally override the one-hour default timeout for every HTTP request
-  // made by this session.
-  const uint64_t request_timeout_milliseconds = 30'000;
-  ret = IQM_QDMI_device_session_set_parameter(
-      session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
-      sizeof(request_timeout_milliseconds), &request_timeout_milliseconds);
-
-  // Initialize the session
-  IQM_QDMI_device_session_init(session);
-
-  return session;
-}
+```{literalinclude} ../test/qdmi_client/qdmi_client.cpp
+:language: cpp
+:start-at: auto QDMIClient::get_iqm_session(
+:end-before: auto QDMIClient::get_name()
 ```
+
+Set optional session parameters, such as the HTTP request timeout, before
+calling {cpp:func}`IQM_QDMI_device_session_init`.
 
 The {cpp:func}`IQM_QDMI_device_session_alloc` function allocates a new session
 object, and the {cpp:func}`IQM_QDMI_device_session_set_parameter` function is
@@ -128,6 +82,11 @@ used to set various parameters for the session:
   Optional positive `uint64_t` duration in milliseconds applied to every HTTP
   request made by the session. If not set, each request uses the default
   one-hour timeout.
+- **Calibration Set ID** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4`): Optional
+  null-terminated canonical UUID string (lowercase hexadecimal). Set it before
+  session initialization to select and pin the architecture, quality metrics,
+  and execution calibration. Initialization fails if the server cannot supply
+  the requested set.
 - **Authentication Token**
   ({cpp:enumerator}`~QDMI_DEVICE_SESSION_PARAMETER_T::QDMI_DEVICE_SESSION_PARAMETER_TOKEN`):
   Bearer token for authentication. If not set, falls back to the `IQM_TOKEN`
@@ -210,31 +169,70 @@ in the Contributing guide.
 
 ## Using the Device with MQT Core
 
-The installed CMake target publishes the stable ID `iqm.default` and the `IQM`
-symbol prefix. Applications that link the MQT Core driver statically can use its
-runtime-copy helper to synthesize a relocatable manifest and colocate it with
-the device library beside the executable. This requires CMake 3.28 or newer:
+The installed CMake target identifies its device manifest through
+`QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
+the symbol prefix and relative library path. Applications using MQT Core 4.1 or
+later can copy the device library and manifest beside their executables. This
+integration requires CMake 3.28 or later.
+
+The C++ example requires MQT Core installed from source, with its `Development`
+component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
+the build and install steps.
 
 ```cmake
-find_package(mqt-core 4.0.0 CONFIG REQUIRED)
+find_package(mqt-core 4.1.1 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
-add_executable(my-application main.cpp)
-target_link_libraries(my-application PRIVATE MQT::CoreQDMI)
-mqt_copy_qdmi_runtime(my-application iqm-qdmi-device)
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE MQT::CoreQDMI)
+mqt_copy_qdmi_runtime(my_app iqm-qdmi-device)
 ```
 
-For dynamically linked consumers, automatic discovery searches beside the driver
-library rather than the executable. Such consumers must place the generated
-manifest in a discovered location or select a complete configuration with
-`MQT_CORE_QDMI_CONFIG_FILE`. Python integrations instead register the same
-stable ID directly from the packaged library path and open a fresh device
-session for each backend.
+The helper copies the MQT Core QDMI driver, device library, and manifest beside
+the application. The driver resolves relative library paths from the manifest
+directory.
+
+Python consumers use installed entry-point metadata to discover the manifest
+without importing provider code or loading the native library. The Python
+package advertises its manifest with:
+
+```toml
+[project.entry-points]
+"mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
+```
+
+The catalogue defines the following Resonance connections:
+
+| System  | Hardware stable ID | Mock stable ID     |
+| ------- | ------------------ | ------------------ |
+| Garnet  | `iqm.garnet`       | `iqm.garnet.mock`  |
+| Emerald | `iqm.emerald`      | `iqm.emerald.mock` |
+| Sirius  | `iqm.sirius`       | `iqm.sirius.mock`  |
+
+These definitions use `https://resonance.iqm.tech` and select the corresponding
+alias, such as `emerald` or `emerald:mock`. Mocks also run on Resonance and use
+its authentication. `iqm.default` remains available for custom connections and
+environment-based selection.
+
+List configured IDs offline, then open only the selected device:
+
+```python
+from mqt.core.qdmi import builtin_driver as qdmi_driver
+
+print(qdmi_driver.registered_device_ids())
+device = qdmi_driver.open_device("iqm.emerald.mock", token="…")
+```
+
+An explicit configuration augments built-in and installed device definitions and
+overrides definitions with the same stable ID. See
+[Python Package](python_package.md) for Qiskit integration and device queries.
+An explicitly configured quantum computer ID or alias takes precedence over both
+`IQM_QC_ID` and `IQM_QUANTUM_COMPUTER` environment defaults.
 
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the
-[SPANK Plugin Guide](spank_plugin.md).
+[IQM on Slurm](slurm.md).
 
 ## Understanding Quantum Architecture and Calibration Sets
 
@@ -276,10 +274,15 @@ calibration data at a specific point in time. It includes:
 - Quality metrics for qubits (T1, T2 coherence times)
 - Quality metrics for operations (gate fidelities)
 
-When you initialize a session, the system uses the "default" calibration set
-(typically the most recent calibration). You can trigger new calibrations using
-calibration jobs, which create new calibration sets and automatically update the
-session to use them.
+Without a selector, session initialization resolves the server's default
+calibration set. Every session retains its resolved architecture and metrics for
+its lifetime. A calibration job returns a new set ID; open a new session with
+that ID before compiling and running circuits against the new set.
+
+Each local circuit job uses the session calibration for submission. Query
+`QDMI_DEVICE_JOB_PROPERTY_CUSTOM1` for this null-terminated UUID string. This
+property is unavailable for retrieved remote jobs, whose original calibration is
+not inferred from the retrieval session.
 
 ## Querying Device Information
 
@@ -357,137 +360,44 @@ IQM Server API.
 
 ## Submitting jobs
 
-The QDMI device allows you to submit jobs to the quantum computing hardware. The
-following code snippet demonstrates how to submit a job with various parameters,
-including the
+Set one or more programs in a common format with
+{cpp:func}`IQM_QDMI_device_job_set_programs`. Set the shared shot count with
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`;
+it must be positive and defaults to one. The device adds the session calibration
+set ID.
 
-- **program**: The quantum program to be executed, set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`,
-- **program format**: The format used for the program, set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT`,
-- **number of shots**: The number of shots to execute for a quantum circuit job,
-  set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`,
-- **heralding mode**: Controls heralding behavior (valid values: "none",
-  "zeros"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`,
-- **move validation mode**: Validation level for moves (valid values: "strict",
-  "allow_prx", "none"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM2`,
-- **move gate frame tracking mode**: Frame tracking behavior (valid values:
-  "full", "no_detuning_correction", "none"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM3`,
-- **dynamical decoupling mode**: Enable/disable dynamical decoupling (valid
-  values: "disabled", "enabled"), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM4`,
-- **qubit mapping**: Mapping of logical qubit names to physical qubit names
-  (important for QIR programs), set via
-  {cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM5`,
-- **maximum circuit duration over T2**: The maximum duration of a circuit over
-  T2 time, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1`,
-- **number of active reset cycles**: The number of active reset cycles to
-  perform, set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2`, and
-- **dynamical decoupling strategy**: Strategy configuration as JSON string
-  according to the
-  [IQM SDK data model](https://github.com/iqm-finland/sdk/blob/1a563651751bb0779026fcc7f45d8ca676c365c3/iqm_client/src/iqm/iqm_client/models.py#L791),
-  set via `QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3`.
+Optional IQM `CircuitJobDefinition` fields go in a JSON object with exactly one
+trailing NUL byte in
+{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_CUSTOM1`:
+
+```cpp
+const std::string options = R"({"dd_mode":"enabled","active_reset_cycles":2})";
+const auto status = IQM_QDMI_device_job_set_parameter(
+    job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, options.size() + 1,
+    options.c_str());
+```
+
+Check `status` before submitting the job. The object applies to every program in
+the job and replaces any previously set object. Omit it or set `{}` to use
+server defaults. The device validates the JSON object and reserves `circuits`,
+`shots`, and `calibration_set_id` for the programs, shot count, and session
+configuration. The IQM service defines the supported optional fields and values
+in its
+[`PostJobsRequest` model](https://docs.iqm.tech/iqm-station-control-client/api/iqm.station_control.interface.models.circuit.PostJobsRequest.html).
+Calibration jobs use a separate request format.
+
+Execution requires the requested number of shots. Omit `heralding_mode` or use
+`"none"`. Setting the shot-discarding `"zeros"` mode returns
+`QDMI_ERROR_NOTSUPPORTED`; rejected options leave the job's current settings
+intact.
 
 After submission,
 {cpp:enumerator}`~QDMI_DEVICE_JOB_PROPERTY_T::QDMI_DEVICE_JOB_PROPERTY_QUEUEPOSITION`
-reports the number of jobs ahead of the job while it is queued. Every property
-query refreshes the job status and queue position from the IQM server. The query
+reports the number of jobs ahead while the job is queued. Every property query
+refreshes the job status and queue position from the IQM server. The query
 returns `QDMI_ERROR_BADSTATE` when the refreshed job is not queued and
 `QDMI_ERROR_NOTSUPPORTED` when the server does not provide a trustworthy queue
 position.
-
-```cpp
-auto FoMaC::submit_job(
-    const std::string &program, const QDMI_Program_Format format,
-    const size_t num_shots, const std::string &heralding_mode,
-    const std::string &move_validation_mode,
-    const std::string &move_gate_frame_tracking_mode,
-    const std::string &dd_mode,
-    const std::optional<std::map<std::string, std::string>> &qubit_mapping,
-    const std::optional<double> &max_circuit_duration_over_t2,
-    const std::optional<size_t> &num_active_reset_cycles,
-    const std::optional<std::string> &dd_strategy) const
-    -> IQM_QDMI_Device_Job {
-  IQM_QDMI_Device_Job job = nullptr;
-  int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAMFORMAT, sizeof(QDMI_Program_Format),
-      &format);
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM,
-                                        program.size() + 1, program.c_str());
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, heralding_mode.size() + 1,
-      heralding_mode.c_str());
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, move_validation_mode.size() + 1,
-      move_validation_mode.c_str());
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3,
-      move_gate_frame_tracking_mode.size() + 1,
-      move_gate_frame_tracking_mode.c_str());
-  ret =
-      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM4,
-                                        dd_mode.size() + 1, dd_mode.c_str());
-  if (qubit_mapping.has_value()) {
-    std::string mapping_str;
-    for (const auto &pair : *qubit_mapping) {
-      mapping_str += pair.first + ":" + pair.second + ",";
-    }
-    if (!mapping_str.empty()) {
-      mapping_str.pop_back(); // Remove the trailing comma
-    }
-    ret = IQM_QDMI_device_job_set_parameter(
-        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM5, mapping_str.size() + 1,
-        mapping_str.c_str());
-  }
-  if (max_circuit_duration_over_t2.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 1),
-        sizeof(double), &max_circuit_duration_over_t2.value());
-  }
-  if (num_active_reset_cycles.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 2),
-        sizeof(size_t), &num_active_reset_cycles.value());
-  }
-  if (dd_strategy.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job,
-        // NOLINTNEXTLINE
-        static_cast<QDMI_Device_Job_Parameter>(
-            QDMI_DEVICE_JOB_PARAMETER_CUSTOM5 + 3),
-        dd_strategy->size() + 1, dd_strategy->c_str());
-  }
-  ret = IQM_QDMI_device_job_submit(job);
-  return job;
-}
-```
-
-The {cpp:func}`IQM_QDMI_device_session_create_device_job` function creates a new
-job object, and the {cpp:func}`IQM_QDMI_device_job_set_parameter` function is
-used to set various parameters for the job. The job is submitted with
-{cpp:func}`IQM_QDMI_device_job_submit`, which sends the job to the quantum
-computing hardware for execution. As before, `ret` is the
-{cpp:enum}`QDMI_STATUS` return value of the last function call, which can be
-checked for error codes.
-
-**Important:** When submitting circuit jobs (QIR or IQM JSON), the
-implementation automatically includes the current calibration set ID in the job
-submission. This ensures that the job uses the same calibrated gates that were
-available when the session was initialized or last updated.
 
 The QDMI device currently supports the following program formats:
 
@@ -498,9 +408,16 @@ The QDMI device currently supports the following program formats:
   ({cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's
   native JSON circuit format.
 
-For QIR and JSON formats, the program should be provided as a string via the
-{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_PROGRAM`
-parameter.
+Pass QIR and JSON programs as strings with exactly one trailing NUL byte. The
+program-list setter copies all programs before returning. They share the format,
+shots per circuit, and other job parameters, and are submitted together in one
+IQM job. Programs and results are indexed in input order, starting at zero; use
+`IQM_QDMI_device_job_get_program` to read a stored program. IQM exposes one
+outcome for the entire job; `IQM_QDMI_device_job_get_program_status` returns
+`QDMI_ERROR_NOTSUPPORTED` for individual outcomes.
+
+The number of programs is available through
+`QDMI_DEVICE_JOB_PROPERTY_PROGRAMSNUM`.
 
 ## Retrieving jobs by ID
 
@@ -520,9 +437,11 @@ credentials and initializes the handle with the remote job's current status.
 Retrieving does not clone or submit the job. Parameters cannot be changed and
 the retrieved handle cannot be submitted again. Freeing it only releases the
 local handle; it does not cancel or delete the remote job. Check or wait for
-completion before retrieving results. Since the original submission payload is
-not reconstructed, only the job ID is exposed as a job property on a retrieved
-handle.
+completion before retrieving results. Retrieval reads the IQM job payload to
+restore the program count and shots per circuit. JSON circuit payloads also
+identify the IQM JSON format; other historical format metadata and original
+program bytes are not reconstructed. Their property queries return
+`QDMI_ERROR_NOTSUPPORTED`.
 
 ## Retrieving Job Results
 
@@ -552,20 +471,20 @@ IQM_QDMI_device_job_wait(job, 0);
 
 // Get histogram keys (bitstrings)
 size_t keys_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                 0, nullptr, &keys_size);
 std::vector<char> keys_buffer(keys_size);
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_KEYS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                 keys_size, keys_buffer.data(), nullptr);
 std::string keys(keys_buffer.data());
 // keys contains: "00,01,10,11" (example)
 
 // Get histogram values (counts)
 size_t values_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                 0, nullptr, &values_size);
 std::vector<size_t> values(values_size / sizeof(size_t));
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_HIST_VALUES,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_VALUES,
                                 values_size, values.data(), nullptr);
 // values contains: {25, 15, 18, 6} (example counts for each key)
 ```
@@ -604,10 +523,10 @@ IQM_QDMI_device_job_wait(job, 0);
 
 // Get individual shots
 size_t shots_size = 0;
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                 0, nullptr, &shots_size);
 std::vector<char> shots_buffer(shots_size);
-IQM_QDMI_device_job_get_results(job, QDMI_JOB_RESULT_SHOTS,
+IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS,
                                 shots_size, shots_buffer.data(), nullptr);
 std::string shots(shots_buffer.data());
 // shots contains: "00,10,01,11,00,10,..." (one bitstring per shot)
@@ -615,6 +534,14 @@ std::string shots(shots_buffer.data());
 
 Each bitstring in the result represents the measurement outcome for one shot.
 The bitstrings are ordered chronologically (shot 1, shot 2, shot 3, etc.).
+
+For IQM JSON, output bits follow measurement-instruction order, then each
+instruction's `locus` order. Bit zero appears on the right, and leading zeros
+are retained. For example, measuring `locus: ["QB2", "QB1"]` with backend
+columns `[1, 0]` produces `"01"`. This order applies to shots and histogram
+keys, including circuit batches and jobs retrieved by ID. Measurement keys
+identify columns; their spelling and physical site names do not determine output
+positions.
 
 ### Unsupported Result Formats
 
@@ -637,33 +564,26 @@ Attempting to retrieve these formats will return
 ## Triggering Calibration Jobs
 
 Use {cpp:func}`IQM_QDMI_device_job_submit_calibration` from
-`iqm_qdmi/calibration.h`. This IQM extension replaces the removed QDMI
-calibration program format. It returns `QDMI_ERROR_NOTSUPPORTED` if the server
-does not support calibration jobs, as checked during session initialization.
+`iqm_qdmi/calibration.h`. The extension returns `QDMI_ERROR_NOTSUPPORTED` if the
+server does not support calibration jobs, as checked during session
+initialization.
 
-Create a regular IQM job and set `QDMI_DEVICE_JOB_PARAMETER_PROGRAM` to a
-calibration configuration encoded as a JSON string according to the IQM Server
-API. Call the extension instead of `IQM_QDMI_device_job_submit`. The extension
-ignores the program format, shot count, and circuit-specific parameters. After
-submission, program-format and shot-count queries return
-`QDMI_ERROR_NOTSUPPORTED`. The usual job check, wait, cancel, and free functions
-remain available.
+Create a regular IQM job and use `IQM_QDMI_device_job_set_programs` to set one
+`QDMI_PROGRAM_FORMAT_IQMJSON` program containing the calibration configuration
+as a NUL-terminated JSON string according to the IQM Server API. Call the
+extension instead of `IQM_QDMI_device_job_submit`. The extension ignores the
+program format, shot count, and circuit-specific parameters. After submission,
+program-format and shot-count queries return `QDMI_ERROR_NOTSUPPORTED`. The
+usual job check, wait, cancel, and free functions remain available.
 
 The results can be retrieved via the
 {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM1` job result
 parameter on a calibration job, which returns the new calibration set ID.
 
-**Important:** When querying the result of a calibration job, the system will:
-
-1. Extract the new calibration set ID from the job result
-2. Automatically update the session to use the new calibration set
-3. Fetch the updated dynamic quantum architecture with the new calibrated gates
-4. Retrieve the updated calibration metrics (T1/T2 times, gate fidelities)
-
-This automatic update invalidates all previously obtained
-{cpp:type}`IQM_QDMI_Operation` pointers and the quality metrics associated with
-the qubits and operations. You should re-query device information after a
-calibration job completes.
+Querying the result of a calibration job returns its new calibration set ID. The
+session continues to use its original calibration and cached device properties.
+To use the new set, initialize a new session with its ID through
+`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4`.
 
 Here's an example of submitting a calibration job:
 
@@ -677,8 +597,10 @@ int calibrate(IQM_QDMI_Device_Session session, const char *config,
   if (status != QDMI_SUCCESS) {
     return status;
   }
-  status = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_PROGRAM, config_size, config);
+  constexpr auto format = QDMI_PROGRAM_FORMAT_IQMJSON;
+  const void *program = config;
+  status = IQM_QDMI_device_job_set_programs(job, format, 1, &config_size,
+                                        &program);
   if (status == QDMI_SUCCESS) {
     status = IQM_QDMI_device_job_submit_calibration(job);
   }
@@ -689,7 +611,7 @@ int calibrate(IQM_QDMI_Device_Session session, const char *config,
     /// Refresh the session's calibration data.
     size_t size = 0;
     status = IQM_QDMI_device_job_get_results(
-        job, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
+        job, 0, QDMI_JOB_RESULT_CUSTOM1, 0, nullptr, &size);
   }
   IQM_QDMI_device_job_free(job);
   return status;
@@ -715,7 +637,7 @@ When you check a job's status using {cpp:func}`IQM_QDMI_device_job_check()` and
 the job has failed, all errors and messages will be automatically logged:
 
 ```cpp
-auto *job = fomac.submit_job(TEST_PROGRAM, QDMI_PROGRAM_FORMAT_QIRBASESTRING);
+auto *job = client.submit_job(TEST_PROGRAM, QDMI_PROGRAM_FORMAT_QIRBASESTRING);
 IQM_QDMI_device_job_wait(job, 0);
 
 QDMI_Job_Status status;
@@ -768,6 +690,8 @@ request with less time than that left proceeds without waiting. Other clients
 using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
 
+[MQT Core installation guide]: https://mqt.readthedocs.io/projects/core/en/latest/installation.html#integrating-mqt-core-into-your-project
+
 ## Program output and result ordering
 
 `QDMI_PROGRAM_FORMAT_IQMJSON` contains one circuit. Execution options and the
@@ -807,11 +731,14 @@ result IDs and return `QDMI_ERROR_NOTSUPPORTED` on this device.
 The Qiskit serializer returns a Core `SerializedProgram` with one mapping entry
 per source classical bit. This preserves separate registers, initial zeros, and
 the final write to each destination, independently of measurement-key names.
-With Core versions predating this API, only identity layouts are accepted; other
-layouts raise an upgrade error before submission. Complete mapping support is
-introduced in
+With Core versions predating this API, complete terminal readout is emitted in
+classical-bit order. Initialized holes, overwritten destinations, and loose
+classical bits require the new mapping API. Core's backend currently rejects
+loose classical bits before invoking the serializer, so their serialization
+support does not yet enable execution. Measurements remain terminal, and each
+qubit may be measured once. The output-mapping API is introduced in
 [Core #2626](https://github.com/munich-quantum-toolkit/core/pull/2626).
 
-PennyLane uses Core's IQM JSON converter when the device advertises `prx` and
-`cz`. It measures in wire order and reconstructs requested wire subsets through
-the regular QDMI plugin. Both integrations use IQM JSON.
+Core #2626 also adds PennyLane IQM JSON conversion when the device advertises
+`prx` and `cz`. It measures in wire order and reconstructs requested wire
+subsets through the QDMI plugin.

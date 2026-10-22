@@ -177,6 +177,11 @@ perfect. We will guide you through the process.
 Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer.
 
+CI runs the native integration tests and documentation notebooks with
+`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
+Slurm smoke test submits eight shots per installation mode to the Emerald
+Resonance mock.
+
 ### Configure and Build
 
 This project uses CMake as the main build configuration tool. Building a project
@@ -415,7 +420,7 @@ If you touch one of these examples, update the corresponding documentation in
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and
-built with Sphinx + MyST, using Doxygen XML via Breathe for the C++ API and
+built with Sphinx + MyST, using Doxygen XML via Breathe for the C/C++ API and
 AutoAPI for the Python package. The documentation source files can be found in
 the `docs/` directory.
 
@@ -502,6 +507,7 @@ Server API:
 - `SUBMIT_CIRCUIT_JOB`: Submits a quantum circuit job (QIR or IQM JSON format)
   for execution.
 - `GET_JOB_STATUS`: Checks the status of a submitted job.
+- `GET_JOB_PAYLOAD`: Recovers circuit count and shots when opening a job by ID.
 - `GET_JOB_ARTIFACT_MEASUREMENT_COUNTS`: Retrieves the measurement results as
   aggregated histogram counts of a completed job.
 - `GET_JOB_ARTIFACT_MEASUREMENTS`: Retrieves the individual shot measurement
@@ -528,8 +534,8 @@ These steps correspond to the initialization sequence described in the
    available.
 3. `GET_STATIC_QUANTUM_ARCHITECTURE`: Retrieves the static architecture (qubits,
    connectivity).
-4. `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Fetches calibrated gates for the default
-   calibration set.
+4. `GET_DYNAMIC_QUANTUM_ARCHITECTURE`: Fetches calibrated gates for the selected
+   calibration set, or resolves the default when none was selected.
 5. `GET_CALIBRATION_SET_QUALITY_METRICS`: Retrieves quality metrics (T1, T2,
    fidelities) if available.
 6. `COCOS_HEALTH`: Checks whether calibration jobs are supported.
@@ -561,14 +567,6 @@ These steps correspond to the initialization sequence described in the
   position are cached together, and a value is returned only while the job is
   queued.
 
-**After Calibration Job Completion:**
-
-When querying results of a calibration job, the implementation automatically:
-
-1. Extracts the new calibration set ID from the job result.
-2. Calls `GET_DYNAMIC_QUANTUM_ARCHITECTURE` with the new calibration set ID.
-3. Calls `GET_CALIBRATION_SET_QUALITY_METRICS` to update quality metrics.
-
 ### API Configuration
 
 The `APIConfig` class in `iqm_api_config.hpp` provides a centralized way to
@@ -596,17 +594,20 @@ The implementation expects JSON responses in specific formats:
 - **Quality Metrics**: Object with `observations` array containing `dut_field`,
   `value`, and `invalid` fields.
 - **Job Status**: Object with job status, errors, and messages.
-- **Measurement Counts Artifact**: Array with a single object containing
+- **Measurement Counts Artifact**: Array with one object per circuit containing
   `measurement_keys` (the concatenation order for result bitstrings) and
   `counts` (an object mapping bitstrings to count integers).
-- **Measurements Artifact**: Array typically containing a single object where
-  results have the shape `results[measurement_key][shot][qubit_index]`. A
-  measurement key may cover one or more qubits; its result arrays have a
-  constant width across shots and contain integer bits (0 or 1). For example,
+- **Measurements Artifact**: Array with one object per circuit where results
+  have the shape `results[measurement_key][shot][qubit_index]`. A measurement
+  key may cover one or more qubits; its result arrays have a constant width
+  across shots and contain integer bits (0 or 1). For example,
   `[{"m_pair": [[0, 1], [1, 0]], "m_single": [[0], [1]]}]` represents two shots,
   with `m_pair` measuring two qubits and `m_single` one qubit. The
   `measurement_keys` metadata from the corresponding counts artifact determines
-  how these per-key arrays are concatenated into each result bitstring.
+  how these per-key arrays are concatenated in the backend's histogram keys. For
+  native IQM JSON, the provider matches these keys to the circuit's measurement
+  instructions and their locus widths, then returns QDMI bitstrings in
+  instruction/locus order with bit zero on the right.
 
 For more details, see the implementation in `iqm_device.cpp` and the API
 configuration in `iqm_api_config.hpp`/`.cpp`.

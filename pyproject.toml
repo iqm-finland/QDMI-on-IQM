@@ -17,12 +17,12 @@
 
 [build-system]
 build-backend = "scikit_build_core.build"
-requires = [ "scikit-build-core>=1.0.1" ]
+requires = [ "scikit-build-core>=1.1" ]
 
 
 [project]
 name = "iqm-qdmi"
-version = "1.4.0"
+version = "1.5.0"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -46,6 +46,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Quantum Computing",
   "Typing :: Typed",
 ]
+dynamic = [ "import-names", "import-namespaces" ]
 
 [[project.authors]]
 name = "IQM Finland Oy"
@@ -53,9 +54,10 @@ email = "developers@iqm.tech"
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=4.0.0",
+  "mqt-core~=4.1.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
+  "numpy>=2.5.2; python_version>='3.15'",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
 ]
@@ -72,6 +74,7 @@ iqm-qdmi = "iqm.qdmi.__main__:main"
 iqm-sampler = "iqm.qdmi.sampler:main"
 
 [project.entry-points]
+"mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
 # Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
 "mqt.core.qiskit.program_serializers".IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
 
@@ -100,8 +103,11 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core~=4.0.0",
+  "mqt-core~=4.1.1",
   "numpy>=2.1",
+  "numpy>=2.1; python_version>='3.13'",
+  "numpy>=2.3.2; python_version>='3.14'",
+  "numpy>=2.5.2; python_version>='3.15'",
   "qiskit[qasm3-import]>=2.1",
   "qiskit-algorithms>=0.4",
 ]
@@ -127,7 +133,6 @@ make-fallback = true
 exclude = [
   "**/docs",
   "**/test",
-  "spank/**",
   "sitecustomize.py",
   ".*",
 ]
@@ -171,7 +176,6 @@ test-skip = [
   "cp3??t-*",      # no freethreading qiskit wheels
   "cp*-win_arm64", # no numpy, qiskit, ... wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
-  "cp315*",        # no 3.15 wheels yet
 ]
 archs = "auto64"
 build-frontend = "uv"
@@ -225,6 +229,7 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
+per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true
@@ -251,7 +256,6 @@ separate_root_table = "\n\n"
 extend-ignore-re = [
   "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",                      # ignore line
   "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on", # ignore block
-  "FoMaC"
 ]
 
 [tool.typos.default.extend-words]

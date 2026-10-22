@@ -25,23 +25,16 @@ import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-try:
-    from qiskit import qpy, transpile
-
-    from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler
-except ImportError as e:
-    msg = (
-        "Failed to import Qiskit plugin. "
-        "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
-    )
-    raise ImportError(msg) from e
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Execute the sampler CLI subcommand."""
+    """Execute the sampler CLI subcommand.
+
+    Raises:
+        ImportError: If execution requires an optional Qiskit dependency that is not installed.
+    """
     parser = argparse.ArgumentParser(description="Sample a serialized QPY circuit.")
     parser.add_argument("circuit", type=str, help="Path to the QPY circuit file.")
     parser.add_argument("--shots", type=int, required=True, help="Number of shots to run the circuit.")
@@ -58,6 +51,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    # Keep CLI help independent of optional SDK imports.
+    try:
+        from qiskit import qpy, transpile  # ruff:ignore[import-outside-top-level]
+
+        from ._backends import TRANSPILE_OPTIMIZATION_LEVEL, build_sampler  # ruff:ignore[import-outside-top-level]
+    except ImportError as e:
+        msg = (
+            "Failed to import Qiskit plugin. "
+            "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
+        )
+        raise ImportError(msg) from e
 
     with Path(args.circuit).open("rb") as file_obj:
         circuit = qpy.load(file_obj)[0]

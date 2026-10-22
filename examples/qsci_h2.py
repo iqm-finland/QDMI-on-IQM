@@ -20,6 +20,7 @@
 # requires-python = ">=3.11,<3.14"
 # dependencies = [
 #   "iqm-qdmi[qiskit]",
+#   "qiskit!=2.6.0", # https://github.com/Qiskit/qiskit/issues/17213
 #   "qiskit-nature[pyscf]>=0.7.2",
 # ]
 #
