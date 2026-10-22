@@ -26,7 +26,11 @@ jobs:
         .github/workflows/cpp-coverage.yml
         .github/workflows/cpp-linter.yml
         .github/workflows/cpp-install-tests.yml
+        .github/workflows/cpp-sdk-build.yml
+        .github/workflows/cpp-sdk-release.yml
         .github/workflows/cpp-sanitizers.yml
+        scripts/package_cpp_sdk.py
+        test/sdk/**
       additional-python-files: |
         .github/workflows/CI.yml
         .github/workflows/python-*.yml
@@ -128,6 +132,12 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  cpp-sdk:
+    name: 📦 SDK
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: $/.github/workflows/cpp-sdk-build.yml
+
   cpp-sanitizers:
     name: 🇨 Sanitizers
     needs: change-detection
@@ -220,6 +230,7 @@ jobs:
       - cpp-tests-macos
       - cpp-tests-windows
       - cpp-install-tests
+      - cpp-sdk
       - cpp-sanitizers
       - cpp-coverage
       - cpp-linter
@@ -240,7 +251,7 @@ jobs:
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sdk,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
