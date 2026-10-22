@@ -57,11 +57,13 @@ jobs:
           CONFIG: ${{ inputs.config }}
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$CONFIG"
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --target ${{ github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id && 'unit_tests' || 'all' }}
+      # Fork PRs can run unit tests without the upstream IQM token.
       - name: Test
         env:
           IQM_BASE_URL: "https://resonance.iqm.tech"
           IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
+          TEST_DIR: ${{ github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id && 'build/test/unit' || 'build' }}
+        run: ctest --output-on-failure --test-dir "$TEST_DIR" --timeout 600 --repeat until-pass:3

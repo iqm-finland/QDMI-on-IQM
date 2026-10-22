@@ -14,10 +14,11 @@ concurrency:
 permissions:
   contents: read
 
+# Fork PRs run without upstream cloud credentials.
 jobs:
   change-detection:
     name: 🔍 Change
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@fd3d75dece69c363989347869529a5e99cdcfffc # v2.5.1
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@6c933678406ab1887a137839dfd0e290f12917da # v2.5.2
     with:
       additional-cpp-files: |
         .github/workflows/CI.yml
@@ -30,8 +31,9 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/python-*.yml
       additional-cd-files: |
-        spank/**
-        .github/workflows/spank-tests.yml
+        .dockerignore
+        test/slurm/**
+        .github/workflows/slurm.yml
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -64,7 +66,7 @@ jobs:
   cpp-tests-macos:
     name: 🇨 Test 🍎
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +88,7 @@ jobs:
   cpp-tests-windows:
     name: 🇨 Test 🏁
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
       fail-fast: false
       matrix:
@@ -115,7 +117,7 @@ jobs:
   cpp-install-tests:
     name: 📦 Install
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +131,7 @@ jobs:
   cpp-sanitizers:
     name: 🇨 Sanitizers
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: $/.github/workflows/cpp-sanitizers.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
@@ -137,7 +139,7 @@ jobs:
   cpp-coverage:
     name: 🇨 Coverage
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: $/.github/workflows/cpp-coverage.yml
     permissions:
       contents: read
@@ -162,20 +164,10 @@ jobs:
     name: 🐍 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-linter)
-    # Temporary local setup while Core requires a source build before 4.1.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
-        with:
-          llvm-version: 23.1.2
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      - run: uvx prek run -a ty
-      - run: uvx check-sdist --inject-junk
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-linter.yml@6c933678406ab1887a137839dfd0e290f12917da # v2.5.2
+    with:
+      enable-ty: true
+      enable-mypy: false
 
   examples:
     name: 🐍 End-to-End Examples
@@ -192,7 +184,7 @@ jobs:
   build-wheel:
     name: 🚀 CD
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && (fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd))
     strategy:
       fail-fast: false
       matrix:
@@ -210,11 +202,11 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
-  spank-tests:
-    name: 🇸 Test SPANK
+  slurm-tests:
+    name: 🇸 Test Slurm
     needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: $/.github/workflows/spank-tests.yml
+    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && (fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd))
+    uses: $/.github/workflows/slurm.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
@@ -235,13 +227,17 @@ jobs:
       - examples
       - build-sdist
       - build-wheel
-      - spank-tests
+      - slurm-tests
     runs-on: ubuntu-slim
     steps:
       - name: Decide whether the needed jobs succeeded or failed
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           allowed-skips: >-
+            ${{
+              (github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id)
+              && 'cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,build-wheel,slurm-tests,' || ''
+            }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
               && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
@@ -263,7 +259,7 @@ jobs:
               && 'build-sdist,build-wheel,' || ''
             }}
             ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'spank-tests,' || ''
+              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
+              && 'slurm-tests,' || ''
             }}
           jobs: ${{ toJSON(needs) }}

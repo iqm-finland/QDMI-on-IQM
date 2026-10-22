@@ -20,7 +20,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "iqm-qdmi",
-#   "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@5f3fc6620f6a731067863ce0a8f2b1afc6f66058",
+#   "mqt-core~=4.1.1",
 #   "requests>=2.31",
 # ]
 # [tool.uv.sources]

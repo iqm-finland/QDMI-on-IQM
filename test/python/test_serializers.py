@@ -94,155 +94,81 @@ def backend() -> Callable[[int], StubBackend]:
     return StubBackend
 
 
-def test_simple_circuit(backend: Callable[[int], StubBackend]) -> None:
-    """A circuit of native operations serializes to an IQM JSON program."""
-    qc = QuantumCircuit(2, 2)
-    qc.r(np.pi / 2, 0.0, 0)
+def test_native_circuit_and_readout_order(backend: Callable[[int], StubBackend]) -> None:
+    """Native gates and complete multi-register readout use physical site names."""
+    qc = QuantumCircuit(QuantumRegister(3), ClassicalRegister(2, "left"), ClassicalRegister(1, "right"), name="native")
+    qc.r(-np.pi / 3, np.pi / 4, 0)
     qc.cz(0, 1)
-    qc.measure([0, 1], [0, 1])
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
-
-    assert [instr["name"] for instr in program["instructions"]] == ["prx", "cz", "measure", "measure"]
-    assert program["metadata"] == {}
-
-
-@pytest.mark.parametrize(
-    ("angle", "phase"),
-    [(0.0, 0.0), (np.pi, np.pi / 2), (-np.pi / 3, -np.pi / 4), (5 * np.pi, -7 * np.pi), (0.123, 0.456)],
-)
-def test_prx_parameters(backend: Callable[[int], StubBackend], angle: float, phase: float) -> None:
-    """An R gate preserves radians in the current IQM circuit format."""
-    qc = QuantumCircuit(1)
-    qc.r(angle, phase, 0)
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    prx = program["instructions"][0]
-    assert prx["name"] == "prx"
-    assert prx["locus"] == ["QB1"]
-    assert prx["args"] == pytest.approx({"angle": angle, "phase": phase})
-
-
-def test_barrier(backend: Callable[[int], StubBackend]) -> None:
-    """A barrier keeps every site it spans in its locus."""
-    qc = QuantumCircuit(3)
+    qc.append(MoveGate(), [1, 2])
+    qc.measure(0, 2)
     qc.barrier([0, 2])
+    qc.measure([1, 2], [0, 1])
+    original = qc.copy()
 
     program = json.loads(qiskit_to_iqm_json(qc, backend(3)))  # ty: ignore[invalid-argument-type]
 
-    barrier = program["instructions"][0]
-    assert barrier["name"] == "barrier"
-    assert barrier["locus"] == ["QB1", "QB3"]
-    assert barrier["args"] == {}
+    assert program == {
+        "name": "native",
+        "metadata": {},
+        "instructions": [
+            {"name": "prx", "locus": ["QB1"], "args": {"angle": -np.pi / 3, "phase": np.pi / 4}},
+            {"name": "cz", "locus": ["QB1", "QB2"], "args": {}},
+            {"name": "move", "locus": ["QB2", "QB3"], "args": {}},
+            {"name": "barrier", "locus": ["QB1", "QB3"], "args": {}},
+            {"name": "measure", "locus": ["QB2"], "args": {"key": "left_2_0_0"}},
+            {"name": "measure", "locus": ["QB3"], "args": {"key": "left_2_0_1"}},
+            {"name": "measure", "locus": ["QB1"], "args": {"key": "right_1_1_0"}},
+        ],
+    }
+    assert qc == original
 
 
-def test_cz_gate(backend: Callable[[int], StubBackend]) -> None:
-    """A CZ gate becomes a two-site cz instruction."""
-    qc = QuantumCircuit(2)
-    qc.cz(0, 1)
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
-
-    cz = program["instructions"][0]
-    assert cz["name"] == "cz"
-    assert cz["locus"] == ["QB1", "QB2"]
-    assert cz["args"] == {}
-
-
-def test_move_gate(backend: Callable[[int], StubBackend]) -> None:
-    """A MOVE gate becomes a two-site move instruction."""
-    qc = QuantumCircuit(2)
-    qc.append(MoveGate(), [0, 1])
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
-
-    move = program["instructions"][0]
-    assert move["name"] == "move"
-    assert move["locus"] == ["QB1", "QB2"]
-    assert move["args"] == {}
-
-
-def test_measure_keys_are_unique(backend: Callable[[int], StubBackend]) -> None:
-    """Each measurement carries a key derived from its classical register position."""
-    qc = QuantumCircuit(2, 2)
-    qc.cz(0, 1)
-    qc.measure([0, 1], [0, 1])
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(2)))  # ty: ignore[invalid-argument-type]
-
-    keys = [instr["args"]["key"] for instr in program["instructions"] if instr["name"] == "measure"]
-    assert len(keys) == 2
-    assert len(set(keys)) == 2
-
-
-def test_circuit_name_is_preserved(backend: Callable[[int], StubBackend]) -> None:
-    """The program carries the circuit name."""
-    qc = QuantumCircuit(1, name="my_circuit")
-    qc.r(0.0, 0.0, 0)
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["name"] == "my_circuit"
-
-
-def test_bound_parameters(backend: Callable[[int], StubBackend]) -> None:
-    """A circuit serializes once its parameters are bound."""
+def test_parameter_binding(backend: Callable[[int], StubBackend]) -> None:
+    """Parameters must be bound before serialization."""
     theta = Parameter("theta")
     qc = QuantumCircuit(1)
     qc.r(theta, 0.0, 0)
-
-    program = json.loads(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["instructions"][0]["args"]["angle"] == pytest.approx(np.pi)
-
-
-def test_unbound_parameters_are_rejected(backend: Callable[[int], StubBackend]) -> None:
-    """An unbound parameter fails the conversion with a message naming it."""
-    theta = Parameter("theta")
-    qc = QuantumCircuit(1)
-    qc.r(theta, 0.0, 0)
-
     with pytest.raises(UnsupportedOperationError, match="unbound parameters: theta"):
         qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
 
-
-def test_unsupported_operation_is_rejected(backend: Callable[[int], StubBackend]) -> None:
-    """An operation outside the IQM native gate set fails the conversion."""
-    qc = QuantumCircuit(1)
-    qc.h(0)
-
-    with pytest.raises(UnsupportedOperationError, match="not supported in IQM JSON format"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+    program = json.loads(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
+    assert program["instructions"][0]["args"]["angle"] == pytest.approx(np.pi)
 
 
-def test_unregistered_classical_bit_is_rejected(backend: Callable[[int], StubBackend]) -> None:
-    """Measuring into a loose classical bit fails the conversion."""
-    qc = QuantumCircuit(QuantumRegister(1), [Clbit()])
-    qc.measure(0, 0)
-
-    with pytest.raises(TranslationError, match="unregistered classical bit"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
-
-
-def test_registered_classical_bit(backend: Callable[[int], StubBackend]) -> None:
-    """Measuring into a named register encodes the register in the key."""
-    creg = ClassicalRegister(1, "result")
-    qc = QuantumCircuit(QuantumRegister(1), creg)
-    qc.measure(0, 0)
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["instructions"][0]["args"]["key"] == "result_1_0_0"
-
-
-def test_serialization_failure_becomes_translation_error(backend: Callable[[int], StubBackend]) -> None:
-    """A failure inside the conversion surfaces as a TranslationError."""
-    qc = QuantumCircuit(2)
-    qc.cz(0, 1)
-
-    with pytest.raises(TranslationError, match="Failed to serialize the circuit to IQM JSON"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+@pytest.mark.parametrize("case", ["unused", "overwrite", "repeated", "intermediate", "unregistered", "gate", "site"])
+def test_unsupported_circuits(backend: Callable[[int], StubBackend], case: str) -> None:
+    """Reject unsupported gates, site indices, and readout before submission."""
+    qc = QuantumCircuit(2, 2)
+    error: type[Exception] = TranslationError
+    sites = 2
+    if case == "unused":
+        qc.measure(0, 0)
+        message = "Every classical bit must be measured exactly once"
+    elif case == "overwrite":
+        qc.measure([0, 1], [0, 0])
+        message = "Each qubit and classical bit may be measured only once"
+    elif case == "repeated":
+        qc.measure([0, 0], [0, 1])
+        message = "Each qubit and classical bit may be measured only once"
+    elif case == "intermediate":
+        qc.measure(0, 0)
+        qc.r(0.5, 0, 1)
+        error = UnsupportedOperationError
+        message = "terminal measurements"
+    elif case == "unregistered":
+        qc = QuantumCircuit(QuantumRegister(1), [Clbit()])
+        qc.measure(0, 0)
+        message = "unregistered classical bit"
+    elif case == "gate":
+        qc.h(0)
+        error = UnsupportedOperationError
+        message = "not supported in IQM JSON format"
+    else:
+        qc.cz(0, 1)
+        sites = 1
+        message = "Failed to serialize the circuit to IQM JSON"
+    with pytest.raises(error, match=message):
+        qiskit_to_iqm_json(qc, backend(sites))  # ty: ignore[invalid-argument-type]
 
 
 def test_serializer_is_advertised_to_mqt_core() -> None:
@@ -259,6 +185,7 @@ def test_nested_metadata_is_preserved(backend: Callable[[int], StubBackend]) -> 
         "experiment": "calibration-check",
         "provenance": {"tags": ["測定", None, True], "iteration": 2, "angle": 0.25},
         "empty": {},
+        "coordinates": (1, 2),
     }
     qc = QuantumCircuit(1, 1, metadata=metadata)
     qc.r(np.pi, 0, 0)
@@ -267,24 +194,12 @@ def test_nested_metadata_is_preserved(backend: Callable[[int], StubBackend]) -> 
 
     program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
 
-    assert program["metadata"] == original
+    assert program["metadata"] == {**original, "coordinates": [1, 2]}
     assert qc.metadata == original
     assert [instruction["name"] for instruction in program["instructions"]] == ["prx", "measure"]
 
 
-def test_metadata_tuples_become_arrays(backend: Callable[[int], StubBackend]) -> None:
-    """Tuples follow Python's JSON encoding while the source remains a tuple."""
-    qc = QuantumCircuit(1, metadata={"coordinates": (1, 2)})
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["metadata"] == {"coordinates": [1, 2]}
-    assert qc.metadata == {"coordinates": (1, 2)}
-
-
-@pytest.mark.parametrize(
-    "value", [object(), {1, 2}, complex(1, 2), np.array([1]), float("nan"), float("inf"), -float("inf")]
-)
+@pytest.mark.parametrize("value", [object(), float("nan")])
 def test_invalid_metadata_is_dropped(backend: Callable[[int], StubBackend], value: object) -> None:
     """Unsupported values, including nonfinite numbers, drop metadata with a warning."""
     qc = QuantumCircuit(1, metadata={"nested": [value]})

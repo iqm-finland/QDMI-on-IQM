@@ -17,14 +17,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Temporary: remove after replacing the Core source pin with a release.
-      - name: Set up LLVM/MLIR for source-built MQT Core
-        uses: munich-quantum-software/setup-mlir@8d3eae73d0f0196fd30c787d91ebd2018cb6c709 # v1.5.0
-        with:
-          llvm-version: 23.1.2
-
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: 3.13
           activate-environment: true
@@ -35,6 +29,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Run Python tests for fork PRs
+        if: github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+        run: uvx nox -s tests-3.13
 
       - name: Run end-user examples on the simulator
         run: uvx nox -s examples -- --backend sim

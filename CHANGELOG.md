@@ -14,14 +14,31 @@ releases may include breaking changes.
 
 - ✨ Discover IQM quantum computers and select the largest matching
   `--min-qubits` with `examples/discover_backends.py` ([#146]) ([**@marcelwa**])
+
+### Changed
+
+- ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
+  ([**@burgholzer**]).
+
+### Fixed
+
+- 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
+  complete terminal Qiskit readout to classical-bit order ([#306], [#308])
+  ([**@burgholzer**]).
+- 🐛 Exclude Qiskit 2.6.0 from the QSCI example to avoid its Linux PySCF loading
+  failure ([#306]) ([**@burgholzer**]).
+
+## [1.5.0] - 2026-10-14
+
+### Added
+
+- 🧪 Run an authenticated eight-shot Qiskit job on the Emerald Resonance mock in
+  the shared Slurm cluster ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Select and pin an IQM calibration before target construction through
   session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
   effective UUID, and keep every session on its initial calibration when a
   calibration job returns a new set ([#271]) ([**@burgholzer**],
   [**@marcelwa**])
-- ✨ Answer `QDMI_DEVICE_PROPERTY_NEEDSCALIBRATION` with zero instead of
-  `QDMI_ERROR_NOTSUPPORTED`, since IQM schedules recalibration itself and never
-  asks a client to trigger one ([#229]) ([**@marcelwa**])
 - ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
   them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
@@ -51,12 +68,14 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Pin QDMI v1.4.0 and the matching MQT Core main commit while keeping the
-  Core source build temporary until 4.1.0 ([#298]) ([**@burgholzer**]).
+- ⬆️ Update MQT Core to 4.1.1 ([#298], [#302]) ([**@burgholzer**],
+  [**@denialhaag**]).
+- ⬆️ Update QDMI to 1.4.0 ([#298]) ([**@burgholzer**]).
+- ♻️ Use MQT Core's shared Slurm deployment and device-wheel discovery in one
+  environment ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
 - ✨ Discover the installed QDMI manifest without loading provider code and open
   independent sessions through the MQT Core QDMI driver. Explicit device
-  selection takes precedence over environment defaults. Temporary Core source
-  pins and LLVM/MLIR CI setup remain until a suitable release ([#274])
+  selection takes precedence over environment defaults ([#274])
   ([**@burgholzer**]).
 - 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
@@ -75,8 +94,18 @@ releases may include breaking changes.
   ([**@denialhaag**])
 - 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
 
+### Removed
+
+- 💥 Remove the IQM-specific SPANK plugin and its cluster configuration ([#265])
+  ([**@flowerthrower**], [**@burgholzer**]).
+
 ### Fixed
 
+- 🐛 Show sampler and estimator CLI help without importing the optional Qiskit
+  SDK ([#265]) ([**@flowerthrower**], [**@burgholzer**]).
+- 🐛 Pass the offloader's quantum computer selection to the IQM worker instead
+  of a SPANK-specific `srun` option ([#265]) ([**@flowerthrower**],
+  [**@burgholzer**]).
 - 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
   operations, preserving physical site names during IQM JSON serialization
   ([#293]) ([**@burgholzer**])
@@ -295,7 +324,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.1.1...v1.2.0
@@ -306,6 +336,9 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
+[#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
+[#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
@@ -316,18 +349,19 @@ Compatible with QDMI `v1.3.0`.
 [#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
+[#266]: https://github.com/iqm-finland/QDMI-on-IQM/pull/266
+[#265]: https://github.com/iqm-finland/QDMI-on-IQM/pull/265
 [#260]: https://github.com/iqm-finland/QDMI-on-IQM/pull/260
 [#254]: https://github.com/iqm-finland/QDMI-on-IQM/pull/254
-[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#246]: https://github.com/iqm-finland/QDMI-on-IQM/pull/246
+[#242]: https://github.com/iqm-finland/QDMI-on-IQM/pull/242
 [#232]: https://github.com/iqm-finland/QDMI-on-IQM/pull/232
 [#231]: https://github.com/iqm-finland/QDMI-on-IQM/pull/231
-[#266]: https://github.com/iqm-finland/QDMI-on-IQM/pull/266
 [#229]: https://github.com/iqm-finland/QDMI-on-IQM/pull/229
-[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#220]: https://github.com/iqm-finland/QDMI-on-IQM/pull/220
 [#218]: https://github.com/iqm-finland/QDMI-on-IQM/pull/218
 [#217]: https://github.com/iqm-finland/QDMI-on-IQM/pull/217
+[#214]: https://github.com/iqm-finland/QDMI-on-IQM/pull/214
 [#206]: https://github.com/iqm-finland/QDMI-on-IQM/pull/206
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
@@ -347,9 +381,9 @@ Compatible with QDMI `v1.3.0`.
 [#169]: https://github.com/iqm-finland/QDMI-on-IQM/pull/169
 [#163]: https://github.com/iqm-finland/QDMI-on-IQM/pull/163
 [#162]: https://github.com/iqm-finland/QDMI-on-IQM/pull/162
+[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
-[#160]: https://github.com/iqm-finland/QDMI-on-IQM/pull/160
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
 [#146]: https://github.com/iqm-finland/QDMI-on-IQM/pull/146
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
@@ -383,6 +417,7 @@ Compatible with QDMI `v1.3.0`.
 [**@marcelwa**]: https://github.com/marcelwa
 [**@iqmtjm**]: https://github.com/iqmtjm
 [**@denialhaag**]: https://github.com/denialhaag
+[**@flowerthrower**]: https://github.com/flowerthrower
 
 <!-- General links -->
 
