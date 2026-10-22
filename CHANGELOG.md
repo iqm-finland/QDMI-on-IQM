@@ -25,7 +25,8 @@ releases may include breaking changes.
 
 ### Fixed
 
-- 🐛 Preserve IQM JSON measurement order in shots and histograms ([#306])
+- 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
+  complete terminal Qiskit readout to classical-bit order ([#306], [#308])
   ([**@burgholzer**]).
 - 🐛 Exclude Qiskit 2.6.0 from the QSCI example to avoid its Linux PySCF loading
   failure ([#306]) ([**@burgholzer**]).
@@ -339,6 +340,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
+[#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
