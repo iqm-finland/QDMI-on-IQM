@@ -25,19 +25,6 @@ import pickle  # ruff:ignore[suspicious-pickle-import]
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-try:
-    from qiskit import qpy
-    from qiskit_algorithms import VQE
-    from qiskit_algorithms.optimizers import L_BFGS_B
-
-    from ._backends import build_estimator
-except ImportError as e:
-    msg = (
-        "Failed to import Qiskit plugin and VQE requirements. "
-        "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
-    )
-    raise ImportError(msg) from e
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -45,7 +32,11 @@ if TYPE_CHECKING:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Execute the estimator CLI subcommand."""
+    """Execute the estimator CLI subcommand.
+
+    Raises:
+        ImportError: If execution requires an optional Qiskit dependency that is not installed.
+    """
     parser = argparse.ArgumentParser(description="Estimate VQE parameters for a serialized ansatz.")
     parser.add_argument("circuit", type=str, help="Path to the QPY circuit file.")
     parser.add_argument("observable", type=str, help="Path to the serialized observable file.")
@@ -63,6 +54,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    # Keep CLI help independent of optional SDK imports.
+    try:
+        from qiskit import qpy  # ruff:ignore[import-outside-top-level]
+        from qiskit_algorithms import VQE  # ruff:ignore[import-outside-top-level]
+        from qiskit_algorithms.optimizers import L_BFGS_B  # ruff:ignore[import-outside-top-level]
+
+        from ._backends import build_estimator  # ruff:ignore[import-outside-top-level]
+    except ImportError as e:
+        msg = (
+            "Failed to import Qiskit plugin and VQE requirements. "
+            "Ensure that `iqm-qdmi` is installed with the `qiskit` extra, e.g., via `uv pip install iqm-qdmi[qiskit]`."
+        )
+        raise ImportError(msg) from e
 
     with Path(args.circuit).open("rb") as file_obj:
         ansatz = qpy.load(file_obj)[0]

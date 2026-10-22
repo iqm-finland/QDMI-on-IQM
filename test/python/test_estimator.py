@@ -22,6 +22,8 @@ from __future__ import annotations
 import base64
 import math
 import pickle  # ruff:ignore[suspicious-pickle-import]
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qpy
@@ -70,8 +72,20 @@ def test_estimator_cli_simulator(tmp_path: Path, script_runner: ScriptRunner) ->
     assert math.isfinite(float(params[0]))
 
 
-def test_estimator_cli_help(script_runner: ScriptRunner) -> None:
-    """Test running the estimator CLI with the --help flag."""
-    result = script_runner.run(["iqm-estimator", "--help"])
-    assert result.success
+def test_estimator_cli_help() -> None:
+    """Help works without loading the optional Qiskit SDK."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import runpy, sys; sys.modules['qiskit'] = None; "
+                "runpy.run_module('iqm.qdmi.estimator', run_name='__main__')"
+            ),
+            "--help",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     assert "Estimate VQE parameters" in result.stdout

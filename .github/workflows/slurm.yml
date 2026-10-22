@@ -1,0 +1,48 @@
+name: Slurm smoke test
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "The ubuntu runner image to use."
+        default: "ubuntu-26.04"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  slurm-tests:
+    name: Slurm smoke test
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: provider
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: munich-quantum-toolkit/core
+          ref: 575acd1b9ca52e4608ccf4833e7d60640913cef4 # v4.1.1
+          fetch-depth: 0
+          persist-credentials: false
+          path: core
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.15"
+
+      - name: Run the device workload
+        timeout-minutes: 40
+        env:
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+        run: |
+          uv run --no-project core/test/slurm/run_integration.py \
+            --workload provider --package /workload \
+            --compose-file provider/test/slurm/compose.yml \
+            --device-license iqm.emerald.mock \
+            -- python3 /workload/test/slurm/workload.py

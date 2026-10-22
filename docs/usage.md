@@ -10,7 +10,7 @@ quantum computing hardware.
 
 ### Prebuilt C++ SDK
 
-Each GitHub Release from v1.5.0 onward offers a platform-specific
+Releases prepared with the C++ SDK workflow offer a platform-specific
 `iqm-qdmi-device_*.tar.gz` archive. Download the archive for your operating
 system and CPU from the [Releases page], then extract it. The `iqm-qdmi-device/`
 directory is a relocatable CMake install prefix containing the shared device
@@ -209,14 +209,16 @@ in the Contributing guide.
 
 The installed CMake target identifies its device manifest through
 `QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
-the symbol prefix and relative library path. An application using the pinned MQT
-Core source build can copy the device library and manifest beside its
-executable. Released Core 4.0.x packages lack this helper. This integration
-requires CMake 3.28 or later:
+the symbol prefix and relative library path. Applications using MQT Core 4.1 or
+later can copy the device library and manifest beside their executables. This
+integration requires CMake 3.28 or later.
+
+The C++ example requires MQT Core installed from source, with its `Development`
+component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
+the build and install steps.
 
 ```cmake
-# FIXME: Require mqt-core 4.1.0 once released; source builds use a 4.0.x version.
-find_package(mqt-core 4.0.0 CONFIG REQUIRED)
+find_package(mqt-core 4.1.1 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)
@@ -253,10 +255,10 @@ environment-based selection.
 List configured IDs offline, then open only the selected device:
 
 ```python
-from mqt.core.qdmi import builtin_driver
+from mqt.core.qdmi import builtin_driver as qdmi_driver
 
-print(builtin_driver.registered_device_ids())
-device = builtin_driver.open_device("iqm.emerald.mock", token="…")
+print(qdmi_driver.registered_device_ids())
+device = qdmi_driver.open_device("iqm.emerald.mock", token="…")
 ```
 
 An explicit configuration augments built-in and installed device definitions and
@@ -268,7 +270,7 @@ An explicitly configured quantum computer ID or alias takes precedence over both
 ## Running Jobs via Slurm
 
 For Slurm-backed native job submission, see the
-[SPANK Plugin Guide](spank_plugin.md).
+[IQM on Slurm](slurm.md).
 
 ## Understanding Quantum Architecture and Calibration Sets
 
@@ -571,6 +573,14 @@ std::string shots(shots_buffer.data());
 Each bitstring in the result represents the measurement outcome for one shot.
 The bitstrings are ordered chronologically (shot 1, shot 2, shot 3, etc.).
 
+For IQM JSON, output bits follow measurement-instruction order, then each
+instruction's `locus` order. Bit zero appears on the right, and leading zeros
+are retained. For example, measuring `locus: ["QB2", "QB1"]` with backend
+columns `[1, 0]` produces `"01"`. This order applies to shots and histogram
+keys, including circuit batches and jobs retrieved by ID. Measurement keys
+identify columns; their spelling and physical site names do not determine output
+positions.
+
 ### Unsupported Result Formats
 
 The following QDMI standard result formats (see {cpp:enum}`QDMI_JOB_RESULT_T`)
@@ -717,3 +727,5 @@ instead. The wait comes out of the timeout of the request that triggered it; a
 request with less time than that left proceeds without waiting. Other clients
 using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
+
+[MQT Core installation guide]: https://mqt.readthedocs.io/projects/core/en/latest/installation.html#integrating-mqt-core-into-your-project

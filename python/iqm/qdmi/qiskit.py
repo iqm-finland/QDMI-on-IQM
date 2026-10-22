@@ -136,7 +136,7 @@ class IQMBackend(QDMIBackend):
             Backend defaults; ``None`` leaves server options at their defaults.
         """
         options = super()._default_options()
-        options.update_options(run_request_options=None)
+        options.update_options(memory=True, run_request_options=None)
         return options
 
     def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
