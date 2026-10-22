@@ -32,6 +32,7 @@
 #include <chrono>
 #include <cpr/bearer.h>
 #include <cpr/body.h>
+#include <cpr/body_view.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
@@ -134,7 +135,8 @@ cpr::Response Default_post(const cpr::Url &url,
   cpr::Session session;
   Apply_common_options(session, url, bearer_token, connection_pool, headers,
                        timeout);
-  session.SetBody(body);
+  // The caller owns the body until this synchronous request finishes.
+  session.SetBodyView(cpr::BodyView{body.str()});
   return session.Post();
 }
 

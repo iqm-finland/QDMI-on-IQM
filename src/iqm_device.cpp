@@ -1272,12 +1272,12 @@ int IQM_QDMI_device_job_set_programs(IQM_QDMI_Device_Job job,
   if (format == PULSE_PROGRAM_FORMAT && count != 1) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
-  if (programs == nullptr) {
-    return QDMI_SUCCESS;
-  }
   if (format == PULSE_PROGRAM_FORMAT &&
       (job->num_shots_.has_value() || !job->run_request_options_.empty())) {
     return QDMI_ERROR_NOTSUPPORTED;
+  }
+  if (programs == nullptr) {
+    return QDMI_SUCCESS;
   }
   std::vector<std::string> copied_programs;
   copied_programs.reserve(count);
@@ -1920,11 +1920,7 @@ int IQM_QDMI_device_job_get_results_sweep_results(IQM_QDMI_Device_Job job,
         &job->session_->rate_limit_);
     const auto status = iqm::http::Handle_response(sweep_results_response);
     if (status != QDMI_SUCCESS) {
-      // Only mark the job as failed for truly fatal errors, but always
-      // propagate the underlying status code to the caller.
-      if (status == QDMI_ERROR_FATAL) {
-        job->status_ = QDMI_JOB_STATUS_FAILED;
-      }
+      // A failed download does not change the completed job's execution status.
       return status;
     }
     job->sweep_results_ = std::move(sweep_results_response.text);
