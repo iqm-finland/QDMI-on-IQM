@@ -3735,6 +3735,9 @@ TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
                                         options.size() + 1, options.c_str()),
       QDMI_SUCCESS);
   EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
                                              1, &size, &program),
             QDMI_ERROR_NOTSUPPORTED);
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
@@ -3743,6 +3746,9 @@ TEST_F(DeviceJobMockTest, PulseProgramIsCopiedAndSubmittedByteExactly) {
   ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                 job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
             QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
   EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
                                              1, &size, &program),
             QDMI_ERROR_NOTSUPPORTED);
@@ -3823,6 +3829,38 @@ TEST_F(DeviceJobMockTest, RetrievedPulseJobKeepsIndexedBinaryResults) {
             QDMI_SUCCESS);
   EXPECT_EQ(result, artifact);
   IQM_QDMI_device_job_free(retrieved);
+}
+
+TEST_F(DeviceJobMockTest, PulseArtifactFailureCanBeRetried) {
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  http_stub.queue_get(200, R"({"status":"ready","type":"run"})");
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, "pulse-123", &job),
+            QDMI_SUCCESS);
+  const auto requests_before = http_stub.get_urls().size();
+  http_stub.queue_get(500);
+  size_t size = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM2, 0,
+                                            nullptr, &size),
+            QDMI_ERROR_FATAL);
+  QDMI_Job_Status status = QDMI_JOB_STATUS_FAILED;
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+
+  const std::string artifact{"\x08\x00", 2};
+  http_stub.queue_get(200, artifact,
+                      {{"Content-Type", "application/protobuf"}});
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM2, 0,
+                                            nullptr, &size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(size, artifact.size());
+  std::string result(size, '\0');
+  ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_CUSTOM2,
+                                            size, result.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(result, artifact);
+  EXPECT_EQ(http_stub.get_urls().size(), requests_before + 2);
 }
 
 TEST_F(DeviceJobMockTest, FailedPulseSubmissionCannotBeRepeated) {
