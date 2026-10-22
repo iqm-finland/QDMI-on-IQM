@@ -86,12 +86,16 @@ Ordered samples are included by default (`memory=True`). Use
 `result.get_memory()` to access them, or pass `memory=False` to return counts
 only.
 
-Measurements must follow all gates and write every classical bit exactly once;
-each qubit may be measured once. The serializer orders terminal measurements by
-classical-bit index, including across registers, so counts and memory use the
-Qiskit register layout. Barriers in the readout suffix precede the serialized
-measurements. Circuits with unused classical bits or intermediate measurements
-are rejected before submission.
+Measurements must follow all gates, and each qubit may be measured once. With
+released Core versions, every classical bit must be measured exactly once;
+measurements are emitted in classical-bit order, including across registers.
+With Core's output-mapping API, initialized zeros and final writes to
+overwritten destinations are also preserved. The serializer can describe loose
+classical bits, but Core's backend currently rejects them before serialization.
+See
+[program output and result ordering](usage.md#program-output-and-result-ordering)
+for compatibility details. Intermediate measurements are rejected before
+submission.
 
 ## Circuit Metadata
 

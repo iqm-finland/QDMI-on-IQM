@@ -1991,6 +1991,36 @@ TEST_F(DeviceJobMockTest, CircuitOutputOrderMatchesCountsWithScrambledKeys) {
                                             nullptr),
             QDMI_SUCCESS);
   EXPECT_STREQ(shots_buffer.data(), "100,011");
+  for (const auto result :
+       {QDMI_JOB_RESULT_QIR_OUTPUT, QDMI_JOB_RESULT_QASM3_OUTPUT}) {
+    EXPECT_EQ(
+        IQM_QDMI_device_job_get_results(job, 0, result, 0, nullptr, nullptr),
+        QDMI_ERROR_NOTSUPPORTED);
+  }
+}
+
+TEST_F(DeviceJobMockTest, LegacyQirResultsKeepOutputBitZeroOnTheRight) {
+  constexpr auto qir = "define void @main() { ret void }";
+  const void *program = qir;
+  const size_t program_size = strlen(qir) + 1;
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job,
+                                             QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+                                             1, &program_size, &program),
+            QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"qir-job"})");
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  http_stub.queue_get(200,
+                      R"([{"measurement_keys":["m"],"counts":{"100":1}}])");
+  http_stub.queue_get(200, R"([{"m":[[1,0,0]]}])");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  std::array<char, 4> output{};
+  for (const auto result : {QDMI_JOB_RESULT_HIST_KEYS, QDMI_JOB_RESULT_SHOTS}) {
+    ASSERT_EQ(IQM_QDMI_device_job_get_results(job, 0, result, output.size(),
+                                              output.data(), nullptr),
+              QDMI_SUCCESS);
+    EXPECT_STREQ(output.data(), "001");
+  }
 }
 
 TEST_F(DeviceJobMockTest, RetrieveShotsBeforeCompletion) {
@@ -3340,6 +3370,9 @@ TEST_F(DeviceJobMockTest, HistogramResultsRejectMalformedCountsResponses) {
   // Values of the wrong type must be reported rather than retyped.
   expect_rejected(R"([{"measurement_keys":[0],"counts":{"0":4}}])");
   expect_rejected(R"([{"measurement_keys":["m"],"counts":{"0":"many"}}])");
+  expect_rejected(R"([{"measurement_keys":["meas_2_0_0"],"counts":{"0":-1}}])");
+  expect_rejected(
+      R"([{"measurement_keys":["meas_2_0_0"],"counts":{"0":1.5}}])");
   expect_rejected(R"([{"measurement_keys":["m"],"counts":{"0":1}}])");
   expect_rejected(R"([{"measurement_keys":[],"counts":{}}])");
   expect_rejected(
@@ -3631,6 +3664,17 @@ TEST_F(DeviceJobMockTest, ResultRetrievalErrorCases) {
   EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
                                             0, nullptr, &size_ret),
             QDMI_ERROR_OUTOFRANGE);
+}
+
+TEST_F(DeviceJobMockTest, RejectInvalidOutputLociBeforeSubmission) {
+  for (
+      const auto *program :
+      {R"({"instructions":[{"name":"measure","locus":[1],"args":{"key":"m"}}]})",
+       R"({"circuits":[],"instructions":[]})", "{}"}) {
+    ASSERT_EQ(Set_program(job, strlen(program) + 1, program), QDMI_SUCCESS);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_INVALIDARGUMENT);
+  }
+  EXPECT_TRUE(http_stub.post_bodies().empty());
 }
 
 TEST_F(DeviceJobMockTest, MalformedCircuitHandling) {

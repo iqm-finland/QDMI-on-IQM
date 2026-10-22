@@ -29,6 +29,7 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 try:
+    from mqt.core.plugins.qiskit import serializers as core_serializers
     from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
     from qiskit.circuit.library import Barrier, CZGate, Measure, RGate
 except ImportError as e:
@@ -91,7 +92,7 @@ def _json_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     return metadata
 
 
-def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
+def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str | core_serializers.SerializedProgram:  # ty: ignore[unresolved-attribute]
     """Serialize a Qiskit :class:`~qiskit.circuit.QuantumCircuit` into IQM JSON.
 
     The IQM JSON format is a device-specific format that encodes quantum operations
@@ -101,14 +102,11 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
     Metadata that cannot be encoded is dropped with a warning; the circuit and
     its metadata are not modified.
 
-    Measurements must be terminal and write each classical bit exactly once.
-    Each qubit may be measured once. Measurements are emitted in classical-bit
-    order so counts and memory use the circuit's register layout. Barriers in
-    the readout suffix are emitted before the measurements.
-
-    Qiskit initializes untouched classical bits to zero, but the IQM JSON result
-    path does not reconstruct those slots. When using ``measure_all()``, create
-    the circuit without preallocated classical bits, as in the example below.
+    Measurements must be terminal and each qubit may be measured once. With
+    Core's output-mapping API, source classical bits retain initialized zeros
+    and the final write to each destination. Older Core versions require complete
+    readout and emit measurements in classical-bit order. Barriers in the readout
+    suffix precede the measurements on that compatibility path.
 
     Note:
         The serialization currently supports only operations that are natively
@@ -122,7 +120,8 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
             circuit indices follow the calibrated target's site order.
 
     Returns:
-        JSON string representation of the circuit in IQM format.
+        IQM JSON and source-classical mapping when Core supports it, otherwise
+        a JSON string with measurements ordered by classical destination.
 
     Raises:
         UnsupportedOperationError: If the circuit contains operations not supported
@@ -166,11 +165,14 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         instructions: list[dict[str, Any]] = []
         measurements: dict[int, dict[str, Any]] = {}
         measured_qubits: set[int] = set()
+        serialized_program = getattr(core_serializers, "SerializedProgram", None)
+        clbit_indices: list[int | None] = [None] * circuit.num_clbits
+        output_width = 0
 
         for instruction in circuit.data:
             operation, qargs, cargs = instruction.operation, instruction.qubits, instruction.clbits
 
-            if measurements and not isinstance(operation, Measure | Barrier):
+            if measured_qubits and not isinstance(operation, Measure | Barrier):
                 _raise_error(UnsupportedOperationError, "IQM JSON requires terminal measurements.")
 
             # R gate (PRX in IQM terminology)
@@ -215,38 +217,45 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
                 clbit = cargs[0]
                 bitloc = circuit.find_bit(clbit)
 
-                # Check if classical bit is part of a register
-                if not bitloc.registers:
-                    msg = (
-                        "Measurement of unregistered classical bit is unsupported by IQM JSON export. "
-                        "All classical bits must be part of a ClassicalRegister."
-                    )
-                    _raise_error(TranslationError, msg)
-
-                creg = bitloc.registers[0][0]
-                creg_idx = circuit.cregs.index(creg)
-                clbit_index = bitloc.registers[0][1]
-                key = f"{creg.name}_{len(creg)}_{creg_idx}_{clbit_index}"
+                if serialized_program is not None:
+                    key = f"m{output_width}"
+                else:
+                    if not bitloc.registers:
+                        _raise_error(
+                            TranslationError,
+                            "An unregistered classical bit requires MQT Core with SerializedProgram support.",
+                        )
+                    creg = bitloc.registers[0][0]
+                    creg_idx = circuit.cregs.index(creg)
+                    clbit_index = bitloc.registers[0][1]
+                    key = f"{creg.name}_{len(creg)}_{creg_idx}_{clbit_index}"
                 qubit_index = circuit.find_bit(qargs[0]).index
-                if bitloc.index in measurements or qubit_index in measured_qubits:
+                if qubit_index in measured_qubits or (serialized_program is None and bitloc.index in measurements):
                     _raise_error(TranslationError, "Each qubit and classical bit may be measured only once.")
                 measured_qubits.add(qubit_index)
-                measurements[bitloc.index] = {
+                measurement = {
                     "name": "measure",
                     "locus": [sites[qubit_index].name()],
                     "args": {
                         "key": key,
                     },
                 }
+                if serialized_program is not None:
+                    instructions.append(measurement)
+                    clbit_indices[bitloc.index] = output_width
+                    output_width += 1
+                else:
+                    measurements[bitloc.index] = measurement
 
             # Unsupported operation
             else:
                 msg = f"Operation '{operation.name}' is not supported in IQM JSON format"
                 _raise_error(UnsupportedOperationError, msg)
 
-        if len(measurements) != circuit.num_clbits:
+        if serialized_program is None and len(measurements) != circuit.num_clbits:
             _raise_error(TranslationError, "Every classical bit must be measured exactly once.")
-        instructions.extend(measurements[index] for index in range(circuit.num_clbits))
+        if serialized_program is None:
+            instructions.extend(measurements[index] for index in range(circuit.num_clbits))
 
         program: dict[str, Any] = {
             "name": circuit.name or "circuit",
@@ -254,7 +263,10 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
             "instructions": instructions,
         }
 
-        return json.dumps(program)
+        payload = json.dumps(program)
+        if serialized_program is not None:
+            return serialized_program(payload, output_width, tuple(clbit_indices))
+        return payload  # ruff: ignore[try-consider-else]
 
     except UnsupportedOperationError:
         raise

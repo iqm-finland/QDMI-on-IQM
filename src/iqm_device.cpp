@@ -1056,6 +1056,10 @@ Submission_queue_position(const nlohmann::json &response) {
 /// Recover the native circuit's output positions without using physical IDs.
 bool Set_output_layout(IQM_QDMI_Device_Job_impl_d::Program_results &result,
                        const nlohmann::json &circuit) {
+  if (!circuit.is_object() || circuit.contains("circuits") ||
+      !circuit.contains("instructions")) {
+    return false;
+  }
   const auto &instructions = circuit.at("instructions");
   if (!instructions.is_array()) {
     return false;
@@ -1068,6 +1072,8 @@ bool Set_output_layout(IQM_QDMI_Device_Job_impl_d::Program_results &result,
     const auto key = instruction.at("args").at("key").get<std::string>();
     const auto &locus = instruction.at("locus");
     if (key.empty() || !locus.is_array() || locus.empty() ||
+        !std::ranges::all_of(
+            locus, [](const auto &site) { return site.is_string(); }) ||
         std::ranges::any_of(
             layout, [&](const auto &field) { return field.first == key; })) {
       return false;
@@ -1772,7 +1778,14 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       auto &entry = results.emplace_back();
       entry.measurement_keys =
           circuit.at("measurement_keys").get<std::vector<std::string>>();
-      entry.counts = circuit.at("counts").get<std::map<std::string, size_t>>();
+      const auto &raw_counts = circuit.at("counts");
+      if (!raw_counts.is_object() ||
+          !std::ranges::all_of(raw_counts, [](const auto &count) {
+            return count.is_number_unsigned();
+          })) {
+        return QDMI_ERROR_FATAL;
+      }
+      entry.counts = raw_counts.get<std::map<std::string, size_t>>();
       if (const auto &layout = job->results_[i].output_layout; layout) {
         std::map<std::string, size_t> offsets;
         size_t width = 0;
@@ -1806,6 +1819,16 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
         for (const auto &[key, key_width] : *layout) {
           entry.measurement_keys->push_back(key);
         }
+      } else {
+        // The legacy QIR service exposes only measurement-key order.
+        std::map<std::string, size_t> counts;
+        for (const auto &[outcome, count] : entry.counts) {
+          if (outcome.find_first_not_of("01") != std::string::npos) {
+            return QDMI_ERROR_FATAL;
+          }
+          counts.emplace(std::string(outcome.rbegin(), outcome.rend()), count);
+        }
+        entry.counts = std::move(counts);
       }
     }
     /// Commit only complete, validated artifact data. Download failures leave
@@ -1997,10 +2020,8 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
           }
         }
       }
-      if (layout) {
-        for (auto &shot : shots) {
-          std::ranges::reverse(shot);
-        }
+      for (auto &shot : shots) {
+        std::ranges::reverse(shot);
       }
     }
     for (size_t i = 0; i < results.size(); ++i) {

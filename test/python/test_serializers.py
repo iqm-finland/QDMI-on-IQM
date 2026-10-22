@@ -22,9 +22,11 @@ from __future__ import annotations
 import copy
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from mqt.core.plugins.qiskit import serializers as core_serializers
 from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
 from qiskit.circuit import ClassicalRegister, Clbit, Parameter, QuantumCircuit, QuantumRegister
 
@@ -89,8 +91,9 @@ class StubBackend:
 
 
 @pytest.fixture
-def backend() -> Callable[[int], StubBackend]:
+def backend(monkeypatch: pytest.MonkeyPatch) -> Callable[[int], StubBackend]:
     """Returns a factory for stub backends with a given number of device sites."""
+    monkeypatch.delattr(core_serializers, "SerializedProgram", raising=False)
     return StubBackend
 
 
@@ -231,3 +234,33 @@ def test_circular_metadata_is_dropped(backend: Callable[[int], StubBackend]) -> 
         qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
 
     assert qc.metadata["self"] is qc.metadata
+
+
+@pytest.mark.parametrize("loose", [False, True])
+def test_source_classical_mapping(
+    backend: Callable[[int], StubBackend], monkeypatch: pytest.MonkeyPatch, *, loose: bool
+) -> None:
+    """Keep initialized bits and overwritten destinations through Core's mapping API."""
+    constructor = Mock()
+    monkeypatch.setattr(core_serializers, "SerializedProgram", constructor, raising=False)
+    qc = QuantumCircuit(QuantumRegister(3), ClassicalRegister(3, "a"), ClassicalRegister(2, "b"))
+    if loose:
+        qc.add_bits([Clbit()])
+    qc.measure(0, 2)
+    qc.measure(1, 4)
+    qc.measure(2, 5 if loose else 2)
+    if loose:
+        qc.barrier()
+    original = qc.copy()
+
+    serialized = qiskit_to_iqm_json(qc, backend(3))  # ty: ignore[invalid-argument-type]
+
+    assert serialized is constructor.return_value
+    payload, width, mapping = constructor.call_args.args
+    assert width == 3
+    expected = (None, None, 0, None, 1, 2) if loose else (None, None, 2, None, 1)
+    assert mapping == expected
+    measurements = [item for item in json.loads(payload)["instructions"] if item["name"] == "measure"]
+    assert [item["args"]["key"] for item in measurements] == ["m0", "m1", "m2"]
+    assert [item["locus"] for item in measurements] == [["QB1"], ["QB2"], ["QB3"]]
+    assert qc == original
