@@ -154,6 +154,15 @@ def examples(session: nox.Session) -> None:
         env=env,
         external=True,
     )
+    session.run(
+        Path("examples/discover_backends.py"),
+        "--backend",
+        args.backend,
+        "--min-qubits",
+        "3",
+        env=env,
+        external=True,
+    )
 
 
 @nox.session(python="3.14", reuse_venv=True)
