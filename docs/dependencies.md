@@ -6,21 +6,27 @@ and licenses.
 
 ## Core Runtime Dependencies
 
-These dependencies are linked into the shared library and
-**shipped with every built wheel or binary**.
+These dependencies are linked into the shared library. macOS uses the system
+curl; other platforms bundle curl with every built wheel or binary.
 
-| Dependency      | Version | License                        | Purpose                                                    |
-| :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
-| [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
-| [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
-| [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
-| [OpenSSL]       | 3.5.9   | Apache-2.0                     | TLS and cryptography                                       |
+| Dependency      | Version                 | License                        | Purpose                                                    |
+| :-------------- | :---------------------- | :----------------------------- | :--------------------------------------------------------- |
+| [QDMI]          | 1.4.0                   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
+| [nlohmann/json] | 3.12.0                  | MIT License                    | JSON parsing and serialization                             |
+| [CPR]           | 1.15.1                  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [curl]          | 8.23.0; system on macOS | curl License                   | HTTP transport                                             |
 
 ```{note}
-Native builds and wheels link CPR, its bundled curl, and OpenSSL 3.5.9
-statically on every platform. CMake builds OpenSSL from pinned sources. HTTP/2
-is disabled, so nghttp2 is not needed. Certificate verification uses the host's
-CA bundle on Linux and the native trust stores on macOS and Windows.
+CPR is linked statically. macOS uses Apple's system curl and TLS; Windows and
+Linux link curl statically. TLS uses Windows Schannel or installed OpenSSL 3 on
+Linux. curl uses available system compression libraries and nghttp2 for HTTP/2.
+Certificate verification uses the host's CA bundle on Linux and the native trust
+stores on macOS and Windows.
+
+Native installations use system TLS and compression libraries, which can be
+updated independently. Portable Linux Python wheels include copies of
+non-platform shared libraries; those copies are updated through wheel releases.
+macOS and Windows wheels use system TLS.
 ```
 
 ## Build Dependencies
@@ -28,8 +34,9 @@ CA bundle on Linux and the native trust stores on macOS and Windows.
 Used to build the Python package and bridge packaging with the CMake-based
 native build. These are **not shipped** in any binary or wheel.
 
-Native builds also require a C++20 compiler, CMake >=3.24, Perl, and Make (NMake
-with MSVC on Windows). Windows x64 builds additionally require NASM.
+Native builds require a C++20 compiler and CMake >=3.24. Linux builds also need
+the OpenSSL 3 development package. System compression development packages are
+optional; curl enables the decoders it finds.
 
 | Dependency          | Version | License    | Purpose                                    |
 | :------------------ | :------ | :--------- | :----------------------------------------- |
@@ -113,6 +120,7 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 
 [Breathe]: https://github.com/breathe-doc/breathe
 [CPR]: https://github.com/libcpr/cpr
+[curl]: https://curl.se/
 [Doxygen]: https://github.com/doxygen/doxygen
 [Furo]: https://github.com/pradyunsg/furo
 [googletest]: https://github.com/google/googletest
@@ -121,7 +129,6 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 [MyST-NB]: https://github.com/executablebooks/MyST-NB
 [nlohmann/json]: https://github.com/nlohmann/json
 [nox]: https://github.com/wntrblm/nox
-[OpenSSL]: https://github.com/openssl/openssl
 [pytest]: https://github.com/pytest-dev/pytest
 [pytest-console-scripts]: https://github.com/kvas-it/pytest-console-scripts
 [pytest-cov]: https://github.com/pytest-dev/pytest-cov

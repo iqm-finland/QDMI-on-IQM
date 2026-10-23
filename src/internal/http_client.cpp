@@ -35,7 +35,6 @@
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
-#include <cpr/http_version.h>
 #include <cpr/response.h>
 #include <cpr/session.h>
 #include <cpr/ssl_options.h>
@@ -89,8 +88,6 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
   session.SetUrl(url);
   session.SetHeader(headers);
   session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
-  // Avoid the HTTP/2 receive-path flaw in bundled curl 8.22.0 (CVE-2026-92392).
-  session.SetHttpVersion(cpr::HttpVersion{cpr::HttpVersionCode::VERSION_1_1});
   using CprTimeoutRep = decltype(cpr::Timeout{timeout}.Milliseconds());
   session.SetTimeout(
       cpr::Timeout{Clamp_timeout_for_transport<CprTimeoutRep>(timeout)});

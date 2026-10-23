@@ -12,23 +12,20 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Update CPR to 1.15.1 ([#311]) ([**@burgholzer**]).
+- ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
 - ⚡️ Avoid copying submission bodies across synchronous requests and rate-limit
   retries ([#311]) ([**@burgholzer**]).
-- 📦 Build pinned OpenSSL 3.5.9 and curl from source and link them statically on
-  every platform, preserving native certificate trust ([#311])
-  ([**@burgholzer**]).
-- ⚡️ Support gzip, deflate, Brotli and Zstd HTTP responses with bundled static
+- 📦 Link CPR statically; use Apple's system curl on macOS and static curl on
+  Linux and Windows ([#311]) ([**@burgholzer**]).
+- ♻️ Use Windows Schannel and installed OpenSSL 3 on Linux with available system
   compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
 ### Fixed
 
-- 🔒 Use HTTP/1.1 to avoid curl's HTTP/2 receive-path vulnerability
-  (CVE-2026-92392) ([#311]) ([**@burgholzer**]).
 - ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
   one-second upload stall observed with Resonance over HTTP/2 ([#311])
   ([**@burgholzer**]).

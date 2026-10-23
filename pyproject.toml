@@ -193,7 +193,17 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg 
 
 [[tool.cibuildwheel.overrides]]
 select = "*-manylinux*"
-before-all = "yum install -y perl-core"
+# EPEL's OpenSSL 3 development files coexist with the image's OpenSSL 1.1.
+environment = { CMAKE_INCLUDE_PATH = "/usr/include/openssl3", CMAKE_LIBRARY_PATH = "/usr/lib64/openssl3" }
+before-all = "yum install -y openssl3-devel zlib-devel"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-musllinux*"
+before-all = """
+apk add openssl-dev zlib-dev
+mkdir -p /usr/share/licenses/openssl
+curl -fsSL "https://raw.githubusercontent.com/openssl/openssl/openssl-$(pkg-config --modversion openssl)/LICENSE.txt" -o /usr/share/licenses/openssl/LICENSE.txt
+"""
 
 
 [tool.ruff]

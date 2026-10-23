@@ -39,7 +39,8 @@ Linux wheels use the host's CA trust store, discovering the standard CA bundle
 on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
 distribution's `ca-certificates` package if it is missing. macOS and Windows use
 their native certificate trust stores. The same trust settings apply to native
-builds and wheels, which bundle static OpenSSL.
+builds and wheels. Native builds use system TLS libraries; portable Linux wheels
+include the non-platform TLS libraries they require.
 
 For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
 bundle before making requests. `SSL_CERT_FILE` is also supported when

@@ -26,22 +26,8 @@ install(
   FILES "${PROJECT_SOURCE_DIR}/LICENSE"
   DESTINATION "${LICENSE_INSTALL_DIR}"
   COMPONENT ${QDMI_TARGET_NAME}_Runtime)
-set(LICENSE_DEPENDENCIES
-    cpr
-    nlohmann_json
-    curl
-    openssl
-    zlib
-    brotli
-    zstd)
-set(LICENSE_FILENAMES
-    LICENSE
-    LICENSE.MIT
-    COPYING
-    LICENSE.txt
-    LICENSE.md
-    LICENSE
-    LICENSE)
+set(LICENSE_DEPENDENCIES cpr nlohmann_json curl)
+set(LICENSE_FILENAMES LICENSE LICENSE.MIT COPYING)
 foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
   FetchContent_GetProperties(${DEPENDENCY})
   if(${DEPENDENCY}_SOURCE_DIR)
@@ -51,6 +37,26 @@ foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
       COMPONENT ${QDMI_TARGET_NAME}_Runtime)
   endif()
 endforeach()
+
+# Wheel repair bundles these system libraries; retain their package notices.
+if(SKBUILD AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  foreach(DEPENDENCY ssl brotli zstd nghttp2)
+    file(
+      GLOB NOTICES
+      LIST_DIRECTORIES FALSE
+      "/usr/share/licenses/*${DEPENDENCY}*/LICENSE*"
+      "/usr/share/licenses/*${DEPENDENCY}*/COPYING*"
+      "/usr/share/doc/*${DEPENDENCY}*/copyright")
+    foreach(NOTICE IN LISTS NOTICES)
+      get_filename_component(PACKAGE_DIRECTORY "${NOTICE}" DIRECTORY)
+      get_filename_component(PACKAGE_NAME "${PACKAGE_DIRECTORY}" NAME)
+      install(
+        FILES "${NOTICE}"
+        DESTINATION "${LICENSE_INSTALL_DIR}/system/${PACKAGE_NAME}"
+        COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+    endforeach()
+  endforeach()
+endif()
 
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})

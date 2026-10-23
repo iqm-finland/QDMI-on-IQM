@@ -57,61 +57,73 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-include(${CMAKE_CURRENT_LIST_DIR}/BuildOpenSSL.cmake)
+set(BUILD_SHARED_LIBS OFF)
+if(APPLE)
+  if(NOT TARGET CURL::libcurl)
+    # Use Apple's SDK curl, even when Homebrew curl is installed.
+    set(_curl_sdk "${CMAKE_OSX_SYSROOT}")
+    if(NOT _curl_sdk)
+      set(_curl_sdk macosx)
+    endif()
+    if(NOT IS_DIRECTORY "${_curl_sdk}")
+      execute_process(
+        COMMAND xcrun --sdk "${_curl_sdk}" --show-sdk-path
+        OUTPUT_VARIABLE _curl_sdk
+        OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+    add_library(CURL::libcurl UNKNOWN IMPORTED)
+    set_target_properties(
+      CURL::libcurl
+      PROPERTIES IMPORTED_LOCATION "${_curl_sdk}/usr/lib/libcurl.tbd"
+                 INTERFACE_INCLUDE_DIRECTORIES "${_curl_sdk}/usr/include")
+  endif()
+else()
+  # Build only curl; TLS and response codecs come from the host.
+  if(UNIX)
+    find_package(OpenSSL 3 REQUIRED)
+  endif()
+  set(BUILD_CURL_EXE OFF)
+  set(BUILD_TESTING OFF)
+  set(CURL_DISABLE_INSTALL ON)
+  foreach(
+    PROTOCOL
+    DICT
+    FILE
+    FTP
+    GOPHER
+    IMAP
+    IPFS
+    LDAP
+    LDAPS
+    MQTT
+    POP3
+    RTSP
+    SMTP
+    TELNET
+    TFTP
+    WEBSOCKETS)
+    set(CURL_DISABLE_${PROTOCOL} ON)
+  endforeach()
+  set(CURL_USE_OPENSSL ${UNIX})
+  set(CURL_USE_SCHANNEL ${WIN32})
+  set(CURL_USE_LIBSSH2 OFF)
+  set(USE_LIBIDN2 OFF)
+  set(CURL_USE_LIBPSL OFF)
+  FetchContent_Declare(
+    curl
+    URL https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz
+    URL_HASH
+      SHA256=8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5)
+  list(APPEND FETCH_PACKAGES curl)
+endif()
+
 set(CPR_BUILD_TESTS
     OFF
     CACHE BOOL "Disable CPR tests" FORCE)
-# CPR and curl are private dependencies; do not install their public interfaces.
 set(CPR_ENABLE_INSTALL OFF)
-set(CPR_USE_SYSTEM_CURL OFF)
-set(CPR_FORCE_OPENSSL_BACKEND ON)
-set(CURL_DISABLE_INSTALL ON)
-set(USE_APPLE_SECTRUST ${APPLE})
-set(CURL_USE_LIBSSH2 OFF)
-set(USE_LIBIDN2 OFF)
-set(CPR_CURL_USE_LIBPSL
-    OFF
-    CACHE BOOL "Disable libpsl for CPR curl" FORCE)
-# Build curl's response decoders as private static dependencies.
-set(CURL_ZLIB
-    ON
-    CACHE STRING "Enable zlib in bundled curl" FORCE)
-include(${CMAKE_CURRENT_LIST_DIR}/BuildZlib.cmake)
-set(BUILD_SHARED_LIBS OFF)
-set(BROTLI_BUILD_TOOLS
-    OFF
-    CACHE BOOL "" FORCE)
-set(ZSTD_BUILD_SHARED OFF)
-set(ZSTD_BUILD_PROGRAMS OFF)
-set(ZSTD_BUILD_TESTS OFF)
-set(ZSTD_BUILD_COMPRESSION OFF)
-set(ZSTD_BUILD_DICTBUILDER OFF)
-FetchContent_Declare(
-  brotli
-  URL https://github.com/google/brotli/archive/refs/tags/v1.2.1.tar.gz
-  URL_HASH
-    SHA256=98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f)
-FetchContent_Declare(
-  zstd
-  URL https://github.com/facebook/zstd/archive/refs/tags/v1.5.7.tar.gz
-  URL_HASH
-    SHA256=37d7284556b20954e56e1ca85b80226768902e2edabd3b649e9e72c0c9012ee3
-  SOURCE_SUBDIR build/cmake)
-FetchContent_MakeAvailable(brotli zstd)
-set_property(DIRECTORY "${brotli_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
-set_property(DIRECTORY "${zstd_SOURCE_DIR}/build/cmake"
-             PROPERTY EXCLUDE_FROM_ALL TRUE)
-set(BROTLI_INCLUDE_DIR "${brotli_SOURCE_DIR}/c/include")
-set(BROTLICOMMON_LIBRARY brotlicommon)
-set(BROTLIDEC_LIBRARY brotlidec)
-set(ZSTD_INCLUDE_DIR "${zstd_SOURCE_DIR}/lib")
-set(ZSTD_LIBRARY libzstd_static)
-set(CURL_BROTLI ON)
-set(CURL_ZSTD ON)
-# HTTP/1.1 needs no nghttp2 and avoids CVE-2026-92392 in cpr's bundled curl.
-set(USE_NGHTTP2
-    OFF
-    CACHE BOOL "Disable HTTP/2 in bundled curl" FORCE)
+# Configuring curl directly avoids CPR's bundled zlib build.
+set(CPR_USE_EXISTING_CURL_TARGET ON)
+set(CPR_FORCE_OPENSSL_BACKEND OFF)
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
@@ -152,6 +164,4 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 endif()
 
-# CPR uses BUILD_SHARED_LIBS to select its library type.
-set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(${FETCH_PACKAGES})

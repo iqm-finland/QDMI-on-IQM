@@ -8,12 +8,12 @@ install it in your Spack environment.
 
 - Spack is installed and initialized (see the
   [Spack Getting Started guide](https://spack.readthedocs.io/en/latest/getting_started.html)).
-- Your compiler and basic build tools (`cmake`, `git`, `make`, `perl`) are
-  discoverable by Spack. If they are not, run:
+- Your compiler and basic build tools (`cmake`, `git`, `make`) are discoverable
+  by Spack. If they are not, run:
 
   ```console
   spack compiler find
-  spack external find gmake ncurses cmake git perl
+  spack external find gmake ncurses cmake git
   ```
 
 ## Creating the Package Definition
@@ -64,7 +64,7 @@ existing custom repo or create a dedicated one.
 
        depends_on("cmake", type="build")
        depends_on("gmake", type="build")
-       depends_on("perl", type="build")
+       depends_on("openssl@3:", when="platform=linux")
        depends_on("nlohmann-json")
 
        def cmake_args(self):
