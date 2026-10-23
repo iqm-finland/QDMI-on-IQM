@@ -13,14 +13,14 @@ releases may include breaking changes.
 ### Changed
 
 - ⬆️ Update CPR to 1.15.1 and use its default POST-to-GET handling for HTTP 301,
-  302, and 303 redirects ([**@burgholzer**]).
+  302, and 303 redirects ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
 ### Fixed
 
 - ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
-  one-second upload stall observed with Resonance over HTTP/2
+  one-second upload stall observed with Resonance over HTTP/2 ([#311])
   ([**@burgholzer**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
   complete terminal Qiskit readout to classical-bit order ([#306], [#308])
@@ -337,6 +337,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
+[#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
