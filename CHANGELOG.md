@@ -12,11 +12,23 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
+- ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
+  default ([#311]) ([**@burgholzer**]).
+- ⚡️ Avoid copying submission bodies across synchronous requests and rate-limit
+  retries ([#311]) ([**@burgholzer**]).
+- 📦 Link CPR statically; use Apple's system curl on macOS and static curl on
+  Linux and Windows ([#311]) ([**@burgholzer**]).
+- ♻️ Use Windows Schannel and installed OpenSSL 3 on Linux with available system
+  compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
 ### Fixed
 
+- ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
+  one-second upload stall observed with Resonance over HTTP/2 ([#311])
+  ([**@burgholzer**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
   complete terminal Qiskit readout to classical-bit order ([#306], [#308])
   ([**@burgholzer**]).
@@ -331,8 +343,9 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
+[#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
+[#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293

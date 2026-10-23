@@ -37,6 +37,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+
       # set up ccache for faster builds
       - name: Set up ccache
         uses: Chocobo1/setup-ccache-action@a4d08616f5b614053bce228ddf881592f69d61d4 # v1.5.9
@@ -57,12 +60,6 @@ jobs:
 
       - name: Install Ninja
         run: uv tool install ninja
-
-      # Install build dependencies
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON

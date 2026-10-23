@@ -38,6 +38,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -48,12 +51,6 @@ jobs:
 
       - name: Install Ninja
         run: uv tool install ninja
-
-      # Install build dependencies
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Set up Clang ${{ inputs.clang-version }}
         env:

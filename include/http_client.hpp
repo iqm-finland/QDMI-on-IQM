@@ -27,7 +27,6 @@
 
 #include <chrono>
 #include <cpr/bearer.h>
-#include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
@@ -36,6 +35,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace iqm::http {
@@ -86,31 +86,24 @@ cpr::Response Get(const cpr::Url &url,
                   std::chrono::milliseconds timeout = std::chrono::hours{1},
                   Rate_limit_budget *rate_limit = nullptr);
 
-/**
- * @brief Perform an HTTP POST request.
- *
- * Sends an HTTP POST request to the specified URL with a JSON body. The
- * request automatically includes a JSON content type header and supports
- * additional custom headers. The request waits when @p rate_limit_budget
- * reports the remaining quota running low, and HTTP 429 responses are retried
- * according to the server's Retry-After header.
- *
- * @param url The target URL for the POST request.
- * @param bearer_token Bearer token used for authentication, if configured.
- * @param connection_pool Connection pool shared by the owning device session.
- * @param data The request body data.
- * @param additional_headers Additional HTTP headers to include.
- * @param timeout Overall timeout for the request, the rate-limit wait, and any
- * rate-limit retries.
- * @param rate_limit Quota the calling session last saw, updated in place.
- * A request belonging to no session passes nullptr and relies on Retry-After.
- * @return CPR response object.
- */
+/// @brief Perform an HTTP POST request with a JSON content type and body.
+///
+/// The request waits when @p rate_limit reports the remaining quota running
+/// low, and HTTP 429 responses are retried according to Retry-After.
+///
+/// @param url The target URL for the POST request.
+/// @param bearer_token Bearer token used for authentication, if configured.
+/// @param connection_pool Connection pool shared by the owning device session.
+/// @param data Body borrowed for this synchronous call, including retries.
+/// @param timeout Overall timeout for the request, the rate-limit wait, and any
+/// rate-limit retries.
+/// @param rate_limit Quota the calling session last saw, updated in place.
+/// A request belonging to no session passes nullptr and relies on Retry-After.
+/// @return CPR response object.
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::ConnectionPool &connection_pool,
-                   const cpr::Body &data,
-                   const cpr::Header &additional_headers = {},
+                   std::string_view data,
                    std::chrono::milliseconds timeout = std::chrono::hours{1},
                    Rate_limit_budget *rate_limit = nullptr);
 
@@ -126,7 +119,7 @@ QDMI_STATUS Handle_response(
 namespace internal {
 /// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
 /// bundle. An empty result leaves libcurl's platform default in place.
-/// Explicit paths are passed through even when invalid, so TLS fails closed.
+/// Explicit paths are passed through to libcurl.
 [[nodiscard]] std::string Resolve_ca_bundle();
 
 /**
@@ -174,7 +167,7 @@ struct Hooks {
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      const cpr::Body &body, std::chrono::milliseconds timeout)>
+      std::string_view body, std::chrono::milliseconds timeout)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;

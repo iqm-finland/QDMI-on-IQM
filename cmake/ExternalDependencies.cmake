@@ -57,26 +57,77 @@ FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(BUILD_SHARED_LIBS OFF)
+if(APPLE)
+  if(NOT TARGET CURL::libcurl)
+    # Use Apple's SDK curl, even when Homebrew curl is installed.
+    set(_curl_sdk "${CMAKE_OSX_SYSROOT}")
+    if(NOT _curl_sdk)
+      set(_curl_sdk macosx)
+    endif()
+    if(NOT IS_DIRECTORY "${_curl_sdk}")
+      execute_process(
+        COMMAND xcrun --sdk "${_curl_sdk}" --show-sdk-path
+        OUTPUT_VARIABLE _curl_sdk
+        OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+    add_library(CURL::libcurl UNKNOWN IMPORTED)
+    set_target_properties(
+      CURL::libcurl
+      PROPERTIES IMPORTED_LOCATION "${_curl_sdk}/usr/lib/libcurl.tbd"
+                 INTERFACE_INCLUDE_DIRECTORIES "${_curl_sdk}/usr/include")
+  endif()
+else()
+  # Build only curl; TLS and response codecs come from the host.
+  if(UNIX)
+    find_package(OpenSSL 3 REQUIRED)
+  endif()
+  set(BUILD_CURL_EXE OFF)
+  set(BUILD_TESTING OFF)
+  set(CURL_DISABLE_INSTALL ON)
+  foreach(
+    PROTOCOL
+    DICT
+    FILE
+    FTP
+    GOPHER
+    IMAP
+    IPFS
+    LDAP
+    LDAPS
+    MQTT
+    POP3
+    RTSP
+    SMTP
+    TELNET
+    TFTP
+    WEBSOCKETS)
+    set(CURL_DISABLE_${PROTOCOL} ON)
+  endforeach()
+  set(CURL_USE_OPENSSL ${UNIX})
+  set(CURL_USE_SCHANNEL ${WIN32})
+  set(CURL_USE_LIBSSH2 OFF)
+  set(USE_LIBIDN2 OFF)
+  set(CURL_USE_LIBPSL OFF)
+  FetchContent_Declare(
+    curl
+    URL https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz
+    URL_HASH
+      SHA256=8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5)
+  list(APPEND FETCH_PACKAGES curl)
+endif()
+
 set(CPR_BUILD_TESTS
     OFF
     CACHE BOOL "Disable CPR tests" FORCE)
-set(CPR_CURL_USE_LIBPSL
-    OFF
-    CACHE BOOL "Disable libpsl for CPR curl" FORCE)
-set(CPR_USE_SYSTEM_CURL
-    OFF
-    CACHE BOOL "Use system curl for CPR")
-set(BUILD_STATIC_CURL
-    ON
-    CACHE BOOL "Enable static curl for CPR" FORCE)
-set(BUILD_SHARED_LIBS
-    OFF
-    CACHE BOOL "Disable shared libraries for CPR" FORCE)
+set(CPR_ENABLE_INSTALL OFF)
+# Configuring curl directly avoids CPR's bundled zlib build.
+set(CPR_USE_EXISTING_CURL_TARGET ON)
+set(CPR_FORCE_OPENSSL_BACKEND OFF)
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
-  GIT_TAG 1.14.2
-  FIND_PACKAGE_ARGS 1.14.2)
+  GIT_TAG 1.15.1)
 list(APPEND FETCH_PACKAGES cpr)
 
 if(BUILD_IQM_QDMI_TESTS)
@@ -113,12 +164,4 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 endif()
 
-# Make all declared dependencies available.
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
-
-# CPR 1.14.2 treats clang-cl like Unix Clang and combines /Wall with -Werror.
-# Keep its diagnostics visible without failing the dependency build.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL
-                                              "MSVC")
-  target_compile_options(cpr PRIVATE -Wno-error)
-endif()

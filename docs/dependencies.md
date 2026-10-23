@@ -7,23 +7,18 @@ and licenses.
 ## Core Runtime Dependencies
 
 These dependencies are linked into the shared library and
-**shipped with every built wheel or binary**.
+**shipped with every built wheel or binary**, except system curl on macOS.
 
 | Dependency      | Version | License                        | Purpose                                                    |
 | :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
 | [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
 | [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
-| [CPR]           | 1.14.2  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [curl]          | 8.23.0  | curl License                   | HTTP transport                                             |
 
 ```{note}
-In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2,
-etc.) are automatically bundled by platform-specific repair tools:
-[`auditwheel`](https://github.com/pypa/auditwheel) on Linux,
-[`delocate`](https://github.com/matthew-brett/delocate) on macOS, and
-[`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux,
-the exact bundled versions correspond to those available in the
-[`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by
-[cibuildwheel](https://cibuildwheel.pypa.io/).
+Linux wheels also bundle OpenSSL 3 (Apache-2.0); updating it requires a new
+wheel release. The device's LLVM exception does not apply to OpenSSL.
 ```
 
 ## Build Dependencies
@@ -113,6 +108,7 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 
 [Breathe]: https://github.com/breathe-doc/breathe
 [CPR]: https://github.com/libcpr/cpr
+[curl]: https://curl.se/
 [Doxygen]: https://github.com/doxygen/doxygen
 [Furo]: https://github.com/pradyunsg/furo
 [googletest]: https://github.com/google/googletest

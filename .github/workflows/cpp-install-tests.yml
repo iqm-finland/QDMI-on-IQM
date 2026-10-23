@@ -41,10 +41,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # Install build dependencies (Ubuntu only)
-      - name: Install Dependencies
+      - name: Install build dependencies on Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
 
       # Set up ccache for faster C++ builds
       - name: Setup ccache

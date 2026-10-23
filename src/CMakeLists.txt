@@ -17,6 +17,29 @@
 
 include(GNUInstallDirs)
 
+# Copy notices from the dependencies bundled into this build.
+set(LICENSE_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/licenses/${QDMI_TARGET_NAME}")
+# scikit-build-core packages LICENSE, including OpenSSL 3's Apache-2.0 text.
+if(SKBUILD)
+  set(LICENSE_INSTALL_DIR "${SKBUILD_METADATA_DIR}/licenses")
+else()
+  install(
+    FILES "${PROJECT_SOURCE_DIR}/LICENSE"
+    DESTINATION "${LICENSE_INSTALL_DIR}"
+    COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+endif()
+set(LICENSE_DEPENDENCIES cpr nlohmann_json curl)
+set(LICENSE_FILENAMES LICENSE LICENSE.MIT COPYING)
+foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
+  FetchContent_GetProperties(${DEPENDENCY})
+  if(${DEPENDENCY}_SOURCE_DIR)
+    install(
+      FILES "${${DEPENDENCY}_SOURCE_DIR}/${FILENAME}"
+      DESTINATION "${LICENSE_INSTALL_DIR}/${DEPENDENCY}"
+      COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+  endif()
+endforeach()
+
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})
 
