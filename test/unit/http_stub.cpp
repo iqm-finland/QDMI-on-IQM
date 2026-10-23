@@ -87,8 +87,10 @@ HttpStub::HttpStub() {
   hooks.post = [this](const cpr::Url &url,
                       const std::optional<cpr::Bearer> &bearer_token,
                       const cpr::ConnectionPool &connection_pool,
-                      const cpr::Header & /*headers*/, const cpr::Body &body,
+                      const cpr::Header &headers, const cpr::Body &body,
                       const std::chrono::milliseconds timeout) {
+    EXPECT_EQ(headers.at("Content-Type"), "application/json");
+    EXPECT_FALSE(headers.contains("Expect"));
     post_urls_.push_back(url.str());
     post_bodies_.push_back(body.str());
     post_bearer_tokens_.push_back(bearer_token);

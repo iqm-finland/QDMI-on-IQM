@@ -1411,8 +1411,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, token, *job->session_->connection_pool_, payload,
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_,
-      &job->session_->rate_limit_);
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1469,8 +1468,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, token, *job->session_->connection_pool_, program,
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_,
-      &job->session_->rate_limit_);
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1581,7 +1579,7 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
                                             job->job_id_);
   const auto job_abortion_response = iqm::http::Post(
       job_abortion_url, job->session_->token_manager_->get_bearer_token(),
-      *job->session_->connection_pool_, "", {}, job->session_->request_timeout_,
+      *job->session_->connection_pool_, "", job->session_->request_timeout_,
       &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_abortion_response);
   if (status != QDMI_SUCCESS) {

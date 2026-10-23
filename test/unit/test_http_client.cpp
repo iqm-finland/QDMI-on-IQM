@@ -381,6 +381,21 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
             (std::vector<const cpr::ConnectionPool *>{&connection_pool}));
 }
 
+TEST(HttpClientTest, PostDoesNotRequestContinueWhenRetryingLargeBody) {
+  iqm::test_support::HttpStub http_stub;
+  http_stub.queue_post(429, "", {{"Retry-After", "1"}}).queue_post(200);
+  const cpr::ConnectionPool connection_pool;
+  const std::string payload((1024 * 1024) + 1, 'x');
+
+  EXPECT_EQ(iqm::http::Post("https://example.test/jobs", std::nullopt,
+                            connection_pool, payload)
+                .status_code,
+            200);
+  EXPECT_EQ(http_stub.post_bodies(),
+            (std::vector<std::string>{payload, payload}));
+  EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{1});
+}
+
 TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
   iqm::test_support::HttpStub http_stub;
   const cpr::ConnectionPool connection_pool;
@@ -391,7 +406,7 @@ TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
       "https://example.test/jobs", std::nullopt, connection_pool, timeout);
   const auto post_response =
       iqm::http::Post("https://example.test/jobs", std::nullopt,
-                      connection_pool, "{}", {}, timeout);
+                      connection_pool, "{}", timeout);
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);

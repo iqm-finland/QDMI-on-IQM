@@ -60,6 +60,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CPR_BUILD_TESTS
     OFF
     CACHE BOOL "Disable CPR tests" FORCE)
+set(CPR_ENABLE_INSTALL
+    OFF
+    CACHE BOOL "Disable installation of internal CPR dependency" FORCE)
 set(CPR_CURL_USE_LIBPSL
     OFF
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
@@ -75,8 +78,8 @@ set(BUILD_SHARED_LIBS
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
-  GIT_TAG 1.14.2
-  FIND_PACKAGE_ARGS 1.14.2)
+  GIT_TAG 1.15.1
+  FIND_PACKAGE_ARGS 1.15.1)
 list(APPEND FETCH_PACKAGES cpr)
 
 if(BUILD_IQM_QDMI_TESTS)
@@ -115,10 +118,3 @@ endif()
 
 # Make all declared dependencies available.
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
-
-# CPR 1.14.2 treats clang-cl like Unix Clang and combines /Wall with -Werror.
-# Keep its diagnostics visible without failing the dependency build.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL
-                                              "MSVC")
-  target_compile_options(cpr PRIVATE -Wno-error)
-endif()

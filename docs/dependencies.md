@@ -13,7 +13,7 @@ These dependencies are linked into the shared library and
 | :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
 | [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
 | [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
-| [CPR]           | 1.14.2  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
 
 ```{note}
 In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2,

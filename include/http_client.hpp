@@ -86,31 +86,24 @@ cpr::Response Get(const cpr::Url &url,
                   std::chrono::milliseconds timeout = std::chrono::hours{1},
                   Rate_limit_budget *rate_limit = nullptr);
 
-/**
- * @brief Perform an HTTP POST request.
- *
- * Sends an HTTP POST request to the specified URL with a JSON body. The
- * request automatically includes a JSON content type header and supports
- * additional custom headers. The request waits when @p rate_limit_budget
- * reports the remaining quota running low, and HTTP 429 responses are retried
- * according to the server's Retry-After header.
- *
- * @param url The target URL for the POST request.
- * @param bearer_token Bearer token used for authentication, if configured.
- * @param connection_pool Connection pool shared by the owning device session.
- * @param data The request body data.
- * @param additional_headers Additional HTTP headers to include.
- * @param timeout Overall timeout for the request, the rate-limit wait, and any
- * rate-limit retries.
- * @param rate_limit Quota the calling session last saw, updated in place.
- * A request belonging to no session passes nullptr and relies on Retry-After.
- * @return CPR response object.
- */
+/// @brief Perform an HTTP POST request with a JSON content type and body.
+///
+/// The request waits when @p rate_limit reports the remaining quota running
+/// low, and HTTP 429 responses are retried according to Retry-After.
+///
+/// @param url The target URL for the POST request.
+/// @param bearer_token Bearer token used for authentication, if configured.
+/// @param connection_pool Connection pool shared by the owning device session.
+/// @param data The request body data.
+/// @param timeout Overall timeout for the request, the rate-limit wait, and any
+/// rate-limit retries.
+/// @param rate_limit Quota the calling session last saw, updated in place.
+/// A request belonging to no session passes nullptr and relies on Retry-After.
+/// @return CPR response object.
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::ConnectionPool &connection_pool,
                    const cpr::Body &data,
-                   const cpr::Header &additional_headers = {},
                    std::chrono::milliseconds timeout = std::chrono::hours{1},
                    Rate_limit_budget *rate_limit = nullptr);
 

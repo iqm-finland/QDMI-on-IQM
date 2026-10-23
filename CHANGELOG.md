@@ -12,11 +12,16 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update CPR to 1.15.1 and use its default POST-to-GET handling for HTTP 301,
+  302, and 303 redirects ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
 ### Fixed
 
+- ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
+  one-second upload stall observed with Resonance over HTTP/2
+  ([**@burgholzer**]).
 - 🐛 Preserve IQM JSON measurement order in shots and histograms and normalize
   complete terminal Qiskit readout to classical-bit order ([#306], [#308])
   ([**@burgholzer**]).
