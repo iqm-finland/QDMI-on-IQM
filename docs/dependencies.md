@@ -16,14 +16,12 @@ These dependencies are linked into the shared library and
 | [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
 
 ```{note}
-In pre-built wheels, libcurl and its transitive dependencies (OpenSSL, nghttp2,
-etc.) are automatically bundled by platform-specific repair tools:
-[`auditwheel`](https://github.com/pypa/auditwheel) on Linux,
-[`delocate`](https://github.com/matthew-brett/delocate) on macOS, and
-[`delvewheel`](https://github.com/adang1345/delvewheel) on Windows. On Linux,
-the exact bundled versions correspond to those available in the
-[`manylinux_2_28`](https://github.com/pypa/manylinux) container images used by
-[cibuildwheel](https://cibuildwheel.pypa.io/).
+Wheels link CPR and its bundled curl statically. HTTP/2 is disabled, so nghttp2
+is not needed. On Linux, [`auditwheel`](https://github.com/pypa/auditwheel)
+bundles OpenSSL from the [`manylinux_2_28`](https://github.com/pypa/manylinux)
+build image. macOS wheels also link OpenSSL statically, built from source for
+macOS 13.3, and use Apple's native certificate trust. Windows uses the system
+Schannel TLS backend.
 ```
 
 ## Build Dependencies

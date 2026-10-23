@@ -12,16 +12,22 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Update CPR to 1.15.1, use its default POST-to-GET handling for HTTP 301,
-  302, and 303 redirects, and borrow submission bodies through synchronous
-  requests and retries without copying them. Use HTTP/1.1 to avoid the bundled
-  curl HTTP/2 receive-path vulnerability (CVE-2026-92392) ([#311])
-  ([**@burgholzer**]).
+- ⬆️ Update CPR to 1.15.1 ([#311]) ([**@burgholzer**]).
+- ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
+  default ([#311]) ([**@burgholzer**]).
+- ⚡️ Avoid copying submission bodies across synchronous requests and rate-limit
+  retries ([#311]) ([**@burgholzer**]).
+- 📦 Bundle static curl and OpenSSL in macOS wheels while using Apple's system
+  certificate trust ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
 ### Fixed
 
+- 🔒 Use HTTP/1.1 to avoid curl's HTTP/2 receive-path vulnerability
+  (CVE-2026-92392) ([#311]) ([**@burgholzer**]).
+- 🩹 Select OpenSSL 3 headers and libraries for manylinux wheel builds ([#311])
+  ([**@burgholzer**]).
 - ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
   one-second upload stall observed with Resonance over HTTP/2 ([#311])
   ([**@burgholzer**]).

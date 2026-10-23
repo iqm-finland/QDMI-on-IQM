@@ -153,12 +153,6 @@ template = '''
 version = "${version}"
 '''
 
-[[tool.scikit-build.overrides]]
-if.platform-system = "darwin"
-cmake.define.CMAKE_IGNORE_PREFIX_PATH = "/opt/homebrew;/usr/local"
-cmake.define.CMAKE_DISABLE_FIND_PACKAGE_PkgConfig = "ON"
-cmake.define.CPR_USE_SYSTEM_CURL = "ON"
-
 
 [tool.uv]
 cache-keys = [
@@ -199,7 +193,18 @@ overrides = [
 before-all = "yum install -y openssl3-devel"
 
 [tool.cibuildwheel.macos]
-environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "13.3", OPENSSL_ROOT_DIR = "/tmp/qdmi-openssl" }
+# Homebrew bottles target newer macOS versions than the wheels support.
+before-all = """
+set -eu
+curl -fsSL https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz -o /tmp/qdmi-openssl.tar.gz
+echo '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a  /tmp/qdmi-openssl.tar.gz' | shasum -a 256 -c -
+tar -xzf /tmp/qdmi-openssl.tar.gz -C /tmp
+cd /tmp/openssl-3.5.9
+./Configure no-shared no-tests no-module --prefix="$OPENSSL_ROOT_DIR" -mmacosx-version-min="$MACOSX_DEPLOYMENT_TARGET"
+make -j3 install_dev
+cp LICENSE.txt "$OPENSSL_ROOT_DIR"
+"""
 
 [tool.cibuildwheel.windows]
 repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --namespace-pkg iqm"

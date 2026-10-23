@@ -62,13 +62,14 @@ set(CPR_BUILD_TESTS
     CACHE BOOL "Disable CPR tests" FORCE)
 # CPR and curl are private dependencies; do not install their public interfaces.
 set(CPR_ENABLE_INSTALL OFF)
+set(CPR_USE_SYSTEM_CURL OFF)
 set(CURL_DISABLE_INSTALL ON)
+if(APPLE)
+  set(USE_APPLE_SECTRUST ON)
+endif()
 set(CPR_CURL_USE_LIBPSL
     OFF
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
-set(CPR_USE_SYSTEM_CURL
-    OFF
-    CACHE BOOL "Use system curl for CPR")
 # HTTP/1.1 needs no nghttp2 and avoids CVE-2026-92392 in cpr's bundled curl.
 set(USE_NGHTTP2
     OFF

@@ -119,7 +119,7 @@ QDMI_STATUS Handle_response(
 namespace internal {
 /// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
 /// bundle. An empty result leaves libcurl's platform default in place.
-/// Explicit paths are passed through even when invalid, so TLS fails closed.
+/// Explicit paths are passed through to libcurl.
 [[nodiscard]] std::string Resolve_ca_bundle();
 
 /**
