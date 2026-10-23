@@ -199,11 +199,7 @@ before-all = "yum install -y openssl3-devel zlib-devel"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
-before-all = """
-apk add openssl-dev zlib-dev
-mkdir -p /usr/share/licenses/openssl
-curl -fsSL "https://raw.githubusercontent.com/openssl/openssl/openssl-$(pkg-config --modversion openssl)/LICENSE.txt" -o /usr/share/licenses/openssl/LICENSE.txt
-"""
+before-all = "apk add openssl-dev zlib-dev"
 
 
 [tool.ruff]

@@ -6,37 +6,25 @@ and licenses.
 
 ## Core Runtime Dependencies
 
-These dependencies are linked into the shared library. macOS uses the system
-curl; other platforms bundle curl with every built wheel or binary.
+These dependencies are linked into the shared library and
+**shipped with every built wheel or binary**, except system curl on macOS.
 
-| Dependency      | Version                 | License                        | Purpose                                                    |
-| :-------------- | :---------------------- | :----------------------------- | :--------------------------------------------------------- |
-| [QDMI]          | 1.4.0                   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
-| [nlohmann/json] | 3.12.0                  | MIT License                    | JSON parsing and serialization                             |
-| [CPR]           | 1.15.1                  | MIT License                    | C++ Requests HTTP client library for backend communication |
-| [curl]          | 8.23.0; system on macOS | curl License                   | HTTP transport                                             |
+| Dependency      | Version | License                        | Purpose                                                    |
+| :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
+| [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
+| [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
+| [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [curl]          | 8.23.0  | curl License                   | HTTP transport                                             |
 
 ```{note}
-CPR is linked statically. macOS uses Apple's system curl and TLS; Windows and
-Linux link curl statically. TLS uses Windows Schannel or installed OpenSSL 3 on
-Linux. curl uses available system compression libraries and nghttp2 for HTTP/2.
-Certificate verification uses the host's CA bundle on Linux and the native trust
-stores on macOS and Windows.
-
-Native installations use system TLS and compression libraries, which can be
-updated independently. Portable Linux Python wheels include copies of
-non-platform shared libraries; those copies are updated through wheel releases.
-macOS and Windows wheels use system TLS.
+Linux wheels also bundle OpenSSL 3 (Apache-2.0); updating it requires a new
+wheel release. The device's LLVM exception does not apply to OpenSSL.
 ```
 
 ## Build Dependencies
 
 Used to build the Python package and bridge packaging with the CMake-based
 native build. These are **not shipped** in any binary or wheel.
-
-Native builds require a C++20 compiler and CMake >=3.24. Linux builds also need
-the OpenSSL 3 development package. System compression development packages are
-optional; curl enables the decoders it finds.
 
 | Dependency          | Version | License    | Purpose                                    |
 | :------------------ | :------ | :--------- | :----------------------------------------- |

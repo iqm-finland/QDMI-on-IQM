@@ -37,10 +37,8 @@ Examples guide.
 
 Linux wheels use the host's CA trust store, discovering the standard CA bundle
 on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
-distribution's `ca-certificates` package if it is missing. macOS and Windows use
-their native certificate trust stores. The same trust settings apply to native
-builds and wheels. Native builds use system TLS libraries; portable Linux wheels
-include the non-platform TLS libraries they require.
+distribution's `ca-certificates` package if it is missing. Other platforms keep
+libcurl's native defaults.
 
 For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
 bundle before making requests. `SSL_CERT_FILE` is also supported when
@@ -50,9 +48,7 @@ native and Python clients.
 
 ### Session Configuration
 
-Serialize calls on a device session and all jobs created from it. They share
-connections, authentication state, and rate-limit information. Use separate
-sessions for parallel requests.
+Use separate device sessions for concurrent requests.
 
 The internal `QDMIClient` test helper configures a device session as shown
 below. It calls the IQM QDMI Device interface directly and is not part of the

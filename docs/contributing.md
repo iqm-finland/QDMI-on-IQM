@@ -175,23 +175,8 @@ perfect. We will guide you through the process.
 ## Working on the C++ Library
 
 Building the project requires a C++20-capable C++ compiler and
-[CMake](https://cmake.org/) 3.24 or newer. CMake builds CPR from source and
-links it statically. macOS uses Apple's system curl and TLS; Windows and Linux
-build static curl, with Schannel on Windows and installed OpenSSL 3 on Linux.
-
-Linux builds need the OpenSSL development package:
-
-- Debian/Ubuntu: `sudo apt-get install libssl-dev`
-- Fedora/RHEL: `sudo dnf install openssl-devel`
-
-curl automatically enables gzip/deflate, Brotli and Zstd response decoding when
-it finds the corresponding system development packages. No separate curl,
-OpenSSL or compression-library source build is needed.
-
-Native installations use system TLS and compression libraries, so their package
-manager or operating system can update them independently. Portable Linux Python
-wheels include copies of non-platform shared libraries; updating those copies
-requires a new wheel release. macOS and Windows wheels use system TLS.
+[CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
+development package.
 
 CI runs the native integration tests and documentation notebooks with
 `IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
