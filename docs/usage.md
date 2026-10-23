@@ -48,6 +48,10 @@ native and Python clients.
 
 ### Session Configuration
 
+Serialize calls on a device session and all jobs created from it. They share
+connections, authentication state, and rate-limit information. Use separate
+sessions for parallel requests.
+
 The internal `QDMIClient` test helper configures a device session as shown
 below. It calls the IQM QDMI Device interface directly and is not part of the
 installed API. Each failed call throws; the helper frees the session on failure

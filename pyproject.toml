@@ -155,7 +155,8 @@ version = "${version}"
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "darwin"
-cmake.define.CMAKE_IGNORE_PATH = "/opt/homebrew;/usr/local"
+cmake.define.CMAKE_IGNORE_PREFIX_PATH = "/opt/homebrew;/usr/local"
+cmake.define.CMAKE_DISABLE_FIND_PACKAGE_PkgConfig = "ON"
 cmake.define.CPR_USE_SYSTEM_CURL = "ON"
 
 
@@ -189,10 +190,13 @@ environment-pass = [
 test-command = "pytest test/python"
 test-groups = [ "test" ]
 test-sources = [ "test/python" ]
-overrides = [ { select = "*-musllinux*", before-all = "apk add openssl-dev" } ]
+overrides = [
+  { select = "*-manylinux*", config-settings = { "cmake.define.CMAKE_PREFIX_PATH" = "/usr/include/openssl3;/usr/lib64/openssl3" } },
+  { select = "*-musllinux*", before-all = "apk add openssl-dev" },
+]
 
 [tool.cibuildwheel.linux]
-before-all = "yum install -y openssl-devel"
+before-all = "yum install -y openssl3-devel"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }

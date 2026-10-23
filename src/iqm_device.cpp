@@ -1460,7 +1460,7 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
   if (job->programs_.size() != 1) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
-  const auto program = std::string{Program_contents(job->programs_.front())};
+  const auto program = Program_contents(job->programs_.front());
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   const auto token = job->session_->token_manager_->get_bearer_token();

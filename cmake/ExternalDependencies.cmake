@@ -60,21 +60,19 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CPR_BUILD_TESTS
     OFF
     CACHE BOOL "Disable CPR tests" FORCE)
-set(CPR_ENABLE_INSTALL
-    OFF
-    CACHE BOOL "Disable installation of internal CPR dependency" FORCE)
+# CPR and curl are private dependencies; do not install their public interfaces.
+set(CPR_ENABLE_INSTALL OFF)
+set(CURL_DISABLE_INSTALL ON)
 set(CPR_CURL_USE_LIBPSL
     OFF
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
 set(CPR_USE_SYSTEM_CURL
     OFF
     CACHE BOOL "Use system curl for CPR")
-set(BUILD_STATIC_CURL
-    ON
-    CACHE BOOL "Enable static curl for CPR" FORCE)
-set(BUILD_SHARED_LIBS
+# HTTP/1.1 needs no nghttp2 and avoids CVE-2026-92392 in cpr's bundled curl.
+set(USE_NGHTTP2
     OFF
-    CACHE BOOL "Disable shared libraries for CPR" FORCE)
+    CACHE BOOL "Disable HTTP/2 in bundled curl" FORCE)
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
@@ -116,5 +114,8 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 endif()
 
-# Make all declared dependencies available.
+# Build private dependencies statically without changing the parent's defaults.
+set(BUILD_SHARED_LIBS_PREV ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
+set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_PREV})

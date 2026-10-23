@@ -31,11 +31,11 @@
 #include <cerrno>
 #include <chrono>
 #include <cpr/bearer.h>
-#include <cpr/body.h>
 #include <cpr/body_view.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
+#include <cpr/http_version.h>
 #include <cpr/response.h>
 #include <cpr/session.h>
 #include <cpr/ssl_options.h>
@@ -47,6 +47,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -88,6 +89,8 @@ void Apply_common_options(cpr::Session &session, const cpr::Url &url,
   session.SetUrl(url);
   session.SetHeader(headers);
   session.SetUserAgent(cpr::UserAgent{"QDMI-on-IQM"});
+  // Avoid the HTTP/2 receive-path flaw in bundled curl 8.22.0 (CVE-2026-92392).
+  session.SetHttpVersion(cpr::HttpVersion{cpr::HttpVersionCode::VERSION_1_1});
   using CprTimeoutRep = decltype(cpr::Timeout{timeout}.Milliseconds());
   session.SetTimeout(
       cpr::Timeout{Clamp_timeout_for_transport<CprTimeoutRep>(timeout)});
@@ -113,13 +116,14 @@ cpr::Response Default_get(const cpr::Url &url,
 cpr::Response Default_post(const cpr::Url &url,
                            const std::optional<cpr::Bearer> &bearer_token,
                            const cpr::ConnectionPool &connection_pool,
-                           const cpr::Header &headers, const cpr::Body &body,
+                           const cpr::Header &headers,
+                           const std::string_view body,
                            const std::chrono::milliseconds timeout) {
   cpr::Session session;
   Apply_common_options(session, url, bearer_token, connection_pool, headers,
                        timeout);
   // The caller owns the body until this synchronous request returns.
-  session.SetBodyView(cpr::BodyView{body.str()});
+  session.SetBodyView(cpr::BodyView{body});
   return session.Post();
 }
 
@@ -533,11 +537,11 @@ cpr::Response Get(const cpr::Url &url,
 
 cpr::Response
 Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
-     const cpr::ConnectionPool &connection_pool, const cpr::Body &data,
+     const cpr::ConnectionPool &connection_pool, const std::string_view data,
      const std::chrono::milliseconds timeout, Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing POST request to " + url.str());
-  if (const auto &data_str = data.str(); !data_str.empty()) {
-    LOG_DEBUG("POST data: " + data_str);
+  if (!data.empty()) {
+    LOG_DEBUG(std::string{"POST data: "}.append(data));
   }
   const auto &hooks = internal::Get_hooks();
   const cpr::Header headers{{"Content-Type", "application/json"}};

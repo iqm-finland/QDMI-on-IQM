@@ -27,7 +27,6 @@
 
 #include <chrono>
 #include <cpr/bearer.h>
-#include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
@@ -36,6 +35,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace iqm::http {
@@ -94,7 +94,7 @@ cpr::Response Get(const cpr::Url &url,
 /// @param url The target URL for the POST request.
 /// @param bearer_token Bearer token used for authentication, if configured.
 /// @param connection_pool Connection pool shared by the owning device session.
-/// @param data The request body data.
+/// @param data Body borrowed for this synchronous call, including retries.
 /// @param timeout Overall timeout for the request, the rate-limit wait, and any
 /// rate-limit retries.
 /// @param rate_limit Quota the calling session last saw, updated in place.
@@ -103,7 +103,7 @@ cpr::Response Get(const cpr::Url &url,
 cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::ConnectionPool &connection_pool,
-                   const cpr::Body &data,
+                   std::string_view data,
                    std::chrono::milliseconds timeout = std::chrono::hours{1},
                    Rate_limit_budget *rate_limit = nullptr);
 
@@ -167,7 +167,7 @@ struct Hooks {
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      const cpr::Body &body, std::chrono::milliseconds timeout)>
+      std::string_view body, std::chrono::milliseconds timeout)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;

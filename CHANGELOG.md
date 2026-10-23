@@ -12,8 +12,11 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Update CPR to 1.15.1 and use its default POST-to-GET handling for HTTP 301,
-  302, and 303 redirects ([#311]) ([**@burgholzer**]).
+- ⬆️ Update CPR to 1.15.1, use its default POST-to-GET handling for HTTP 301,
+  302, and 303 redirects, and borrow submission bodies through synchronous
+  requests and retries without copying them. Use HTTP/1.1 to avoid the bundled
+  curl HTTP/2 receive-path vulnerability (CVE-2026-92392) ([#311])
+  ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
