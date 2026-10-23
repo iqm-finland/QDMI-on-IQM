@@ -245,6 +245,7 @@ endif()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 # Use the dependency metadata from this build, never a host pkg-config file.
+set(OpenSSL_DIR "${OPENSSL_ROOT_DIR}/lib/cmake/OpenSSL")
 find_package(
   OpenSSL
   ${OPENSSL_VERSION}
