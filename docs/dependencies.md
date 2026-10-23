@@ -14,20 +14,22 @@ These dependencies are linked into the shared library and
 | [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
 | [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
 | [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
+| [OpenSSL]       | 3.5.9   | Apache-2.0                     | TLS and cryptography                                       |
 
 ```{note}
-Wheels link CPR and its bundled curl statically. HTTP/2 is disabled, so nghttp2
-is not needed. On Linux, [`auditwheel`](https://github.com/pypa/auditwheel)
-bundles OpenSSL from the [`manylinux_2_28`](https://github.com/pypa/manylinux)
-build image. macOS wheels also link OpenSSL statically, built from source for
-macOS 13.3, and use Apple's native certificate trust. Windows uses the system
-Schannel TLS backend.
+Native builds and wheels link CPR, its bundled curl, and OpenSSL 3.5.9
+statically on every platform. CMake builds OpenSSL from pinned sources. HTTP/2
+is disabled, so nghttp2 is not needed. Certificate verification uses the host's
+CA bundle on Linux and the native trust stores on macOS and Windows.
 ```
 
 ## Build Dependencies
 
 Used to build the Python package and bridge packaging with the CMake-based
 native build. These are **not shipped** in any binary or wheel.
+
+Native builds also require a C++20 compiler, CMake >=3.24, Perl, and Make (NMake
+with MSVC on Windows). Windows x64 builds additionally require NASM.
 
 | Dependency          | Version | License    | Purpose                                    |
 | :------------------ | :------ | :--------- | :----------------------------------------- |
@@ -119,6 +121,7 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 [MyST-NB]: https://github.com/executablebooks/MyST-NB
 [nlohmann/json]: https://github.com/nlohmann/json
 [nox]: https://github.com/wntrblm/nox
+[OpenSSL]: https://github.com/openssl/openssl
 [pytest]: https://github.com/pytest-dev/pytest
 [pytest-console-scripts]: https://github.com/kvas-it/pytest-console-scripts
 [pytest-cov]: https://github.com/pytest-dev/pytest-cov

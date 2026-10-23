@@ -174,8 +174,15 @@ perfect. We will guide you through the process.
 
 ## Working on the C++ Library
 
-Building the project requires a C++20-capable C++ compiler and
-[CMake](https://cmake.org/) 3.24 or newer.
+Building the project requires a C++20-capable C++ compiler,
+[CMake](https://cmake.org/) 3.24 or newer, Perl, and Make (NMake with MSVC on
+Windows). Windows x64 builds also need NASM. CMake builds pinned OpenSSL 3.5.9
+and CPR/curl from source and links them statically; no system OpenSSL or curl
+development package is needed.
+
+Build one x86_64 or ARM64 architecture at a time; Linux builds use a native
+toolchain. When embedding the project with `add_subdirectory`, configure it
+before other dependencies create `OpenSSL::SSL` or `OpenSSL::Crypto` targets.
 
 CI runs the native integration tests and documentation notebooks with
 `IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The

@@ -49,6 +49,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install NASM
+        if: runner.arch == 'X64'
+        uses: ilammy/setup-nasm@e77cc62a22a374a4d0668286007cc3e3b4c17760 # v1.5.2
+        with:
+          version: "3.02"
       - name: Configure CMake
         env:
           COMPILER: ${{ inputs.compiler }}

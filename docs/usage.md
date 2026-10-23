@@ -37,8 +37,9 @@ Examples guide.
 
 Linux wheels use the host's CA trust store, discovering the standard CA bundle
 on Debian/Ubuntu, RHEL, SUSE, and Alpine systems at runtime. Install your
-distribution's `ca-certificates` package if it is missing. Other platforms keep
-libcurl's native defaults.
+distribution's `ca-certificates` package if it is missing. macOS and Windows use
+their native certificate trust stores. The same trust settings apply to native
+builds and wheels, which bundle static OpenSSL.
 
 For a private CA or a nonstandard bundle location, set `CURL_CA_BUNDLE` to a PEM
 bundle before making requests. `SSL_CERT_FILE` is also supported when

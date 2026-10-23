@@ -28,6 +28,11 @@ jobs:
           submodules: recursive
           fetch-depth: 0
           persist-credentials: false
+      - name: Install NASM
+        if: runner.os == 'Windows' && runner.arch == 'X64'
+        uses: ilammy/setup-nasm@e77cc62a22a374a4d0668286007cc3e3b4c17760 # v1.5.2
+        with:
+          version: "3.02"
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0

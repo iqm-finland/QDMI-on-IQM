@@ -17,20 +17,15 @@
 
 include(GNUInstallDirs)
 
-# macOS wheels statically bundle OpenSSL built for the deployment target.
-if(SKBUILD
-   AND APPLE
-   AND CURL_USE_OPENSSL)
-  find_file(
-    OPENSSL_LICENSE
-    NAMES LICENSE.txt
-    PATHS "${OPENSSL_INCLUDE_DIR}/.."
-    NO_DEFAULT_PATH REQUIRED)
-  install(
-    FILES "${OPENSSL_LICENSE}"
-    DESTINATION "${SKBUILD_METADATA_DIR}/licenses/openssl"
-    COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+# OpenSSL is statically linked into every distribution.
+set(LICENSE_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/licenses/${QDMI_TARGET_NAME}")
+if(SKBUILD)
+  set(LICENSE_INSTALL_DIR "${SKBUILD_METADATA_DIR}/licenses")
 endif()
+install(
+  FILES "${openssl_SOURCE_DIR}/LICENSE.txt"
+  DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
+  COMPONENT ${QDMI_TARGET_NAME}_Runtime)
 
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})
