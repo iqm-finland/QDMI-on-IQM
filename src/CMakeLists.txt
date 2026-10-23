@@ -17,15 +17,27 @@
 
 include(GNUInstallDirs)
 
-# OpenSSL is statically linked into every distribution.
+# Copy notices from the dependencies bundled into this build.
 set(LICENSE_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/licenses/${QDMI_TARGET_NAME}")
 if(SKBUILD)
   set(LICENSE_INSTALL_DIR "${SKBUILD_METADATA_DIR}/licenses")
 endif()
-install(
-  FILES "${openssl_SOURCE_DIR}/LICENSE.txt"
-  DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
-  COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+foreach(DEPENDENCY IN ITEMS cpr nlohmann_json curl openssl)
+  FetchContent_GetProperties(${DEPENDENCY})
+  if(${DEPENDENCY}_SOURCE_DIR)
+    file(
+      GLOB
+      DEPENDENCY_LICENSE
+      "${${DEPENDENCY}_SOURCE_DIR}/LICENSE"
+      "${${DEPENDENCY}_SOURCE_DIR}/LICENSE.MIT"
+      "${${DEPENDENCY}_SOURCE_DIR}/LICENSE.txt"
+      "${${DEPENDENCY}_SOURCE_DIR}/COPYING")
+    install(
+      FILES ${DEPENDENCY_LICENSE}
+      DESTINATION "${LICENSE_INSTALL_DIR}/${DEPENDENCY}"
+      COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+  endif()
+endforeach()
 
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})
