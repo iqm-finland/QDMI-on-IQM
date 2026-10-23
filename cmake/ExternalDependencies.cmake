@@ -27,7 +27,7 @@ else()
       CACHE STRING "Minimum QDMI version")
   set(QDMI_VERSION 1.4.0
       CACHE STRING "QDMI version")
-  set(QDMI_REV "6db03d83ad602aaa9fe928b5c3fc5cce84b10061" # v1.4.0
+  set(QDMI_REV "e230464ebedae1ea233e2c3346eb19e0bd4d2f0c" # QDMI query conformance tests
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -35,11 +35,24 @@ else()
       OFF
       CACHE BOOL "Generate installation instructions for QDMI")
   # cmake-format: on
+  if(BUILD_IQM_QDMI_TESTS)
+    # Released packages do not yet contain the shared query suite.
+    set(qdmi_find_package_mode "${FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
+    set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+  endif()
   FetchContent_Declare(
     qdmi
     GIT_REPOSITORY https://github.com/${QDMI_REPO_OWNER}/qdmi.git
     GIT_TAG ${QDMI_REV}
     FIND_PACKAGE_ARGS ${QDMI_MINIMUM_VERSION})
+  if(BUILD_IQM_QDMI_TESTS)
+    if(qdmi_find_package_mode STREQUAL "")
+      unset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
+    else()
+      set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${qdmi_find_package_mode}")
+    endif()
+    unset(qdmi_find_package_mode)
+  endif()
   list(APPEND FETCH_PACKAGES qdmi)
 endif()
 
