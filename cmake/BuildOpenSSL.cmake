@@ -90,12 +90,12 @@ else()
 endif()
 list(APPEND _openssl_install install_dev)
 
-# Isolate builds when the compiler, native target, or deployment settings
-# change.
+# Invalidate cached builds when the recipe or toolchain settings change.
+file(SHA256 "${CMAKE_CURRENT_LIST_FILE}" _openssl_recipe_hash)
 string(
   SHA256
     _openssl_signature
-    "${OPENSSL_VERSION};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_C_COMPILER};${CMAKE_C_COMPILER_VERSION};$ENV{VCToolsVersion};${_openssl_options}"
+    "${_openssl_recipe_hash};${OPENSSL_VERSION};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_C_COMPILER};${CMAKE_C_COMPILER_VERSION};$ENV{VCToolsVersion};${_openssl_options}"
 )
 string(SUBSTRING "${_openssl_signature}" 0 16 _openssl_signature)
 set(_openssl_build "${openssl_BINARY_DIR}/${_openssl_signature}")
