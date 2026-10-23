@@ -47,10 +47,6 @@
 #include <utility>
 #include <vector>
 
-#if defined(_WIN32) && !defined(IQM_QDMI_STATIC_DEFINE)
-#error "Unit tests must not import QDMI symbols from a separate DLL"
-#endif
-
 namespace {
 
 int Set_program(IQM_QDMI_Device_Job job, const size_t size,

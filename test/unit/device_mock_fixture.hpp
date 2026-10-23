@@ -24,12 +24,17 @@
 #pragma once
 
 #include "http_stub.hpp"
+#include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/device.h"
 
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <string>
 #include <utility>
+
+#if defined(_WIN32) && !defined(IQM_QDMI_STATIC_DEFINE)
+#error "Unit tests must not import QDMI symbols from a separate DLL"
+#endif
 
 inline int Set_env_var_raw(const char *key, const char *value) {
 #ifdef _WIN32

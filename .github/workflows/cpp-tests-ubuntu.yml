@@ -57,7 +57,7 @@ jobs:
           CONFIG: ${{ inputs.config }}
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$CONFIG"
       - name: Build
-        run: cmake --build build --target ${{ github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id && 'unit_tests' || 'all' }}
+        run: cmake --build build --target ${{ github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id && 'unit_tests iqm_query_tests' || 'all' }}
       # Fork PRs can run unit tests without the upstream IQM token.
       - name: Test
         env:
