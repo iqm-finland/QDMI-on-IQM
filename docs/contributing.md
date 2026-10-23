@@ -178,12 +178,14 @@ Building the project requires a C++20-capable C++ compiler,
 [CMake](https://cmake.org/) 3.24 or newer, Perl, and Make (NMake with MSVC on
 Windows). Windows x64 builds also need NASM. CMake builds pinned OpenSSL 3.5.9
 and CPR/curl from source and links them statically; no system OpenSSL or curl
-development package is needed. On Windows, OpenSSL uses MSVC even when the
-device uses ClangCL.
+development package is needed. On Windows, use a Developer Command Prompt for
+the intended architecture. OpenSSL uses MSVC even when the device uses ClangCL.
+HTTP responses support gzip, deflate, Brotli and Zstd compression through
+bundled static libraries.
 
-Build one x86_64 or ARM64 architecture at a time; Linux builds use a native
-toolchain. When embedding the project with `add_subdirectory`, configure it
-before other dependencies create `OpenSSL::SSL` or `OpenSSL::Crypto` targets.
+Use a native x86_64 or ARM64 toolchain. When embedding the project with
+`add_subdirectory`, configure it before other dependencies create
+`OpenSSL::SSL`, `OpenSSL::Crypto` or `ZLIB::ZLIB` targets.
 
 CI runs the native integration tests and documentation notebooks with
 `IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The

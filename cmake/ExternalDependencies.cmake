@@ -72,16 +72,42 @@ set(USE_LIBIDN2 OFF)
 set(CPR_CURL_USE_LIBPSL
     OFF
     CACHE BOOL "Disable libpsl for CPR curl" FORCE)
-# Keep bundled curl independent of optional host compression libraries.
+# Build curl's response decoders as private static dependencies.
 set(CURL_ZLIB
+    ON
+    CACHE STRING "Enable zlib in bundled curl" FORCE)
+include(${CMAKE_CURRENT_LIST_DIR}/BuildZlib.cmake)
+set(BUILD_SHARED_LIBS OFF)
+set(BROTLI_BUILD_TOOLS
     OFF
-    CACHE STRING "Disable zlib in bundled curl" FORCE)
-set(CURL_BROTLI
-    OFF
-    CACHE STRING "Disable Brotli in bundled curl" FORCE)
-set(CURL_ZSTD
-    OFF
-    CACHE STRING "Disable Zstandard in bundled curl" FORCE)
+    CACHE BOOL "" FORCE)
+set(ZSTD_BUILD_SHARED OFF)
+set(ZSTD_BUILD_PROGRAMS OFF)
+set(ZSTD_BUILD_TESTS OFF)
+set(ZSTD_BUILD_COMPRESSION OFF)
+set(ZSTD_BUILD_DICTBUILDER OFF)
+FetchContent_Declare(
+  brotli
+  URL https://github.com/google/brotli/archive/refs/tags/v1.2.1.tar.gz
+  URL_HASH
+    SHA256=98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f)
+FetchContent_Declare(
+  zstd
+  URL https://github.com/facebook/zstd/archive/refs/tags/v1.5.7.tar.gz
+  URL_HASH
+    SHA256=37d7284556b20954e56e1ca85b80226768902e2edabd3b649e9e72c0c9012ee3
+  SOURCE_SUBDIR build/cmake)
+FetchContent_MakeAvailable(brotli zstd)
+set_property(DIRECTORY "${brotli_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
+set_property(DIRECTORY "${zstd_SOURCE_DIR}/build/cmake"
+             PROPERTY EXCLUDE_FROM_ALL TRUE)
+set(BROTLI_INCLUDE_DIR "${brotli_SOURCE_DIR}/c/include")
+set(BROTLICOMMON_LIBRARY brotlicommon)
+set(BROTLIDEC_LIBRARY brotlidec)
+set(ZSTD_INCLUDE_DIR "${zstd_SOURCE_DIR}/lib")
+set(ZSTD_LIBRARY libzstd_static)
+set(CURL_BROTLI ON)
+set(CURL_ZSTD ON)
 # HTTP/1.1 needs no nghttp2 and avoids CVE-2026-92392 in cpr's bundled curl.
 set(USE_NGHTTP2
     OFF

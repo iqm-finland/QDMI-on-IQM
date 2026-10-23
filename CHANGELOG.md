@@ -20,6 +20,8 @@ releases may include breaking changes.
 - 📦 Build pinned OpenSSL 3.5.9 and curl from source and link them statically on
   every platform, preserving native certificate trust ([#311])
   ([**@burgholzer**]).
+- ⚡️ Support gzip, deflate, Brotli and Zstd HTTP responses with bundled static
+  compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
