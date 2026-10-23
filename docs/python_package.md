@@ -252,3 +252,28 @@ print(job.check())
 ```
 
 A retrieved job cannot be resubmitted, and its parameters cannot be changed.
+
+## Pulse-Level Programs
+
+The device transports serialized IQM `RunDefinition` programs and raw
+`sweep_results` artifacts. Use IQM Client 36 and PulLA 15 to create a compiler
+with the device's current calibration and control settings:
+
+```console
+uv pip install 'iqm-qdmi[pulla]'
+```
+
+The `pulla` extra supports Python 3.11–3.14. The
+[pulse example](examples.md#pulse-level-execution) compiles a circuit, submits
+the serialized program through QDMI, and deserializes the acquisition arrays
+with IQM's SDK. The caller owns and can reuse the IQM client and compiler.
+
+Set the repetitions in the compiler settings. QDMI shot parameters are
+unsupported for pulse jobs because repetitions are part of the program. Assign
+fresh run and sweep UUIDs before serializing each submission.
+
+Raw results map acquisition labels to lists of NumPy arrays, one per sweep spot.
+Their shapes and values depend on the compiled readout settings; they may
+contain bits, complex integration values, or traces. Keep the run definition and
+compiler context when interpreting these results. QDMI preserves the raw
+artifact without converting it to circuit counts.

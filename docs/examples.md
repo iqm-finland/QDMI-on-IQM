@@ -71,6 +71,29 @@ uvx nox -s examples
 ./examples/mqt_bench.py --benchmark ghz --shots 128
 ```
 
+## Pulse-Level Execution
+
+`examples/pulse.py` uses IQM Client 36 and PulLA 15 to compile a one-qubit
+measurement into a `RunDefinition`, submit it through QDMI, and print the raw
+acquisition arrays. It requires Python 3.11–3.14 and pulse access to the
+selected IQM system. Configure `IQM_SERVER_URL`, `IQM_QUANTUM_COMPUTER`, and
+`IQM_TOKEN` as above, then run:
+
+```console
+./examples/pulse.py --qubit QB1 --shots 1
+```
+
+The script creates a caller-owned compiler with the current calibration and
+control settings. Reuse that compiler for further compilations, and retain the
+run definition and returned compiler context if your application needs to
+interpret acquisitions. The result maps acquisition labels to lists of NumPy
+arrays, one per sweep spot. Its dimensions and value types follow the compiled
+readout settings.
+
+This example is separate from the circuit examples session because it requires
+pulse access. See [Pulse-Level Programs](python_package.md#pulse-level-programs)
+for the submission and result contract.
+
 ## Quantum Chemistry
 
 Our first workload is a quantum chemistry application that estimates the

@@ -974,7 +974,6 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
       QDMI_PROGRAM_FORMAT_QIRADAPTIVESTRING,
       QDMI_PROGRAM_FORMAT_QIRADAPTIVEMODULE,
       QDMI_PROGRAM_FORMAT_QPY,
-      QDMI_PROGRAM_FORMAT_CUSTOM1,
       QDMI_PROGRAM_FORMAT_CUSTOM2,
       QDMI_PROGRAM_FORMAT_CUSTOM3,
       QDMI_PROGRAM_FORMAT_CUSTOM4,
@@ -991,7 +990,23 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
                 job, QDMI_DEVICE_JOB_PARAMETER_MAX, 0, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
 
+  const std::string pulse_payload{"\x08\x00", 2};
+  const size_t pulse_size = pulse_payload.size();
+  const void *pulse_program = pulse_payload.data();
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1,
+                                             1, &pulse_size, &pulse_program),
+            QDMI_SUCCESS);
   size_t shots = 5;
+  EXPECT_EQ(
+      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
+                                        sizeof(size_t), &shots),
+      QDMI_ERROR_NOTSUPPORTED);
+
+  const size_t json_size = 3;
+  const void *json_program = "{}";
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_IQMJSON,
+                                             1, &json_size, &json_program),
+            QDMI_SUCCESS);
   EXPECT_EQ(
       IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
                                         sizeof(size_t), &shots),
@@ -1138,7 +1153,7 @@ TEST_F(QDMIIntegrationTest, FailedJobErrorLog) {
       invalid_options);
   ASSERT_EQ(ret, QDMI_SUCCESS);
   ret = IQM_QDMI_device_job_submit(job);
-  ASSERT_EQ(ret, QDMI_ERROR_FATAL);
+  ASSERT_EQ(ret, QDMI_ERROR_INVALIDARGUMENT);
   const std::string output = testing::internal::GetCapturedStderr();
   EXPECT_NE(output.find("Job payload is not valid"), std::string::npos)
       << "Expected error message was not found in stderr output";
