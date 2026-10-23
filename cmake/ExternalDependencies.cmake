@@ -114,8 +114,6 @@ if(BUILD_IQM_QDMI_DOCS)
   list(APPEND FETCH_PACKAGES Doxygen)
 endif()
 
-# Build private dependencies statically without changing the parent's defaults.
-set(BUILD_SHARED_LIBS_PREV ${BUILD_SHARED_LIBS})
+# CPR uses BUILD_SHARED_LIBS to select its library type.
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(${FETCH_PACKAGES})
-set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_PREV})
