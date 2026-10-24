@@ -18,9 +18,7 @@ releases may include breaking changes.
 - ⚡️ Avoid copying submission bodies across synchronous requests and rate-limit
   retries ([#311]) ([**@burgholzer**]).
 - 📦 Link CPR statically; use Apple's system curl on macOS and static curl on
-  Linux and Windows. Ship the CPR, curl and JSON license texts with the packages
-  and fix README license links on PyPI ([#301], [#311]) ([**@marcelwa**],
-  [**@burgholzer**]).
+  Linux and Windows ([#311]) ([**@burgholzer**]).
 - ♻️ Use Windows Schannel and installed OpenSSL 3 on Linux with available system
   compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
@@ -28,6 +26,10 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 📝 Fix README license links on PyPI ([#301]) ([**@marcelwa**],
+  [**@burgholzer**]).
+- 📦 Include CPR, curl and JSON license texts in built packages ([#301], [#311])
+  ([**@marcelwa**], [**@burgholzer**]).
 - ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
   one-second upload stall observed with Resonance over HTTP/2 ([#311])
   ([**@burgholzer**]).
