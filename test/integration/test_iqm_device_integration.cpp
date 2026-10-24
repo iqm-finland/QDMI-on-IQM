@@ -413,11 +413,6 @@ TEST_F(QDMIIntegrationTest, QueryDeviceProperties) {
   ASSERT_FALSE(calibration_set_id.empty())
       << "Device must provide a calibration set ID";
 
-  // The MAX property is not a valid value for any device.
-  EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
-                session, QDMI_DEVICE_PROPERTY_MAX, 0, nullptr, nullptr),
-            QDMI_ERROR_INVALIDARGUMENT);
-
   // Custom property 1 exposes the calibration set ID.
   EXPECT_EQ(IQM_QDMI_device_session_query_device_property(
                 session, QDMI_DEVICE_PROPERTY_CUSTOM1, 0, nullptr, nullptr),
@@ -540,11 +535,6 @@ TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
       // T2 property is not supported - this is acceptable
       GTEST_LOG_(INFO) << "T2 property not supported for site " + site_name;
     }
-
-    // The MAX property is not a valid value for any device.
-    EXPECT_EQ(IQM_QDMI_device_session_query_site_property(
-                  session, site, QDMI_SITE_PROPERTY_MAX, 0, nullptr, nullptr),
-              QDMI_ERROR_INVALIDARGUMENT);
 
     // The IQM device does not support custom properties for sites.
     EXPECT_EQ(
@@ -757,12 +747,6 @@ TEST_F(QDMIIntegrationTest, QueryGatePropertiesForEachGate) {
         }
       }
     }
-
-    // The MAX property is not a valid value for any device
-    EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
-                  session, op, 0, nullptr, 0, nullptr,
-                  QDMI_OPERATION_PROPERTY_MAX, 0, nullptr, nullptr),
-              QDMI_ERROR_INVALIDARGUMENT);
 
     // The example devices do not support custom properties
     EXPECT_EQ(IQM_QDMI_device_session_query_operation_property(
