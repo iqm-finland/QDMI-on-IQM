@@ -26,6 +26,10 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 📝 Fix README license links on PyPI ([#301]) ([**@marcelwa**],
+  [**@burgholzer**]).
+- 📦 Include CPR, curl and JSON license texts in built packages ([#301], [#311])
+  ([**@marcelwa**], [**@burgholzer**]).
 - ⚡️ Avoid the `Expect: 100-continue` wait on job submissions, removing a
   one-second upload stall observed with Resonance over HTTP/2 ([#311])
   ([**@burgholzer**]).
@@ -347,6 +351,7 @@ Compatible with QDMI `v1.3.0`.
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
 [#302]: https://github.com/iqm-finland/QDMI-on-IQM/pull/302
+[#301]: https://github.com/iqm-finland/QDMI-on-IQM/pull/301
 [#298]: https://github.com/iqm-finland/QDMI-on-IQM/pull/298
 [#293]: https://github.com/iqm-finland/QDMI-on-IQM/pull/293
 [#291]: https://github.com/iqm-finland/QDMI-on-IQM/pull/291
