@@ -14,9 +14,6 @@ ci:
   autofix_commit_msg: "🎨 pre-commit fixes"
   skip: [ty]
 
-# Preserve verbatim upstream license texts.
-exclude: ^licenses/LICENSE-
-
 repos:
   ## Standard hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -19,8 +19,8 @@ releases may include breaking changes.
   retries ([#311]) ([**@burgholzer**]).
 - 📦 Link CPR statically; use Apple's system curl on macOS and static curl on
   Linux and Windows. Ship the CPR, curl and JSON license texts with the packages
-  and fix README license links on PyPI ([#301], [#311])
-  ([**@marcelwa**], [**@burgholzer**]).
+  and fix README license links on PyPI ([#301], [#311]) ([**@marcelwa**],
+  [**@burgholzer**]).
 - ♻️ Use Windows Schannel and installed OpenSSL 3 on Linux with available system
   compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])

@@ -65,7 +65,4 @@ for the development workflow, coding standards, and pull request process.
 
 This project is licensed under the **Apache License 2.0 with LLVM exception**.
 See [LICENSE](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE) for
-the license text. Binary wheels also contain third-party libraries under their
-own licenses. Their
-[notices](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/licenses/README.md)
-and license texts are included in the package's `.dist-info/licenses` directory.
+the license text.
