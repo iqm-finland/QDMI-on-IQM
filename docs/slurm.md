@@ -49,8 +49,10 @@ configuration, and committed scripts.
 The
 [offloader](python_package.md#programmatic-offloading-with-the-offloader-module)
 also submits IQM sampler and estimator jobs through `srun`. IQM supports IQM
-JSON and QIR. MQT Core's PennyLane adapter requires OpenQASM; use the IQM Qiskit
-adapter for these workloads.
+JSON and QIR. The
+[MQT Core PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html)
+also compiles to IQM JSON; select `terminal_readout=TerminalReadout.MEASURED`
+when constructing that device.
 
 ## Prepare the cluster
 

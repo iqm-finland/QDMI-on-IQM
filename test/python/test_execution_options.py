@@ -33,8 +33,6 @@ from qiskit.transpiler import Target
 
 from iqm.qdmi.qiskit import IQMBackend
 
-pytestmark = pytest.mark.usefixtures("operation_constraints")
-
 
 @pytest.fixture
 def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:
@@ -118,7 +116,6 @@ def test_classical_result_destinations(
     """Normalized readout uses Core's counts and memory decoding unchanged."""
     iqm_backend, device = backend
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", QDMIBackend._serialize_circuit)  # ruff:ignore[private-member-access]
-    monkeypatch.setattr(IQMBackend, "physical_qubits", property(lambda _self: (0, 1, 2, 3)))
     handle = Mock(spec=Job)
     handle.get_program_status.return_value = None
     handle.check.return_value = Job.Status.DONE

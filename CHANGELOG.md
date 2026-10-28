@@ -16,6 +16,8 @@ releases may include breaking changes.
   reconstruction; retain the specialized MOVE path. ([#321]) ([**@burgholzer**])
 - ♻️ Keep circuit metadata in local Qiskit results without sending it to IQM.
   ([#321]) ([**@burgholzer**])
+- ♻️ Retain physical qubit indices when filtering the Qiskit target for
+  available calibrations. ([#321]) ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).

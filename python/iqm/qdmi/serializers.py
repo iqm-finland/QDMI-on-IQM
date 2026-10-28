@@ -28,7 +28,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 try:
-    from mqt.core.mlir import serialize_program
+    from mqt.core.mlir import TerminalReadout, serialize_program
     from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
     from mqt.core.qdmi import ProgramFormat
     from qiskit.circuit.library import Barrier, CZGate, Measure, RGate
@@ -40,7 +40,6 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from .gates import MoveGate
-from .qiskit import IQMBackend
 
 if TYPE_CHECKING:
     from mqt.core.mlir import CompiledProgram
@@ -80,7 +79,7 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> Compile
             circuit,
             target=backend.device,
             program_format=ProgramFormat.IQM_JSON,
-            site_indices=backend.physical_qubits if isinstance(backend, IQMBackend) else None,
+            terminal_readout=TerminalReadout.MEASURED,
         )
     except (RuntimeError, ValueError) as exc:
         msg = f"Failed to serialize the circuit to IQM JSON: {exc}"
@@ -119,8 +118,6 @@ def _serialize_move_circuit(circuit: QuantumCircuit, backend: QDMIBackend) -> st
             _raise_error(UnsupportedOperationError, msg)
 
         sites = backend.device.sites()
-        if isinstance(backend, IQMBackend):
-            sites = [sites[index] for index in backend.physical_qubits]
         instructions: list[dict[str, Any]] = []
         measurements: dict[int, dict[str, Any]] = {}
         measured_qubits: set[int] = set()

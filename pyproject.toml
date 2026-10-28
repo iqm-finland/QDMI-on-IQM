@@ -54,7 +54,7 @@ email = "developers@iqm.tech"
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@7b474a3bccd15534da66afaf2d4a0f8523ad9637",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@43f90be9f0df1b3eee1b747bf5c4b872b7016373",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
@@ -103,7 +103,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@7b474a3bccd15534da66afaf2d4a0f8523ad9637",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@43f90be9f0df1b3eee1b747bf5c4b872b7016373",
   "numpy>=2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",

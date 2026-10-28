@@ -86,12 +86,12 @@ must use the same format.
 calibrations, together with the device's computational resonators. At least one
 calibrated qubit is required.
 
-Circuit qubit indices and `initial_layout` entries refer to this target. For
-example, if QB2 is unavailable on a three-qubit device, target indices 0 and 1
-refer to QB1 and QB3. Inspect `backend.physical_qubits` for the corresponding
-device site indices; the IQM JSON serializer uses this mapping for instruction
-loci. The underlying QDMI device and generic MQT Core `QDMIBackend` expose
-physical site indices.
+Circuit qubit indices and `initial_layout` entries are physical device site
+indices. For example, if QB2 is unavailable on a three-qubit device, usable
+indices remain 0 and 2 for QB1 and QB3. The target excludes operations involving
+uncalibrated qubits without renumbering the remaining sites. The transpiled
+circuit retains its Qiskit layout and addresses the same physical sites during
+IQM JSON serialization.
 
 ## Measurement results
 

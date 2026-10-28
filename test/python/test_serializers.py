@@ -31,7 +31,7 @@ from qiskit.circuit import ClassicalRegister, Parameter, QuantumCircuit, Quantum
 from iqm.qdmi.gates import MoveGate
 from iqm.qdmi.serializers import qiskit_to_iqm_json
 
-pytestmark = pytest.mark.usefixtures("operation_constraints", "serialization_target")
+pytestmark = pytest.mark.usefixtures("serialization_target")
 
 
 if TYPE_CHECKING:
@@ -156,17 +156,17 @@ def test_terminal_readout_layout(backend: Callable[[int], StubBackend], case: st
     assert compiled.result_layout is not None
     layout = compiled.result_layout
     assert len(layout.bits) == 3
-    assert layout.bits[1] is False
+    assert layout.bits[1] is None
     if case == "repeated":
         assert layout.bits[0] == layout.bits[2]
     else:
-        assert layout.bits[0] is False
+        assert layout.bits[0] is None
     program = json.loads(compiled.payload)
     measured = [instruction for instruction in program["instructions"] if instruction["name"] == "measure"]
     assert len(measured) == layout.raw_width
     assert len({instruction["locus"][0] for instruction in measured}) == layout.raw_width
     raw = [instruction["locus"] == ["QB1"] for instruction in measured]
-    decoded = "".join(str(int(bit if isinstance(bit, bool) else raw[bit])) for bit in reversed(layout.bits))
+    decoded = "".join(str(int(False if bit is None else raw[bit])) for bit in reversed(layout.bits))
     assert decoded == {"unused": "100", "overwrite": "000", "repeated": "101"}[case]
 
 

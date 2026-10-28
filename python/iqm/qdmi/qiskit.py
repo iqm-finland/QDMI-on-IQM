@@ -86,16 +86,11 @@ class IQMBackend(QDMIBackend):
     #: standard gate library, so the Target needs it supplied here.
     _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
 
-    @property
-    def physical_qubits(self) -> tuple[int, ...]:
-        """Device site indices in target order, including computational resonators."""
-        return self._physical_qubits
-
     def _build_target(self) -> Target:
         """Build a target from calibrated qubits and computational resonators.
 
         Returns:
-            A calibrated target with contiguous indices and native resonator operations.
+            A calibrated target retaining physical indices and native resonator operations.
 
         Raises:
             UnsupportedDeviceError: No qubits have both required calibrations.
@@ -103,26 +98,25 @@ class IQMBackend(QDMIBackend):
         target = super()._build_target()
         # The IQM device lists qubits first, followed by computational resonators.
         num_qubits = self.device.qubits_num()
-        self._physical_qubits = tuple(
+        usable = {
             index
             for index in range(target.num_qubits)
             if index >= num_qubits
             or all(target.instruction_supported(operation_name=gate, qargs=(index,)) for gate in ("r", "measure"))
-        )
-        if not any(index < num_qubits for index in self._physical_qubits):
+        }
+        if not any(index < num_qubits for index in usable):
             msg = "No IQM qubits have calibrated PRX and measurement operations."
             raise UnsupportedDeviceError(msg)
-        if len(self._physical_qubits) == target.num_qubits:
+        if len(usable) == target.num_qubits:
             return target
 
-        indices = {physical: logical for logical, physical in enumerate(self._physical_qubits)}
-        restricted = Target(description=target.description, num_qubits=len(indices))
+        restricted = Target(description=target.description, num_qubits=target.num_qubits)
         # IQM native operations have explicit calibrated loci.
         for name, placements in target.items():
             properties = {
-                tuple(indices[index] for index in locus): props
+                locus: props
                 for locus, props in placements.items()
-                if locus is not None and all(index in indices for index in locus)
+                if locus is not None and all(index in usable for index in locus)
             }
             if properties:
                 restricted.add_instruction(target.operation_from_name(name), properties, name=name)
