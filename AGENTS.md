@@ -39,9 +39,9 @@ explicit intent, valid credentials, and an appropriate target.
 ## Slurm Integration
 
 - MQT Core owns the shared Slurm runner and Docker cluster.
-- `test/slurm/` contains an SDK workload for the Emerald Resonance mock. Its
-  README describes the required credentials and eight-shot workload. Run it only
-  when live IQM access is explicitly intended.
+- `docs/slurm.md` contains IQM-specific credentials and a workload example for
+  the shared deployment. Run it only when live IQM access is explicitly
+  intended.
 
 ## Tech Stack
 

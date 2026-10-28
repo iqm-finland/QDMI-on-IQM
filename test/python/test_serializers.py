@@ -19,17 +19,20 @@
 
 from __future__ import annotations
 
-import copy
 import json
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
-from qiskit.circuit import ClassicalRegister, Clbit, Parameter, QuantumCircuit, QuantumRegister
+from mqt.core.mlir import CompiledProgram
+from mqt.core.plugins.qiskit.exceptions import TranslationError
+from qiskit.circuit import ClassicalRegister, Parameter, QuantumCircuit, QuantumRegister
 
 from iqm.qdmi.gates import MoveGate
 from iqm.qdmi.serializers import qiskit_to_iqm_json
+
+pytestmark = pytest.mark.usefixtures("serialization_target")
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -126,48 +129,62 @@ def test_native_circuit_and_readout_order(backend: Callable[[int], StubBackend])
 def test_parameter_binding(backend: Callable[[int], StubBackend]) -> None:
     """Parameters must be bound before serialization."""
     theta = Parameter("theta")
-    qc = QuantumCircuit(1)
+    qc = QuantumCircuit(1, 1)
     qc.r(theta, 0.0, 0)
-    with pytest.raises(UnsupportedOperationError, match="unbound parameters: theta"):
+    qc.measure(0, 0)
+    with pytest.raises(TranslationError, match="parameter"):
         qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
 
-    program = json.loads(qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1)))  # ty: ignore[invalid-argument-type]
+    compiled = qiskit_to_iqm_json(qc.assign_parameters({theta: np.pi}), backend(1))  # ty: ignore[invalid-argument-type]
+    assert isinstance(compiled, CompiledProgram)
+    program = json.loads(compiled.payload)
     assert program["instructions"][0]["args"]["angle"] == pytest.approx(np.pi)
 
 
-@pytest.mark.parametrize("case", ["unused", "overwrite", "repeated", "intermediate", "unregistered", "gate", "site"])
-def test_unsupported_circuits(backend: Callable[[int], StubBackend], case: str) -> None:
-    """Reject unsupported gates, site indices, and readout before submission."""
-    qc = QuantumCircuit(2, 2)
-    error: type[Exception] = TranslationError
-    sites = 2
-    if case == "unused":
-        qc.measure(0, 0)
-        message = "Every classical bit must be measured exactly once"
-    elif case == "overwrite":
-        qc.measure([0, 1], [0, 0])
-        message = "Each qubit and classical bit may be measured only once"
+@pytest.mark.parametrize("case", ["unused", "overwrite", "repeated"])
+def test_terminal_readout_layout(backend: Callable[[int], StubBackend], case: str) -> None:
+    """The native compiler retains zeros, final writes, and shared measurements."""
+    qc = QuantumCircuit(2, 3)
+    qc.r(np.pi, 0, 0)
+    qc.measure(0, 2)
+    if case == "overwrite":
+        qc.measure(1, 2)
     elif case == "repeated":
-        qc.measure([0, 0], [0, 1])
-        message = "Each qubit and classical bit may be measured only once"
-    elif case == "intermediate":
         qc.measure(0, 0)
-        qc.r(0.5, 0, 1)
-        error = UnsupportedOperationError
-        message = "terminal measurements"
-    elif case == "unregistered":
-        qc = QuantumCircuit(QuantumRegister(1), [Clbit()])
+    compiled = qiskit_to_iqm_json(qc, backend(2))  # ty: ignore[invalid-argument-type]
+    assert isinstance(compiled, CompiledProgram)
+    assert compiled.result_layout is not None
+    layout = compiled.result_layout
+    assert len(layout.bits) == 3
+    assert layout.bits[1] is None
+    if case == "repeated":
+        assert layout.bits[0] == layout.bits[2]
+    else:
+        assert layout.bits[0] is None
+    program = json.loads(compiled.payload)
+    measured = [instruction for instruction in program["instructions"] if instruction["name"] == "measure"]
+    assert len(measured) == layout.raw_width
+    assert len({instruction["locus"][0] for instruction in measured}) == layout.raw_width
+    raw = [instruction["locus"] == ["QB1"] for instruction in measured]
+    decoded = "".join(str(int(False if bit is None else raw[bit])) for bit in reversed(layout.bits))
+    assert decoded == {"unused": "100", "overwrite": "000", "repeated": "101"}[case]
+
+
+@pytest.mark.parametrize("case", ["intermediate", "gate", "site"])
+def test_unsupported_circuits(backend: Callable[[int], StubBackend], case: str) -> None:
+    """Unsupported instructions and sites fail before submission."""
+    qc = QuantumCircuit(2, 2)
+    sites = 2
+    if case == "intermediate":
         qc.measure(0, 0)
-        message = "unregistered classical bit"
+        qc.r(0.5, 0, 0)
     elif case == "gate":
         qc.h(0)
-        error = UnsupportedOperationError
-        message = "not supported in IQM JSON format"
     else:
         qc.cz(0, 1)
         sites = 1
-        message = "Failed to serialize the circuit to IQM JSON"
-    with pytest.raises(error, match=message):
+    qc.measure(1, 1)
+    with pytest.raises(TranslationError):
         qiskit_to_iqm_json(qc, backend(sites))  # ty: ignore[invalid-argument-type]
 
 
@@ -179,55 +196,12 @@ def test_serializer_is_advertised_to_mqt_core() -> None:
     assert program_serializer(ProgramFormat.IQM_JSON) is qiskit_to_iqm_json
 
 
-def test_nested_metadata_is_preserved(backend: Callable[[int], StubBackend]) -> None:
-    """Nested metadata survives serialization without changing caller data."""
-    metadata = {
-        "experiment": "calibration-check",
-        "provenance": {"tags": ["測定", None, True], "iteration": 2, "angle": 0.25},
-        "empty": {},
-        "coordinates": (1, 2),
-    }
+def test_metadata_remains_local(backend: Callable[[int], StubBackend]) -> None:
+    """Arbitrary source metadata is untouched and omitted from the cloud payload."""
+    metadata = {"experiment": object()}
     qc = QuantumCircuit(1, 1, metadata=metadata)
-    qc.r(np.pi, 0, 0)
     qc.measure(0, 0)
-    original = copy.deepcopy(qc.metadata)
-
-    program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["metadata"] == {**original, "coordinates": [1, 2]}
-    assert qc.metadata == original
-    assert [instruction["name"] for instruction in program["instructions"]] == ["prx", "measure"]
-
-
-@pytest.mark.parametrize("value", [object(), float("nan")])
-def test_invalid_metadata_is_dropped(backend: Callable[[int], StubBackend], value: object) -> None:
-    """Unsupported values, including nonfinite numbers, drop metadata with a warning."""
-    qc = QuantumCircuit(1, metadata={"nested": [value]})
-
-    with pytest.warns(UserWarning, match="Dropping circuit metadata"):
-        program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["metadata"] == {}
-
-
-def test_metadata_key_collision_is_dropped(backend: Callable[[int], StubBackend]) -> None:
-    """Numeric keys cannot silently overwrite their string equivalents in JSON."""
-    qc = QuantumCircuit(1, metadata={"nested": [{1: "numeric", "1": "string"}]})
-
-    with pytest.warns(UserWarning, match="Metadata object keys must be strings"):
-        program = json.loads(qiskit_to_iqm_json(qc, backend(1)))  # ty: ignore[invalid-argument-type]
-
-    assert program["metadata"] == {}
-
-    assert qc.metadata == {"nested": [{1: "numeric", "1": "string"}]}
-
-
-def test_circular_metadata_is_dropped(backend: Callable[[int], StubBackend]) -> None:
-    """Circular metadata is dropped with a warning."""
-    qc = QuantumCircuit(1)
-    qc.metadata["self"] = qc.metadata
-
-    with pytest.warns(UserWarning, match="Dropping circuit metadata"):
-        qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
-
-    assert qc.metadata["self"] is qc.metadata
+    compiled = qiskit_to_iqm_json(qc, backend(1))  # ty: ignore[invalid-argument-type]
+    assert isinstance(compiled, CompiledProgram)
+    assert not json.loads(compiled.payload).get("metadata")
+    assert qc.metadata == metadata

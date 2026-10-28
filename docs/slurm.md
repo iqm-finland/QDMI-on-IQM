@@ -21,8 +21,9 @@ ID, assuming one local license with a count of one (`ID` or `ID:1`):
 
 import os
 
+from mqt.core.mlir import compile_program
 from mqt.core.qdmi import builtin_driver as qdmi_driver
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit
 from iqm.qdmi.qiskit import IQMBackend
 
 device_id = os.environ["SLURM_JOB_LICENSES"].removesuffix(":1")
@@ -31,7 +32,7 @@ circuit = QuantumCircuit(2)
 circuit.h(0)
 circuit.cx(0, 1)
 circuit.measure_all()
-result = backend.run(transpile(circuit, backend), shots=100).result()
+result = backend.run(compile_program(circuit, target=backend), shots=100).result()
 print(result.get_counts())
 ```
 
@@ -49,8 +50,10 @@ configuration, and committed scripts.
 The
 [offloader](python_package.md#programmatic-offloading-with-the-offloader-module)
 also submits IQM sampler and estimator jobs through `srun`. IQM supports IQM
-JSON and QIR. MQT Core's PennyLane adapter requires OpenQASM; use the IQM Qiskit
-adapter for these workloads.
+JSON and QIR. The
+[MQT Core PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html)
+also compiles to IQM JSON; select `terminal_readout=TerminalReadout.MEASURED`
+when constructing that device.
 
 ## Prepare the cluster
 
@@ -80,15 +83,11 @@ and expose the workload environment through site defaults or a software module.
 See [device configuration](usage.md#session-configuration) for quantum computer
 IDs, aliases, and their precedence.
 
-## Exercise the integration
+## Shared playground
 
 [MQT Core's cluster playground](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-is a concrete deployment with a shared quantum access partition and several
-device implementations. Follow its build instructions to install the current
-main branches for this development setup.
-
-The
-[Slurm smoke test](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/test/slurm)
-uses that playground to run an authenticated eight-shot Qiskit job on the
-Emerald Resonance mock using the installed wheel. Its README describes the
-required credentials and commands.
+maintains the deployment and integration checks for multiple device
+implementations. Follow its setup instructions, install `iqm-qdmi[qiskit]`, and
+pass IQM credentials to the workload environment. The `iqm.emerald.mock` preset
+requires valid Resonance credentials and network access to
+`https://resonance.iqm.tech`.

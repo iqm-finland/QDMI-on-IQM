@@ -25,11 +25,12 @@ IQM device submits IQM JSON without naming this package.
 from __future__ import annotations
 
 import json
-import warnings
 from typing import TYPE_CHECKING, Any
 
 try:
+    from mqt.core.mlir import TerminalReadout, serialize_program
     from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedOperationError
+    from mqt.core.qdmi import ProgramFormat
     from qiskit.circuit.library import Barrier, CZGate, Measure, RGate
 except ImportError as e:
     msg = (
@@ -39,9 +40,9 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from .gates import MoveGate
-from .qiskit import IQMBackend
 
 if TYPE_CHECKING:
+    from mqt.core.mlir import CompiledProgram
     from mqt.core.plugins.qiskit.backend import QDMIBackend
     from qiskit.circuit import QuantumCircuit
 
@@ -52,92 +53,48 @@ def __dir__() -> list[str]:
     return __all__
 
 
-def _validate_metadata_keys(value: object) -> None:
-    """Reject object keys that JSON encoding would silently convert to strings.
+def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> CompiledProgram | str:
+    """Serialize native instructions through MQT Core without compiling them.
+
+    The shared compiler preserves terminal readout destinations, including
+    repeated measurements and untouched classical bits, in its result layout.
+    Circuits containing MOVE use the existing resonator serializer, which
+    requires one measurement per qubit and classical bit. Circuit metadata stays
+    in the local Qiskit result header; it is not sent to the service.
 
     Args:
-        value: A metadata value to check recursively.
-
-    Raises:
-        TypeError: If an object key is not a string.
-    """
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if not isinstance(key, str):
-                msg = "Metadata object keys must be strings."
-                raise TypeError(msg)
-            _validate_metadata_keys(child)
-    elif isinstance(value, list | tuple):
-        for child in value:
-            _validate_metadata_keys(child)
-
-
-def _json_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Return metadata that encodes safely as JSON, or drop it with a warning.
-
-    Args:
-        metadata: Circuit metadata to check without mutating it.
+        circuit: A bound circuit using the target's native gates and indices.
+        backend: The backend supplying device sites and calibrated target indices.
 
     Returns:
-        The metadata itself, or an empty dictionary if it cannot be encoded.
+        A serialized program with its result layout, or IQM JSON for MOVE.
+
+    Raises:
+        mqt.core.plugins.qiskit.exceptions.TranslationError: Native serialization or the readout layout is unsupported.
     """
+    if any(isinstance(instruction.operation, MoveGate) for instruction in circuit.data):
+        return _serialize_move_circuit(circuit, backend)
     try:
-        # Encode first to reject circular references before traversing the keys.
-        json.dumps(metadata, allow_nan=False)
-        _validate_metadata_keys(metadata)
-    except (TypeError, ValueError, RecursionError) as exc:
-        warnings.warn(f"Dropping circuit metadata that cannot be encoded as JSON: {exc}", stacklevel=3)
-        return {}
-    return metadata
+        return serialize_program(
+            circuit,
+            target=backend.device,
+            program_format=ProgramFormat.IQM_JSON,
+            terminal_readout=TerminalReadout.MEASURED,
+        )
+    except (RuntimeError, ValueError) as exc:
+        msg = f"Failed to serialize the circuit to IQM JSON: {exc}"
+        raise TranslationError(msg) from exc
 
 
-def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
-    """Serialize a Qiskit :class:`~qiskit.circuit.QuantumCircuit` into IQM JSON.
-
-    The IQM JSON format is a device-specific format that encodes quantum operations
-    as JSON objects with site names, operation names, and arguments. Circuit
-    metadata is preserved using Python's JSON encoding (including tuples as
-    arrays), with string object keys and finite numbers required at every level.
-    Metadata that cannot be encoded is dropped with a warning; the circuit and
-    its metadata are not modified.
-
-    Measurements must be terminal and write each classical bit exactly once.
-    Each qubit may be measured once. Measurements are emitted in classical-bit
-    order so counts and memory use the circuit's register layout. Barriers in
-    the readout suffix are emitted before the measurements.
-
-    Qiskit initializes untouched classical bits to zero, but the IQM JSON result
-    path does not reconstruct those slots. When using ``measure_all()``, create
-    the circuit without preallocated classical bits, as in the example below.
-
-    Note:
-        The serialization currently supports only operations that are natively
-        supported by the IQM hardware. Unsupported operations will raise
-        :class:`~mqt.core.plugins.qiskit.exceptions.UnsupportedOperationError`.
-
-    Args:
-        circuit: The Qiskit quantum circuit to serialize.
-        backend: The backend that runs the circuit. Its device provides the site
-            names the format uses as loci. For :class:`~iqm.qdmi.qiskit.IQMBackend`,
-            circuit indices follow the calibrated target's site order.
+def _serialize_move_circuit(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
+    """Retain native MOVE and resonator support until Core can represent it.
 
     Returns:
-        JSON string representation of the circuit in IQM format.
+        IQM JSON with one terminal measurement per classical bit.
 
     Raises:
-        UnsupportedOperationError: If the circuit contains operations not supported
-            by IQM hardware.
-        TranslationError: If the serialization fails.
-
-    Examples:
-        >>> from qiskit import QuantumCircuit
-        >>> import numpy as np
-        >>> from iqm.qdmi.serializers import qiskit_to_iqm_json
-        >>> qc = QuantumCircuit(2)
-        >>> qc.r(np.pi / 2, 0, 0)
-        >>> qc.cz(0, 1)
-        >>> qc.measure_all()
-        >>> json_str = qiskit_to_iqm_json(qc, backend)
+        UnsupportedOperationError: A gate or parameter is unsupported.
+        mqt.core.plugins.qiskit.exceptions.TranslationError: The measurement layout or a site is unsupported.
     """
 
     def _raise_error(exception_type: type[Exception], message: str) -> None:
@@ -161,8 +118,6 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
             _raise_error(UnsupportedOperationError, msg)
 
         sites = backend.device.sites()
-        if isinstance(backend, IQMBackend):
-            sites = [sites[index] for index in backend.physical_qubits]
         instructions: list[dict[str, Any]] = []
         measurements: dict[int, dict[str, Any]] = {}
         measured_qubits: set[int] = set()
@@ -250,7 +205,7 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
 
         program: dict[str, Any] = {
             "name": circuit.name or "circuit",
-            "metadata": _json_metadata(circuit.metadata),
+            "metadata": {},
             "instructions": instructions,
         }
 

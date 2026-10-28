@@ -12,6 +12,15 @@ releases may include breaking changes.
 
 ### Changed
 
+- ♻️ Keep Slurm deployment and integration checks in MQT Core; retain the IQM
+  credentials and workload example in the deployment guide. ([#321])
+  ([**@burgholzer**])
+- ♻️ Serialize native Qiskit circuits through MQT Core with shared result layout
+  reconstruction; retain the specialized MOVE path. ([#321]) ([**@burgholzer**])
+- ♻️ Keep circuit metadata in local Qiskit results without sending it to IQM.
+  ([#321]) ([**@burgholzer**])
+- ♻️ Retain physical qubit indices when filtering the Qiskit target for
+  available calibrations. ([#321]) ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -26,6 +35,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Normalize integer PRX angles and phases for IQM's floating-point argument
+  validator when submitting IQM JSON. ([#321]) ([**@burgholzer**])
 - 📝 Fix README license links on PyPI ([#301]) ([**@marcelwa**],
   [**@burgholzer**]).
 - 📦 Include CPR, curl and JSON license texts in built packages ([#301], [#311])
@@ -347,6 +358,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306

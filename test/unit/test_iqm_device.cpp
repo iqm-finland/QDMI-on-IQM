@@ -1832,6 +1832,29 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReplaceAtomically) {
   EXPECT_EQ(nlohmann::json::parse(http_stub.post_bodies().front()), expected);
 }
 
+TEST_F(DeviceJobMockTest, SubmitPrxArgumentsAsFloatingPoint) {
+  constexpr auto program = R"({"name":"numeric-arguments","instructions":[
+    {"name":"prx","locus":["QB1"],"args":{"angle":1,"phase":0}},
+    {"name":"prx","locus":["QB1"],"args":{"angle":-0.25,"phase":1.5}},
+    {"name":"measure","locus":["QB1"],"args":{"key":"0"}}
+  ]})";
+  ASSERT_EQ(Set_program(job, strlen(program) + 1, program), QDMI_SUCCESS);
+  http_stub.queue_post(200, R"({"id":"numeric-arguments"})");
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(http_stub.post_bodies().size(), 1U);
+  const auto submitted = nlohmann::json::parse(http_stub.post_bodies().front())
+                             .at("circuits")
+                             .at(0);
+  EXPECT_EQ(submitted, nlohmann::json::parse(program));
+  for (const auto index : {0U, 1U}) {
+    const auto &args = submitted.at("instructions").at(index).at("args");
+    EXPECT_TRUE(args.at("angle").is_number_float());
+    EXPECT_TRUE(args.at("phase").is_number_float());
+  }
+  EXPECT_TRUE(
+      submitted.at("instructions").at(2).at("args").at("key").is_string());
+}
+
 TEST_F(DeviceJobMockTest, ReplacingProgramUsesLatestValueForSubmission) {
   constexpr auto replacement_program =
       R"({"name":"replacement","instructions":[],"metadata":{}})";

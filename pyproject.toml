@@ -54,7 +54,7 @@ email = "developers@iqm.tech"
 
 [project.optional-dependencies]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@6992bf9e3604a9fbf038f323e9b9b999016eca28",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
@@ -103,7 +103,7 @@ docs = [
   "sphinx-llm>=1",
 ]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core @ git+https://github.com/munich-quantum-toolkit/core.git@6992bf9e3604a9fbf038f323e9b9b999016eca28",
   "numpy>=2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
@@ -231,7 +231,6 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
-per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true
