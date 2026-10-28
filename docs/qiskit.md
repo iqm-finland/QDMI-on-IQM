@@ -78,7 +78,8 @@ manifest values.
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
 Qiskit serializer uses these units. Applications submitting IQM JSON directly
-must use the same format.
+must use the same format. The device writes integer-valued PRX angles and phases
+as floating-point JSON numbers for IQM's argument validator.
 
 ## Calibrated qubits
 

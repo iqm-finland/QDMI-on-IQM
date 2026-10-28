@@ -1394,6 +1394,17 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
       if (!Set_output_layout(job->results_[i], circuit)) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
+      // IQM's PRX validator requires floating-point spelling even for integers.
+      for (auto &instruction : circuit.at("instructions")) {
+        if (instruction.at("name") == "prx") {
+          for (const auto *name : {"angle", "phase"}) {
+            auto &argument = instruction.at("args").at(name);
+            if (argument.is_number_integer()) {
+              argument = argument.get<double>();
+            }
+          }
+        }
+      }
       json_program["circuits"].push_back(std::move(circuit));
     } else {
       json_program["circuits"].emplace_back(std::string{program});

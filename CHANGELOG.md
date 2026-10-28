@@ -32,6 +32,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Normalize integer PRX angles and phases for IQM's floating-point argument
+  validator when submitting IQM JSON. ([#321]) ([**@burgholzer**])
 - 📝 Fix README license links on PyPI ([#301]) ([**@marcelwa**],
   [**@burgholzer**]).
 - 📦 Include CPR, curl and JSON license texts in built packages ([#301], [#311])
