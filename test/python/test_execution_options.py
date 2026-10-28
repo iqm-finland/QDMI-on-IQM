@@ -40,6 +40,11 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:
     device = Mock(spec=Device)
     device.name.return_value = "IQM option test"
     device.version.return_value = "test"
+    sites = [Mock() for _ in range(4)]
+    for index, (site, name) in enumerate(zip(sites, ["QB7", "QB2", "QB11", "QB5"], strict=True)):
+        site.index.return_value = index
+        site.name.return_value = name
+    device.sites.return_value = sites
     operations = [Mock(), Mock()]
     for operation, name in zip(operations, ["measure", "prx"], strict=True):
         operation.name.return_value = name
@@ -104,6 +109,7 @@ def test_run_request_defaults_and_overrides(backend: tuple[IQMBackend, Mock]) ->
 
 
 @pytest.mark.parametrize("memory", [False, True])
+@pytest.mark.usefixtures("serialization_target")
 def test_classical_result_destinations(
     backend: tuple[IQMBackend, Mock], monkeypatch: pytest.MonkeyPatch, *, memory: bool
 ) -> None:
@@ -111,28 +117,34 @@ def test_classical_result_destinations(
     iqm_backend, device = backend
     monkeypatch.setattr(IQMBackend, "_serialize_circuit", QDMIBackend._serialize_circuit)  # ruff:ignore[private-member-access]
     monkeypatch.setattr(IQMBackend, "physical_qubits", property(lambda _self: (0, 1, 2, 3)))
-    sites = [Mock() for _ in range(4)]
-    for site, name in zip(sites, ["QB7", "QB2", "QB11", "QB5"], strict=True):
-        site.name.return_value = name
-    device.sites.return_value = sites
     handle = Mock(spec=Job)
     handle.get_program_status.return_value = None
     handle.check.return_value = Job.Status.DONE
-    handle.get_shots.return_value = ["1100"] * 3
-    handle.get_counts.return_value = {"1100": 3}
-    device.submit_job.return_value = handle
+
+    def submit(program: str, _format: ProgramFormat, shots: int) -> Mock:
+        instructions = json.loads(program)["instructions"]
+        bits = "".join(
+            "1" if instruction["locus"][0] in {"QB7", "QB11"} else "0"
+            for instruction in instructions
+            if instruction["name"] == "measure"
+        )[::-1]
+        handle.get_shots.return_value = [bits] * shots
+        handle.get_counts.return_value = {bits: shots}
+        return handle
+
+    device.submit_job.side_effect = submit
     circuit = QuantumCircuit(QuantumRegister(4), ClassicalRegister(3, "zeta"), ClassicalRegister(1, "alpha"))
     circuit.r(math.pi, 0, [0, 2])
     circuit.measure([0, 1, 2, 3], [2, 0, 3, 1])
 
     result = iqm_backend.run(circuit, shots=3, memory=memory).result()
     program = json.loads(device.submit_job.call_args.args[0])
-    assert [instruction["locus"] for instruction in program["instructions"] if instruction["name"] == "measure"] == [
-        ["QB2"],
-        ["QB5"],
-        ["QB7"],
-        ["QB11"],
-    ]
+    assert {instruction["locus"][0] for instruction in program["instructions"] if instruction["name"] == "measure"} == {
+        "QB2",
+        "QB5",
+        "QB7",
+        "QB11",
+    }
     # Only q[0] and q[2] are one: zeta[2] = alpha[0] = 1.
     assert result.get_counts() == {"1 100": 3}
     if memory:

@@ -12,6 +12,10 @@ releases may include breaking changes.
 
 ### Changed
 
+- ♻️ Serialize native Qiskit circuits through MQT Core with shared result layout
+  reconstruction; retain the specialized MOVE path. ([**@burgholzer**])
+- ♻️ Keep circuit metadata in local Qiskit results without sending it to IQM.
+  ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).

@@ -23,12 +23,15 @@ import json
 from unittest.mock import Mock
 
 import pytest
+from mqt.core.mlir import CompiledProgram
 from mqt.core.plugins.qiskit.exceptions import TranslationError, UnsupportedDeviceError
 from mqt.core.qdmi import Device, Job, ProgramFormat
 from qiskit import QuantumCircuit, transpile
 
 from iqm.qdmi.qiskit import IQMBackend
 from iqm.qdmi.serializers import qiskit_to_iqm_json
+
+pytestmark = pytest.mark.usefixtures("serialization_target")
 
 
 def _device(*, missing_gate: str | None = "prx", resonator: bool = False) -> Mock:
@@ -78,16 +81,18 @@ def test_transpile_and_submit_calibrated_qubits(missing_gate: str | None) -> Non
     compiled = transpile(circuit, backend, optimization_level=2, seed_transpiler=7)
     backend.run([compiled, compiled], shots=8)
     program = qiskit_to_iqm_json(compiled, backend)
-    assert device.try_submit_job.call_args.args[0] == [program, program]
-    instructions = json.loads(program)["instructions"]
+    assert isinstance(program, CompiledProgram)
+    assert device.try_submit_job.call_args.args[0] == [program.payload, program.payload]
+    instructions = json.loads(program.payload)["instructions"]
     used_sites = {site for instruction in instructions for site in instruction["locus"]}
     assert len(used_sites) == 2
     assert used_sites <= {f"QB{i + 1}" for i in usable}
     assert compiled.layout is not None
-    assert {inst["args"]["key"]: inst["locus"] for inst in instructions if inst["name"] == "measure"} == {
-        f"c_2_0_{1 - logical}": [f"QB{usable[index] + 1}"]
-        for logical, index in enumerate(compiled.layout.final_index_layout())
-    }
+    measured = [inst for inst in instructions if inst["name"] == "measure"]
+    for logical, index in enumerate(compiled.layout.final_index_layout()):
+        raw_slot = program.result_layout.bits[1 - logical] if program.result_layout else 1 - logical
+        assert type(raw_slot) is int
+        assert measured[raw_slot]["locus"] == [f"QB{usable[index] + 1}"]
     assert backend.target["r"][0,].error == pytest.approx(0.03)
 
 

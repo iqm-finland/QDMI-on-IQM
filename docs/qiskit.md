@@ -16,9 +16,16 @@ is implemented in the {py:mod}`iqm.qdmi.qiskit` submodule and is based on the
 open-source, MIT-licensed MQT Core library. To use the wrapper, make sure to
 install the `iqm-qdmi` package with the `qiskit` extra:
 
+This draft requires the shared compiler changes in
+[MQT Core #2886](https://github.com/munich-quantum-toolkit/core/pull/2886).
+Use the exact Core source revision pinned by this checkout until those changes
+are released:
+
 ```console
-uv pip install iqm-qdmi[qiskit]
+uv sync --extra qiskit
 ```
+
+A published package must raise its minimum Core version to that release.
 
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from
 {py:mod}`iqm.qdmi.qiskit` and used with Qiskit's transpilation and execution
@@ -26,8 +33,8 @@ interfaces.
 
 ```{code-cell} ipython3
 from iqm.qdmi.qiskit import IQMBackend
+from mqt.core.mlir import compile_program
 from qiskit.circuit import QuantumCircuit
-from qiskit.compiler import transpile
 
 backend = IQMBackend(device_id="iqm.emerald.mock")
 ```
@@ -38,10 +45,14 @@ qc.h(0)
 qc.cx(0, 1)
 qc.measure_all()
 
-transpiled_qc = transpile(qc, backend)
-result = backend.run(transpiled_qc, shots=128).result()
+native_qc = compile_program(qc, target=backend)
+result = backend.run(native_qc, shots=128).result()
 print(result.get_counts())
 ```
+
+Compile against the selected backend before submission. `run()` validates and
+serializes native instructions without compiling or routing them. Qiskit's
+`transpile(qc, backend)` remains supported, including for MOVE circuits.
 
 Select any stable ID from the
 [installed catalogue](usage.md#using-the-device-with-mqt-core).
@@ -86,28 +97,24 @@ Ordered samples are included by default (`memory=True`). Use
 `result.get_memory()` to access them, or pass `memory=False` to return counts
 only.
 
-Measurements must follow all gates and write every classical bit exactly once;
-each qubit may be measured once. The serializer orders terminal measurements by
-classical-bit index, including across registers, so counts and memory use the
-Qiskit register layout. Barriers in the readout suffix precede the serialized
-measurements. Circuits with unused classical bits or intermediate measurements
-are rejected before submission.
+Measurements must follow all gates. MQT Core serializes each measured qubit once
+and keeps a result layout that reconstructs the circuit's classical bits. Unused
+classical bits remain zero, repeated measurements retain their destinations, and
+the final write wins when a classical bit is overwritten. Counts and memory
+retain the Qiskit register names, boundaries, and bit order. Intermediate
+measurements are rejected before submission.
+
+MOVE circuits retain the existing resonator serializer until MQT Core supports
+MOVE. This path requires each qubit to be measured at most once and every
+classical bit exactly once. Calibrated site indices and resonators are preserved
+on both paths.
 
 ## Circuit Metadata
 
-The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
-program's `metadata` field without modifying the circuit. Empty metadata remains
-`{}`. Values follow Python's JSON encoding: dictionaries, lists, tuples (encoded
-as arrays), strings, booleans, `None`, integers, and finite floating-point
-numbers are supported. Object keys must be strings at every nesting level, so
-that keys such as `1` and `"1"` cannot collide after conversion to JSON.
-
-If any value is unsupported (such as NumPy arrays or custom Python objects), or
-the metadata has circular references or nonfinite numbers, the serializer drops
-the whole metadata with a warning and submits the circuit. Convert such values
-explicitly to keep them. This preserves metadata in the submitted IQM program;
-it does not add a metadata retrieval API or guarantee that a remote service
-returns it in results.
+Circuit names and `QuantumCircuit.metadata` remain in the local Qiskit result
+header. Arbitrary metadata is not sent to the IQM service. The shared compiler's
+IQM payload uses its entry-point name, `main`, independently of the circuit
+name.
 
 ## Sampler and Estimator Primitives
 
@@ -119,7 +126,7 @@ returns it in results.
 backend instance.
 
 ```{code-cell} ipython3
-sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
+sampler_job = backend.sampler().run([(native_qc,)], shots=128)
 counts = sampler_job.result()[0].data["meas"].get_counts()
 print(f"Counts: {counts}")
 ```
@@ -127,10 +134,10 @@ print(f"Counts: {counts}")
 ```{code-cell} ipython3
 from qiskit.quantum_info import SparsePauliOp
 
-transpiled_qc.remove_final_measurements(inplace=True)
+native_qc.remove_final_measurements(inplace=True)
 observable = SparsePauliOp("Z" * backend.num_qubits)
 
-estimator_job = backend.estimator().run([(transpiled_qc, observable)])
+estimator_job = backend.estimator().run([(native_qc, observable)])
 data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
@@ -144,7 +151,7 @@ Configure execution with IQM `CircuitJobDefinition` fields in
 ```python
 backend.set_options(run_request_options={"dd_mode": "enabled"})
 job = backend.run(
-    transpile(qc, backend),
+    compile_program(qc, target=backend),
     shots=128,
     run_request_options={"dd_mode": "enabled", "active_reset_cycles": 2},
 )
