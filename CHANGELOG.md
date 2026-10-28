@@ -12,6 +12,9 @@ releases may include breaking changes.
 
 ### Changed
 
+- ♻️ Keep Slurm deployment and integration checks in MQT Core; retain the IQM
+  credentials and workload example in the deployment guide. ([#321])
+  ([**@burgholzer**])
 - ♻️ Serialize native Qiskit circuits through MQT Core with shared result layout
   reconstruction; retain the specialized MOVE path. ([#321]) ([**@burgholzer**])
 - ♻️ Keep circuit metadata in local Qiskit results without sending it to IQM.

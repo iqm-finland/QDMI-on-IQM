@@ -60,7 +60,8 @@ the internal C++ test helper; it is not an installed client API.
 
 You can either run the full suite of examples using the dedicated `nox` session
 or individually execute the scripts from the command line. For cluster jobs, see
-[IQM on Slurm](slurm.md) for explicit device selection and license requests.
+[IQM on Slurm](slurm.md) for explicit compilation, device selection, and license
+requests using MQT Core's shared deployment.
 
 ```console
 # Run the entire suite

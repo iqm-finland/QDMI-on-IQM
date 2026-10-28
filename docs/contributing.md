@@ -179,9 +179,9 @@ Building the project requires a C++20-capable C++ compiler and
 development package.
 
 CI runs the native integration tests and documentation notebooks with
-`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
-Slurm smoke test submits eight shots per installation mode to the Emerald
-Resonance mock.
+`IQM_TOKEN`. Set valid IQM credentials before running these checks locally.
+Slurm deployment and integration checks are maintained in
+[MQT Core](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html).
 
 ### Configure and Build
 
