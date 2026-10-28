@@ -33,6 +33,8 @@ from qiskit.transpiler import Target
 
 from iqm.qdmi.qiskit import IQMBackend
 
+pytestmark = pytest.mark.usefixtures("operation_constraints")
+
 
 @pytest.fixture
 def backend(monkeypatch: pytest.MonkeyPatch) -> tuple[IQMBackend, Mock]:

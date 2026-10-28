@@ -31,7 +31,7 @@ from qiskit import QuantumCircuit, transpile
 from iqm.qdmi.qiskit import IQMBackend
 from iqm.qdmi.serializers import qiskit_to_iqm_json
 
-pytestmark = pytest.mark.usefixtures("serialization_target")
+pytestmark = pytest.mark.usefixtures("operation_constraints", "serialization_target")
 
 
 def _device(*, missing_gate: str | None = "prx", resonator: bool = False) -> Mock:

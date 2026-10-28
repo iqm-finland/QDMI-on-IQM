@@ -17,7 +17,9 @@ open-source, MIT-licensed MQT Core library. To use the wrapper, make sure to
 install the `iqm-qdmi` package with the `qiskit` extra:
 
 This draft requires the shared compiler changes in
-[MQT Core #2886](https://github.com/munich-quantum-toolkit/core/pull/2886).
+[MQT Core #2886](https://github.com/munich-quantum-toolkit/core/pull/2886)
+and its PennyLane integration in
+[Core #2767](https://github.com/munich-quantum-toolkit/core/pull/2767).
 Use the exact Core source revision pinned by this checkout until those changes
 are released:
 

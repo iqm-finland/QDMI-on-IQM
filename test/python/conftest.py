@@ -23,7 +23,12 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
-from mqt.core.mlir import CompiledProgram, CompilerTarget, serialize_program
+from mqt.core.mlir import (
+    CompiledProgram,
+    CompilerTarget,
+    _operation_parameter_constraints,  # ruff: ignore[import-private-name] Native bridge under test.
+    serialize_program,
+)
 from mqt.core.plugins.qiskit import backend as qdmi_backend
 
 from iqm.qdmi import serializers
@@ -33,15 +38,14 @@ if TYPE_CHECKING:
     from qiskit.circuit import QuantumCircuit
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def operation_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep fake operation metadata local while querying real native handles."""
-    native_constraints = qdmi_backend._operation_parameter_constraints
 
     def constraints(
         operation: Device.Operation,
     ) -> list[tuple[list[float | None], list[tuple[float, float] | None]]]:
-        return [] if isinstance(operation, Mock) else native_constraints(operation)
+        return [] if isinstance(operation, Mock) else _operation_parameter_constraints(operation)
 
     monkeypatch.setattr(qdmi_backend, "_operation_parameter_constraints", constraints)
 

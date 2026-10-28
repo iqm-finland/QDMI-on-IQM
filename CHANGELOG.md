@@ -13,9 +13,9 @@ releases may include breaking changes.
 ### Changed
 
 - ♻️ Serialize native Qiskit circuits through MQT Core with shared result layout
-  reconstruction; retain the specialized MOVE path. ([**@burgholzer**])
+  reconstruction; retain the specialized MOVE path. ([#321]) ([**@burgholzer**])
 - ♻️ Keep circuit metadata in local Qiskit results without sending it to IQM.
-  ([**@burgholzer**])
+  ([#321]) ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -351,6 +351,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306

@@ -31,7 +31,7 @@ from qiskit.circuit import ClassicalRegister, Parameter, QuantumCircuit, Quantum
 from iqm.qdmi.gates import MoveGate
 from iqm.qdmi.serializers import qiskit_to_iqm_json
 
-pytestmark = pytest.mark.usefixtures("serialization_target")
+pytestmark = pytest.mark.usefixtures("operation_constraints", "serialization_target")
 
 
 if TYPE_CHECKING:
