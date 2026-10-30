@@ -8,8 +8,8 @@ permissions: {}
 
 jobs:
   build-sdist:
-    name: 🐍 Packaging
-    uses: $/.github/workflows/python-packaging-sdist.yml
+    name: 🚀 CD
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     permissions:
       contents: read
 
@@ -17,7 +17,7 @@ jobs:
   # The wheels are uploaded as GitHub artifacts `dev-cibw-*` or `cibw-*`, depending on whether
   # the workflow is triggered from a PR or a release, respectively.
   build-wheel:
-    name: 🐍 Packaging
+    name: 🚀 CD
     strategy:
       fail-fast: false
       matrix:
@@ -29,18 +29,16 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
-    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     with:
       runs-on: ${{ matrix.runs-on }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
     permissions:
       contents: read
 
   # Downloads the previously generated artifacts and deploys to PyPI on published releases.
   deploy:
     if: github.event_name == 'release' && github.event.action == 'published'
-    name: 🚀 Deploy to PyPI
+    name: 🚀 Publish
     runs-on: ubuntu-latest
     environment:
       name: pypi

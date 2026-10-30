@@ -1,4 +1,4 @@
-name: 📦 • Install and Test
+name: ☁️ Live native installation
 on:
   workflow_call:
     inputs:
@@ -6,12 +6,6 @@ on:
         description: >
           The runner image to use.
         default: "ubuntu-latest"
-        type: string
-      iqm-qc-alias:
-        description: >
-          The alias of the IQM quantum computer to use for testing. Defaults to 'emerald:mock'.
-          This can be any valid IQM quantum computer alias.
-        default: "emerald:mock"
         type: string
     secrets:
       IQM_TOKEN:
@@ -36,16 +30,17 @@ jobs:
           reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
           git config --system core.longpaths true
 
-      # Check out the repository
+          # Check out the repository
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install build dependencies on Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+        run:
+          sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
 
-      # Set up ccache for faster C++ builds
+          # Set up ccache for faster C++ builds
       - name: Setup ccache
         if: runner.os != 'Windows'
         uses: Chocobo1/setup-ccache-action@efeb0f4b0670854c2190fd2389da92c399ff5ceb # v1.5.10
@@ -54,11 +49,13 @@ jobs:
           override_cache_key: c++-tests-install-${{ inputs.runs-on }}
           windows_compile_environment: msvc
 
-      # Set up mold as linker (Linux only)
+          # Set up mold as linker (Linux only)
       - name: Set up mold as linker
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+        uses:
+          rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
-      # Build and install the IQM QDMI library
+
+          # Build and install the IQM QDMI library
       - name: Configure CMake for QDMI
         run: cmake -S . -B install-build -DCMAKE_BUILD_TYPE=Release
 
@@ -77,7 +74,7 @@ jobs:
           --prefix install-dir
           --component iqm-qdmi-device_Development
 
-      # Build tests using the installed QDMI device library
+          # Build tests using the installed QDMI device library
       - name: Configure tests with the installed library
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -89,7 +86,8 @@ jobs:
 
       - name: Test
         env:
-          IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+          IQM_QUANTUM_COMPUTER: "emerald:mock"
+          IQM_QC_ALIAS: emerald:mock
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
-        run: ctest -C Release --output-on-failure --test-dir build --timeout 600 --repeat until-pass:3
+        run: ctest -C Release --output-on-failure --test-dir build --timeout 600

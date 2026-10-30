@@ -1,0 +1,73 @@
+name: ☁️ Live tests
+on:
+  workflow_call:
+    secrets:
+      IQM_TOKEN:
+        required: true
+permissions:
+  contents: read
+jobs:
+  integration:
+    name: ☁️ Live tests · IQM mock
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.14"
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+      - name: Run checks
+        run: |
+          cmake --preset release
+          cmake --build --preset release --parallel 4
+      - name: Native mock tests
+        run: ctest --test-dir build/release -L live --output-on-failure --timeout 600 --parallel 1
+        env: &id001
+          IQM_SERVER_URL: https://resonance.iqm.tech
+          IQM_BASE_URL: https://resonance.iqm.tech
+          IQM_QUANTUM_COMPUTER: ${{ matrix.mock }}
+          IQM_QC_ALIAS: ${{ matrix.mock }}
+          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+      - name: Python mock tests
+        if: matrix.mock != 'sirius:mock'
+        run: uvx nox -s live-tests
+        env: *id001
+      - name: Python mock metadata
+        if: matrix.mock == 'sirius:mock'
+        run: >-
+          uvx nox -s live-tests -- test/python/test_device_capabilities.py
+          -k 'device_advertises_exactly_its_supported_formats or device_reports_queue_length'
+        env: *id001
+    strategy:
+      fail-fast: false
+      matrix:
+        mock:
+          - emerald:mock
+          - garnet:mock
+          - sirius:mock
+  installation:
+    name: ☁️ Live native installation
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - macos-26
+          - windows-2025
+    uses: $/.github/workflows/cpp-install-tests.yml
+    with:
+      runs-on: ${{ matrix.runs-on }}
+    secrets:
+      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+  slurm:
+    name: ☁️ Live Slurm · IQM mock
+    uses: $/.github/workflows/slurm.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}

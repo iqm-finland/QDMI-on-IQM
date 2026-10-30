@@ -2,15 +2,13 @@
 
 ## C++
 
-- Configure:
-  `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON`
-- Build: `cmake --build build --config Release`
-- Run unit tests without IQM access:
-  `ctest -C Release --test-dir build/test/unit --output-on-failure`
-- Run a single unit test binary: `./build/test/unit/unit_tests`
-- Run all configured tests:
-  `ctest -C Release --test-dir build --output-on-failure`
-- For debug builds, replace `Release` with `Debug`.
+- Configure: `cmake --preset release`
+- Build: `cmake --build --preset release`
+- Run offline tests: `ctest --preset release`
+- Run a single unit test binary: `./build/release/test/unit/unit_tests`
+- Run live tests only when explicitly intended:
+  `ctest --test-dir build/release -L live --output-on-failure`
+- For debug builds, replace the `release` preset with `debug`.
 
 Integration tests under `test/integration/` require access to an IQM backend.
 Set the required `IQM_*` environment variables and run them only when live IQM
@@ -26,8 +24,8 @@ access is explicitly intended.
   `uvx nox -s examples -- --backend sim`
 - Run a targeted test: `uvx nox -s tests-3.14 -- -k <test-expression>`
 
-The default examples session targets real IQM hardware. Do not run it without
-explicit intent, valid credentials, and an appropriate target.
+The examples session defaults to local simulation. Live checks require an
+explicit invocation, valid credentials, and an appropriate target.
 
 ## Documentation
 

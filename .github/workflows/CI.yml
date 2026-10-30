@@ -1,12 +1,10 @@
 name: CI
-
 on:
   push:
     branches: ["main"]
   pull_request:
   merge_group:
   workflow_dispatch:
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -14,26 +12,27 @@ concurrency:
 permissions:
   contents: read
 
-# Fork PRs run without upstream cloud credentials.
 jobs:
   change-detection:
-    name: 🔍 Change
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
+    name: 🔍 Change
     with:
       additional-cpp-files: |
+        CMakePresets.json
         .github/workflows/CI.yml
-        .github/workflows/cpp-tests-*.yml
-        .github/workflows/cpp-coverage.yml
-        .github/workflows/cpp-linter.yml
+        .github/workflows/cpp-tests-windows.yml
         .github/workflows/cpp-install-tests.yml
-        .github/workflows/cpp-sanitizers.yml
+        .github/workflows/reusable-live-tests.yml
       additional-python-files: |
         .github/workflows/CI.yml
-        .github/workflows/python-*.yml
-      additional-cd-files: |
-        .dockerignore
-        test/slurm/**
+        .github/workflows/python-examples.yml
+        .github/workflows/reusable-live-tests.yml
         .github/workflows/slurm.yml
+        examples/**
+      additional-cd-files: |
+        .github/workflows/CD.yml
+        LICENSE
+        README.md
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -42,123 +41,114 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-26.04, ubuntu-26.04-arm]
-        config: [Release]
-        iqm-qc-alias: ["emerald:mock"]
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+        preset:
+          - release
         include:
           - runs-on: ubuntu-26.04
-            config: Debug
-            iqm-qc-alias: "emerald:mock"
-          - runs-on: ubuntu-26.04
-            config: Release
-            iqm-qc-alias: "garnet:mock"
-          - runs-on: ubuntu-26.04
-            config: Release
-            iqm-qc-alias: "sirius:mock"
-    uses: $/.github/workflows/cpp-tests-ubuntu.yml
+            preset: debug
     with:
       runs-on: ${{ matrix.runs-on }}
-      config: ${{ matrix.config }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+      preset-name: ${{ matrix.preset }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-ubuntu.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
 
   cpp-tests-macos:
     name: 🇨 Test 🍎
     needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [macos-26]
-        config: [Release]
-        iqm-qc-alias: ["emerald:mock"]
+        runs-on:
+          - macos-26
+        preset:
+          - release
         include:
           - runs-on: macos-26
-            config: Debug
-            iqm-qc-alias: "emerald:mock"
-    uses: $/.github/workflows/cpp-tests-macos.yml
+            preset: debug
     with:
       runs-on: ${{ matrix.runs-on }}
-      config: ${{ matrix.config }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+      preset-name: ${{ matrix.preset }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-macos.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
 
   cpp-tests-windows:
     name: 🇨 Test 🏁
     needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [windows-2025, windows-11-arm]
-        config: [Release]
-        compiler: [MSVC]
-        iqm-qc-alias: ["emerald:mock"]
+        runs-on:
+          - windows-2025
+          - windows-11-arm
+        preset:
+          - release
         include:
           - runs-on: windows-2025
-            config: Debug
+            preset: debug
             compiler: MSVC
-            iqm-qc-alias: "emerald:mock"
           - runs-on: windows-2025
-            config: Release
+            preset: release
             compiler: ClangCL
-            iqm-qc-alias: "emerald:mock"
-    uses: $/.github/workflows/cpp-tests-windows.yml
+        compiler:
+          - MSVC
     with:
       runs-on: ${{ matrix.runs-on }}
-      config: ${{ matrix.config }}
       compiler: ${{ matrix.compiler }}
-      iqm-qc-alias: ${{ matrix.iqm-qc-alias }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
-
-  cpp-install-tests:
-    name: 📦 Install
-    needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on: [ubuntu-26.04, macos-26, windows-2025]
-    uses: $/.github/workflows/cpp-install-tests.yml
-    with:
-      runs-on: ${{ matrix.runs-on }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+      config: ${{ matrix.preset == 'debug' && 'Debug' || 'Release' }}
+    uses: $/.github/workflows/cpp-tests-windows.yml
 
   cpp-sanitizers:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-ubuntu.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     name: 🇨 Sanitizers
     needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: $/.github/workflows/cpp-sanitizers.yml
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    with:
+      runs-on: ubuntu-26.04
+      preset-name: sanitizers
 
   cpp-coverage:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     name: 🇨 Coverage
     needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    uses: $/.github/workflows/cpp-coverage.yml
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     permissions:
       contents: read
       id-token: write
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
   cpp-linter:
     name: 🇨 Lint
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-linter)
-    uses: $/.github/workflows/cpp-linter.yml
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-linter.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     with:
       clang-version: 22
       files-changed-only: true
       cpp-linter-extra-args: "-std=c++20"
+      cpp-linter-ignore-extra: "!include/**"
     permissions:
       contents: read
       pull-requests: write # required to post comments on PRs
+
+  python-tests:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-tests.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
+    name: 🐍 Test
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-python-tests)
+    with:
+      runs-on: ubuntu-26.04
+      sessions: '["tests", "minimums"]'
+      draft-sessions: '["tests-3.14", "minimums-3.14"]'
+
+  python-coverage:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-coverage.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
+    name: 🐍 Coverage
+    needs: python-tests
+    permissions:
+      contents: read
+      id-token: write
 
   python-linter:
     name: 🐍 Lint
@@ -170,47 +160,62 @@ jobs:
       enable-mypy: false
 
   examples:
-    name: 🐍 End-to-End Examples
+    name: 🧪 Local examples
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
     uses: $/.github/workflows/python-examples.yml
 
   build-sdist:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     name: 🚀 CD
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
-    uses: $/.github/workflows/python-packaging-sdist.yml
 
   build-wheel:
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
     name: 🚀 CD
     needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && (fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd))
+    if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     strategy:
       fail-fast: false
       matrix:
         runs-on:
-          [
-            ubuntu-26.04,
-            ubuntu-26.04-arm,
-            macos-26,
-            windows-2025,
-            windows-11-arm,
-          ]
-    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
     with:
       runs-on: ${{ matrix.runs-on }}
+
+  documentation:
+    name: 📚 Documentation
+    uses: $/.github/workflows/documentation.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+  live-tests:
+    name: ☁️ Live tests
+    needs:
+      - cpp-tests-ubuntu
+      - cpp-tests-macos
+      - cpp-tests-windows
+      - python-tests
+      - build-wheel
+    if: >-
+      !cancelled()
+      && !contains(needs.*.result, 'failure')
+      && contains(needs.*.result, 'success')
+      && (
+        github.event_name != 'pull_request'
+        || github.event.pull_request.head.repo.full_name == github.repository
+      )
+    uses: $/.github/workflows/reusable-live-tests.yml
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
-  slurm-tests:
-    name: 🇸 Test Slurm
-    needs: change-detection
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && (fromJSON(needs.change-detection.outputs.run-cpp-tests) || fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd))
-    uses: $/.github/workflows/slurm.yml
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
-
-  # this job does nothing and is only used for branch protection
   required-checks-pass:
     name: 🚦 Check
     if: always()
@@ -219,28 +224,25 @@ jobs:
       - cpp-tests-ubuntu
       - cpp-tests-macos
       - cpp-tests-windows
-      - cpp-install-tests
       - cpp-sanitizers
       - cpp-coverage
       - cpp-linter
+      - python-tests
+      - python-coverage
       - python-linter
       - examples
       - build-sdist
       - build-wheel
-      - slurm-tests
+      - documentation
+      - live-tests
     runs-on: ubuntu-slim
     steps:
-      - name: Decide whether the needed jobs succeeded or failed
-        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           allowed-skips: >-
             ${{
-              (github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id)
-              && 'cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,build-wheel,slurm-tests,' || ''
-            }}
-            ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
@@ -248,18 +250,25 @@ jobs:
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests)
-              && 'examples,' || ''
+              && 'python-tests,python-coverage,examples,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-linter)
               && 'python-linter,' || ''
             }}
             ${{
-              !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
+              !fromJSON(needs.change-detection.outputs.run-python-tests)
+              && !fromJSON(needs.change-detection.outputs.run-cd)
               && 'build-sdist,build-wheel,' || ''
             }}
             ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests) && !fromJSON(needs.change-detection.outputs.run-python-tests) && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'slurm-tests,' || ''
+              (
+                github.event_name == 'pull_request'
+                && github.event.pull_request.head.repo.full_name != github.repository
+                || !fromJSON(needs.change-detection.outputs.run-cpp-tests)
+                && !fromJSON(needs.change-detection.outputs.run-python-tests)
+                && !fromJSON(needs.change-detection.outputs.run-cd)
+              )
+              && 'live-tests,' || ''
             }}
           jobs: ${{ toJSON(needs) }}

@@ -63,6 +63,21 @@ def _device(*, missing_gate: str | None = "prx", resonator: bool = False) -> Moc
     return device
 
 
+@pytest.mark.parametrize("operation_name", ["prx_12", "measure_012"])
+def test_target_ignores_iqm_extra_operations(operation_name: str) -> None:
+    """Known IQM-specific operations do not fail strict-warning test runs."""
+    device = _device(missing_gate=None)
+    operation = Mock()
+    operation.name.return_value = operation_name
+    operation.is_zoned.return_value = False
+    device.operations.return_value.append(operation)
+
+    backend = IQMBackend(device=device)
+
+    assert operation_name not in backend.target.operation_names
+    assert "measure" in backend.target.operation_names
+
+
 @pytest.mark.parametrize("missing_gate", [None, "prx", "measure"])
 def test_transpile_and_submit_calibrated_qubits(missing_gate: str | None) -> None:
     """Transpilation and both serialization paths address calibrated physical sites."""

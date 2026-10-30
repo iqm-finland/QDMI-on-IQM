@@ -37,6 +37,8 @@ from iqm.qdmi import IQM_QDMI_DEVICE_ID
 from iqm.qdmi.qiskit import IQMBackend
 
 # Every IQM quantum computer accepts these two.
+pytestmark = pytest.mark.live
+
 BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON}
 
 
