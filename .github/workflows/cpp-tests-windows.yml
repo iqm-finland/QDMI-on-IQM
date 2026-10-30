@@ -58,4 +58,4 @@ jobs:
       - name: Test
         env:
           CONFIG: ${{ inputs.config }}
-        run: ctest -C $env:CONFIG --output-on-failure --test-dir build -LE integration --timeout 600
+        run: ctest -C $env:CONFIG --output-on-failure --test-dir build -LE live --timeout 600

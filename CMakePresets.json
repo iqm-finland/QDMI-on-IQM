@@ -79,7 +79,7 @@
       },
       "filter": {
         "exclude": {
-          "label": "integration"
+          "label": "live"
         }
       }
     },

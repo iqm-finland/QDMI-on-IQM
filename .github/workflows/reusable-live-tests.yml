@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.14"
           enable-cache: true
@@ -28,7 +28,7 @@ jobs:
           cmake --preset release
           cmake --build --preset release --parallel 4
       - name: Native mock tests
-        run: ctest --test-dir build/release -L integration --output-on-failure --timeout 600 --parallel 1
+        run: ctest --test-dir build/release -L live --output-on-failure --timeout 600 --parallel 1
         env: &id001
           IQM_SERVER_URL: https://resonance.iqm.tech
           IQM_BASE_URL: https://resonance.iqm.tech
@@ -66,33 +66,6 @@ jobs:
       runs-on: ${{ matrix.runs-on }}
     secrets:
       IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-  documentation:
-    name: ☁️ Live documentation · IQM mock
-    runs-on: ubuntu-26.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
-        with:
-          python-version: "3.14"
-          enable-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
-      - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
-      - uses: ssciwr/doxygen-install@fa3e94d34131d3990b6b8ba939ab982964aa3758
-        with:
-          version: 1.16.1
-      - name: Run checks
-        run: uvx nox --non-interactive -s docs -- --live
-        env:
-          IQM_SERVER_URL: https://resonance.iqm.tech
-          IQM_BASE_URL: https://resonance.iqm.tech
-          IQM_QUANTUM_COMPUTER: emerald:mock
-          IQM_QC_ALIAS: emerald:mock
-          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
   slurm:
     name: ☁️ Live Slurm · IQM mock
     uses: $/.github/workflows/slurm.yml

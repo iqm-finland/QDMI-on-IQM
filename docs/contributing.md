@@ -180,49 +180,30 @@ development package.
 
 CI separates offline native and Python checks from authenticated mock tests. The
 reusable live workflow owns native/Python mock tests, installed-device checks,
-executable documentation and the Slurm smoke test. Default CMake test presets
-and Nox test/minimum-version sessions exclude live tests. Wheel and release
-builds need no IQM credentials.
+and the Slurm smoke test. It runs after offline native, Python and wheel checks
+and restricts remote selectors to named Resonance mocks. Fork PRs stay offline;
+ordinary CI enables no QPU execution. Wheel and release builds need no IQM
+credentials.
+
+Python execution checks run on Emerald and Garnet. Sirius runs Python metadata
+checks and the native integration suite; the generic Python execution circuits
+assume a qubit-only target.
 
 ### Configure and Build
 
-This project uses CMake as the main build configuration tool. Building a project
-using CMake is a two-stage process. First, CMake needs to be _configured_ by
-calling:
+Use the `release`, `debug`, `coverage` and Linux `sanitizers` CMake presets for
+native checks; `lint` prepares static analysis. Each preset has its own build
+directory:
 
 ```console
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
 ```
 
-This tells CMake to:
-
-- search the current directory `.` (passed via `-S`) for a `CMakeLists.txt`
-  file,
-- process it into a directory `build` (passed via `-B`),
-- configure a `Release` build (passed via `-DCMAKE_BUILD_TYPE`) as opposed to,
-  e.g., a `Debug` build, and
-- enable building the tests (passed via `-DBUILD_IQM_QDMI_TESTS=ON`).
-
-Additional useful flags:
-
-- `-DENABLE_COVERAGE=ON` to enable code coverage support
-
-After configuring with CMake, the project can be built by calling:
-
-```console
-cmake --build build --config Release
-```
-
-This builds the project in the `build` directory (passed via `--build`). Some
-operating systems and development environments explicitly require a
-configuration to be set, which is why the `--config` flag is also passed to the
-build command. The flag `--parallel <NUMBER_OF_THREADS>` may be added to trigger
-a parallel build.
-
-Building the project this way generates:
-
-- the main project libraries in the `build/src` directory and
-- some test executables in the `build/test` directory.
+The library and test executables are written under `build/release/`. Use
+`cmake --build --preset release --parallel <NUMBER_OF_THREADS>` for a parallel
+build. Windows CI checks both MSVC and ClangCL toolsets.
 
 :::{note}
 This project uses CMake's
@@ -254,21 +235,20 @@ the code and not just exercise the code paths.
 To run the tests, use CMake's test runner
 [CTest](https://cmake.org/cmake/help/latest/manual/ctest.1.html):
 
-**Running all tests:**
+**Running offline tests:**
 
 ```console
-ctest -C Release --test-dir build --output-on-failure
+ctest --preset release
 ```
 
 **Running only unit tests (no hardware required):**
 
 ```console
-ctest -C Release --test-dir build/test/unit --output-on-failure
+ctest --test-dir build/release/test/unit --output-on-failure
 ```
 
-The integration tests also carry the `integration` CTest label, so
-`ctest -C Release --test-dir build -LE integration --output-on-failure` selects
-the same offline subset from the top-level build directory.
+Provider-access tests carry the `live` CTest label, which normal test presets
+exclude.
 
 **Running integration tests (requires IQM access):**
 
@@ -278,19 +258,19 @@ environment variables:
 ```console
 export IQM_SERVER_URL="https://desired-iqm-server.com"
 export IQM_TOKEN="your-api-key"
-ctest -C Release --test-dir build/test/integration --output-on-failure
+ctest --test-dir build/release -L live --output-on-failure
 ```
 
 **Generating code coverage:**
 
-To generate a code coverage report, configure the project with
-`-DENABLE_COVERAGE=ON`, build, run the tests, and then use `lcov`:
+Use the coverage preset to run offline tests with native instrumentation, then
+collect the report with `lcov`:
 
 ```console
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_QDMI_TESTS=ON -DENABLE_COVERAGE=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-lcov --capture --directory build --output-file coverage.info
+cmake --preset coverage
+cmake --build --preset coverage
+ctest --preset coverage
+lcov --capture --directory build/coverage --output-file coverage.info
 lcov --remove coverage.info '/usr/*' '*/test/*' '*/build/_deps/*' --output-file coverage.info
 lcov --list coverage.info
 ```
@@ -308,7 +288,7 @@ list:
 ```console
 cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DIQM_QDMI_SANITIZERS="address;undefined"
 cmake --build build-sanitizers
-ctest --test-dir build-sanitizers --output-on-failure
+ctest --test-dir build-sanitizers -LE live --output-on-failure
 ```
 
 Use a build directory separate from your regular one: the flags apply to the
@@ -403,14 +383,20 @@ dependency versions for a specific Python version.
 uvx nox -s minimums-3.14
 ```
 
+Normal and minimum-version sessions exclude `live` tests, including in a
+credentialed shell. CI runs both sessions in one shared workflow per runner.
+Draft PRs exercise Python 3.14; ready PRs use every supported Python version.
+`uvx nox -s live-tests` requires credentials and an explicit
+`IQM_QUANTUM_COMPUTER` mock selector.
+
 ### Running the Python examples
 
 Run the full example suite via the dedicated nox session before opening or
 updating a PR:
 
 ```console
-uvx nox -s examples -- --backend sim  # simulator (no IQM access required)
-uvx nox -s examples                   # real IQM hardware
+uvx nox -s examples                  # local simulation
+uvx nox -s examples -- --backend iqm  # explicit live IQM access
 ```
 
 For a walkthrough of each example, environment setup, and CLI options, see the
@@ -453,6 +439,11 @@ uvx nox -s docs
 ```
 
 The generated HTML site is written to `docs/_build/html/`.
+
+Documentation builds render notebooks without executing them. Use
+`uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
+explicit target to execute the examples locally. GitHub Actions builds PR
+previews and publishes the offline documentation to GitHub Pages.
 
 ## Tips for Development
 
@@ -629,33 +620,3 @@ If you have any questions about contributing, feel free to:
 - Reach out to the maintainers directly
 
 Thank you for contributing to the IQM QDMI Device implementation! 🎉
-
-## Continuous integration
-
-Use the `release`, `debug`, `coverage` and `sanitizers` CMake presets for native
-checks; `lint` prepares static analysis. Each preset has its own build
-directory. For example, configure with `cmake --preset release`, build with
-`cmake --build --preset release` and test with `ctest --preset release`. The
-test presets exclude the `integration` label. Windows CI retains separate MSVC
-and ClangCL toolset checks.
-
-Run `uvx nox -s tests minimums` for Python checks. Both sessions stay offline,
-including in a credentialed shell. CI runs one shared Python workflow per runner
-so normal and minimum-version sessions cannot cancel each other or overwrite
-coverage artifacts. Draft PRs exercise Python 3.14; ready PRs use every
-supported Python version.
-
-Trusted CI calls `reusable-live-tests.yml` after the offline native, Python and
-wheel checks. Remote selectors are restricted to the named Resonance mocks; fork
-PRs skip this workflow. No QPU execution is enabled by ordinary CI.
-`uvx nox -s live-tests` requires credentials and an explicit
-`IQM_QUANTUM_COMPUTER` mock selector. Live CTest selections use `-L integration`
-directly, without the offline test preset.
-
-Python execution checks run on Emerald and Garnet. Sirius runs Python metadata
-checks and the native integration suite; the generic Python execution circuits
-assume a qubit-only target.
-
-Documentation builds render notebooks without executing them by default. The
-live workflow uses `uvx nox --non-interactive -s docs -- --live` to exercise the
-mock-backed examples. `uvx nox -s examples` defaults to local simulation.
