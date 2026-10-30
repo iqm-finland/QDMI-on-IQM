@@ -178,10 +178,11 @@ Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
 development package.
 
-CI runs the native integration tests and documentation notebooks with
-`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
-Slurm smoke test submits eight shots per installation mode to the Emerald
-Resonance mock.
+CI separates offline native and Python checks from authenticated mock tests. The
+reusable live workflow owns native/Python mock tests, installed-device checks,
+executable documentation and the Slurm smoke test. Default CMake test presets
+and Nox test/minimum-version sessions exclude live tests. Wheel and release
+builds need no IQM credentials.
 
 ### Configure and Build
 
@@ -204,7 +205,7 @@ This tells CMake to:
 
 Additional useful flags:
 
-- `-DIQM_QDMI_COVERAGE=ON` to enable code coverage support
+- `-DENABLE_COVERAGE=ON` to enable code coverage support
 
 After configuring with CMake, the project can be built by calling:
 
@@ -283,10 +284,10 @@ ctest -C Release --test-dir build/test/integration --output-on-failure
 **Generating code coverage:**
 
 To generate a code coverage report, configure the project with
-`-DIQM_QDMI_COVERAGE=ON`, build, run the tests, and then use `lcov`:
+`-DENABLE_COVERAGE=ON`, build, run the tests, and then use `lcov`:
 
 ```console
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_QDMI_TESTS=ON -DIQM_QDMI_COVERAGE=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_QDMI_TESTS=ON -DENABLE_COVERAGE=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 lcov --capture --directory build --output-file coverage.info
@@ -628,3 +629,33 @@ If you have any questions about contributing, feel free to:
 - Reach out to the maintainers directly
 
 Thank you for contributing to the IQM QDMI Device implementation! 🎉
+
+## Continuous integration
+
+Use the `release`, `debug`, `coverage` and `sanitizers` CMake presets for native
+checks; `lint` prepares static analysis. Each preset has its own build
+directory. For example, configure with `cmake --preset release`, build with
+`cmake --build --preset release` and test with `ctest --preset release`. The
+test presets exclude the `integration` label. Windows CI retains separate MSVC
+and ClangCL toolset checks.
+
+Run `uvx nox -s tests minimums` for Python checks. Both sessions stay offline,
+including in a credentialed shell. CI runs one shared Python workflow per runner
+so normal and minimum-version sessions cannot cancel each other or overwrite
+coverage artifacts. Draft PRs exercise Python 3.14; ready PRs use every
+supported Python version.
+
+Trusted CI calls `reusable-live-tests.yml` after the offline native, Python and
+wheel checks. Remote selectors are restricted to the named Resonance mocks; fork
+PRs skip this workflow. No QPU execution is enabled by ordinary CI.
+`uvx nox -s live-tests` requires credentials and an explicit
+`IQM_QUANTUM_COMPUTER` mock selector. Live CTest selections use `-L integration`
+directly, without the offline test preset.
+
+Python execution checks run on Emerald and Garnet. Sirius runs Python metadata
+checks and the native integration suite; the generic Python execution circuits
+assume a qubit-only target.
+
+Documentation builds render notebooks without executing them by default. The
+live workflow uses `uvx nox --non-interactive -s docs -- --live` to exercise the
+mock-backed examples. `uvx nox -s examples` defaults to local simulation.

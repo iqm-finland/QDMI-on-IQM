@@ -1,27 +1,17 @@
-name: Documentation
+name: 📚 Documentation
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-  merge_group:
-  workflow_dispatch:
+  workflow_call:
 
 defaults:
   run:
     shell: bash
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   build-documentation:
-    # Fork PRs do not receive the upstream token for these notebooks.
-    if: github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id
     runs-on: ubuntu-26.04
 
     steps:
@@ -43,9 +33,6 @@ jobs:
 
       - name: Build documentation with nox
         run: uvx nox -s docs
-        env:
-          IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
-
       - name: Configure GitHub Pages
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -62,6 +49,10 @@ jobs:
         with:
           path: docs/_build/html
 
+    permissions:
+      contents: read
+      pages: write
+    name: 📚 Build
   deploy-pages:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: build-documentation
@@ -76,3 +67,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+    name: 🚀 Publish documentation

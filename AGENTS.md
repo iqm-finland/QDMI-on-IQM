@@ -26,8 +26,8 @@ access is explicitly intended.
   `uvx nox -s examples -- --backend sim`
 - Run a targeted test: `uvx nox -s tests-3.14 -- -k <test-expression>`
 
-The default examples session targets real IQM hardware. Do not run it without
-explicit intent, valid credentials, and an appropriate target.
+The examples session defaults to local simulation. Live checks require an
+explicit invocation, valid credentials, and an appropriate target.
 
 ## Documentation
 

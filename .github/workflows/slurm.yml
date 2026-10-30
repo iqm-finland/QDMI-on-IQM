@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   slurm-tests:
-    name: Slurm smoke test
+    name: 🧪 Slurm workload
     runs-on: ${{ inputs.runs-on }}
     timeout-minutes: 45
     steps:

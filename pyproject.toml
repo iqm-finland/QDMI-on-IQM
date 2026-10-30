@@ -184,7 +184,7 @@ environment-pass = [
 ]
 test-command = "pytest test/python"
 test-groups = [ "test" ]
-test-sources = [ "test/python" ]
+test-sources = [ "test/python", "pyproject.toml" ]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
@@ -282,6 +282,8 @@ allowed-unresolved-imports = [ "mqt.bench.**", "qiskit_nature.**", "qiskit_algor
 
 [tool.pytest]
 addopts = [
+  "-m",
+  "not live",
   "-ra",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
@@ -293,8 +295,10 @@ filterwarnings = [
   "ignore:.*Unknown solver options.*::",
   # UserWarning for unmapped operations
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
+  "ignore:.*Device operation 'measure_012' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
+markers = [ "live: explicit provider access" ]
 minversion = "9.0"
 strict = true
 testpaths = [ "test/python" ]
