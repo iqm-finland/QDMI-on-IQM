@@ -208,7 +208,8 @@ macOS and Windows.
 
 The library and test executables are written under `build/release/`. Use
 `cmake --build --preset release --parallel <NUMBER_OF_THREADS>` for a parallel
-build. Windows CI checks both MSVC and ClangCL toolsets.
+build. Windows CI checks both MSVC and ClangCL. The `release-clangcl` preset
+selects ClangCL in a Visual Studio developer shell.
 
 :::{note}
 This project uses CMake's

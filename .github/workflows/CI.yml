@@ -20,7 +20,6 @@ jobs:
       additional-cpp-files: |
         CMakePresets.json
         .github/workflows/CI.yml
-        .github/workflows/cpp-tests-windows.yml
         .github/workflows/cpp-install-tests.yml
         .github/workflows/cpp-install-live-tests.yml
         .github/workflows/reusable-live-tests.yml
@@ -87,17 +86,17 @@ jobs:
         include:
           - runs-on: windows-2025
             preset: debug
-            compiler: MSVC
+            compiler: msvc
           - runs-on: windows-2025
-            preset: release
-            compiler: ClangCL
+            preset: release-clangcl
+            compiler: clang
         compiler:
-          - MSVC
+          - msvc
     with:
       runs-on: ${{ matrix.runs-on }}
       compiler: ${{ matrix.compiler }}
-      config: ${{ matrix.preset == 'debug' && 'Debug' || 'Release' }}
-    uses: $/.github/workflows/cpp-tests-windows.yml
+      preset-name: ${{ matrix.preset }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-windows.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
 
   cpp-sanitizers:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-ubuntu.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
