@@ -201,6 +201,11 @@ cmake --build --preset release
 ctest --preset release
 ```
 
+Run the offline installation check with `cmake -P test/install.cmake`. It builds
+and installs the device, relocates the installation and tests a separate C
+consumer without accessing IQM. CI includes this check on Linux x86 and ARM,
+macOS and Windows.
+
 The library and test executables are written under `build/release/`. Use
 `cmake --build --preset release --parallel <NUMBER_OF_THREADS>` for a parallel
 build. Windows CI checks both MSVC and ClangCL toolsets.
@@ -385,7 +390,7 @@ uvx nox -s minimums-3.14
 
 Normal and minimum-version sessions exclude `live` tests, including in a
 credentialed shell. CI runs both sessions in one shared workflow per runner.
-Draft PRs exercise Python 3.14; ready PRs use every supported Python version.
+Draft PRs exercise Python 3.15; ready PRs use every supported Python version.
 `uvx nox -s live-tests` requires credentials and an explicit
 `IQM_QUANTUM_COMPUTER` mock selector.
 

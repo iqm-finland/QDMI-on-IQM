@@ -22,6 +22,7 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/cpp-tests-windows.yml
         .github/workflows/cpp-install-tests.yml
+        .github/workflows/cpp-install-live-tests.yml
         .github/workflows/reusable-live-tests.yml
       additional-python-files: |
         .github/workflows/CI.yml
@@ -31,8 +32,6 @@ jobs:
         examples/**
       additional-cd-files: |
         .github/workflows/CD.yml
-        LICENSE
-        README.md
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -140,7 +139,7 @@ jobs:
     with:
       runs-on: ubuntu-26.04
       sessions: '["tests", "minimums"]'
-      draft-sessions: '["tests-3.14", "minimums-3.14"]'
+      draft-sessions: '["tests-3.15", "minimums-3.15"]'
 
   python-coverage:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-coverage.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
@@ -164,6 +163,22 @@ jobs:
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests)
     uses: $/.github/workflows/python-examples.yml
+
+  cpp-install-tests:
+    name: 📦 Native installation
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+    uses: $/.github/workflows/cpp-install-tests.yml
+    with:
+      runs-on: ${{ matrix.runs-on }}
 
   build-sdist:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@a4b4977405c7685f95e127cdb6db396bbadce787 # v2.5.5
@@ -231,6 +246,7 @@ jobs:
       - python-coverage
       - python-linter
       - examples
+      - cpp-install-tests
       - build-sdist
       - build-wheel
       - documentation
@@ -242,7 +258,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-coverage,cpp-install-tests,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)

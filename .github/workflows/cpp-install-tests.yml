@@ -1,93 +1,22 @@
-name: ☁️ Live native installation
+name: 📦 Native installation
 on:
   workflow_call:
     inputs:
       runs-on:
-        description: >
-          The runner image to use.
-        default: "ubuntu-latest"
         type: string
-    secrets:
-      IQM_TOKEN:
-        required: true
-
+        default: ubuntu-26.04
 permissions:
   contents: read
-
 jobs:
-  cpp-tests-install:
+  install:
     name: 📦 ${{ inputs.runs-on }}
     runs-on: ${{ inputs.runs-on }}
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
-      CTEST_PARALLEL_LEVEL: 4
-      FORCE_COLOR: 3
     steps:
-      # Very long directory paths can cause issues on Windows
-      - name: Enable long paths on Windows and Git
-        if: runner.os == 'Windows'
-        run: |
-          reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
-          git config --system core.longpaths true
-
-          # Check out the repository
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Install build dependencies on Linux
+          fetch-depth: 0
+      - name: Install build dependencies
         if: runner.os == 'Linux'
-        run:
-          sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
-
-          # Set up ccache for faster C++ builds
-      - name: Setup ccache
-        if: runner.os != 'Windows'
-        uses: Chocobo1/setup-ccache-action@efeb0f4b0670854c2190fd2389da92c399ff5ceb # v1.5.10
-        with:
-          prepend_symlinks_to_path: false
-          override_cache_key: c++-tests-install-${{ inputs.runs-on }}
-          windows_compile_environment: msvc
-
-          # Set up mold as linker (Linux only)
-      - name: Set up mold as linker
-        uses:
-          rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-
-
-          # Build and install the IQM QDMI library
-      - name: Configure CMake for QDMI
-        run: cmake -S . -B install-build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build QDMI
-        run: cmake --build install-build --config Release --target iqm-qdmi-device
-
-      - name: Install QDMI Runtime Component
-        run: >
-          cmake --install install-build --config Release
-          --prefix install-dir
-          --component iqm-qdmi-device_Runtime
-
-      - name: Install QDMI Development Component
-        run: >
-          cmake --install install-build --config Release
-          --prefix install-dir
-          --component iqm-qdmi-device_Development
-
-          # Build tests using the installed QDMI device library
-      - name: Configure tests with the installed library
-        run: >
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          -DUSE_INSTALLED_IQM_QDMI_DEVICE=ON
-          -DCMAKE_PREFIX_PATH=install-dir
-
-      - name: Build tests
-        run: cmake --build build --config Release
-
-      - name: Test
-        env:
-          IQM_QUANTUM_COMPUTER: "emerald:mock"
-          IQM_QC_ALIAS: emerald:mock
-          IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
-          IQM_LOG_LEVEL: "DEBUG"
-        run: ctest -C Release --output-on-failure --test-dir build --timeout 600
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+      - run: cmake -P test/install.cmake

@@ -61,7 +61,7 @@ jobs:
           - ubuntu-26.04
           - macos-26
           - windows-2025
-    uses: $/.github/workflows/cpp-install-tests.yml
+    uses: $/.github/workflows/cpp-install-live-tests.yml
     with:
       runs-on: ${{ matrix.runs-on }}
     secrets:
