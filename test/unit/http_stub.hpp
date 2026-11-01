@@ -24,10 +24,11 @@
 
 #pragma once
 
+#include "cpr/bearer.h"
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+
 #include <chrono>
-#include <cpr/bearer.h>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
 #include <cstddef>
 #include <cstdint>
 #include <deque>

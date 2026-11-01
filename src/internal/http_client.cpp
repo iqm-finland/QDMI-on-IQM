@@ -24,26 +24,28 @@
 #include "http_client.hpp"
 
 #include "iqm_qdmi/constants.h"
+
 #include "logging.hpp"
+
+#include "cpr/bearer.h"
+#include "cpr/body_view.h"
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/error.h"
+#include "cpr/response.h"
+#include "cpr/session.h"
+#include "cpr/ssl_options.h"
+#include "cpr/timeout.h"
+#include "cpr/user_agent.h"
+#include "nlohmann/json.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cerrno>
 #include <chrono>
-#include <cpr/bearer.h>
-#include <cpr/body_view.h>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/error.h>
-#include <cpr/response.h>
-#include <cpr/session.h>
-#include <cpr/ssl_options.h>
-#include <cpr/timeout.h>
-#include <cpr/user_agent.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>

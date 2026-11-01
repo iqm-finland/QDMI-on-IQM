@@ -17,7 +17,7 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include <iqm_qdmi/device.h>
+#include "iqm_qdmi/device.h"
 
 int main(void) {
   IQM_QDMI_Device_Session session = NULL;

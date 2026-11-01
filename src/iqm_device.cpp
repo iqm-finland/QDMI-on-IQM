@@ -23,20 +23,24 @@
  * documentation at https://munich-quantum-software-stack.github.io/QDMI.
  */
 
+#include "iqm_qdmi/calibration.h"
+#include "iqm_qdmi/device.h"
+
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
-#include "iqm_qdmi/calibration.h"
-#include "iqm_qdmi/device.h"
 #include "logging.hpp"
+
+#include "cpr/connection_pool.h"
+#include "cpr/response.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <chrono>
 #include <cmath>
-#include <cpr/connection_pool.h>
-#include <cpr/response.h>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -47,8 +51,6 @@
 #include <map>
 #include <memory>
 #include <new>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <numeric>
 #include <optional>
 #include <ranges>

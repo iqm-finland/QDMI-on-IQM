@@ -22,11 +22,12 @@
 
 #include "qdmi_client.hpp"
 
+#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/device.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
-#include <iqm_qdmi/constants.h>
-#include <iqm_qdmi/device.h>
 #include <map>
 #include <memory>
 #include <optional>

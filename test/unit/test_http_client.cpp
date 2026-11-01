@@ -17,20 +17,22 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+#include "iqm_qdmi/constants.h"
+
 #include "http_client.hpp"
 #include "http_stub.hpp"
-#include "iqm_qdmi/constants.h"
 #include "logging.hpp"
+
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/response.h"
+#include "gtest/gtest.h"
 
 #include <array>
 #include <chrono>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/response.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
 #include <optional>

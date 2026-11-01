@@ -17,28 +17,30 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+#include "iqm_qdmi/calibration.h"
+#include "iqm_qdmi/device.h"
+
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
-#include "iqm_qdmi/calibration.h"
-#include "iqm_qdmi/device.h"
 #include "logging.hpp"
 #include "qdmi_client.hpp"
+
+#include "cpr/response.h"
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <new>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <sstream>
 #include <stdexcept>

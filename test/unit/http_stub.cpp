@@ -21,15 +21,16 @@
 
 #include "http_client.hpp"
 
+#include "cpr/bearer.h"
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/error.h"
+#include "cpr/response.h"
+#include "gtest/gtest.h"
+
 #include <chrono>
-#include <cpr/bearer.h>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/error.h>
-#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <optional>
 #include <string>
 #include <string_view>

@@ -19,7 +19,13 @@
 
 #include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
+
 #include "qdmi_client.hpp"
+
+#include "gtest/gtest.h"
+// NOLINTNEXTLINE(misc-include-cleaner)
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -28,12 +34,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <map>
-// NOLINTNEXTLINE(misc-include-cleaner)
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <numeric>
 #include <optional>
 #include <random>

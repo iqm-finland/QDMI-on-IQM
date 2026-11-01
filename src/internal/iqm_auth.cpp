@@ -25,9 +25,12 @@
 
 #include "logging.hpp"
 
+#include "cpr/bearer.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
+
 #include <algorithm>
 #include <array>
-#include <cpr/bearer.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -35,8 +38,6 @@
 #include <exception>
 #include <fstream>
 #include <map>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <sstream>

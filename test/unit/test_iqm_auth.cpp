@@ -19,13 +19,14 @@
 
 #include "iqm_auth.hpp"
 
-#include <cpr/bearer.h>
+#include "cpr/bearer.h"
+#include "gtest/gtest.h"
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <optional>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
