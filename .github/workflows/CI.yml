@@ -125,7 +125,7 @@ jobs:
     with:
       clang-version: 22
       files-changed-only: true
-      cpp-linter-extra-args: "-std=c++20"
+      cpp-linter-extra-args: ""
       cpp-linter-ignore-extra: "!include/**"
     permissions:
       contents: read

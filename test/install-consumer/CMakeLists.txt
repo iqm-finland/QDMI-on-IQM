@@ -17,7 +17,9 @@
 
 cmake_minimum_required(VERSION 3.24)
 project(iqm-installed-consumer LANGUAGES C)
-find_package(iqm-qdmi-device 1.5 REQUIRED CONFIG)
+if(NOT TARGET iqm-qdmi-device)
+  find_package(iqm-qdmi-device 1.5 REQUIRED CONFIG)
+endif()
 add_executable(consumer main.c)
 target_link_libraries(consumer PRIVATE iqm-qdmi-device)
 enable_testing()

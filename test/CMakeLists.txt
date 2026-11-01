@@ -17,6 +17,7 @@
 
 add_subdirectory(qdmi_client)
 add_subdirectory(integration)
+add_subdirectory(install-consumer)
 
 set(QDMI_PREFIX "IQM")
 generate_device_defs_executable(${QDMI_PREFIX} TARGET iqm-qdmi-device)
