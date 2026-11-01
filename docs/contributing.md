@@ -268,17 +268,25 @@ ctest --test-dir build/release -L live --output-on-failure
 
 **Generating code coverage:**
 
-Use the coverage preset to run offline tests with native instrumentation, then
-collect the report with `lcov`:
+On Linux, use the coverage preset to instrument the native implementation and
+run offline tests:
 
 ```console
 cmake --preset coverage
 cmake --build --preset coverage
 ctest --preset coverage
-lcov --capture --directory build/coverage --output-file coverage.info
-lcov --remove coverage.info '/usr/*' '*/test/*' '*/build/_deps/*' --output-file coverage.info
-lcov --list coverage.info
 ```
+
+CI uploads the native gcov data under Codecov's `cpp` flag. Python test sessions
+produce a separate report under the `python` flag. To collect it locally:
+
+```console
+uvx nox -s tests-3.14 -- --cov --cov-report=xml:coverage.xml
+```
+
+`pyproject.toml` limits Python measurement to `iqm.qdmi`; `.github/codecov.yml`
+defines the source paths and reporting thresholds. Coverage checks stay offline
+and do not include live IQM tests.
 
 **Running the tests under sanitizers:**
 
