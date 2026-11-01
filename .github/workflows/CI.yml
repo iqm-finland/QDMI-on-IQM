@@ -121,10 +121,10 @@ jobs:
     if: fromJSON(needs.change-detection.outputs.run-cpp-linter)
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-linter.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     with:
-      clang-version: 22
+      clang-version: 23
       files-changed-only: true
-      cpp-linter-extra-args: ""
-      cpp-linter-ignore-extra: "!include/**"
+      # Preserve C mode for the install consumer; C++ uses the compilation database.
+      cpp-linter-extra-args: "-Wunused-template"
     permissions:
       contents: read
       pull-requests: write # required to post comments on PRs
