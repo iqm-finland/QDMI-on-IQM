@@ -13,7 +13,7 @@
 [![Apache 2.0 with LLVM exception](https://img.shields.io/static/v1?logo=Apache&label=License&message=Apache%202.0%20with%20LLVM%20exception&color=informational&style=flat-square)](https://github.com/iqm-finland/QDMI-on-IQM/blob/main/LICENSE)
 [![C++20](https://img.shields.io/static/v1?logo=cplusplus&label=C%2B%2B&message=20&color=informational&style=flat-square)](https://isocpp.org/)
 [![CMake](https://img.shields.io/static/v1?logo=CMake&label=CMake&message=3.24%2B&color=informational&style=flat-square)](https://cmake.org/)
-[![CI](https://img.shields.io/github/actions/workflow/status/iqm-finland/QDMI-on-IQM/CI.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/iqm-finland/QDMI-on-IQM/actions/workflows/CI.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/iqm-finland/QDMI-on-IQM/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/iqm-finland/QDMI-on-IQM/actions/workflows/ci.yml)
 [![codecov](https://img.shields.io/codecov/c/github/iqm-finland/QDMI-on-IQM?style=flat-square&logo=codecov)](https://codecov.io/gh/iqm-finland/QDMI-on-IQM)
 
 **QDMI on IQM** is IQM's official, production-ready implementation of the

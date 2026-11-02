@@ -25,14 +25,6 @@
       }
     },
     {
-      "name": "release-clangcl",
-      "inherits": "release",
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl"
-      }
-    },
-    {
       "name": "coverage",
       "inherits": "debug",
       "cacheVariables": {
@@ -63,10 +55,6 @@
     {
       "name": "release",
       "configurePreset": "release"
-    },
-    {
-      "name": "release-clangcl",
-      "configurePreset": "release-clangcl"
     },
     {
       "name": "coverage",
@@ -107,11 +95,6 @@
       "name": "release",
       "inherits": "base",
       "configurePreset": "release"
-    },
-    {
-      "name": "release-clangcl",
-      "inherits": "base",
-      "configurePreset": "release-clangcl"
     },
     {
       "name": "coverage",

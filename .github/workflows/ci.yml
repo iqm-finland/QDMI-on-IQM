@@ -1,7 +1,8 @@
 name: CI
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -18,18 +19,13 @@ jobs:
     name: 🔍 Change
     with:
       additional-cpp-files: |
-        .github/workflows/CI.yml
-        .github/workflows/cpp-install-tests.yml
-        .github/workflows/cpp-install-live-tests.yml
+        .github/workflows/cpp-*.yml
         .github/workflows/reusable-live-tests.yml
       additional-python-files: |
-        .github/workflows/CI.yml
-        .github/workflows/python-examples.yml
         .github/workflows/reusable-live-tests.yml
+        .github/workflows/python-*.yml
         .github/workflows/slurm.yml
         examples/**
-      additional-cd-files: |
-        .github/workflows/CD.yml
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -79,21 +75,13 @@ jobs:
       matrix:
         runs-on:
           - windows-2025
-          - windows-11-arm
         preset:
           - release
         include:
           - runs-on: windows-2025
             preset: debug
-            compiler: msvc
-          - runs-on: windows-2025
-            preset: release-clangcl
-            compiler: clang
-        compiler:
-          - msvc
     with:
       runs-on: ${{ matrix.runs-on }}
-      compiler: ${{ matrix.compiler }}
       preset-name: ${{ matrix.preset }}
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-tests-windows.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
 
@@ -107,10 +95,10 @@ jobs:
       preset-name: sanitizers
 
   cpp-coverage:
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     name: 🇨 Coverage
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     permissions:
       contents: read
       id-token: write
@@ -127,7 +115,7 @@ jobs:
       cpp-linter-extra-args: "-Wunused-template"
     permissions:
       contents: read
-      pull-requests: write # required to post comments on PRs
+      pull-requests: write
 
   python-tests:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-tests.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
@@ -147,6 +135,12 @@ jobs:
       contents: read
       id-token: write
 
+  python-examples:
+    name: 🐍 Examples
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-python-tests)
+    uses: $/.github/workflows/python-examples.yml
+
   python-linter:
     name: 🐍 Lint
     needs: change-detection
@@ -155,12 +149,6 @@ jobs:
     with:
       enable-ty: true
       enable-mypy: false
-
-  examples:
-    name: 🧪 Local examples
-    needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-python-tests)
-    uses: $/.github/workflows/python-examples.yml
 
   cpp-install-tests:
     name: 📦 Native installation
@@ -197,7 +185,6 @@ jobs:
           - ubuntu-26.04-arm
           - macos-26
           - windows-2025
-          - windows-11-arm
     with:
       runs-on: ${{ matrix.runs-on }}
 
@@ -242,8 +229,8 @@ jobs:
       - cpp-linter
       - python-tests
       - python-coverage
+      - python-examples
       - python-linter
-      - examples
       - cpp-install-tests
       - build-sdist
       - build-wheel
@@ -256,7 +243,11 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-coverage,cpp-install-tests,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-install-tests,' || ''
+            }}
+            ${{
+              !fromJSON(needs.change-detection.outputs.run-cpp-tests)
+              && 'cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
@@ -264,7 +255,7 @@ jobs:
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests)
-              && 'python-tests,python-coverage,examples,' || ''
+              && 'python-tests,python-coverage,python-examples,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-linter)

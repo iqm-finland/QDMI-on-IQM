@@ -1,4 +1,4 @@
-name: 🧪 Local examples
+name: 🐍 Examples
 
 on:
   workflow_call:
