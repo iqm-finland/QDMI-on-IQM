@@ -466,7 +466,7 @@ int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
   session->sites_ptr_.reserve(total_sites);
   session->sites_map_.reserve(total_sites);
 
-  auto add_site = [&](const std::string &site_name, size_t site_index) {
+  const auto add_site = [&](const std::string &site_name, size_t site_index) {
     auto &site =
         session->sites_.emplace_back(std::make_unique<IQM_QDMI_Site_impl_d>());
     site->name_ = site_name;
@@ -604,7 +604,7 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
           msg += gate_name;
           msg += "' references unknown site '";
           msg += site_name;
-          msg += "'";
+          msg += '\'';
           LOG_ERROR(msg);
           return QDMI_ERROR_FATAL;
         }
@@ -1863,10 +1863,8 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
       if (size < req_size) {
         return QDMI_ERROR_INVALIDARGUMENT;
       }
-      auto *data_ptr = static_cast<size_t *>(data);
-      for (const auto &count : program_result.counts | std::views::values) {
-        *data_ptr++ = count;
-      }
+      std::ranges::copy(program_result.counts | std::views::values,
+                        static_cast<size_t *>(data));
     }
   }
   return QDMI_SUCCESS;
@@ -2112,7 +2110,9 @@ int IQM_QDMI_device_job_get_results(IQM_QDMI_Device_Job job,
 
 namespace {
 constexpr std::array SUPPORTED_PROGRAM_FORMATS = {
-    QDMI_PROGRAM_FORMAT_QIRBASESTRING, QDMI_PROGRAM_FORMAT_IQMJSON};
+    QDMI_PROGRAM_FORMAT_QIRBASESTRING,
+    QDMI_PROGRAM_FORMAT_IQMJSON,
+};
 
 /// A device with at least this many queued jobs is reported as busy. The IQM
 /// on-demand queue is FIFO and executes one job at a time, so a single queued

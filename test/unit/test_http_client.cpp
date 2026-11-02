@@ -383,8 +383,11 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
 }
 
 TEST(HttpClientTest, PostBorrowsBodyAcrossRetriesWithoutRequestingContinue) {
-  for (const auto &payload : std::array{std::string{}, std::string{"a\0b", 3},
-                                        std::string((1024 * 1024) + 1, 'x')}) {
+  for (const auto &payload : std::array{
+           std::string{},
+           std::string{"a\0b", 3},
+           std::string((1024 * 1024) + 1, 'x'),
+       }) {
     SCOPED_TRACE(payload.size());
     iqm::test_support::HttpStub http_stub;
     http_stub.queue_post(429, "", {{"Retry-After", "1"}}).queue_post(200);

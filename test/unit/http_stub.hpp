@@ -143,7 +143,8 @@ private:
   std::vector<int> sleep_durations_;
   /// Time the stubbed clock reports, moved only by sleeps and advance().
   std::chrono::steady_clock::time_point now_{
-      std::chrono::steady_clock::time_point{} + std::chrono::hours{1}};
+      std::chrono::steady_clock::time_point{} + std::chrono::hours{1},
+  };
 };
 
 } // namespace iqm::test_support

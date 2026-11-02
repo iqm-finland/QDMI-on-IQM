@@ -40,17 +40,20 @@
 #include "nlohmann/json.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
-#include <fstream>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
+
+#ifdef __linux__
+#include <array>
+#include <fstream>
+#endif
 
 namespace iqm::http {
 namespace internal {
@@ -221,7 +224,8 @@ void Record_rate_limit(Rate_limit_budget &budget,
       // A negative count means the quota is overdrawn, which is exhausted.
       .remaining = std::max<std::int64_t>(0, *remaining),
       .limit = *limit,
-      .observed_at = Get_hooks().now()};
+      .observed_at = Get_hooks().now(),
+  };
 }
 
 /// How long to hold back before spending more of a quota running low: the
@@ -258,7 +262,7 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
                                    Perform_attempt perform_attempt) {
   const auto &hooks = Get_hooks();
   const auto start = hooks.now();
-  const auto remaining_timeout = [&]() {
+  const auto remaining_timeout = [&] {
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         hooks.now() - start);
     return elapsed >= timeout ? std::chrono::milliseconds::zero()
@@ -337,10 +341,12 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
 } // namespace
 
 Hooks &Get_hooks() {
-  static Hooks hooks{.get = Default_get,
-                     .post = Default_post,
-                     .sleep = Default_sleep,
-                     .now = Default_now};
+  static Hooks hooks{
+      .get = Default_get,
+      .post = Default_post,
+      .sleep = Default_sleep,
+      .now = Default_now,
+  };
   return hooks;
 }
 

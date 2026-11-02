@@ -117,17 +117,19 @@ HttpStub::HttpStub() {
     now_ += std::chrono::seconds{seconds};
   };
 
-  hooks.now = [this]() { return now_; };
+  hooks.now = [this] { return now_; };
 }
 
 HttpStub::~HttpStub() { http::internal::Reset_hooks(); }
 
 HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body,
                               cpr::Header headers) {
-  get_responses_.push_back({.status_code = status_code,
-                            .body = std::move(body),
-                            .connection_error = false,
-                            .headers = std::move(headers)});
+  get_responses_.push_back({
+      .status_code = status_code,
+      .body = std::move(body),
+      .connection_error = false,
+      .headers = std::move(headers),
+  });
   return *this;
 }
 
@@ -139,10 +141,12 @@ HttpStub &HttpStub::queue_get_connection_error() {
 
 HttpStub &HttpStub::queue_post(const int64_t status_code, std::string body,
                                cpr::Header headers) {
-  post_responses_.push_back({.status_code = status_code,
-                             .body = std::move(body),
-                             .connection_error = false,
-                             .headers = std::move(headers)});
+  post_responses_.push_back({
+      .status_code = status_code,
+      .body = std::move(body),
+      .connection_error = false,
+      .headers = std::move(headers),
+  });
   return *this;
 }
 
