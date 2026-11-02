@@ -180,10 +180,12 @@ development package.
 
 CI separates offline native and Python checks from authenticated mock tests. The
 reusable live workflow owns native/Python mock tests, installed-device checks,
-and the Slurm smoke test. It runs after offline native, Python and wheel checks
-and restricts remote selectors to named Resonance mocks. Fork PRs stay offline;
-ordinary CI enables no QPU execution. Wheel and release builds need no IQM
-credentials.
+and the Slurm smoke test. It runs after the selected offline native, Python and
+wheel checks pass and restricts remote selectors to named Resonance mocks. Every
+non-fork PR, including release preparation, runs live tests even when change
+detection skips all offline checks. Failed or cancelled prerequisites prevent
+live tests; fork PRs stay offline. Ordinary CI enables no QPU execution. Wheel
+and release builds need no IQM credentials.
 
 Python execution checks run on Emerald and Garnet. Sirius runs Python metadata
 checks and the native integration suite; the generic Python execution circuits
