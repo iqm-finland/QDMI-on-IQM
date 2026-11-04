@@ -23,12 +23,12 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
-    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError, UnsupportedDeviceError
+    from mqt.core.plugins.qiskit.exceptions import CircuitValidationError
     from mqt.core.qdmi import CustomProperty
     from mqt.core.qdmi.builtin_driver import open_device
 except ImportError as e:
@@ -38,16 +38,12 @@ except ImportError as e:
     )
     raise ImportError(msg) from e
 
-from qiskit.transpiler import Target
-
 from . import IQM_QDMI_DEVICE_ID
-from .gates import MoveGate
 
 if TYPE_CHECKING:
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
     from mqt.core.typing import QDMIJobParameters
-    from qiskit.circuit import Instruction
     from qiskit.providers import Options
 
 __all__ = ["IQMBackend"]
@@ -81,52 +77,6 @@ class IQMBackend(QDMIBackend):
     `iqm.default`. An explicit ID or alias takes precedence over either selector
     from the environment. Named presets use their manifest configuration.
     """
-
-    #: MOVE is native to IQM's star-topology devices but absent from Qiskit's
-    #: standard gate library, so the Target needs it supplied here.
-    _EXTRA_GATES: ClassVar[dict[str, Instruction | type[Instruction]]] = {"move": MoveGate()}
-
-    @property
-    def physical_qubits(self) -> tuple[int, ...]:
-        """Device site indices in target order, including computational resonators."""
-        return self._physical_qubits
-
-    def _build_target(self) -> Target:
-        """Build a target from calibrated qubits and computational resonators.
-
-        Returns:
-            A calibrated target with contiguous indices and native resonator operations.
-
-        Raises:
-            UnsupportedDeviceError: No qubits have both required calibrations.
-        """
-        target = super()._build_target()
-        # The IQM device lists qubits first, followed by computational resonators.
-        num_qubits = self.device.qubits_num()
-        self._physical_qubits = tuple(
-            index
-            for index in range(target.num_qubits)
-            if index >= num_qubits
-            or all(target.instruction_supported(operation_name=gate, qargs=(index,)) for gate in ("r", "measure"))
-        )
-        if not any(index < num_qubits for index in self._physical_qubits):
-            msg = "No IQM qubits have calibrated PRX and measurement operations."
-            raise UnsupportedDeviceError(msg)
-        if len(self._physical_qubits) == target.num_qubits:
-            return target
-
-        indices = {physical: logical for logical, physical in enumerate(self._physical_qubits)}
-        restricted = Target(description=target.description, num_qubits=len(indices))
-        # IQM native operations have explicit calibrated loci.
-        for name, placements in target.items():
-            properties = {
-                tuple(indices[index] for index in locus): props
-                for locus, props in placements.items()
-                if locus is not None and all(index in indices for index in locus)
-            }
-            if properties:
-                restricted.add_instruction(target.operation_from_name(name), properties, name=name)
-        return restricted
 
     @classmethod
     def _default_options(cls) -> Options:

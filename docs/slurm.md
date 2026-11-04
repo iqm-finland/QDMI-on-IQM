@@ -22,7 +22,7 @@ ID, assuming one local license with a count of one (`ID` or `ID:1`):
 import os
 
 from mqt.core.qdmi import builtin_driver as qdmi_driver
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit
 from iqm.qdmi.qiskit import IQMBackend
 
 device_id = os.environ["SLURM_JOB_LICENSES"].removesuffix(":1")
@@ -31,7 +31,7 @@ circuit = QuantumCircuit(2)
 circuit.h(0)
 circuit.cx(0, 1)
 circuit.measure_all()
-result = backend.run(transpile(circuit, backend), shots=100).result()
+result = backend.run(backend.compile(circuit), shots=100).result()
 print(result.get_counts())
 ```
 
@@ -49,8 +49,9 @@ configuration, and committed scripts.
 The
 [offloader](python_package.md#programmatic-offloading-with-the-offloader-module)
 also submits IQM sampler and estimator jobs through `srun`. IQM supports IQM
-JSON and QIR. MQT Core's PennyLane adapter requires OpenQASM; use the IQM Qiskit
-adapter for these workloads.
+JSON and QIR. The
+[MQT Core PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html)
+also compiles to IQM JSON and reconstructs the requested logical results.
 
 ## Prepare the cluster
 

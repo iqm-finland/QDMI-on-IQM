@@ -12,6 +12,15 @@ releases may include breaking changes.
 
 ### Changed
 
+- 💥 Use Core's native IQM serialization, including MOVE and logical result
+  reconstruction. Remove `qiskit_to_iqm_json`, its serializer entry point and
+  `physical_qubits`; wire indices denote physical site IDs, including gaps. Keep
+  circuit metadata in local results. ([#321]) ([**@burgholzer**])
+- 💥 Remove `MoveGate` and provider target construction. Compile star-device
+  circuits with `backend.compile` before submission. ([#321])
+  ([**@burgholzer**])
+- ♻️ Keep Slurm deployment and integration checks in MQT Core. ([#321])
+  ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -350,6 +359,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
