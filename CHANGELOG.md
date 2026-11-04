@@ -12,6 +12,7 @@ releases may include breaking changes.
 
 ### Changed
 
+- 📦 Stop publishing Windows ARM64 wheels ([#322]) ([**@denialhaag**]).
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -347,6 +348,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#322]: https://github.com/iqm-finland/QDMI-on-IQM/pull/322
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306

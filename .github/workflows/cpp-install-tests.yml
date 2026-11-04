@@ -1,22 +1,49 @@
-name: 📦 Native installation
+name: 📦 C++ installation
 on:
   workflow_call:
     inputs:
       runs-on:
+        description: The runner image to use.
         type: string
-        default: ubuntu-26.04
+        default: ubuntu-latest
+
 permissions:
   contents: read
+
 jobs:
   install:
     name: 📦 ${{ inputs.runs-on }}
     runs-on: ${{ inputs.runs-on }}
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CTEST_PARALLEL_LEVEL: 4
+      FORCE_COLOR: 3
     steps:
+      - name: Enable long paths on Windows and Git
+        if: runner.os == 'Windows'
+        run: |
+          reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+          git config --system core.longpaths true
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+
       - name: Install build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
-      - run: cmake -P test/install.cmake
+
+      - name: Set up ccache
+        uses: Chocobo1/setup-ccache-action@ccc034167d57f9a0f3248c21b633819fcf331757 # v1.5.11
+        with:
+          prepend_symlinks_to_path: false
+          override_cache_key: cpp-install-tests-${{ inputs.runs-on }}
+          windows_compile_environment: msvc
+
+      - name: Set up mold as linker
+        if: runner.os == 'Linux'
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: Build, install, relocate, and test
+        run: cmake -P test/install.cmake

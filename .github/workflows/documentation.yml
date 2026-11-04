@@ -12,8 +12,11 @@ permissions:
 
 jobs:
   build-documentation:
+    name: 📚 Build
+    permissions:
+      contents: read
+      pages: write
     runs-on: ubuntu-26.04
-
     steps:
       - name: Clone Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +36,7 @@ jobs:
 
       - name: Build documentation with nox
         run: uvx nox -s docs
+
       - name: Configure GitHub Pages
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -49,13 +53,10 @@ jobs:
         with:
           path: docs/_build/html
 
-    permissions:
-      contents: read
-      pages: write
-    name: 📚 Build
   deploy-pages:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    name: 🚀 Publish documentation
     needs: build-documentation
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     permissions:
       pages: write
       id-token: write
@@ -67,4 +68,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
-    name: 🚀 Publish documentation

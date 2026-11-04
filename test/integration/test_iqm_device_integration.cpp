@@ -23,8 +23,7 @@
 #include "qdmi_client.hpp"
 
 #include "gtest/gtest.h"
-// NOLINTNEXTLINE(misc-include-cleaner)
-#include "nlohmann/json.hpp"
+#include "nlohmann/json.hpp" // NOLINT(misc-include-cleaner)
 #include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>

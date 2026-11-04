@@ -178,18 +178,9 @@ Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
 development package.
 
-CI separates offline native and Python checks from authenticated mock tests. The
-reusable live workflow owns native/Python mock tests, installed-device checks,
-and the Slurm smoke test. It runs after the selected offline native, Python and
-wheel checks pass and restricts remote selectors to named Resonance mocks. Every
-non-fork PR, including release preparation, runs live tests even when change
-detection skips all offline checks. Failed or cancelled prerequisites prevent
-live tests; fork PRs stay offline. Ordinary CI enables no QPU execution. Wheel
-and release builds need no IQM credentials.
-
-Python execution checks run on Emerald and Garnet. Sirius runs Python metadata
-checks and the native integration suite; the generic Python execution circuits
-assume a qubit-only target.
+CI runs offline C++ and Python checks separately from authenticated Resonance
+mock tests. Fork PRs stay offline. Wheel and release builds need no IQM
+credentials, and ordinary CI does not execute on a QPU.
 
 ### Configure and Build
 
@@ -263,7 +254,8 @@ Before running the integration tests, make sure you have set the necessary
 environment variables:
 
 ```console
-export IQM_SERVER_URL="https://desired-iqm-server.com"
+export IQM_BASE_URL="https://resonance.iqm.tech"
+export IQM_QUANTUM_COMPUTER="emerald:mock"
 export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
 ```
@@ -279,16 +271,13 @@ cmake --build --preset coverage
 ctest --preset coverage
 ```
 
-CI uploads the native gcov data under Codecov's `cpp` flag. Python test sessions
-produce a separate report under the `python` flag. To collect it locally:
+Collect Python coverage locally with:
 
 ```console
 uvx nox -s tests-3.14 -- --cov --cov-report=xml:coverage.xml
 ```
 
-`pyproject.toml` limits Python measurement to `iqm.qdmi`; `.github/codecov.yml`
-defines the source paths and reporting thresholds. Coverage checks stay offline
-and do not include live IQM tests.
+Coverage checks stay offline and do not include live IQM tests.
 
 **Running the tests under sanitizers:**
 
@@ -399,9 +388,7 @@ uvx nox -s minimums-3.14
 ```
 
 Normal and minimum-version sessions exclude `live` tests, including in a
-credentialed shell. CI runs both sessions in one shared workflow per runner.
-Draft PRs exercise Python 3.15; ready PRs use every supported Python version.
-`uvx nox -s live-tests` requires credentials and an explicit
+credentialed shell. `uvx nox -s live-tests` requires credentials and an explicit
 `IQM_QUANTUM_COMPUTER` mock selector.
 
 ### Running the Python examples
@@ -410,7 +397,7 @@ Run the full example suite via the dedicated nox session before opening or
 updating a PR:
 
 ```console
-uvx nox -s examples                  # local simulation
+uvx nox -s examples                   # local simulation
 uvx nox -s examples -- --backend iqm  # explicit live IQM access
 ```
 
