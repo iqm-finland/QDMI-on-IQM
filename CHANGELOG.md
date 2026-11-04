@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- Standalone IQM iteration creation, inspection, and explicit ending, with
+  bounded requests and separate lifecycle validation. ([**@marcelwa**])
+
 ### Changed
 
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
