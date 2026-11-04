@@ -164,7 +164,7 @@ cache-keys = [
 
 [tool.uv.sources]
 iqm-qdmi = { workspace = true }
-mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "8882cb2c6e8aba32c4ebf3360f1cb37c3855171f" }
+mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "05888c28dfecee456ab6665ed3afe7243b4895e7" }
 
 
 [tool.cibuildwheel]
