@@ -88,8 +88,24 @@ jobs:
             tag_sha=$SOURCE_SHA
           fi
           test "$tag_sha" = "$SOURCE_SHA"
-          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS dist/SOURCE_SHA --repo "$GITHUB_REPOSITORY" --clobber
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort > staged-assets.txt
-          for name in $(find dist -maxdepth 1 -name '*.tar.gz' -printf '%f\n') SHA256SUMS SOURCE_SHA; do
-            grep -Fqx "$name" staged-assets.txt
+          assets=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          if printf '%s\n' "$assets" | grep -Fqx SOURCE_SHA; then
+            gh release delete-asset "$RELEASE_TAG" SOURCE_SHA --repo "$GITHUB_REPOSITORY" --yes
+          fi
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          verify_dir=$(mktemp -d)
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$verify_dir" \
+            --pattern '*.tar.gz' --pattern SHA256SUMS
+          for triple in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu arm64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc; do
+            archive="iqm-qdmi-device_${RELEASE_TAG}_${triple}.tar.gz"
+            test -f "$verify_dir/$archive"
+            awk -v name="$archive" '$2 == name {found++} END {exit found == 1 ? 0 : 1}' "$verify_dir/SHA256SUMS"
           done
+          test "$(find "$verify_dir" -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 5
+          (
+            cd "$verify_dir"
+            test "$(wc -l < SHA256SUMS)" -eq 5
+            sha256sum -c SHA256SUMS
+          )
+          gh release upload "$RELEASE_TAG" dist/SOURCE_SHA --repo "$GITHUB_REPOSITORY"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fqx SOURCE_SHA

@@ -18,8 +18,10 @@ These dependencies are linked into the shared library and
 
 ```{note}
 Linux wheels also bundle OpenSSL 3 (Apache-2.0); updating it requires a new
-wheel release. The device's LLVM exception does not apply to OpenSSL.
-C++ SDK archives bundle available non-system native dependencies and include their licenses under licenses/. The macOS SDK uses system curl. These archives rely on the operating system runtime and CA trust store.
+wheel release. The device's LLVM exception does not apply to OpenSSL. C++ SDK
+archives bundle available non-system native dependencies and include their
+licenses under licenses/. The macOS SDK uses system curl. These archives rely on
+the operating system runtime and CA trust store.
 
 ```
 
