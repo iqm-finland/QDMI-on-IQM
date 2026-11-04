@@ -2348,7 +2348,7 @@ int IQM_QDMI_device_session_query_site_property(IQM_QDMI_Device_Session session,
       QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_SITE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
-  ADD_SINGLE_VALUE_PROPERTY(QDMI_SITE_PROPERTY_INDEX, uint64_t, site->id_, prop,
+  ADD_SINGLE_VALUE_PROPERTY(QDMI_SITE_PROPERTY_INDEX, size_t, site->id_, prop,
                             size, value, size_ret)
   if (site->t1_ > 0) {
     ADD_SINGLE_VALUE_PROPERTY(QDMI_SITE_PROPERTY_T1, uint64_t, site->t1_, prop,
