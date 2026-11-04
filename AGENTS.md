@@ -34,13 +34,6 @@ explicit invocation, valid credentials, and an appropriate target.
 - Check links: `uvx nox -s docs -- -b linkcheck`
 - Generated HTML: `docs/_build/html/`
 
-## Slurm Integration
-
-- MQT Core owns the shared Slurm runner and Docker cluster.
-- `test/slurm/` contains an SDK workload for the Emerald Resonance mock. Its
-  README describes the required credentials and eight-shot workload. Run it only
-  when live IQM access is explicitly intended.
-
 ## Tech Stack
 
 ### General

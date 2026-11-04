@@ -24,7 +24,6 @@ jobs:
       additional-python-files: |
         .github/workflows/live-tests.yml
         .github/workflows/python-*.yml
-        .github/workflows/slurm.yml
         examples/**
 
   cpp-tests-ubuntu:

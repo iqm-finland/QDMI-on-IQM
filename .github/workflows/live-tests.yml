@@ -134,9 +134,3 @@ jobs:
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
         run: ctest -C Release --output-on-failure --test-dir build -L live --timeout 600 --parallel 1
-
-  slurm:
-    name: ☁️ Live Slurm · IQM mock
-    uses: $/.github/workflows/slurm.yml
-    secrets:
-      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
