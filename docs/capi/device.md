@@ -20,3 +20,8 @@
 
 ```{doxygenfunction} IQM_QDMI_device_job_submit_calibration
 ```
+
+## IQM iteration extension (`iteration.h`)
+
+```{doxygenfile} iteration.h
+```

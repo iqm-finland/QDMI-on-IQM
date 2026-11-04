@@ -43,6 +43,7 @@ including the Qiskit backend and its sampler and estimator primitives.
 examples
 qiskit
 usage
+iteration-mode
 python_package
 slurm
 
