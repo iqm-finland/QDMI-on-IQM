@@ -2858,6 +2858,26 @@ std::vector<IQM_QDMI_Site> Query_sites(IQM_QDMI_Device_Session session) {
   return sites;
 }
 
+TEST_F(DeviceIntegrationMockTest, SiteIndexUsesSizeT) {
+  queue_successful_initialization();
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+  const auto sites = Query_sites(session);
+  ASSERT_EQ(sites.size(), 2U);
+  size_t size = 0;
+  ASSERT_EQ(
+      IQM_QDMI_device_session_query_site_property(
+          session, sites.back(), QDMI_SITE_PROPERTY_INDEX, 0, nullptr, &size),
+      QDMI_SUCCESS);
+  EXPECT_EQ(size, sizeof(size_t));
+  size_t index = ~size_t{0};
+  EXPECT_EQ(IQM_QDMI_device_session_query_site_property(
+                session, sites.back(), QDMI_SITE_PROPERTY_INDEX, sizeof(index),
+                &index, &size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(size, sizeof(index));
+  EXPECT_EQ(index, 1U);
+}
+
 /// The operation an initialized session reports under @p name, or nullptr.
 IQM_QDMI_Operation Query_operation(IQM_QDMI_Device_Session session,
                                    const std::string &name) {
