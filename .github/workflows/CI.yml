@@ -9,7 +9,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -27,6 +28,8 @@ jobs:
         .github/workflows/cpp-linter.yml
         .github/workflows/cpp-install-tests.yml
         .github/workflows/cpp-sanitizers.yml
+        .github/workflows/iteration-validation.yml
+        test/iteration/**
       additional-python-files: |
         .github/workflows/CI.yml
         .github/workflows/python-*.yml
@@ -210,6 +213,26 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  iteration-validation:
+    name: 🔁 Iteration lifecycle
+    needs:
+      - change-detection
+      - cpp-tests-ubuntu
+      - cpp-tests-macos
+      - cpp-tests-windows
+      - cpp-install-tests
+      - cpp-sanitizers
+      - cpp-coverage
+      - build-wheel
+      - slurm-tests
+    if: >-
+      always() && needs.change-detection.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: $/.github/workflows/iteration-validation.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+
   # this job does nothing and is only used for branch protection
   required-checks-pass:
     name: 🚦 Check
@@ -228,12 +251,17 @@ jobs:
       - build-sdist
       - build-wheel
       - slurm-tests
+      - iteration-validation
     runs-on: ubuntu-slim
     steps:
       - name: Decide whether the needed jobs succeeded or failed
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           allowed-skips: >-
+            ${{
+              (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository || !fromJSON(needs.change-detection.outputs.run-cpp-tests))
+              && 'iteration-validation,' || ''
+            }}
             ${{
               (github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id)
               && 'cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,build-wheel,slurm-tests,' || ''

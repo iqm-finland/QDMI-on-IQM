@@ -1,0 +1,52 @@
+name: 🔁 • Iteration lifecycle
+on:
+  workflow_call:
+    inputs:
+      iqm-qc-alias:
+        description: Quantum computer used for short lifecycle validation.
+        default: "emerald:mock"
+        type: string
+    secrets:
+      IQM_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    concurrency:
+      group: iqm-iteration-${{ inputs.iqm-qc-alias }}
+      cancel-in-progress: false
+      queue: max
+    env:
+      IQM_SERVER_URL: https://resonance.iqm.tech
+      IQM_QC_ALIAS: ${{ inputs.iqm-qc-alias }}
+      IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+      IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+      - name: Configure standalone live target
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_IQM_QDMI_TESTS=OFF -DBUILD_IQM_QDMI_ITERATION_LIVE_TESTS=ON
+      - name: Build
+        run: cmake --build build --target iteration_management_smoke
+      - name: Create, inspect, and end without a device session
+        run: ./build/test/iteration/iteration_management_smoke
+      - name: Reconcile confirmed IDs
+        if: always()
+        run: |
+          if [[ -x ./build/test/iteration/iteration_management_smoke ]]; then
+            ./build/test/iteration/iteration_management_smoke --cleanup-only
+          elif [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
+            echo "Cleanup executable missing; confirmed iteration IDs need reconciliation"
+            exit 1
+          fi
