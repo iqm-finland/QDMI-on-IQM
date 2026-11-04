@@ -15,6 +15,8 @@ permissions:
 
 jobs:
   lifecycle:
+    # Preserve only this bounded resource lifecycle when the parent is cancelled.
+    if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     concurrency:
@@ -27,21 +29,32 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ success() && !cancelled() }}
         with:
           persist-credentials: false
       - name: Install build dependencies
+        if: ${{ success() && !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
       - name: Configure standalone live target
+        if: ${{ success() && !cancelled() }}
         run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          -DBUILD_IQM_QDMI_TESTS=OFF -DBUILD_IQM_QDMI_ITERATION_LIVE_TESTS=ON
+          -DBUILD_IQM_QDMI_TESTS=ON
       - name: Build
+        id: build
+        if: ${{ success() && !cancelled() }}
         run: cmake --build build --target iteration_management_smoke
       - name: Create, inspect, and end without a device session
+        if: always() && steps.build.outcome == 'success'
         env:
+          CANCELLED_BEFORE_START: ${{ cancelled() }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
-        run: ./build/test/iteration/iteration_management_smoke
+        run: |
+          if [[ "$CANCELLED_BEFORE_START" == true ]]; then
+            exit 0
+          fi
+          ./build/test/iteration/iteration_management_smoke
       - name: Reconcile confirmed IDs
         if: always()
         env:

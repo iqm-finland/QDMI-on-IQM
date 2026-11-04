@@ -35,6 +35,8 @@ Checks: |
 HeaderFilterRegex: "^(src|include)/.*"
 
 CheckOptions:
+  - key: modernize-use-using.IgnoreExternC
+    value: "true"
   - key: readability-identifier-naming.ClassCase
     value: CamelCase
   - key: readability-identifier-naming.ConstantParameterCase

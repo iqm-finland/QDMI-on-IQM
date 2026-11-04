@@ -20,8 +20,6 @@
 #include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/iteration.h"
 
-// Deliberately compiled as C; the shared CI linter also inspects it as C++.
-// NOLINTBEGIN(modernize-deprecated-headers,modernize-use-nullptr,modernize-use-designated-initializers,modernize-redundant-void-arg)
 #include <stddef.h>
 
 int main(void) {
@@ -49,4 +47,3 @@ int main(void) {
   IQM_QDMI_iteration_client_free(client);
   return 0;
 }
-// NOLINTEND(modernize-deprecated-headers,modernize-use-nullptr,modernize-use-designated-initializers,modernize-redundant-void-arg)

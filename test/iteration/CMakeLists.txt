@@ -15,12 +15,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_executable(iteration_management_smoke iteration_management_smoke.cpp)
+# Explicit target only; live mutations must never enter default builds or CTest.
+add_executable(iteration_management_smoke EXCLUDE_FROM_ALL
+               iteration_management_smoke.cpp)
 target_compile_features(iteration_management_smoke PRIVATE cxx_std_20)
 target_link_libraries(iteration_management_smoke
                       PRIVATE ${QDMI_TARGET_NAME} qdmi::qdmi_project_warnings)
-# Deliberately invoked directly: live mutations must never enter default CTest.
 if(WIN32)
+  # Avoid Windows min/max macros and make the device DLL available at runtime.
   target_compile_definitions(iteration_management_smoke PRIVATE NOMINMAX)
   add_custom_command(
     TARGET iteration_management_smoke

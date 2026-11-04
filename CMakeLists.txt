@@ -58,8 +58,6 @@ endif()
 
 option(BUILD_IQM_QDMI_TESTS "Build tests for the IQM QDMI device"
        ${IQM_QDMI_MASTER_PROJECT})
-option(BUILD_IQM_QDMI_ITERATION_LIVE_TESTS
-       "Build opt-in live iteration validation" OFF)
 option(BUILD_IQM_QDMI_DOCS "Build documentation for the IQM QDMI device" OFF)
 option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
 
@@ -85,7 +83,7 @@ if(BUILD_IQM_QDMI_DOCS)
 endif()
 
 # Add the tests
-if(BUILD_IQM_QDMI_TESTS OR BUILD_IQM_QDMI_ITERATION_LIVE_TESTS)
+if(BUILD_IQM_QDMI_TESTS)
   enable_testing()
   include(GoogleTest)
   add_subdirectory(test)

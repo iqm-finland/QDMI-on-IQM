@@ -31,11 +31,9 @@ extern "C" {
 
 /** @brief Opaque, serially used client owning authentication and connections.
  */
-// NOLINTNEXTLINE(modernize-use-using): this declaration is part of the C ABI.
 typedef struct IQM_QDMI_Iteration_Client_impl *IQM_QDMI_Iteration_Client;
 
 /** @brief Caller-owned output, retained even when an operation fails. */
-// NOLINTNEXTLINE(modernize-use-using): this declaration is part of the C ABI.
 typedef struct {
   char iteration_id[37]; /**< Canonical UUID, or empty for unconfirmed creation.
                           */

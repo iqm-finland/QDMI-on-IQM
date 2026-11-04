@@ -12,7 +12,7 @@ releases may include breaking changes.
 
 ### Added
 
-- Standalone IQM iteration creation, inspection, and explicit ending, with
+- ✨ Standalone IQM iteration creation, inspection, and explicit ending, with
   bounded requests and separate lifecycle validation. ([#326]) ([**@marcelwa**])
 
 ### Changed

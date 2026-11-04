@@ -2,11 +2,11 @@
 
 The IQM extension in `iqm_qdmi/iteration.h` creates, inspects, and ends
 iterations without a QDMI device session. It is installed with native packages
-and Python wheels. An iteration reserves one quantum computer (QC); your
-application owns its ID and explicitly ends it. Freeing a management client or a
-device session does not end an iteration. Circuit attachment and Python
-convenience APIs are separate work; ordinary circuit and calibration workflows
-keep their current behavior.
+and Python wheels. An iteration reserves one quantum computer; your application
+owns its ID and explicitly ends it. Freeing a management client or a device
+session does not end an iteration. Circuit attachment and Python convenience
+APIs are separate work; ordinary circuit and calibration workflows keep their
+current behavior.
 
 ## Native interface
 
@@ -17,8 +17,8 @@ connection inputs use `IQM_SERVER_URL`, then `IQM_BASE_URL`. Null authentication
 inputs use the existing token manager (`IQM_TOKEN` or `IQM_TOKENS_FILE`); select
 only one source. Explicit authentication overrides ambient authentication. Use a
 personal workspace token with `job_execution` scope and access to the selected
-QC. Read access alone does not prove iteration creation permission. Keep tokens
-out of logs and command arguments.
+quantum computer. Read access alone does not prove iteration creation
+permission. Keep tokens out of logs and command arguments.
 
 ```c
 #include <iqm_qdmi/iteration.h>
@@ -36,11 +36,11 @@ IQM_QDMI_iteration_client_free(client);
 ```
 
 All operations require a nonnull fixed result; there is no size-query create.
-Create accepts a nonempty QC UUID or alias, maximum duration 1–2700 seconds, and
-idle timeout 1–maximum. Idle zero omits the field and uses the server's default
-(currently 60 seconds). Maximum duration starts on activation, not creation;
-neither it nor the idle timeout bounds queue residence. Idle time includes
-classical processing while no job runs or waits.
+Create accepts a nonempty quantum computer UUID or alias, maximum duration
+1–2700 seconds, and idle timeout 1–maximum. Idle zero omits the field and uses
+the server's default (currently 60 seconds). Maximum duration starts on
+activation, not creation; neither it nor the idle timeout bounds queue
+residence. Idle time includes classical processing while no job runs or waits.
 
 `get` and `end` accept canonical lowercase UUIDs and allow
 `get(client, result.iteration_id, timeout_ms, &result)`. They retain that input
@@ -99,13 +99,14 @@ unrelated iteration. Reconcile ambiguous cases with the service administrator.
 
 ## Designated live validation
 
-Build the opt-in `iteration_management_smoke` executable with
-`-DBUILD_IQM_QDMI_ITERATION_LIVE_TESTS=ON`. It is never registered in default
-CTest or wheel pytest collection. The reusable iteration-validation workflow
-runs it once on trusted native changes, after other token-using CI jobs. It uses
-`emerald:mock`, a 60-second maximum/idle duration, a queue allowance of 120
-seconds, and a separate 30-second cleanup budget. Permission and target failures
-fail the job; they are not skipped or retried until passing.
+Configure with `-DBUILD_IQM_QDMI_TESTS=ON`, then build the explicit
+`iteration_management_smoke` target. It is excluded from default builds and is
+never registered in CTest or wheel pytest collection. The reusable
+iteration-validation workflow runs it once on trusted native changes, after
+other token-using CI jobs. It uses `emerald:mock`, a 60-second maximum/idle
+duration, a queue allowance of 120 seconds, and a separate 30-second cleanup
+budget. Permission and target failures fail the job; they are not skipped or
+retried until passing.
 
 Set `IQM_ITERATION_SCRATCH_FILE` to a runner-local path. Immediately after
 confirmed creation, including a partial create failure, the executable appends
@@ -115,11 +116,19 @@ only those IDs within 30 seconds total, with each get/end capped at ten seconds
 and the remaining budget. The workflow runs this mode in an `always()` step.
 Repeated cleanup is safe. This file contains IDs, never credentials.
 
-Both the owning workflow and live job disable active cancellation and use
-`queue: max`; live jobs serialize by QC across runs. GitHub limits the queue to
-100 pending runs. An overflow or manually cancelled expected job leaves required
-coverage missing: inspect the current-head run and rerun that head rather than
-accepting a green skip. Runner-local scratch is not durable across runner loss.
-Short server timeouts only limit occupancy after activation. Lost queued IDs
-still require manual/server-side reconciliation; cleanup is not guaranteed
-following process loss, node loss, or an exhausted deadline.
+Superseded CI runs cancel normally. Only the lifecycle job and its live and
+cleanup steps preserve execution during normal cancellation, so an in-flight
+create can save its ID and reach bounded cleanup. A cancellation check before
+the live executable starts prevents new creation when cancellation is already
+known. Setup and build steps remain cancellable. Live jobs serialize by quantum
+computer across runs, with active cancellation disabled and `queue: max` only
+for this job. GitHub limits that queue to 100 pending jobs. An overflow or a
+missing expected live job fails required coverage; inspect and rerun the
+current-head run rather than accepting a green skip.
+
+A newer run's ordinary jobs may overlap an older lifecycle while it drains;
+serialization covers only designated lifecycle jobs. Runner-local scratch is not
+durable across runner loss. Short server timeouts only limit occupancy after
+activation. Lost queued IDs still require manual/server-side reconciliation;
+cleanup is not guaranteed following force cancellation, process or node loss, an
+uncertain create without an ID, or an exhausted deadline.

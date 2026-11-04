@@ -9,8 +9,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: false
-  queue: max
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -158,7 +157,6 @@ jobs:
     with:
       clang-version: 22
       files-changed-only: true
-      cpp-linter-extra-args: "-std=c++20"
     permissions:
       contents: read
       pull-requests: write # required to post comments on PRs
@@ -226,7 +224,7 @@ jobs:
       - build-wheel
       - slurm-tests
     if: >-
-      always() && !cancelled() && !failure() && !contains(needs.*.result, 'cancelled') &&
+      always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
       needs.change-detection.result == 'success' &&
       (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       fromJSON(needs.change-detection.outputs.run-cpp-tests)

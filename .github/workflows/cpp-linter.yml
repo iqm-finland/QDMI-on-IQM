@@ -12,7 +12,7 @@ on:
         type: boolean
       cpp-linter-extra-args:
         description: "Extra arguments to pass to the cpp-linter"
-        default: "-std=c++20"
+        default: ""
         type: string
 
 concurrency:
