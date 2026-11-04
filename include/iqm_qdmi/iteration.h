@@ -23,16 +23,19 @@
 #pragma once
 #include "iqm_qdmi/device.h"
 
-#include <stdint.h>
+// This installed header must compile as both C and C++.
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /** @brief Opaque, serially used client owning authentication and connections.
  */
+// NOLINTNEXTLINE(modernize-use-using): this declaration is part of the C ABI.
 typedef struct IQM_QDMI_Iteration_Client_impl *IQM_QDMI_Iteration_Client;
 
 /** @brief Caller-owned output, retained even when an operation fails. */
+// NOLINTNEXTLINE(modernize-use-using): this declaration is part of the C ABI.
 typedef struct {
   char iteration_id[37]; /**< Canonical UUID, or empty for unconfirmed creation.
                           */

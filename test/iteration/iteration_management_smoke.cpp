@@ -19,18 +19,22 @@
 
 #include "iteration_management_smoke.hpp"
 
+#include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/iteration.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <vector>
 #ifdef _WIN32
@@ -40,18 +44,22 @@
 namespace iqm::test_support {
 namespace {
 using Clock = std::chrono::steady_clock;
-using namespace std::chrono_literals;
+using std::chrono::milliseconds;
+using std::chrono::seconds;
 
 bool Canonical_id(const std::string &id) {
-  if (id.size() != 36)
+  if (id.size() != 36) {
     return false;
+  }
   for (size_t i = 0; i < id.size(); ++i) {
     const auto c = id[i];
     if (i == 8 || i == 13 || i == 18 || i == 23) {
-      if (c != '-')
+      if (c != '-') {
         return false;
-    } else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      }
+    } else if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
       return false;
+    }
   }
   return true;
 }
@@ -62,7 +70,8 @@ bool Terminal(const IQM_QDMI_Iteration_Result &result) {
 uint64_t Budget(const Clock::time_point deadline) {
   const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - Clock::now());
-  return static_cast<uint64_t>(std::clamp(remaining, 0ms, 10000ms).count());
+  return static_cast<uint64_t>(
+      std::clamp(remaining, milliseconds{0}, milliseconds{10000}).count());
 }
 void Report(IQM_QDMI_Iteration_Client client,
             const IQM_QDMI_Iteration_Result &result) {
@@ -72,46 +81,57 @@ void Report(IQM_QDMI_Iteration_Client client,
 }
 std::vector<std::string> Read_ids(const std::string &path) {
   std::ifstream input{path, std::ios::binary};
-  if (!input && std::filesystem::exists(path))
+  if (!input && std::filesystem::exists(path)) {
     throw std::runtime_error("Cannot read scratch IDs");
+  }
   std::vector<std::string> ids;
   for (std::string id; std::getline(input, id);) {
-    if ((id.size() == 37 || id.size() == 1) && id.back() == '\r')
+    if ((id.size() == 37 || id.size() == 1) && id.back() == '\r') {
       id.pop_back();
-    if (!id.empty())
+    }
+    if (!id.empty()) {
       ids.push_back(id);
+    }
   }
-  if (input.bad())
+  if (input.bad()) {
     throw std::runtime_error("Cannot read scratch IDs");
+  }
   return ids;
 }
 void Save_id(const std::string &path, const std::string &id) {
   std::ofstream file{path, std::ios::app};
   file << id << '\n' << std::flush;
-  if (!file)
+  if (!file) {
     throw std::runtime_error("Cannot persist confirmed iteration ID");
+  }
 }
 void Remove_id(const std::string &path, const std::string &id) {
   const auto ids = Read_ids(path);
   const std::filesystem::path temporary{path + ".tmp"};
   std::ofstream file{temporary, std::ios::binary | std::ios::trunc};
-  if (!file)
+  if (!file) {
     throw std::runtime_error("Cannot write scratch replacement");
+  }
   try {
-    for (const auto &entry : ids)
-      if (entry != id)
+    for (const auto &entry : ids) {
+      if (entry != id) {
         file << entry << '\n';
+      }
+    }
     file.flush();
-    if (!file)
+    if (!file) {
       throw std::runtime_error("Cannot flush scratch replacement");
+    }
     file.close();
-    if (!file)
+    if (!file) {
       throw std::runtime_error("Cannot close scratch replacement");
+    }
 #ifdef _WIN32
     const std::filesystem::path original{path};
-    if (!MoveFileExW(temporary.c_str(), original.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    if (MoveFileExW(temporary.c_str(), original.c_str(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0) {
       throw std::runtime_error("Cannot replace scratch IDs");
+    }
 #else
     std::filesystem::rename(temporary, path);
 #endif
@@ -126,36 +146,41 @@ void Remove_id(const std::string &path, const std::string &id) {
 bool Cleanup(IQM_QDMI_Iteration_Client client, const std::string &id,
              const Clock::time_point deadline) {
   bool end_accepted = false;
-  auto delay = 1s;
+  auto delay = seconds{1};
   while (Budget(deadline) > 0) {
     IQM_QDMI_Iteration_Result result{};
     const auto status =
         IQM_QDMI_iteration_get(client, id.c_str(), Budget(deadline), &result);
     Report(client, result);
     if (result.http_status == 401 || result.http_status == 403 ||
-        result.http_status == 404)
+        result.http_status == 404) {
       return false;
-    if (status == QDMI_SUCCESS && Terminal(result))
+    }
+    if (status == QDMI_SUCCESS && Terminal(result)) {
       return true;
+    }
     if (!end_accepted && Budget(deadline) > 0) {
       const auto ended =
           IQM_QDMI_iteration_end(client, id.c_str(), Budget(deadline), &result);
       Report(client, result);
       if (result.http_status == 401 || result.http_status == 403 ||
-          result.http_status == 404)
+          result.http_status == 404) {
         return false;
+      }
       if (ended == QDMI_SUCCESS) {
-        if (Terminal(result))
+        if (Terminal(result)) {
           return true;
+        }
         end_accepted = true;
         continue; // Inspect immediately after an accepted asynchronous end.
       }
     }
     const auto remaining = deadline - Clock::now();
-    if (remaining <= Clock::duration::zero())
+    if (remaining <= Clock::duration::zero()) {
       break;
+    }
     std::this_thread::sleep_for(std::min(Clock::duration{delay}, remaining));
-    delay = std::min(delay * 2, 5s);
+    delay = std::min(delay * 2, seconds{5});
   }
   std::cerr << "Termination unconfirmed for " << id << '\n';
   return false;
@@ -181,24 +206,27 @@ int Iteration_management_smoke(const bool cleanup_only) {
                           decltype(&IQM_QDMI_iteration_client_free)>
         client{raw, IQM_QDMI_iteration_client_free};
     if (cleanup_only) {
-      const auto deadline = Clock::now() + 30s;
+      const auto deadline = Clock::now() + seconds{30};
       bool clean = true;
       for (const auto &id : Read_ids(scratch)) {
         if (!Canonical_id(id)) {
           std::cerr << "Invalid scratch ID; no request issued\n";
           clean = false;
-        } else if (Budget(deadline) > 0 && Cleanup(raw, id, deadline))
+        } else if (Budget(deadline) > 0 && Cleanup(raw, id, deadline)) {
           Remove_id(scratch, id);
-        else
+        } else {
           clean = false;
+        }
       }
       return clean ? 0 : 1;
     }
     const char *qc = std::getenv("IQM_QC_ID");
-    if (qc == nullptr || *qc == '\0')
+    if (qc == nullptr || *qc == '\0') {
       qc = std::getenv("IQM_QC_ALIAS");
-    if (qc == nullptr || *qc == '\0')
+    }
+    if (qc == nullptr || *qc == '\0') {
       qc = "emerald:mock";
+    }
     IQM_QDMI_Iteration_Result result{};
     std::string id;
     bool success = false;
@@ -212,36 +240,37 @@ int Iteration_management_smoke(const bool cleanup_only) {
       }
       Report(raw, result);
       if (created == QDMI_SUCCESS) {
-        const auto deadline = Clock::now() + 120s;
-        auto delay = 1s;
-        do {
-          if (Budget(deadline) == 0)
-            break;
+        const auto deadline = Clock::now() + seconds{120};
+        auto delay = seconds{1};
+        while (Budget(deadline) > 0) {
           const auto inspected = IQM_QDMI_iteration_get(
               raw, id.c_str(), Budget(deadline), &result);
           Report(raw, result);
-          if (inspected != QDMI_SUCCESS)
+          if (inspected != QDMI_SUCCESS) {
             break;
+          }
           if (std::string_view{result.state} == "active") {
             success = true;
             break;
           }
-          if (Terminal(result))
+          if (Terminal(result)) {
             break;
+          }
           std::this_thread::sleep_for(
               std::min(Clock::duration{delay}, deadline - Clock::now()));
-          delay = std::min(delay * 2, 5s);
-        } while (Clock::now() < deadline);
+          delay = std::min(delay * 2, seconds{5});
+        }
       }
     } catch (const std::exception &error) {
       std::cerr << error.what() << '\n';
       success = false;
     }
     if (!id.empty()) {
-      if (Cleanup(raw, id, Clock::now() + 30s))
+      if (Cleanup(raw, id, Clock::now() + seconds{30})) {
         Remove_id(scratch, id);
-      else
+      } else {
         success = false;
+      }
     }
     return success ? 0 : 1;
   } catch (const std::exception &error) {
@@ -253,8 +282,10 @@ int Iteration_management_smoke(const bool cleanup_only) {
 
 #ifndef IQM_ITERATION_SMOKE_NO_MAIN
 int main(const int argc, char **argv) {
-  if (argc > 2 || (argc == 2 && std::string_view{argv[1]} != "--cleanup-only"))
+  if (argc > 2 ||
+      (argc == 2 && std::string_view{argv[1]} != "--cleanup-only")) {
     return 1;
+  }
   try {
     return iqm::test_support::Iteration_management_smoke(argc == 2);
   } catch (const std::exception &error) {

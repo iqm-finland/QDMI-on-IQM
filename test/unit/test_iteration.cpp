@@ -18,22 +18,31 @@
  */
 
 #include "../iteration/iteration_management_smoke.hpp"
+#include "cpr/connection_pool.h"
+#include "cpr/response.h"
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
+#include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/iteration.h"
 
 #include <array>
 #include <chrono>
 #include <cpr/error.h>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <windows.h>
+#else
+// POSIX environment functions are not part of the C++ <cstdlib> contract.
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #endif
 #include <iostream>
 #include <iterator>
@@ -43,7 +52,9 @@
 #include <string>
 
 namespace {
-using namespace std::chrono_literals;
+using std::chrono::microseconds;
+using std::chrono::milliseconds;
+using std::chrono::seconds;
 constexpr const char *ID = "12345678-1234-1234-abcd-123456789abc";
 std::string Reply(const std::string &state = "waiting") {
   return nlohmann::json{{"id", ID}, {"status", state}}.dump();
@@ -63,7 +74,7 @@ protected:
     EXPECT_TRUE(http_.post_urls().empty());
   }
   void TearDown() override { IQM_QDMI_iteration_client_free(client_); }
-  nlohmann::json Diagnostics() {
+  nlohmann::json diagnostics() {
     return nlohmann::json::parse(
         IQM_QDMI_iteration_client_diagnostics(client_));
   }
@@ -107,20 +118,22 @@ TEST_F(IterationManagement, CreateGetEndWithoutSessionAndWithAliasedId) {
       QDMI_SUCCESS);
   EXPECT_STREQ(result_.state, "completed");
   EXPECT_EQ(http_.post_urls().size(), 2);
-  EXPECT_EQ(http_.post_timeouts().front(), 10000ms);
+  EXPECT_EQ(http_.post_timeouts().front(), milliseconds{10000});
 }
 
 TEST_F(IterationManagement, ValidatesEveryArgumentBeforeNetworkActivity) {
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 60, 30000, nullptr),
             QDMI_ERROR_INVALIDARGUMENT);
-  for (const auto max : {0U, 2701U})
+  for (const auto max : {0U, 2701U}) {
     EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", max, 0, 30000, &result_),
               QDMI_ERROR_INVALIDARGUMENT);
+  }
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 61, 30000, &result_),
             QDMI_ERROR_INVALIDARGUMENT);
-  for (const auto *qc : {static_cast<const char *>(nullptr), ""})
+  for (const auto *qc : {static_cast<const char *>(nullptr), ""}) {
     EXPECT_EQ(IQM_QDMI_iteration_create(client_, qc, 60, 0, 30000, &result_),
               QDMI_ERROR_INVALIDARGUMENT);
+  }
   for (const auto timeout :
        {uint64_t{0}, std::numeric_limits<uint64_t>::max()}) {
     EXPECT_EQ(
@@ -189,22 +202,22 @@ TEST_F(IterationManagement, RetainsConfirmedIdOnStateOrDiagnosticsFailure) {
 }
 
 TEST_F(IterationManagement, DoesNotRetryUncertainCreation) {
-  for (const auto *body : {"{", "{}", "{\"id\":42}", "{\"id\":\"invalid\"}"}) {
+  for (const auto *body : {"{", "{}", "{\"id\":42}", R"({"id":"invalid"})"}) {
     http_.queue_post(200, body);
     EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
               QDMI_ERROR_FATAL);
     EXPECT_STREQ(result_.iteration_id, "");
-    EXPECT_TRUE(Diagnostics()["creation_uncertain"].get<bool>());
+    EXPECT_TRUE(diagnostics()["creation_uncertain"].get<bool>());
   }
   http_.queue_post_connection_error();
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_ERROR_FATAL);
   EXPECT_EQ(result_.http_status, 0);
-  EXPECT_TRUE(Diagnostics()["creation_uncertain"].get<bool>());
+  EXPECT_TRUE(diagnostics()["creation_uncertain"].get<bool>());
   http_.queue_post(500, "{}");
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_ERROR_FATAL);
-  EXPECT_TRUE(Diagnostics()["creation_uncertain"].get<bool>());
+  EXPECT_TRUE(diagnostics()["creation_uncertain"].get<bool>());
   EXPECT_EQ(http_.post_urls().size(), 6);
 }
 
@@ -236,12 +249,12 @@ TEST_F(IterationManagement, MapsHttpErrorsAndSelectsDiagnostics) {
     EXPECT_EQ(IQM_QDMI_iteration_end(client_, ID, 30000, &result_), expected);
     EXPECT_STREQ(result_.iteration_id, ID);
     EXPECT_EQ(result_.http_status, http);
-    EXPECT_EQ(Diagnostics()["error_code"], "server_reason");
-    EXPECT_EQ(Diagnostics()["message"], "reason");
-    EXPECT_EQ(Diagnostics()["request_id"], "trace");
-    EXPECT_EQ(Diagnostics()["http_status"], http);
-    EXPECT_FALSE(Diagnostics().contains("credentials"));
-    EXPECT_FALSE(Diagnostics().contains("private-header"));
+    EXPECT_EQ(diagnostics()["error_code"], "server_reason");
+    EXPECT_EQ(diagnostics()["message"], "reason");
+    EXPECT_EQ(diagnostics()["request_id"], "trace");
+    EXPECT_EQ(diagnostics()["http_status"], http);
+    EXPECT_FALSE(diagnostics().contains("credentials"));
+    EXPECT_FALSE(diagnostics().contains("private-header"));
   }
 }
 
@@ -249,15 +262,16 @@ TEST_F(IterationManagement, RetriesOnlyExplicitRefusalWithinTotalDeadline) {
   http_.queue_post(429, "{}", {{"Retry-After", "30"}});
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_FALSE(Diagnostics().contains("creation_uncertain"));
+  EXPECT_FALSE(diagnostics().contains("creation_uncertain"));
   EXPECT_EQ(http_.sleep_call_count(), 0);
   http_.queue_post(429, "{}", {{"Retry-After", "30"}}).queue_post(200, Reply());
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 90000, &result_),
             QDMI_SUCCESS);
   EXPECT_EQ(http_.post_urls().size(), 3);
   EXPECT_EQ(http_.sleep_durations(), std::vector<int>{30});
-  for (const auto timeout : http_.post_timeouts())
-    EXPECT_EQ(timeout, 10000ms);
+  for (const auto timeout : http_.post_timeouts()) {
+    EXPECT_EQ(timeout, milliseconds{10000});
+  }
 }
 
 TEST_F(IterationManagement, SupportsAllKnownStatesAndIdempotentEnd) {
@@ -284,7 +298,7 @@ TEST_F(IterationManagement, NullClientAndAllocationFailuresAreContained) {
   EXPECT_EQ(
       IQM_QDMI_iteration_client_alloc(nullptr, nullptr, nullptr, 1, nullptr),
       QDMI_ERROR_INVALIDARGUMENT);
-  auto invalid = client_;
+  auto *invalid = client_;
   EXPECT_EQ(
       IQM_QDMI_iteration_client_alloc("url", nullptr, nullptr, 0, &invalid),
       QDMI_ERROR_INVALIDARGUMENT);
@@ -309,7 +323,7 @@ TEST_F(IterationManagement, ContainsBoundaryExceptionsAndPreservesConfirmedId) {
     };
     EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
               expected);
-    EXPECT_TRUE(Diagnostics().is_object());
+    EXPECT_TRUE(diagnostics().is_object());
     EXPECT_EQ(std::string(IQM_QDMI_iteration_client_diagnostics(client_))
                   .find("secret"),
               std::string::npos);
@@ -335,8 +349,8 @@ TEST_F(IterationManagement, RedirectsAreNotFollowedAndCredentialsAreRedacted) {
                    R"({"message":"test-token","request_id":"test-token"})");
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_ERROR_PERMISSIONDENIED);
-  EXPECT_EQ(Diagnostics()["message"], "[redacted]");
-  EXPECT_EQ(Diagnostics()["request_id"], "[redacted]");
+  EXPECT_EQ(diagnostics()["message"], "[redacted]");
+  EXPECT_EQ(diagnostics()["request_id"], "[redacted]");
 }
 
 TEST_F(IterationManagement, SeparateClientsOwnCredentialsPoolsAndQuota) {
@@ -366,10 +380,10 @@ TEST_F(IterationManagement, CapsAttemptsByRemainingBudgetAndMapsLocalExpiry) {
   ASSERT_EQ(IQM_QDMI_iteration_get(client_, ID, 30000, &result_), QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_iteration_get(client_, ID, 13000, &result_), QDMI_SUCCESS);
   EXPECT_EQ(http_.sleep_durations(), std::vector<int>{10});
-  EXPECT_EQ(http_.get_timeouts().back(), 3000ms);
+  EXPECT_EQ(http_.get_timeouts().back(), milliseconds{3000});
   auto &hook = iqm::http::internal::Get_hooks().get;
   hook = [&](const auto &...) {
-    http_.advance(10s);
+    http_.advance(seconds{10});
     cpr::Response response;
     response.error.code = cpr::ErrorCode::OPERATION_TIMEDOUT;
     response.error.message = "timeout";
@@ -382,11 +396,14 @@ TEST_F(IterationManagement, CapsAttemptsByRemainingBudgetAndMapsLocalExpiry) {
 }
 
 TEST(HttpDeadline, SubMillisecondRemainderDoesNotStartRequest) {
+  // Hooks must record unexpected requests through their captured mutable this.
+  // NOLINTNEXTLINE(misc-const-correctness)
   iqm::test_support::HttpStub http;
   const cpr::ConnectionPool pool;
-  const auto deadline = iqm::http::internal::Get_hooks().now() + 500us;
+  const auto deadline =
+      iqm::http::internal::Get_hooks().now() + microseconds{500};
   const auto response = iqm::http::Get("https://example.test", std::nullopt,
-                                       pool, 10s, deadline, nullptr);
+                                       pool, seconds{10}, deadline, nullptr);
   EXPECT_EQ(response.error.code, cpr::ErrorCode::OPERATION_TIMEDOUT);
   EXPECT_TRUE(http.get_urls().empty());
 }
@@ -399,7 +416,7 @@ protected:
                                         "IQM_TOKENS_FILE",
                                         "IQM_ITERATION_SCRATCH_FILE"};
   std::array<std::optional<std::string>, VARIABLES.size()> previous_;
-  static void Set(const char *key, const char *value) {
+  static void set(const char *key, const char *value) {
 #ifdef _WIN32
     ASSERT_EQ(_putenv_s(key, value == nullptr ? "" : value), 0);
 #else
@@ -408,9 +425,10 @@ protected:
   }
   void SetUp() override {
     for (size_t i = 0; i < VARIABLES.size(); ++i) {
-      if (const auto *value = std::getenv(VARIABLES[i]); value != nullptr)
+      if (const auto *value = std::getenv(VARIABLES[i]); value != nullptr) {
         previous_[i] = value;
-      Set(VARIABLES[i], nullptr);
+      }
+      set(VARIABLES[i], nullptr);
     }
     scratch_ =
         std::filesystem::temp_directory_path() /
@@ -418,13 +436,14 @@ protected:
          ::testing::UnitTest::GetInstance()->current_test_info()->name() +
          ".txt");
     std::filesystem::remove(scratch_);
-    Set("IQM_SERVER_URL", "https://example.test");
-    Set("IQM_TOKEN", "test-token");
-    Set("IQM_ITERATION_SCRATCH_FILE", scratch_.string().c_str());
+    set("IQM_SERVER_URL", "https://example.test");
+    set("IQM_TOKEN", "test-token");
+    set("IQM_ITERATION_SCRATCH_FILE", scratch_.string().c_str());
   }
   void TearDown() override {
-    for (size_t i = 0; i < VARIABLES.size(); ++i)
-      Set(VARIABLES[i], previous_[i] ? previous_[i]->c_str() : nullptr);
+    for (size_t i = 0; i < VARIABLES.size(); ++i) {
+      set(VARIABLES[i], previous_[i] ? previous_[i]->c_str() : nullptr);
+    }
     std::filesystem::remove(scratch_);
   }
 };
@@ -486,22 +505,25 @@ TEST_F(IterationManagement, ReusedClientPerformanceProbe) {
   for (const auto count : {10, 1000}) {
     for (const bool reuse : {true, false}) {
       const auto start_requests = http_.get_urls().size();
-      for (int i = 0; i < count; ++i)
+      for (int i = 0; i < count; ++i) {
         http_.queue_get(200, Reply("active"));
+      }
       const auto start = std::chrono::steady_clock::now();
       for (int i = 0; i < count; ++i) {
         IQM_QDMI_Iteration_Client current = client_;
-        if (!reuse)
+        if (!reuse) {
           ASSERT_EQ(IQM_QDMI_iteration_client_alloc("https://example.test",
                                                     "test-token", nullptr,
                                                     10000, &current),
                     QDMI_SUCCESS);
+        }
         ASSERT_EQ(IQM_QDMI_iteration_get(current, ID, 30000, &result_),
                   QDMI_SUCCESS);
         ASSERT_STREQ(result_.iteration_id, ID);
         ASSERT_STREQ(result_.state, "active");
-        if (!reuse)
+        if (!reuse) {
           IQM_QDMI_iteration_client_free(current);
+        }
       }
       const auto elapsed =
           std::chrono::duration_cast<std::chrono::microseconds>(
@@ -509,11 +531,13 @@ TEST_F(IterationManagement, ReusedClientPerformanceProbe) {
               .count();
       EXPECT_EQ(http_.get_urls().size() - start_requests,
                 static_cast<size_t>(count));
-      if (reuse)
+      if (reuse) {
         for (size_t i = start_requests; i < http_.get_connection_pools().size();
-             ++i)
+             ++i) {
           EXPECT_EQ(http_.get_connection_pools()[i],
                     http_.get_connection_pools()[start_requests]);
+        }
+      }
       std::cout << "PERF reads=" << count << " reuse=" << reuse
                 << " requests=" << count << " elapsed_us=" << elapsed << '\n';
     }
@@ -578,7 +602,7 @@ TEST_F(IterationSmoke, FailedAtomicReplacementPreservesOtherUnconfirmedIds) {
     std::ofstream file{scratch_};
     file << original;
   }
-  const auto locked = CreateFileW(
+  auto *const locked = CreateFileW(
       scratch_.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
       nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   ASSERT_NE(locked, INVALID_HANDLE_VALUE);

@@ -20,15 +20,18 @@
 /** @file
  * @brief Standalone IQM iteration management.
  */
+#include "cpr/connection_pool.h"
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
+#include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/iteration.h"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cpr/error.h>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -66,23 +69,27 @@ bool Valid_timeout(const uint64_t timeout, const Clock::time_point now) {
   const auto available = std::chrono::duration_cast<std::chrono::milliseconds>(
                              Clock::time_point::max() - now)
                              .count();
-  return timeout > 0 && available > 0 &&
-         timeout <= static_cast<uint64_t>(available);
+  return timeout != uint64_t{0} && available > 0 &&
+         std::cmp_less_equal(timeout, available);
 }
 
 bool Normalize_uuid(char *id, const size_t size) {
-  if (size != 36)
+  if (size != 36) {
     return false;
+  }
   for (size_t i = 0; i < size; ++i) {
     auto &c = id[i];
     if (i == 8 || i == 13 || i == 18 || i == 23) {
-      if (c != '-')
+      if (c != '-') {
         return false;
+      }
     } else {
-      if (c >= 'A' && c <= 'F')
+      if (c >= 'A' && c <= 'F') {
         c = static_cast<char>(c - 'A' + 'a');
-      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      }
+      if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
         return false;
+      }
     }
   }
   return true;
@@ -96,16 +103,20 @@ void Diagnostic(IQM_QDMI_Iteration_Client client, const int http_status,
                 const char *message) {
   auto json =
       nlohmann::json{{"http_status", http_status}, {"message", message}};
-  if (client->creation_uncertain_)
+  if (client->creation_uncertain_) {
     json["creation_uncertain"] = true;
+  }
   client->diagnostics_ = json.dump();
 }
 
 void Emergency(IQM_QDMI_Iteration_Client client,
                const IQM_QDMI_Iteration_Result *result,
                const char *message) noexcept {
-  if (client == nullptr)
+  if (client == nullptr) {
     return;
+  }
+  // Allocation-free C ABI error reporting.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
   std::snprintf(client->emergency_.data(), client->emergency_.size(),
                 R"({"http_status":%d,"message":"%s"%s})",
                 result == nullptr ? 0 : result->http_status, message,
@@ -158,8 +169,9 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
   // Explicit refusals are safe; transport/5xx/redirect outcomes remain
   // uncertain.
   if (create && !response.error && response.status_code >= 400 &&
-      response.status_code < 500)
+      response.status_code < 500) {
     client->creation_uncertain_ = false;
+  }
   auto json = nlohmann::json::parse(response.text, nullptr, false);
   bool valid = false;
   const bool received_success =
@@ -182,17 +194,21 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
           if (std::ranges::find(known, text) != known.end()) {
             std::memcpy(result.state, text.c_str(), text.size() + 1);
             valid = true;
-          } else
+          } else {
             protocol_error = "Unknown iteration state: " + text;
+          }
         }
       }
     }
-    if (!valid && protocol_error.empty())
+    if (!valid && protocol_error.empty()) {
       protocol_error = "Malformed iteration response or mismatching ID";
-  } else if (received_success)
+    }
+  } else if (received_success) {
     protocol_error = "Malformed iteration response";
-  if (received_success && !success)
+  }
+  if (received_success && !success) {
     protocol_error = "Unexpected HTTP success status";
+  }
 
   auto diagnostics = nlohmann::json{{"http_status", result.http_status}};
   if (json.is_object()) {
@@ -203,14 +219,16 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
       }
     }
   }
-  if (!protocol_error.empty())
+  if (!protocol_error.empty()) {
     diagnostics["message"] = protocol_error;
+  }
   if (bearer.has_value()) {
     const std::string_view secret{bearer->GetToken()};
     if (!secret.empty()) {
       for (auto &value : diagnostics) {
-        if (!value.is_string())
+        if (!value.is_string()) {
           continue;
+        }
         auto &text = value.get_ref<std::string &>();
         size_t pos = 0;
         while ((pos = text.find(secret, pos)) != std::string::npos) {
@@ -220,15 +238,19 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
       }
     }
   }
-  if (client->creation_uncertain_)
+  if (client->creation_uncertain_) {
     diagnostics["creation_uncertain"] = true;
+  }
   client->diagnostics_ = diagnostics.dump();
-  if (response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT)
+  if (response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT) {
     return QDMI_ERROR_TIMEOUT;
-  if (response.error)
+  }
+  if (response.error) {
     return QDMI_ERROR_FATAL;
-  if (received_success)
+  }
+  if (received_success) {
     return success && valid ? QDMI_SUCCESS : QDMI_ERROR_FATAL;
+  }
   // Only selected diagnostics reach the existing logger; never log raw bodies.
   cpr::Response sanitized;
   sanitized.status_code = response.status_code;
@@ -253,15 +275,17 @@ int Get_or_end(IQM_QDMI_Iteration_Client client, const char *iteration_id,
                         std::equal(id.begin(), id.end(), iteration_id);
   if (result != nullptr) {
     *result = {};
-    if (valid_id)
+    if (valid_id) {
       std::memcpy(result->iteration_id, id.data(), id.size());
+    }
   }
   return Boundary(client, result, [&]() -> int {
     const auto now = iqm::http::internal::Get_hooks().now();
     if (client == nullptr || result == nullptr || !valid_id ||
         !Valid_timeout(timeout_ms, now)) {
-      if (client != nullptr)
+      if (client != nullptr) {
         Diagnostic(client, 0, "Invalid ID, output or timeout");
+      }
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     return Request(client, endpoint, id.data(), "",
@@ -274,13 +298,15 @@ int IQM_QDMI_iteration_client_alloc(const char *base_url, const char *token,
                                     const char *tokens_file,
                                     const uint64_t request_timeout_ms,
                                     IQM_QDMI_Iteration_Client *client) {
-  if (client == nullptr)
+  if (client == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
+  }
   *client = nullptr;
   try {
     if (!Valid_timeout(request_timeout_ms,
-                       iqm::http::internal::Get_hooks().now()))
+                       iqm::http::internal::Get_hooks().now())) {
       return QDMI_ERROR_INVALIDARGUMENT;
+    }
     std::string url = base_url == nullptr ? "" : base_url;
     if (base_url == nullptr) {
       for (const auto *key : {"IQM_SERVER_URL", "IQM_BASE_URL"}) {
@@ -291,8 +317,9 @@ int IQM_QDMI_iteration_client_alloc(const char *base_url, const char *token,
         }
       }
     }
-    if (url.empty())
+    if (url.empty()) {
       return QDMI_ERROR_INVALIDARGUMENT;
+    }
     *client = new IQM_QDMI_Iteration_Client_impl(
         std::move(url), Optional_string(token), Optional_string(tokens_file),
         std::chrono::milliseconds{request_timeout_ms});
@@ -309,14 +336,16 @@ int IQM_QDMI_iteration_client_alloc(const char *base_url, const char *token,
 void IQM_QDMI_iteration_client_free(IQM_QDMI_Iteration_Client client) {
   try {
     delete client;
-  } catch (...) { /* No exception may cross the C ABI. */
+  } catch (...) { // NOLINT(bugprone-empty-catch)
+    // No exception may cross the C ABI.
   }
 }
 
 const char *
 IQM_QDMI_iteration_client_diagnostics(IQM_QDMI_Iteration_Client client) {
-  if (client == nullptr)
+  if (client == nullptr) {
     return INVALID_ARGUMENT;
+  }
   return client->fallback_ != nullptr ? client->fallback_
                                       : client->diagnostics_.c_str();
 }
@@ -328,29 +357,34 @@ int IQM_QDMI_iteration_create(IQM_QDMI_Iteration_Client client, const char *qc,
                               IQM_QDMI_Iteration_Result *result) {
   return Boundary(client, result, [&]() -> int {
     Clock::time_point now;
-    std::string selector;
-    try {
-      now = iqm::http::internal::Get_hooks().now();
-      selector = qc == nullptr ? "" : qc;
-    } catch (...) {
-      if (result != nullptr)
-        *result = {};
-      throw;
-    }
-    if (result != nullptr)
+    const auto selector = [&] {
+      try {
+        now = iqm::http::internal::Get_hooks().now();
+        return std::string{qc == nullptr ? "" : qc};
+      } catch (...) {
+        if (result != nullptr) {
+          *result = {};
+        }
+        throw;
+      }
+    }();
+    if (result != nullptr) {
       *result = {};
+    }
     if (client == nullptr || result == nullptr || selector.empty() ||
         max_duration_seconds < 1 || max_duration_seconds > 2700 ||
         idle_timeout_seconds > max_duration_seconds ||
         !Valid_timeout(timeout_ms, now)) {
-      if (client != nullptr)
+      if (client != nullptr) {
         Diagnostic(client, 0, "Invalid QC, duration, output or timeout");
+      }
       return QDMI_ERROR_INVALIDARGUMENT;
     }
     auto body = nlohmann::json{{"qc", selector},
                                {"max_duration_seconds", max_duration_seconds}};
-    if (idle_timeout_seconds != 0)
+    if (idle_timeout_seconds != 0) {
       body["idle_timeout_seconds"] = idle_timeout_seconds;
+    }
     return Request(client, iqm::API_ENDPOINT::CREATE_ITERATION, "", body.dump(),
                    now + std::chrono::milliseconds{timeout_ms}, *result);
   });
