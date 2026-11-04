@@ -117,7 +117,8 @@ only.
 Each measured qubit's last gate must precede its measurement. Core reconstructs
 classical bits from the measured-site results; see its guide linked above.
 
-Hand-written MOVE circuits use `serialize_program` and preserve ordered
+Hand-written MOVE circuits use `Gate("move", 2, [])` from
+{py:class}`qiskit.circuit.Gate` and `serialize_program`, preserving ordered
 qubit/resonator loci.
 
 ## Circuit Metadata

@@ -81,9 +81,9 @@ command-line scripts are exposed:
   Variational Quantum Eigensolver (VQE) parameter estimation for a serialized
   ansatz and observable.
 
-The sampler, estimator, and offloader use Qiskit transpilation and require
-direct qubit connectivity for two-qubit circuits; they do not route through
-Sirius resonators.
+The sampler and offloader transpile with Qiskit; the estimator expects a native
+ansatz. They require direct qubit connectivity for two-qubit circuits and do not
+route through Sirius resonators.
 
 ### `iqm-sampler` Usage
 
