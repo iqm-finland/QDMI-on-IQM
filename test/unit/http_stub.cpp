@@ -23,7 +23,6 @@
 
 #include <chrono>
 #include <cpr/bearer.h>
-#include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
@@ -33,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -87,10 +87,12 @@ HttpStub::HttpStub() {
   hooks.post = [this](const cpr::Url &url,
                       const std::optional<cpr::Bearer> &bearer_token,
                       const cpr::ConnectionPool &connection_pool,
-                      const cpr::Header & /*headers*/, const cpr::Body &body,
+                      const cpr::Header &headers, const std::string_view body,
                       const std::chrono::milliseconds timeout) {
+    EXPECT_EQ(headers.at("Content-Type"), "application/json");
+    EXPECT_FALSE(headers.contains("Expect"));
     post_urls_.push_back(url.str());
-    post_bodies_.push_back(body.str());
+    post_bodies_.emplace_back(body);
     post_bearer_tokens_.push_back(bearer_token);
     post_timeouts_.push_back(timeout);
     post_connection_pools_.push_back(&connection_pool);

@@ -63,7 +63,8 @@ existing custom repo or create a dedicated one.
        version("main", branch="main")
 
        depends_on("cmake", type="build")
-       depends_on("curl", type=("build", "link", "run"))
+       depends_on("gmake", type="build")
+       depends_on("openssl@3:", when="platform=linux")
        depends_on("nlohmann-json")
 
        def cmake_args(self):
