@@ -5,7 +5,7 @@ on:
       runs-on:
         description: The runner image to use.
         type: string
-        default: ubuntu-latest
+        default: ubuntu-26.04
 
 permissions:
   contents: read

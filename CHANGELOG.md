@@ -12,7 +12,6 @@ releases may include breaking changes.
 
 ### Changed
 
-- 📦 Stop publishing Windows ARM64 wheels ([#322]) ([**@denialhaag**]).
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -24,6 +23,10 @@ releases may include breaking changes.
   compression libraries ([#311]) ([**@burgholzer**]).
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
+
+### Removed
+
+- 📦 Stop publishing Windows ARM64 wheels ([#322]) ([**@denialhaag**]).
 
 ### Fixed
 
