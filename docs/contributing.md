@@ -175,7 +175,8 @@ perfect. We will guide you through the process.
 ## Working on the C++ Library
 
 Building the project requires a C++20-capable C++ compiler and
-[CMake](https://cmake.org/) 3.24 or newer.
+[CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
+development package.
 
 CI runs the native integration tests and documentation notebooks with
 `IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
