@@ -35,6 +35,7 @@
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/error.h>
+#include <cpr/redirect.h>
 #include <cpr/response.h>
 #include <cpr/session.h>
 #include <cpr/ssl_options.h>
@@ -43,6 +44,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -103,8 +105,10 @@ cpr::Response Default_get(const cpr::Url &url,
                           const std::optional<cpr::Bearer> &bearer_token,
                           const cpr::ConnectionPool &connection_pool,
                           const cpr::Header &headers,
-                          const std::chrono::milliseconds timeout) {
+                          const std::chrono::milliseconds timeout,
+                          const bool follow_redirects) {
   cpr::Session session;
+  session.SetRedirect(cpr::Redirect{follow_redirects});
   Apply_common_options(session, url, bearer_token, connection_pool, headers,
                        timeout);
   return session.Get();
@@ -115,8 +119,10 @@ cpr::Response Default_post(const cpr::Url &url,
                            const cpr::ConnectionPool &connection_pool,
                            const cpr::Header &headers,
                            const std::string_view body,
-                           const std::chrono::milliseconds timeout) {
+                           const std::chrono::milliseconds timeout,
+                           const bool follow_redirects) {
   cpr::Session session;
+  session.SetRedirect(cpr::Redirect{follow_redirects});
   Apply_common_options(session, url, bearer_token, connection_pool, headers,
                        timeout);
   // The caller owns the body until this synchronous request returns.
@@ -157,7 +163,7 @@ int Retry_after_seconds(const cpr::Response &http_response) {
   char *end = nullptr;
   if (const auto seconds = std::strtol(retry_after->second.c_str(), &end, 10);
       end != retry_after->second.c_str() && *end == '\0' && errno != ERANGE &&
-      seconds >= 0) {
+      seconds >= 0 && seconds <= std::numeric_limits<int>::max()) {
     return static_cast<int>(seconds);
   }
   return DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
@@ -249,26 +255,20 @@ void Log_error(const ERROR_LOG_POLICY policy, const std::string &message) {
 
 /// Execute a hooked request, holding back when the session's quota is running
 /// low and obeying Retry-After headers for HTTP 429 rate limiting.
-template <typename Perform_attempt>
+template <typename Perform_attempt, typename Remaining_budget>
 cpr::Response Perform_with_retries(const cpr::Url &url,
                                    const std::chrono::milliseconds timeout,
                                    Rate_limit_budget *budget,
-                                   Perform_attempt perform_attempt) {
+                                   Perform_attempt perform_attempt,
+                                   Remaining_budget remaining_timeout) {
   const auto &hooks = Get_hooks();
-  const auto start = hooks.now();
-  const auto remaining_timeout = [&]() {
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        hooks.now() - start);
-    return elapsed >= timeout ? std::chrono::milliseconds::zero()
-                              : timeout - elapsed;
-  };
 
   // Waiting out the window costs a fraction of the 30-second block it avoids,
   // but it comes out of this request's own timeout: a caller that cannot spare
   // the wait goes out unthrottled and falls back on Retry-After.
   if (budget != nullptr) {
     if (const auto wait = Rate_limit_wait_seconds(*budget); wait > 0) {
-      if (std::chrono::seconds{wait} < timeout) {
+      if (std::chrono::seconds{wait} < remaining_timeout()) {
         LOG_DEBUG("Request to URL '" + url.str() + "' is holding back for " +
                   std::to_string(wait) +
                   " second(s) to let the rate-limit window replenish");
@@ -286,13 +286,12 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
     if (remaining <= std::chrono::milliseconds::zero()) {
       cpr::Response response;
       response.url = url;
-      response.error =
-          cpr::Error{static_cast<int>(cpr::ErrorCode::OPERATION_TIMEDOUT),
-                     "Request and rate-limit retry deadline exceeded"};
+      response.error.code = cpr::ErrorCode::OPERATION_TIMEDOUT;
+      response.error.message = "Request and rate-limit retry deadline exceeded";
       return response;
     }
 
-    auto http_response = perform_attempt(remaining);
+    auto http_response = perform_attempt(std::min(timeout, remaining));
 
     if (http_response.error) {
       return http_response;
@@ -330,6 +329,32 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
   response.error = cpr::Error{static_cast<int>(cpr::ErrorCode::UNKNOWN_ERROR),
                               "Rate-limit retry loop ended without a response"};
   return response;
+}
+
+template <typename Perform_attempt>
+cpr::Response Perform_with_retries(const cpr::Url &url,
+                                   const std::chrono::milliseconds timeout,
+                                   Rate_limit_budget *budget,
+                                   Perform_attempt perform_attempt) {
+  const auto start = Get_hooks().now();
+  return Perform_with_retries(url, timeout, budget, perform_attempt, [&] {
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        Get_hooks().now() - start);
+    return elapsed >= timeout ? std::chrono::milliseconds::zero()
+                              : timeout - elapsed;
+  });
+}
+
+template <typename Perform_attempt>
+cpr::Response Perform_with_retries(
+    const cpr::Url &url, const std::chrono::milliseconds timeout,
+    const std::chrono::steady_clock::time_point deadline,
+    Rate_limit_budget *budget, Perform_attempt perform_attempt) {
+  return Perform_with_retries(url, timeout, budget, perform_attempt, [&] {
+    return std::max(std::chrono::milliseconds::zero(),
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        deadline - Get_hooks().now()));
+  });
 }
 
 } // namespace
@@ -528,7 +553,8 @@ cpr::Response Get(const cpr::Url &url,
   const auto &hooks = internal::Get_hooks();
   return internal::Perform_with_retries(
       url, timeout, rate_limit, [&](const auto remaining) {
-        return hooks.get(url, bearer_token, connection_pool, {}, remaining);
+        return hooks.get(url, bearer_token, connection_pool, {}, remaining,
+                         true);
       });
 }
 
@@ -545,7 +571,35 @@ Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
   return internal::Perform_with_retries(
       url, timeout, rate_limit, [&](const auto remaining) {
         return hooks.post(url, bearer_token, connection_pool, headers, data,
-                          remaining);
+                          remaining, true);
+      });
+}
+
+cpr::Response Get(const cpr::Url &url,
+                  const std::optional<cpr::Bearer> &bearer_token,
+                  const cpr::ConnectionPool &connection_pool,
+                  const std::chrono::milliseconds request_timeout,
+                  const std::chrono::steady_clock::time_point deadline,
+                  Rate_limit_budget *rate_limit) {
+  return internal::Perform_with_retries(
+      url, request_timeout, deadline, rate_limit, [&](const auto remaining) {
+        return internal::Get_hooks().get(url, bearer_token, connection_pool, {},
+                                         remaining, false);
+      });
+}
+
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
+                   const std::string_view data,
+                   const std::chrono::milliseconds request_timeout,
+                   const std::chrono::steady_clock::time_point deadline,
+                   Rate_limit_budget *rate_limit) {
+  const cpr::Header headers{{"Content-Type", "application/json"}};
+  return internal::Perform_with_retries(
+      url, request_timeout, deadline, rate_limit, [&](const auto remaining) {
+        return internal::Get_hooks().post(url, bearer_token, connection_pool,
+                                          headers, data, remaining, false);
       });
 }
 

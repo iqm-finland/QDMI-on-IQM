@@ -34,6 +34,10 @@ namespace iqm {
  * Supported API endpoints for the IQM Server API.
  */
 enum class API_ENDPOINT : uint8_t {
+  CREATE_ITERATION,
+  GET_ITERATION,
+  END_ITERATION,
+
   // Job management endpoints
   SUBMIT_CIRCUIT_JOB,
   GET_JOB_STATUS,

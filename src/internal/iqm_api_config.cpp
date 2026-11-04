@@ -31,6 +31,10 @@ namespace iqm {
 namespace {
 // NOLINTNEXTLINE(*-throwing-static-initialization)
 const std::unordered_map<API_ENDPOINT, std::string> URLS = {
+    {API_ENDPOINT::CREATE_ITERATION, "api/v1/iterations"},
+    {API_ENDPOINT::GET_ITERATION, "api/v1/iterations/%s"},
+    {API_ENDPOINT::END_ITERATION, "api/v1/iterations/%s/end"},
+
     // Job management endpoints
     {API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "api/v1/jobs/%s/circuit"},
     {API_ENDPOINT::GET_JOB_STATUS, "api/v1/jobs/%s"},
