@@ -32,7 +32,11 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -545,6 +549,85 @@ TEST_F(IterationSmoke, UnreadableScratchCannotReportSuccessfulReconciliation) {
   std::filesystem::create_directory(scratch_);
   EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
   EXPECT_TRUE(http_.get_urls().empty());
+  EXPECT_TRUE(http_.post_urls().empty());
+}
+
+TEST_F(IterationSmoke, FailedScratchWritePreservesOtherUnconfirmedIds) {
+  constexpr const char *other = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const std::string original = std::string(ID) + "\n" + other + "\n";
+  {
+    std::ofstream file{scratch_};
+    file << original;
+  }
+  const auto blocked = std::filesystem::path{scratch_.string() + ".tmp"};
+  std::filesystem::create_directory(blocked);
+  http_.queue_get(200, Reply("completed"))
+      .queue_get(200,
+                 nlohmann::json{{"id", other}, {"status", "completed"}}.dump());
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
+  std::ifstream file{scratch_};
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}), original);
+  std::filesystem::remove(blocked);
+}
+
+#ifdef _WIN32
+TEST_F(IterationSmoke, FailedAtomicReplacementPreservesOtherUnconfirmedIds) {
+  constexpr const char *other = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const std::string original = std::string(ID) + "\n" + other + "\n";
+  {
+    std::ofstream file{scratch_};
+    file << original;
+  }
+  const auto locked = CreateFileW(
+      scratch_.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+      nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  ASSERT_NE(locked, INVALID_HANDLE_VALUE);
+  http_.queue_get(200, Reply("completed"))
+      .queue_get(200,
+                 nlohmann::json{{"id", other}, {"status", "completed"}}.dump());
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
+  EXPECT_NE(CloseHandle(locked), 0);
+  std::ifstream file{scratch_};
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}), original);
+}
+#endif
+
+TEST_F(IterationSmoke, PermanentAccessFailureRetainsLedgerWithoutEnding) {
+  {
+    std::ofstream file{scratch_};
+    file << ID << '\n';
+  }
+  for (const auto code : {401, 403, 404}) {
+    const auto requests = http_.get_urls().size();
+    http_.queue_get(code, R"({"error_code":"forbidden"})");
+    EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
+    EXPECT_EQ(http_.get_urls().size(), requests + 1);
+    EXPECT_TRUE(http_.post_urls().empty());
+    EXPECT_GT(std::filesystem::file_size(scratch_), 0);
+  }
+}
+
+TEST_F(IterationSmoke, AcceptsCanonicalCrLfRecoveryIds) {
+  {
+    std::ofstream file{scratch_, std::ios::binary};
+    file << ID << "\r\n";
+  }
+  http_.queue_get(200, Reply("completed"));
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 0);
+  EXPECT_EQ(http_.get_urls().size(), 1);
+  EXPECT_EQ(std::filesystem::file_size(scratch_), 0);
+}
+TEST_F(IterationSmoke, SuccessfulAtomicReplacementRetainsOnlyUnconfirmedIds) {
+  constexpr const char *other = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  {
+    std::ofstream file{scratch_};
+    file << ID << '\n' << other << '\n';
+  }
+  http_.queue_get(200, Reply("completed")).queue_get(404, "{}");
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
+  std::ifstream file{scratch_};
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}),
+            std::string(other) + "\n");
   EXPECT_TRUE(http_.post_urls().empty());
 }
 } // namespace

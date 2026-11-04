@@ -76,8 +76,12 @@ confirmed cleanup.
 until the next operation or free. Copy it promptly. It contains HTTP status and
 selected server `error_code`, `message`, and `request_id`, without arbitrary
 headers or response fields. The result preserves HTTP status and any confirmed
-ID on partial failure. Allocation failure returns `QDMI_ERROR_OUTOFMEM` without
-discarding an already confirmed ID. No HTTP response means status zero.
+ID on partial failure. Recoverable allocation failure returns
+`QDMI_ERROR_OUTOFMEM` without discarding an already confirmed ID. No HTTP
+response means status zero. The pinned JSON dependency can terminate under
+severe memory exhaustion during destruction; that process termination cannot
+become a QDMI error (see
+[upstream issue 5135](https://github.com/nlohmann/json/issues/5135)).
 
 Management requests preserve TLS verification and do not follow redirects.
 Explicit 429 refusals may be retried within budget. Ambiguous create transport,

@@ -21,6 +21,7 @@ target_link_libraries(iteration_management_smoke
                       PRIVATE ${QDMI_TARGET_NAME} qdmi::qdmi_project_warnings)
 # Deliberately invoked directly: live mutations must never enter default CTest.
 if(WIN32)
+  target_compile_definitions(iteration_management_smoke PRIVATE NOMINMAX)
   add_custom_command(
     TARGET iteration_management_smoke
     POST_BUILD

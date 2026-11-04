@@ -33,6 +33,9 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace iqm::test_support {
 namespace {
@@ -68,13 +71,16 @@ void Report(IQM_QDMI_Iteration_Client client,
             << IQM_QDMI_iteration_client_diagnostics(client) << '\n';
 }
 std::vector<std::string> Read_ids(const std::string &path) {
-  std::ifstream input{path};
+  std::ifstream input{path, std::ios::binary};
   if (!input && std::filesystem::exists(path))
     throw std::runtime_error("Cannot read scratch IDs");
   std::vector<std::string> ids;
-  for (std::string id; std::getline(input, id);)
+  for (std::string id; std::getline(input, id);) {
+    if ((id.size() == 37 || id.size() == 1) && id.back() == '\r')
+      id.pop_back();
     if (!id.empty())
       ids.push_back(id);
+  }
   if (input.bad())
     throw std::runtime_error("Cannot read scratch IDs");
   return ids;
@@ -87,13 +93,34 @@ void Save_id(const std::string &path, const std::string &id) {
 }
 void Remove_id(const std::string &path, const std::string &id) {
   const auto ids = Read_ids(path);
-  std::ofstream file{path, std::ios::trunc};
-  for (const auto &entry : ids)
-    if (entry != id)
-      file << entry << '\n';
-  file.flush();
+  const std::filesystem::path temporary{path + ".tmp"};
+  std::ofstream file{temporary, std::ios::binary | std::ios::trunc};
   if (!file)
-    throw std::runtime_error("Cannot update scratch IDs");
+    throw std::runtime_error("Cannot write scratch replacement");
+  try {
+    for (const auto &entry : ids)
+      if (entry != id)
+        file << entry << '\n';
+    file.flush();
+    if (!file)
+      throw std::runtime_error("Cannot flush scratch replacement");
+    file.close();
+    if (!file)
+      throw std::runtime_error("Cannot close scratch replacement");
+#ifdef _WIN32
+    const std::filesystem::path original{path};
+    if (!MoveFileExW(temporary.c_str(), original.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+      throw std::runtime_error("Cannot replace scratch IDs");
+#else
+    std::filesystem::rename(temporary, path);
+#endif
+  } catch (...) {
+    file.close();
+    std::error_code ignored;
+    std::filesystem::remove(temporary, ignored);
+    throw;
+  }
 }
 
 bool Cleanup(IQM_QDMI_Iteration_Client client, const std::string &id,
@@ -105,12 +132,18 @@ bool Cleanup(IQM_QDMI_Iteration_Client client, const std::string &id,
     const auto status =
         IQM_QDMI_iteration_get(client, id.c_str(), Budget(deadline), &result);
     Report(client, result);
+    if (result.http_status == 401 || result.http_status == 403 ||
+        result.http_status == 404)
+      return false;
     if (status == QDMI_SUCCESS && Terminal(result))
       return true;
     if (!end_accepted && Budget(deadline) > 0) {
       const auto ended =
           IQM_QDMI_iteration_end(client, id.c_str(), Budget(deadline), &result);
       Report(client, result);
+      if (result.http_status == 401 || result.http_status == 403 ||
+          result.http_status == 404)
+        return false;
       if (ended == QDMI_SUCCESS) {
         if (Terminal(result))
           return true;

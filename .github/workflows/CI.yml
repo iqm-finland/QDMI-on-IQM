@@ -226,7 +226,8 @@ jobs:
       - build-wheel
       - slurm-tests
     if: >-
-      always() && needs.change-detection.result == 'success' &&
+      always() && !cancelled() && !failure() && !contains(needs.*.result, 'cancelled') &&
+      needs.change-detection.result == 'success' &&
       (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       fromJSON(needs.change-detection.outputs.run-cpp-tests)
     uses: $/.github/workflows/iteration-validation.yml

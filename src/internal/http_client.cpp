@@ -326,8 +326,8 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
 
   cpr::Response response;
   response.url = url;
-  response.error = cpr::Error{static_cast<int>(cpr::ErrorCode::UNKNOWN_ERROR),
-                              "Rate-limit retry loop ended without a response"};
+  response.error.code = cpr::ErrorCode::UNKNOWN_ERROR;
+  response.error.message = "Rate-limit retry loop ended without a response";
   return response;
 }
 
