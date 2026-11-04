@@ -92,10 +92,10 @@ explicit intent, valid credentials, and an appropriate target.
 - MUST format changelog entries with the pull request reference and every
   contributing author, for example `([#123]) ([**@username**])`, and define the
   corresponding links at the bottom of `CHANGELOG.md`.
-- MUST fold additions, enhancements, or bug fixes for features that are still in
-  `[Unreleased]` into the existing `[Unreleased]` `CHANGELOG.md` entry for that
-  feature (appending the PR number) rather than creating separate bullet points
-  for every minor addition to an unreleased feature.
+- MUST keep each changelog entry focused on one user-visible change. Split
+  independent changes even when they share a pull request.
+- Fold follow-ups into an existing `[Unreleased]` entry only when they describe
+  the same change; retain the relevant PR links and author credits.
 - MUST update `docs/examples.md` when changing an example.
 - MUST preserve the existing license header and SPDX identifier appropriate to
   the file's component.

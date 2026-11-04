@@ -46,7 +46,14 @@ bundle before making requests. `SSL_CERT_FILE` is also supported when
 fail; certificate and hostname verification remain enabled. This applies to both
 native and Python clients.
 
+The selected bundle does not necessarily replace every other trust source.
+Depending on the TLS backend and its configuration, the native CA store or a CA
+directory may also be used. Keep those stores updated; do not rely on the bundle
+alone to exclude certificates trusted by another store.
+
 ### Session Configuration
+
+Use separate device sessions for concurrent requests.
 
 The internal `QDMIClient` test helper configures a device session as shown
 below. It calls the IQM QDMI Device interface directly and is not part of the

@@ -24,7 +24,6 @@
 
 #include <array>
 #include <chrono>
-#include <cpr/body.h>
 #include <cpr/connection_pool.h>
 #include <cpr/cprtypes.h>
 #include <cpr/response.h>
@@ -381,6 +380,33 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
             (std::vector<const cpr::ConnectionPool *>{&connection_pool}));
 }
 
+TEST(HttpClientTest, PostBorrowsBodyAcrossRetriesWithoutRequestingContinue) {
+  for (const auto &payload : std::array{std::string{}, std::string{"a\0b", 3},
+                                        std::string((1024 * 1024) + 1, 'x')}) {
+    SCOPED_TRACE(payload.size());
+    iqm::test_support::HttpStub http_stub;
+    http_stub.queue_post(429, "", {{"Retry-After", "1"}}).queue_post(200);
+    const cpr::ConnectionPool connection_pool;
+    auto &post_hook = iqm::http::internal::Get_hooks().post;
+    auto stub_post = post_hook;
+    post_hook = [&](const auto &url, const auto &token, const auto &pool,
+                    const auto &headers, const std::string_view body,
+                    const auto timeout) {
+      EXPECT_EQ(body.data(), payload.data());
+      EXPECT_EQ(body, payload);
+      return stub_post(url, token, pool, headers, body, timeout);
+    };
+
+    EXPECT_EQ(iqm::http::Post("https://example.test/jobs", std::nullopt,
+                              connection_pool, payload)
+                  .status_code,
+              200);
+    EXPECT_EQ(http_stub.post_bodies(),
+              (std::vector<std::string>{payload, payload}));
+    EXPECT_EQ(http_stub.sleep_durations(), std::vector<int>{1});
+  }
+}
+
 TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
   iqm::test_support::HttpStub http_stub;
   const cpr::ConnectionPool connection_pool;
@@ -391,7 +417,7 @@ TEST(HttpClientTest, ExplicitTimeoutIsPassedToHooks) {
       "https://example.test/jobs", std::nullopt, connection_pool, timeout);
   const auto post_response =
       iqm::http::Post("https://example.test/jobs", std::nullopt,
-                      connection_pool, "{}", {}, timeout);
+                      connection_pool, "{}", timeout);
 
   EXPECT_EQ(iqm::http::Handle_response(get_response), QDMI_SUCCESS);
   EXPECT_EQ(iqm::http::Handle_response(post_response), QDMI_SUCCESS);
