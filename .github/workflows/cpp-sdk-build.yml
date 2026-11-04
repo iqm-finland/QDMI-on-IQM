@@ -30,13 +30,15 @@ jobs:
           persist-credentials: false
       - name: Install native build tools
         run: |
-          yum install -y openssl-devel patchelf
+          yum install -y openssl3-devel patchelf
           /opt/python/cp311-cp311/bin/python -m pip install 'cmake>=3.24' ninja
           echo /opt/python/cp311-cp311/bin >> "$GITHUB_PATH"
       - name: Build and install C++ SDK
         run: |
           cmake -S . -B sdk-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=OFF \
+            -DCMAKE_INCLUDE_PATH=/usr/include/openssl3 \
+            -DCMAKE_LIBRARY_PATH=/usr/lib64/openssl3 \
             -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdk-prefix"
           cmake --build sdk-build --target iqm-qdmi-device --parallel 4
           cmake --install sdk-build --component iqm-qdmi-device_Runtime
