@@ -31,6 +31,8 @@ releases may include breaking changes.
 
 ### Fixed
 
+- 🐛 Return site indices with the specified `size_t` payload on 32-bit systems
+  ([#327]) ([**@marcelwa**]).
 - 📝 Fix README license links on PyPI ([#301]) ([**@marcelwa**],
   [**@burgholzer**]).
 - 📦 Include CPR, curl and JSON license texts in built packages ([#301], [#311])
@@ -352,6 +354,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
 [#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
