@@ -34,3 +34,11 @@ target_link_libraries(
                      iqm::qdmi_device_internals nlohmann_json::nlohmann_json)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
+
+# Keep global allocation fault injection isolated from GoogleTest and other
+# tests.
+add_executable(iteration_allocation_probe iteration_allocation_probe.cpp)
+target_compile_features(iteration_allocation_probe PRIVATE cxx_std_20)
+target_link_libraries(iteration_allocation_probe
+                      PRIVATE iqm::qdmi_device_internals)
+add_test(NAME IterationAllocation COMMAND iteration_allocation_probe)

@@ -70,10 +70,10 @@ bool Valid_timeout(const uint64_t timeout, const Clock::time_point now) {
          timeout <= static_cast<uint64_t>(available);
 }
 
-bool Normalize_uuid(std::string &id) {
-  if (id.size() != 36)
+bool Normalize_uuid(char *id, const size_t size) {
+  if (size != 36)
     return false;
-  for (size_t i = 0; i < id.size(); ++i) {
+  for (size_t i = 0; i < size; ++i) {
     auto &c = id[i];
     if (i == 8 || i == 13 || i == 18 || i == 23) {
       if (c != '-')
@@ -121,7 +121,7 @@ int Boundary(IQM_QDMI_Iteration_Client client,
     if (client != nullptr) {
       client->fallback_ = nullptr;
       client->creation_uncertain_ = false;
-      client->diagnostics_ = "{}";
+      client->diagnostics_.clear();
     }
     return operation();
   } catch (const std::bad_alloc &) {
@@ -168,7 +168,8 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
   if (!json.is_discarded() && json.is_object() && received_success) {
     if (const auto it = json.find("id"); it != json.end() && it->is_string()) {
       auto returned_id = it->get<std::string>();
-      if (Normalize_uuid(returned_id) && (create || returned_id == id)) {
+      if (Normalize_uuid(returned_id.data(), returned_id.size()) &&
+          (create || returned_id == id)) {
         // Retain ownership before decoding state or allocating diagnostics.
         std::memcpy(result.iteration_id, returned_id.c_str(),
                     returned_id.size() + 1);
@@ -239,24 +240,31 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
 int Get_or_end(IQM_QDMI_Iteration_Client client, const char *iteration_id,
                const uint64_t timeout_ms, IQM_QDMI_Iteration_Result *result,
                const iqm::API_ENDPOINT endpoint) {
+  std::array<char, 37> id{};
+  size_t length = 0;
+  if (iteration_id != nullptr) {
+    while (length < 36 && iteration_id[length] != '\0') {
+      id[length] = iteration_id[length];
+      ++length;
+    }
+  }
+  const bool valid_id = length == 36 && iteration_id[36] == '\0' &&
+                        Normalize_uuid(id.data(), 36) &&
+                        std::equal(id.begin(), id.end(), iteration_id);
+  if (result != nullptr) {
+    *result = {};
+    if (valid_id)
+      std::memcpy(result->iteration_id, id.data(), id.size());
+  }
   return Boundary(client, result, [&]() -> int {
     const auto now = iqm::http::internal::Get_hooks().now();
-    // Snapshot before clearing: iteration_id may point inside result.
-    std::string id = iteration_id == nullptr ? "" : iteration_id;
-    const auto original = id;
-    const bool valid_id = Normalize_uuid(id) && id == original;
-    if (result != nullptr) {
-      *result = {};
-      if (valid_id)
-        std::memcpy(result->iteration_id, id.c_str(), id.size() + 1);
-    }
     if (client == nullptr || result == nullptr || !valid_id ||
         !Valid_timeout(timeout_ms, now)) {
       if (client != nullptr)
         Diagnostic(client, 0, "Invalid ID, output or timeout");
       return QDMI_ERROR_INVALIDARGUMENT;
     }
-    return Request(client, endpoint, id, "",
+    return Request(client, endpoint, id.data(), "",
                    now + std::chrono::milliseconds{timeout_ms}, *result);
   });
 }
@@ -319,8 +327,16 @@ int IQM_QDMI_iteration_create(IQM_QDMI_Iteration_Client client, const char *qc,
                               const uint64_t timeout_ms,
                               IQM_QDMI_Iteration_Result *result) {
   return Boundary(client, result, [&]() -> int {
-    const auto now = iqm::http::internal::Get_hooks().now();
-    const std::string selector = qc == nullptr ? "" : qc;
+    Clock::time_point now;
+    std::string selector;
+    try {
+      now = iqm::http::internal::Get_hooks().now();
+      selector = qc == nullptr ? "" : qc;
+    } catch (...) {
+      if (result != nullptr)
+        *result = {};
+      throw;
+    }
     if (result != nullptr)
       *result = {};
     if (client == nullptr || result == nullptr || selector.empty() ||
