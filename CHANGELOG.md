@@ -13,7 +13,7 @@ releases may include breaking changes.
 ### Added
 
 - Standalone IQM iteration creation, inspection, and explicit ending, with
-  bounded requests and separate lifecycle validation. ([**@marcelwa**])
+  bounded requests and separate lifecycle validation. ([#326]) ([**@marcelwa**])
 
 ### Changed
 
@@ -352,6 +352,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306
