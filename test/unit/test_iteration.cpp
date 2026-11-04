@@ -576,6 +576,12 @@ TEST_F(IterationSmoke, UnreadableScratchCannotReportSuccessfulReconciliation) {
   EXPECT_TRUE(http_.post_urls().empty());
 }
 
+TEST_F(IterationSmoke, MissingScratchNeedsNoReconciliation) {
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 0);
+  EXPECT_TRUE(http_.get_urls().empty());
+  EXPECT_TRUE(http_.post_urls().empty());
+}
+
 TEST_F(IterationSmoke, FailedScratchWritePreservesOtherUnconfirmedIds) {
   constexpr const char *other = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const std::string original = std::string(ID) + "\n" + other + "\n";

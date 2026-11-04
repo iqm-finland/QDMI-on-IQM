@@ -80,6 +80,11 @@ void Report(IQM_QDMI_Iteration_Client client,
             << IQM_QDMI_iteration_client_diagnostics(client) << '\n';
 }
 std::vector<std::string> Read_ids(const std::string &path) {
+  const auto status = std::filesystem::status(path);
+  if (std::filesystem::exists(status) &&
+      !std::filesystem::is_regular_file(status)) {
+    throw std::runtime_error("Cannot read scratch IDs");
+  }
   std::ifstream input{path, std::ios::binary};
   if (!input && std::filesystem::exists(path)) {
     throw std::runtime_error("Cannot read scratch IDs");
