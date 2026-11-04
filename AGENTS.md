@@ -63,7 +63,7 @@ explicit invocation, valid credentials, and an appropriate target.
 
 - Sphinx and MyST
 - Furo theme
-- Doxygen and Breathe for C/C++ API documentation
+- Doxygen for C/C++ API documentation
 - AutoAPI for Python API documentation
 
 ## Development Guidelines

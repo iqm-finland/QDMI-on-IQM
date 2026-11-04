@@ -22,21 +22,22 @@ from __future__ import annotations
 import os
 from importlib import metadata
 
+try:
+    version = metadata.version("iqm-qdmi")
+except ModuleNotFoundError:
+    msg = "iqm-qdmi must be installed to build the documentation"
+    raise ModuleNotFoundError(msg) from None
+
+release = version.split("+")[0]
+
 project = "QDMI on IQM"
 author = "IQM Finland Oy"
 language = "en"
 project_copyright = "2025 - 2026 IQM Finland Oy"
 master_doc = "index"
 
-try:
-    version = metadata.version("iqm-qdmi")
-except metadata.PackageNotFoundError:
-    version = "0.0.0"
-release = version.split("+")[0]
-
 extensions = [
     "autoapi.extension",
-    "breathe",
     "myst_nb",
     "sphinx_copybutton",
     "sphinx_design",
@@ -46,6 +47,12 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
 ]
+
+# The Markdown builder omits these nodes.
+llms_txt_suppress_unknown_node_warnings = ["abbreviation", "caption"]
+
+# AutoAPI treats the ellipsis in tuple[int, ...] as a class reference.
+nitpick_ignore = [("py:class", "Ellipsis")]
 
 source_suffix = [".rst", ".md"]
 exclude_patterns = [
@@ -61,6 +68,7 @@ exclude_patterns = [
 
 templates_path = ["_templates"]
 html_theme = "furo"
+html_extra_path = ["_build/doxygen"]
 html_static_path = ["_static"]
 html_css_files = [
     "custom.css",
@@ -95,6 +103,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
     "qiskit": ("https://docs.quantum.ibm.com/api/qiskit", None),
+    "qiskit-algorithms": ("https://qiskit-community.github.io/qiskit-algorithms", None),
     "core": ("https://mqt.readthedocs.io/projects/core/en/stable", None),
 }
 
@@ -111,6 +120,7 @@ myst_substitutions = {
 myst_heading_anchors = 3
 
 nb_execution_mode = "cache"
+nb_execution_excludepatterns = [] if os.getenv("IQM_QDMI_LIVE_DOCS") == "1" else ["qiskit.md"]
 nb_execution_raise_on_error = True
 nb_execution_timeout = 300
 nb_mime_priority_overrides = [("latex", "image/svg+xml", 15)]
@@ -140,20 +150,3 @@ toc_object_entries_show_parents = "hide"
 python_use_unqualified_type_names = True
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
-
-breathe_projects = {"QDMI on IQM": "_build/doxygen/xml"}
-breathe_default_project = "QDMI on IQM"
-
-# Get the IQM QDMI build directory as the stem for the generated headers.
-try:
-    iqm_qdmi_build_dir = os.environ["IQM_QDMI_BUILD_DIR"]
-except KeyError:
-    msg = "No build dir set in environment. Consider setting IQM_QDMI_BUILD_DIR."
-    raise RuntimeError(msg) from None
-
-breathe_projects_source = {
-    "QDMI on IQM": (
-        f"../{iqm_qdmi_build_dir}/src/include/iqm_qdmi",
-        ["constants.h", "types.h", "export.h", "device.h"],
-    )
-}

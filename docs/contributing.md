@@ -410,9 +410,10 @@ If you touch one of these examples, update the corresponding documentation in
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and
-built with Sphinx + MyST, using Doxygen XML via Breathe for the C/C++ API and
-AutoAPI for the Python package. The documentation source files can be found in
-the `docs/` directory.
+built with Sphinx + MyST, using Doxygen for the C/C++ API and AutoAPI for the
+Python package. The documentation source files are in `docs/`.
+
+Install Doxygen 1.15 or newer on `PATH` to build the API reference.
 
 ### Writing Documentation
 
@@ -442,10 +443,9 @@ uvx nox -s docs
 
 The generated HTML site is written to `docs/_build/html/`.
 
-Documentation builds render notebooks without executing them. Use
+Documentation builds execute offline examples and cache their outputs. Use
 `uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
-explicit target to execute the examples locally. GitHub Actions builds PR
-previews and publishes the offline documentation to GitHub Pages.
+explicit target to execute provider-backed notebooks.
 
 ## Tips for Development
 

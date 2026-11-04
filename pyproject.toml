@@ -81,6 +81,7 @@ iqm-sampler = "iqm.qdmi.sampler:main"
 
 [dependency-groups]
 dev = [
+  { include-group = "build" },
   { include-group = "test" },
   "nox>=2026.4.10",
 ]
@@ -93,7 +94,7 @@ test = [
   { include-group = "qiskit" },
 ]
 docs = [
-  "breathe>=4.36",
+  { include-group = "qiskit" },
   "furo>=2025.12.19",
   "myst-nb>=1.4",
   "sphinx>=9",
@@ -102,6 +103,7 @@ docs = [
   "sphinx-design>=0.7",
   "sphinx-llm>=1",
 ]
+build = [ "scikit-build-core>=1.1" ]
 qiskit = [
   "mqt-core~=4.1.1",
   "numpy>=2.1",

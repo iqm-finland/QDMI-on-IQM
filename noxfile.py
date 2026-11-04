@@ -174,7 +174,10 @@ def examples(session: nox.Session) -> None:
 
 @nox.session(python="3.14", reuse_venv=True)
 def docs(session: nox.Session) -> None:
-    """Build documentation; pass --live to execute notebook examples."""
+    """Build documentation.
+
+    Pass ``--live`` to execute provider-backed notebooks.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true", help="Execute provider-backed notebook examples")
     parser.add_argument("-b", dest="builder", default="html", help="Build target (default: html)")
@@ -183,34 +186,43 @@ def docs(session: nox.Session) -> None:
     serve = args.builder == "html" and session.interactive
     if serve:
         session.install("sphinx-autobuild")
-    session.install("scikit-build-core")
-
+    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+    if shutil.which("cmake") is None:
+        session.install("cmake")
+    if shutil.which("ninja") is None:
+        session.install("ninja")
+    session.run(
+        "uv",
+        "sync",
+        "--inexact",
+        "--no-dev",
+        "--group",
+        "build",
+        "--group",
+        "docs",
+        "--no-build-isolation-package",
+        "iqm-qdmi",
+        "--reinstall-package",
+        "iqm-qdmi",
+        "--config-settings-package",
+        "iqm-qdmi:build-dir=build/docs",
+        "--config-settings-package",
+        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
+        env=env,
+    )
     session.run(
         "uv",
         "run",
-        "--no-build-isolation-package",
-        "iqm-qdmi",
-        "--config-settings-package",
-        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
-        "--config-settings-package",
-        "iqm-qdmi:build.targets=iqm-qdmi-device;iqm-qdmi-device-docs",
-        "--config-settings-package",
-        "iqm-qdmi:build-dir=build/docs",
-        "--group",
-        "docs",
-        "--verbose",
+        "--no-sync",
         "sphinx-autobuild" if serve else "sphinx-build",
         "-n",
         "-T",
+        "-W",
         f"-b={args.builder}",
         "docs",
         f"docs/_build/{args.builder}",
-        *([] if args.live else ["-D", "nb_execution_mode=off"]),
         *posargs,
-        env={
-            "IQM_QDMI_BUILD_DIR": "build/docs",
-            "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
-        },
+        env={**env, "IQM_QDMI_LIVE_DOCS": "1" if args.live else "0"},
     )
 
 
