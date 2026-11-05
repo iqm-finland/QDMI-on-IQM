@@ -13,7 +13,8 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Discover IQM quantum computers and select the largest matching
-  `--min-qubits` with `examples/discover_backends.py` ([#146]) ([**@marcelwa**])
+  `--min-qubits` with `examples/discover_backends.py`. Bearer tokens require an
+  HTTPS endpoint, except for loopback HTTP ([#146]) ([**@marcelwa**])
 
 ### Changed
 
