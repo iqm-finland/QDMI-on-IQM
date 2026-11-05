@@ -146,6 +146,15 @@ def fix_linux_paths(library: Path, bundled: dict[str, Path]) -> None:
             raise RuntimeError(msg)
 
 
+def export_runtime_files(prefix: Path, bundled: dict[str, Path]) -> None:
+    """Expose bundled libraries to consumers staging the QDMI runtime."""
+    if bundled:
+        config = prefix / "share/cmake/iqm-qdmi-device/iqm-qdmi-device-config.cmake"
+        names = ";".join(sorted(bundled))
+        with config.open("a", encoding="utf-8") as output:
+            output.write(f'\nset_property(TARGET iqm-qdmi-device PROPERTY QDMI_RUNTIME_FILES "{names}")\n')
+
+
 def fix_macos_paths(library: Path, bundled: dict[str, Path]) -> None:
     """Rewrite bundled dylib references to paths relative to each binary."""
     for binary in [library, *(library.parent / name for name in bundled)]:
@@ -246,6 +255,7 @@ def main() -> None:
     scan_file = build_dir / "sdk-runtime-dependencies.txt"
     dependencies = scan_dependencies(library, scan_file)
     bundled = copy_dependencies(dependencies, library.parent, args.platform)
+    export_runtime_files(prefix, bundled)
     if args.platform == "linux":
         fix_linux_paths(library, bundled)
     elif args.platform == "macos":

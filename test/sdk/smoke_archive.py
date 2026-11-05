@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -89,6 +90,21 @@ def main(archive_path: Path) -> None:
 
         build = work / "consumer-build"
         run("cmake", "-S", str(ROOT / "test/sdk/consumer"), "-B", str(build), f"-DCMAKE_PREFIX_PATH={prefix}")
+        library_dir = prefix / ("bin" if sys.platform == "win32" else "lib")
+        manifest = json.loads((library_dir / "iqm-qdmi-device.qdmi.json").read_text(encoding="utf-8"))
+        if (
+            manifest["schema-version"] != 1
+            or not manifest["qdmi"]["devices"]
+            or not all((library_dir / device["library"]).is_file() for device in manifest["qdmi"]["devices"])
+        ):
+            msg = "The device manifest does not resolve to the installed library"
+            raise RuntimeError(msg)
+        if sys.platform.startswith("linux"):
+            bundled = {path.name for path in library_dir.glob("*.so*")} - {"libiqm-qdmi-device.so"}
+            runtime_files = set((build / "runtime-files.txt").read_text(encoding="utf-8").split(";")) - {""}
+            if bundled != runtime_files:
+                msg = f"QDMI runtime files do not match bundled libraries: {runtime_files} != {bundled}"
+                raise RuntimeError(msg)
         run("cmake", "--build", str(build), "--config", "Release")
         executable = build / "Release/sdk-smoke.exe" if sys.platform == "win32" else build / "sdk-smoke"
         env = os.environ.copy()
