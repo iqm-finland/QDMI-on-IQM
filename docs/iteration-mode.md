@@ -2,23 +2,20 @@
 
 The IQM extension in `iqm_qdmi/iteration.h` creates, inspects, and ends
 iterations without a QDMI device session. It is installed with native packages
-and Python wheels. An iteration reserves one quantum computer; your application
-owns its ID and explicitly ends it. Freeing a management client or a device
-session does not end an iteration. Circuit attachment and Python convenience
-APIs are separate work; ordinary circuit and calibration workflows keep their
-current behavior.
+and Python wheels. An iteration reserves one quantum computer. Your application
+owns its ID and must explicitly end it; freeing a client or device session does
+not end it.
 
 ## Native interface
 
 Allocate one client and reuse it for serial operations. Separate clients can run
-concurrently. Each owns its token manager, HTTP connection pool, quota budget,
-and diagnostics. Allocation copies its inputs without network access. Null
+concurrently. Allocation copies its inputs without network access. Null
 connection inputs use `IQM_SERVER_URL`, then `IQM_BASE_URL`. Null authentication
-inputs use the existing token manager (`IQM_TOKEN` or `IQM_TOKENS_FILE`); select
-only one source. Explicit authentication overrides ambient authentication. Use a
-personal workspace token with `job_execution` scope and access to the selected
-quantum computer. Read access alone does not prove iteration creation
-permission. Keep tokens out of logs and command arguments.
+inputs use `IQM_TOKEN` or `IQM_TOKENS_FILE`; select only one source. Explicit
+authentication overrides these defaults. Use a personal workspace token with
+`job_execution` scope and access to the selected quantum computer. Read access
+alone does not prove iteration creation permission. Keep tokens out of logs and
+command arguments.
 
 ```c
 #include <iqm_qdmi/iteration.h>
@@ -35,12 +32,12 @@ if (status == QDMI_SUCCESS) {
 IQM_QDMI_iteration_client_free(client);
 ```
 
-All operations require a nonnull fixed result; there is no size-query create.
-Create accepts a nonempty quantum computer UUID or alias, maximum duration
-1–2700 seconds, and idle timeout 1–maximum. Idle zero omits the field and uses
-the server's default (currently 60 seconds). Maximum duration starts on
-activation, not creation; neither it nor the idle timeout bounds queue
-residence. Idle time includes classical processing while no job runs or waits.
+All operations require a nonnull result. Create accepts a nonempty quantum
+computer UUID or alias, a maximum duration of 1–2700 seconds, and an idle
+timeout of 1–maximum seconds. Idle zero uses the server's default (currently 60
+seconds). Maximum duration starts on activation, not creation; neither timeout
+bounds time in the queue. Idle time includes classical processing while no job
+runs or waits.
 
 `get` and `end` accept canonical lowercase UUIDs and allow
 `get(client, result.iteration_id, timeout_ms, &result)`. They retain that input
@@ -83,11 +80,11 @@ severe memory exhaustion during destruction; that process termination cannot
 become a QDMI error (see
 [upstream issue 5135](https://github.com/nlohmann/json/issues/5135)).
 
-Management requests preserve TLS verification and do not follow redirects.
-Explicit 429 refusals may be retried within budget. Ambiguous create transport,
-5xx, redirect, or decoding outcomes are never automatically recreated. An
-unreadable or missing create ID is reported with `creation_uncertain: true`. If
-an ID is present even on failure, retain it and attempt bounded cleanup.
+Management requests verify TLS and do not follow redirects. Explicit 429
+refusals may be retried within budget. Ambiguous create transport, 5xx,
+redirect, or decoding outcomes are never automatically retried. An unreadable or
+missing create ID is reported with `creation_uncertain: true`. If an ID is
+present even on failure, retain it and attempt bounded cleanup.
 
 For an uncertain create without an ID, inspect your own server list using
 `GET /api/v1/iterations?qc=emerald%3Amock&status=waiting&status=active&page=1&page_size=100`.
@@ -116,19 +113,19 @@ only those IDs within 30 seconds total, with each get/end capped at ten seconds
 and the remaining budget. The workflow runs this mode in an `always()` step.
 Repeated cleanup is safe. This file contains IDs, never credentials.
 
-Superseded CI runs cancel normally. Only the lifecycle job and its live and
-cleanup steps preserve execution during normal cancellation, so an in-flight
-create can save its ID and reach bounded cleanup. A cancellation check before
-the live executable starts prevents new creation when cancellation is already
-known. Setup and build steps remain cancellable. Live jobs serialize by quantum
-computer across runs, with active cancellation disabled and `queue: max` only
-for this job. GitHub limits that queue to 100 pending jobs. An overflow or a
-missing expected live job fails required coverage; inspect and rerun the
-current-head run rather than accepting a green skip.
+Superseded CI runs cancel normally; only the lifecycle job preserves its live
+and cleanup steps. This lets an in-flight create save its ID and reach cleanup.
+Setup and build steps remain cancellable. A cancellation check prevents a new
+create when cancellation is already known.
 
-A newer run's ordinary jobs may overlap an older lifecycle while it drains;
-serialization covers only designated lifecycle jobs. Runner-local scratch is not
-durable across runner loss. Short server timeouts only limit occupancy after
-activation. Lost queued IDs still require manual/server-side reconciliation;
-cleanup is not guaranteed following force cancellation, process or node loss, an
-uncertain create without an ID, or an exhausted deadline.
+Lifecycle jobs serialize by quantum computer across runs; other jobs may
+overlap. GitHub's lifecycle queue holds at most 100 pending jobs. Overflow or a
+missing expected live job fails required coverage; inspect and rerun the
+current-head run.
+
+:::{important}
+Runner-local scratch does not survive runner loss. Server timeouts only limit
+occupancy after activation, so lost queued IDs require manual or server-side
+reconciliation. Cleanup is not guaranteed after force cancellation, process or
+node loss, an uncertain create without an ID, or an exhausted deadline.
+:::
