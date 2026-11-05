@@ -3114,6 +3114,51 @@ TEST_F(DeviceIntegrationMockTest, TwoQubitFidelityIsFoundInEitherSiteOrder) {
   EXPECT_DOUBLE_EQ(fidelity, 0.97);
 }
 
+TEST_F(DeviceIntegrationMockTest, OperationLocusValidationPreservesDirection) {
+  http_stub.queue_get(200, list_quantum_computers_response);
+  http_stub.queue_get(200, get_static_quantum_architectures_response);
+  http_stub.queue_get(200, R"({
+    "calibration_set_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+    "qubits": ["QB1", "QB2"], "computational_resonators": [],
+    "gates": {
+      "move": {"implementations": {"default": {"loci": [["QB1", "QB2"]]}},
+               "default_implementation": "default"},
+      "cz": {"implementations": {"default": {"loci": [["QB1", "QB2"]]}},
+             "default_implementation": "default"}
+    }
+  })");
+  http_stub.queue_get(200, R"({"observations": []})");
+  http_stub.queue_get(200, cocos_health_response);
+  ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+
+  const auto sites = Query_sites(session);
+  ASSERT_EQ(sites.size(), 2U);
+  auto *const move = Query_operation(session, "move");
+  auto *const cz = Query_operation(session, "cz");
+  ASSERT_NE(move, nullptr);
+  ASSERT_NE(cz, nullptr);
+  std::array<IQM_QDMI_Site, 2> reported{};
+  ASSERT_EQ(IQM_QDMI_device_session_query_operation_property(
+                session, move, 0, nullptr, 0, nullptr,
+                QDMI_OPERATION_PROPERTY_SITES, sizeof(reported),
+                reported.data(), nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(reported[0], sites[0]);
+  EXPECT_EQ(reported[1], sites[1]);
+  const auto query = [&](IQM_QDMI_Operation op, IQM_QDMI_Site first,
+                         IQM_QDMI_Site second) {
+    const std::array pair{first, second};
+    size_t count = 0;
+    return IQM_QDMI_device_session_query_operation_property(
+        session, op, pair.size(), pair.data(), 0, nullptr,
+        QDMI_OPERATION_PROPERTY_PARAMETERSNUM, sizeof(count), &count, nullptr);
+  };
+  EXPECT_EQ(query(move, sites[0], sites[1]), QDMI_SUCCESS);
+  EXPECT_EQ(query(move, sites[1], sites[0]), QDMI_ERROR_INVALIDARGUMENT);
+  EXPECT_EQ(query(cz, sites[1], sites[0]), QDMI_SUCCESS);
+  EXPECT_EQ(query(cz, sites[0], sites[0]), QDMI_ERROR_INVALIDARGUMENT);
+}
+
 TEST_F(DeviceIntegrationMockTest, GateWithLociOfDifferingSizesIsNotRegistered) {
   const ScopedLogCapture log_capture;
   http_stub.queue_get(200, list_quantum_computers_response);
