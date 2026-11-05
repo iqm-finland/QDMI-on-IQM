@@ -191,7 +191,9 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
         ValueError: If credentials or the inventory are invalid.
     """
     resolved_base_url = resolve_base_url(base_url)
-    log.info("Discovering quantum computers available at '%s'...", resolved_base_url)
+    server = urlsplit(resolved_base_url)
+    safe_base_url = f"{server.scheme}://{server.netloc.rsplit('@', 1)[-1]}"
+    log.info("Discovering quantum computers available at '%s'...", safe_base_url)
     token, tokens_file = resolve_credentials(token, tokens_file)
     bearer_token = token
     if tokens_file:
@@ -202,7 +204,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
             raise ValueError(msg)
     quantum_computers = list_quantum_computers(resolved_base_url, bearer_token)
     if not quantum_computers:
-        sys.exit(f"No quantum computers reported by '{resolved_base_url}'.")
+        sys.exit(f"No quantum computers reported by '{safe_base_url}'.")
 
     log.info("Found %d quantum computer(s):", len(quantum_computers))
     for qc in quantum_computers:
@@ -215,7 +217,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
 
     candidates: list[tuple[str, int, str]] = []
     for qc in quantum_computers:
-        name = qc.get("alias") or qc["id"]
+        name = qc["alias"]
         log.info("Querying properties of '%s'...", name)
         try:
             device = open_device(
@@ -287,13 +289,9 @@ def main() -> None:
             tokens_file=args.tokens_file,
             min_qubits=args.min_qubits,
         )
-    except requests.RequestException as exc:
+    except (requests.RequestException, OSError) as exc:
         sys.exit(f"Discovery failed ({type(exc).__name__}). Check the server URL and authentication settings.")
-    except OSError as exc:
-        sys.exit(f"Discovery failed ({type(exc).__name__}). Check the server URL and authentication settings.")
-    except InvalidServerResponseError as exc:
-        sys.exit(f"Discovery failed: {exc}")
-    except ValueError as exc:
+    except (InvalidServerResponseError, ValueError) as exc:
         sys.exit(f"Discovery failed: {exc}")
 
 
