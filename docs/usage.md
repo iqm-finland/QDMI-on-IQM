@@ -551,11 +551,9 @@ Attempting to retrieve these formats will return `QDMI_ERROR_NOTSUPPORTED`.
 ## Submitting Pulse-Level Jobs
 
 QDMI has no program format of its own for pulse-level programs, so this device
-carries one in
-{cpp:enumerator}`~QDMI_PROGRAM_FORMAT_T::QDMI_PROGRAM_FORMAT_CUSTOM1`. The
-program is a serialized IQM `RunDefinition` protobuf, the same payload IQM's own
-client submits, and the device forwards it to the IQM Server byte for byte
-without reading it.
+carries one in `QDMI_PROGRAM_FORMAT_CUSTOM1`. The program is a serialized IQM
+`RunDefinition` protobuf, the same payload IQM's own client submits, and the
+device forwards it to the IQM Server byte for byte without reading it.
 
 Because the payload is binary, its length is the byte count, with no terminator:
 
@@ -571,11 +569,10 @@ A pulse job accepts one binary program, containing the complete compiled sweep.
 The program and results use index zero.
 
 Results come back as the raw `sweep_results` artifact via the
-{cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM2` job result, again
-as protobuf bytes with no terminator. Shot and histogram results are not
-available for a pulse-level job, because the IQM Server produces no measurement
-artifacts for one; asking for them returns
-{cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`.
+`QDMI_JOB_RESULT_CUSTOM2` job result, again as protobuf bytes with no
+terminator. Shot and histogram results are not available for a pulse-level job,
+because the IQM Server produces no measurement artifacts for one; asking for
+them returns `QDMI_ERROR_NOTSUPPORTED`.
 
 :::{note}
 Use IQM's SDK to compile the payload and deserialize the acquisition arrays; see
@@ -588,18 +585,17 @@ status and cancellation with circuit jobs:
 - Submit: `/api/v1/jobs/<quantum_computer>/run`
 - Results: `/api/v1/jobs/<job_id>/artifacts/sweep_results`
 
-{cpp:enumerator}`~QDMI_DEVICE_JOB_PARAMETER_T::QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM`
-does not apply. The repetition count is compiled into the `RunDefinition`, and
-the device forwards the payload without reading it, so setting or querying the
-parameter returns {cpp:enumerator}`~QDMI_STATUS::QDMI_ERROR_NOTSUPPORTED`. Set
-the repetition count in the compiler settings with `settings.set_shots(shots)`.
-Circuit run-request options are also unsupported. The caller owns the compiled
-calibration; the QDMI job calibration property returns `QDMI_ERROR_NOTSUPPORTED`
-for pulse jobs.
+`QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` does not apply. The repetition count is
+compiled into the `RunDefinition`, and the device forwards the payload without
+reading it, so setting or querying the parameter returns
+`QDMI_ERROR_NOTSUPPORTED`. Set the repetition count in the compiler settings
+with `settings.set_shots(shots)`. Circuit run-request options are also
+unsupported. The caller owns the compiled calibration; the QDMI job calibration
+property returns `QDMI_ERROR_NOTSUPPORTED` for pulse jobs.
 
-{cpp:func}`IQM_QDMI_device_session_retrieve_device_job_by_id` recognizes the IQM
-Server's `run` job type, so a later session can reopen a pulse-level job and
-retrieve {cpp:enumerator}`~QDMI_JOB_RESULT_T::QDMI_JOB_RESULT_CUSTOM2`.
+`IQM_QDMI_device_session_retrieve_device_job_by_id` recognizes the IQM Server's
+`run` job type, so a later session can reopen a pulse-level job and retrieve
+`QDMI_JOB_RESULT_CUSTOM2`.
 
 ## Triggering Calibration Jobs
 
