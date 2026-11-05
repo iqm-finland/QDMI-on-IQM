@@ -24,10 +24,6 @@ releases may include breaking changes.
 - ✨ Return ordered Qiskit samples by default (`memory=True`) ([#306])
   ([**@burgholzer**]).
 
-### Removed
-
-- 📦 Stop publishing Windows ARM64 wheels ([#322]) ([**@denialhaag**]).
-
 ### Fixed
 
 - 🐛 Return site indices with the specified `size_t` payload on 32-bit systems
@@ -354,7 +350,6 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
-[#322]: https://github.com/iqm-finland/QDMI-on-IQM/pull/322
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306

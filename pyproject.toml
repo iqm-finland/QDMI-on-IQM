@@ -170,8 +170,8 @@ iqm-qdmi = { workspace = true }
 
 [tool.cibuildwheel]
 build = "cp3*"
-skip = [ "*-win_arm64" ]
 test-skip = [
+  "*-win_arm64",   # no Windows ARM64 wheels for qiskit and dependencies
   "cp3??t-*",      # no freethreading qiskit wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
 ]

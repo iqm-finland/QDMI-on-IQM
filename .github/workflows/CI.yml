@@ -74,6 +74,7 @@ jobs:
       matrix:
         runs-on:
           - windows-2025
+          - windows-11-arm
         preset:
           - release
         include:
@@ -182,6 +183,7 @@ jobs:
           - ubuntu-26.04-arm
           - macos-26
           - windows-2025
+          - windows-11-arm
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     with:
       runs-on: ${{ matrix.runs-on }}
