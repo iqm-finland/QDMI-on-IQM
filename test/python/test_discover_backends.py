@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Offline regression tests for the discovery example."""
+"""Regression tests for the discovery example."""
 
 from __future__ import annotations
 
@@ -252,22 +252,26 @@ def test_http_error_redacts_credentials(discovery: ModuleType, monkeypatch: pyte
     assert EXAMPLE_VALUE not in str(exc_info.value)
 
 
-def test_base_url_log_redacts_userinfo(
-    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize("base_url", ["https://alice:password@example.com", "http://alice:password@example.com"])
+def test_url_credentials_are_rejected_before_transport(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, base_url: str
 ) -> None:
-    """Do not write URL credentials into application logs."""
-    monkeypatch.setattr(discovery, "list_quantum_computers", Mock(return_value=[]))
-    caplog.set_level(logging.INFO)
-    with pytest.raises(SystemExit, match="No quantum computers reported") as exc_info:
-        discovery.run_discovery(
-            base_url="https://alice:password@example.com", token=None, tokens_file=None, min_qubits=5
-        )
-    assert "alice" not in caplog.text
-    assert "password" not in caplog.text
-    assert "https://example.com" in caplog.text
-    assert "alice" not in str(exc_info.value)
-    assert "password" not in str(exc_info.value)
-    assert "https://example.com" in str(exc_info.value)
+    """Never forward credentials embedded in the server URL."""
+    get = Mock()
+    monkeypatch.setattr(discovery.requests, "get", get)
+    with pytest.raises(ValueError, match="Credentials in server URLs are not supported"):
+        discovery.list_quantum_computers(base_url, None)
+    get.assert_not_called()
+    with pytest.raises(ValueError, match="Credentials in server URLs are not supported"):
+        discovery.run_discovery(base_url=base_url, token=None, tokens_file=None, min_qubits=5)
+    get.assert_not_called()
+
+
+@pytest.mark.parametrize("base_url", ["example.com", "ftp://example.com"])
+def test_base_url_requires_http_scheme_and_host(discovery: ModuleType, base_url: str) -> None:
+    """Reject malformed endpoints before logging or sending requests."""
+    with pytest.raises(ValueError, match="HTTP or HTTPS scheme and a hostname"):
+        discovery.resolve_base_url(base_url)
 
 
 @pytest.mark.parametrize("base_url", ["http://example.com", "http://192.0.2.1"])
