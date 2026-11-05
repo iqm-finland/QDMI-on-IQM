@@ -210,7 +210,10 @@ and must not include a query string or fragment. Authentication values must be
 nonempty, and the inventory endpoint must not redirect. The script skips
 computers whose properties cannot be queried and exits with an error if none
 meets the constraint. The separate REST inventory request reads the current
-access token from a tokens file; it does not refresh an expired token.
+access token from a tokens file; it does not refresh an expired token. The
+inventory request also uses `CURL_CA_BUNDLE` or `SSL_CERT_FILE` for a private
+CA, and uses the system CA bundle on Linux when neither is set. These settings
+take precedence over the Requests-specific `REQUESTS_CA_BUNDLE`.
 
 Exercise the local DDSIM simulator without contacting an IQM Server:
 

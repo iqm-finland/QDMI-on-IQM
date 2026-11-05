@@ -192,8 +192,28 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
                 url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
             )
     else:
+        ca_bundle = os.getenv("CURL_CA_BUNDLE") or os.getenv("SSL_CERT_FILE")
+        if not ca_bundle and sys.platform.startswith("linux"):
+            ca_bundle = next(
+                (
+                    path
+                    for path in (
+                        "/etc/ssl/certs/ca-certificates.crt",
+                        "/etc/pki/tls/certs/ca-bundle.crt",
+                        "/etc/ssl/ca-bundle.pem",
+                        "/etc/ssl/cert.pem",
+                    )
+                    if Path(path).is_file()
+                ),
+                None,
+            )
         response = requests.get(
-            url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
+            url,
+            headers=headers,
+            timeout=30,
+            auth=_PreserveAuthorizationHeader(),
+            allow_redirects=False,
+            verify=ca_bundle,
         )
     if 300 <= response.status_code < 400:
         msg = "Redirects are not supported for the server inventory."

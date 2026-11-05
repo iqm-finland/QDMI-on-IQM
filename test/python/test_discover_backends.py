@@ -131,6 +131,29 @@ def test_inventory_validation(discovery: ModuleType, monkeypatch: pytest.MonkeyP
         discovery.list_quantum_computers("https://server.example", None)
 
 
+def test_inventory_uses_driver_ca_bundle(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use the driver's SSL_CERT_FILE fallback for the inventory request."""
+    monkeypatch.delenv("CURL_CA_BUNDLE", raising=False)
+    monkeypatch.setenv("SSL_CERT_FILE", "private-ca.pem")
+    response = Mock(status_code=200)
+    response.json.return_value = {"quantum_computers": []}
+    get = Mock(return_value=response)
+    monkeypatch.setattr(discovery.requests, "get", get)
+    discovery.list_quantum_computers("https://server.example", None)
+    assert get.call_args.kwargs["verify"] == "private-ca.pem"
+    monkeypatch.setenv("CURL_CA_BUNDLE", "curl-ca.pem")
+    discovery.list_quantum_computers("https://server.example", None)
+    assert get.call_args.kwargs["verify"] == "curl-ca.pem"
+    monkeypatch.delenv("CURL_CA_BUNDLE")
+    monkeypatch.delenv("SSL_CERT_FILE")
+    monkeypatch.setattr(discovery.sys, "platform", "linux")
+    monkeypatch.setattr(
+        Path, "is_file", lambda self: self.as_posix() in {"/etc/ssl/cert.pem", "/etc/ssl/ca-bundle.pem"}
+    )
+    discovery.list_quantum_computers("https://server.example", None)
+    assert get.call_args.kwargs["verify"] == "/etc/ssl/ca-bundle.pem"
+
+
 @pytest.mark.parametrize("payload", [{}, {"quantum_computers": {}}])
 def test_invalid_inventory_shape(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     """Report unexpected inventory types without hiding unrelated TypeErrors."""
