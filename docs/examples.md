@@ -4,6 +4,7 @@ kernelspec:
   name: python3
 language_info:
   name: python
+  pygments_lexer: ipython3
 mystnb:
   number_source_lines: true
 ---

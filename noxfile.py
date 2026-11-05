@@ -72,8 +72,11 @@ def _run_tests(
     install_args: Sequence[str] = (),
     extra_command: Sequence[str] = (),
     pytest_run_args: Sequence[str] = (),
+    live: bool = False,
 ) -> None:
     env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+    if not live:
+        env.update(IQM_TOKEN="", IQM_TOKENS_FILE="")
 
     if extra_command:
         session.run(*extra_command, env=env)
@@ -86,9 +89,10 @@ def _run_tests(
         "test",
         *install_args,
         "pytest",
-        "test/python",
         *pytest_run_args,
         *session.posargs,
+        "-m",
+        "live" if live else "not live",
         "--cov-config=pyproject.toml",
         env=env,
     )
@@ -113,6 +117,18 @@ def minimums(session: nox.Session) -> None:
         session.run("uv", "tree", "--frozen", env=env)
 
 
+@nox.session(name="live-tests", python="3.14", reuse_venv=True, default=False)
+def live_tests(session: nox.Session) -> None:
+    """Run live Python checks against an explicitly selected IQM mock."""
+    if not os.environ.get("IQM_TOKEN"):
+        session.error("IQM mock tests require credentials")
+    if os.environ.get("IQM_QUANTUM_COMPUTER") not in {"emerald:mock", "garnet:mock", "sirius:mock"}:
+        session.error("live-tests requires an explicit IQM mock")
+    if os.environ.get("IQM_QC_ID") or os.environ.get("IQM_TOKENS_FILE"):
+        session.error("live-tests requires token authentication and no quantum computer ID override")
+    _run_tests(session, live=True, pytest_run_args=("-n", "0"))
+
+
 @nox.session(python=["3.13"], reuse_venv=True)
 def examples(session: nox.Session) -> None:
     """Run the standalone example scripts against the selected backend."""
@@ -120,8 +136,8 @@ def examples(session: nox.Session) -> None:
     parser.add_argument(
         "--backend",
         choices=("iqm", "sim"),
-        default="iqm",
-        help="Backend to use for the examples session (default: iqm).",
+        default="sim",
+        help="Backend to use for the examples session (default: sim).",
     )
     args, posargs = parser.parse_known_args(session.posargs)
     if posargs:
@@ -167,41 +183,55 @@ def examples(session: nox.Session) -> None:
 
 @nox.session(python="3.14", reuse_venv=True)
 def docs(session: nox.Session) -> None:
-    """Build the docs. Pass "--serve" for live reload or "-b linkcheck" to check links."""
+    """Build documentation.
+
+    Pass ``--live`` to execute provider-backed notebooks.
+    """
     parser = argparse.ArgumentParser()
+    parser.add_argument("--live", action="store_true", help="Execute provider-backed notebook examples")
     parser.add_argument("-b", dest="builder", default="html", help="Build target (default: html)")
     args, posargs = parser.parse_known_args(session.posargs)
 
     serve = args.builder == "html" and session.interactive
     if serve:
         session.install("sphinx-autobuild")
-    session.install("scikit-build-core")
-
+    env = {"UV_PROJECT_ENVIRONMENT": session.virtualenv.location}
+    if shutil.which("cmake") is None:
+        session.install("cmake")
+    if shutil.which("ninja") is None:
+        session.install("ninja")
+    session.run(
+        "uv",
+        "sync",
+        "--inexact",
+        "--no-dev",
+        "--group",
+        "build",
+        "--group",
+        "docs",
+        "--no-build-isolation-package",
+        "iqm-qdmi",
+        "--reinstall-package",
+        "iqm-qdmi",
+        "--config-settings-package",
+        "iqm-qdmi:build-dir=build/docs",
+        "--config-settings-package",
+        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
+        env=env,
+    )
     session.run(
         "uv",
         "run",
-        "--no-build-isolation-package",
-        "iqm-qdmi",
-        "--config-settings-package",
-        "iqm-qdmi:cmake.define.BUILD_IQM_QDMI_DOCS=ON",
-        "--config-settings-package",
-        "iqm-qdmi:build.targets=iqm-qdmi-device;iqm-qdmi-device-docs",
-        "--config-settings-package",
-        "iqm-qdmi:build-dir=build/docs",
-        "--group",
-        "docs",
-        "--verbose",
+        "--no-sync",
         "sphinx-autobuild" if serve else "sphinx-build",
         "-n",
         "-T",
+        "-W",
         f"-b={args.builder}",
         "docs",
         f"docs/_build/{args.builder}",
         *posargs,
-        env={
-            "IQM_QDMI_BUILD_DIR": "build/docs",
-            "UV_PROJECT_ENVIRONMENT": session.virtualenv.location,
-        },
+        env={**env, "IQM_QDMI_LIVE_DOCS": "1" if args.live else "0"},
     )
 
 

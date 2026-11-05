@@ -15,61 +15,38 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Set the Doxygen configuration file. In the Doxyfile.in file, there are some
-# placeholders that are replaced by CMake. That is also the reason for the
-# extension `.in`. For details see below for the command `configure_file`.
-set(DOXYGEN_CONFIG_FILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+find_package(Doxygen 1.15 REQUIRED)
 
-# Set the input directories for doxygen, i.e., all files that contain source
-# code with documentation.
-set(DOXYGEN_INPUT_DIRS ${PROJECT_BINARY_DIR}/src/include
-                       ${PROJECT_SOURCE_DIR}/include/iqm_qdmi)
-
-# This variable is only needed to setup the dependency tracking of CMake
-# correctly and is not passed to Doxygen. Whenever such a file is modified,
-# CMake detects that change and will rerun the Doxygen command instead of using
-# the cached result when the target `docs` is built.
-
-file(
-  GLOB_RECURSE DOXYGEN_INPUT_FILES
-  ${PROJECT_BINARY_DIR}/src/include/iqm_qdmi/*.h
-  ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.md)
-
-# By default the files are separated by a semicolon. This is not what Doxygen
-# wants, so we replace it with a space.
-string(REPLACE ";" " " DOXYGEN_INPUT_DIRS "${DOXYGEN_INPUT_DIRS}")
-
-# Set the output directory for the generated documentation: Place it in the
-# CMake build directory.
-set(DOXYGEN_OUTPUT_DIR ${PROJECT_SOURCE_DIR}/docs/_build/doxygen)
-
-# Set the Doxygen configured configuration file. This will point to the Doxyfile
-# that is written out by CMake with all placeholders substituted.
-set(DOXYGEN_CONFIG_FILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-
-# Ensure the output directory exists
-file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}/xml)
-
-# Replace variables inside @@ with the current values, e.g., the placeholder
-# @DOXYGEN_INPUT_DIRS@ is replaced by the content of the variable
-# DOXYGEN_INPUT_DIRS.
-configure_file(${DOXYGEN_CONFIG_FILE_IN} ${DOXYGEN_CONFIG_FILE_OUT} @ONLY)
-
-if(${DOXYGEN_EXECUTABLE} STREQUAL "DOXYGEN_EXECUTABLE-NOTFOUND")
-  set(DOXYGEN_EXECUTABLE ${doxygen_BINARY_DIR}/bin/doxygen)
-  message(STATUS "Setting doxygen binary manually to ${DOXYGEN_EXECUTABLE}")
+string(TOLOWER "${QDMI_PREFIX}" _qdmi_prefix)
+set(_device_headers "${PROJECT_BINARY_DIR}/src/include/${_qdmi_prefix}_qdmi")
+if(QDMI_INCLUDE_BUILD_DIR)
+  set(_qdmi_headers "${QDMI_INCLUDE_BUILD_DIR}/qdmi")
+else()
+  set(_qdmi_headers "${qdmi_INCLUDE_DIR}/qdmi")
 endif()
 
-# Create a custom command to run Doxygen
-add_custom_command(
-  OUTPUT ${DOXYGEN_OUTPUT_DIR}/xml/index.xml
-  DEPENDS ${DOXYGEN_INPUT_FILES} ${DOXYGEN_CONFIG_FILE_IN}
-          $<IF:$<TARGET_EXISTS:doxygen>,doxygen,>
-  COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE_OUT}
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Generating API documentation with Doxygen"
-  VERBATIM)
+set(DOXYGEN_PROJECT_NAME "QDMI on IQM")
+set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/_build/doxygen")
+set(DOXYGEN_HTML_OUTPUT cpp)
+set(DOXYGEN_GENERATE_HTML YES)
+set(DOXYGEN_GENERATE_TREEVIEW YES)
+set(DOXYGEN_GENERATE_XML NO)
+set(DOXYGEN_EXTRACT_ALL YES)
+set(DOXYGEN_EXCLUDE "${_device_headers}/constants.h")
+set(DOXYGEN_FILE_PATTERNS *.h *.hpp)
+set(DOXYGEN_FULL_PATH_NAMES NO)
+set(DOXYGEN_STRIP_FROM_PATH "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
+set(DOXYGEN_MACRO_EXPANSION YES)
+set(DOXYGEN_EXPAND_ONLY_PREDEF YES)
+set(DOXYGEN_PREDEFINED "${QDMI_PREFIX}_QDMI_EXPORT=" "QDMI_EXPORT="
+                       "QDMI_DRIVER_EXPORT=")
+set(DOXYGEN_QUIET YES)
+set(DOXYGEN_WARN_AS_ERROR YES)
+set(DOXYGEN_WARN_IF_UNDOCUMENTED NO)
+set(DOXYGEN_WARN_NO_PARAMDOC YES)
 
-# Create a custom target
-add_custom_target(iqm-qdmi-device-docs ALL
-                  DEPENDS ${DOXYGEN_OUTPUT_DIR}/xml/index.xml)
+doxygen_add_docs(
+  ${QDMI_TARGET_NAME}-docs "${_device_headers}" "${_qdmi_headers}"
+  "${PROJECT_SOURCE_DIR}/include/iqm_qdmi"
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+add_dependencies(${QDMI_TARGET_NAME} ${QDMI_TARGET_NAME}-docs)

@@ -1,3 +1,14 @@
 BasedOnStyle: LLVM
 IncludeBlocks: Regroup
+IncludeCategories:
+  # clang-format assigns the matching header priority 0.
+  - Regex: '^"(iqm_qdmi)/'
+    Priority: 1
+  - Regex: '^"(cpr|curl|gmock|gtest|nlohmann|qdmi)/'
+    Priority: 3
+  # Remaining quoted includes are private project headers.
+  - Regex: '^"'
+    Priority: 2
+  - Regex: "^<"
+    Priority: 4
 Standard: c++20

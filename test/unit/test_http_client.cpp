@@ -17,20 +17,22 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+#include "iqm_qdmi/constants.h"
+
 #include "http_client.hpp"
 #include "http_stub.hpp"
-#include "iqm_qdmi/constants.h"
 #include "logging.hpp"
+
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/response.h"
+#include "gtest/gtest.h"
 
 #include <array>
 #include <chrono>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/response.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -381,8 +383,11 @@ TEST(HttpClientTest, BearerTokenIsPassedToHooks) {
 }
 
 TEST(HttpClientTest, PostBorrowsBodyAcrossRetriesWithoutRequestingContinue) {
-  for (const auto &payload : std::array{std::string{}, std::string{"a\0b", 3},
-                                        std::string((1024 * 1024) + 1, 'x')}) {
+  for (const auto &payload : std::array{
+           std::string{},
+           std::string{"a\0b", 3},
+           std::string((1024 * 1024) + 1, 'x'),
+       }) {
     SCOPED_TRACE(payload.size());
     iqm::test_support::HttpStub http_stub;
     http_stub.queue_post(429, "", {{"Retry-After", "1"}}).queue_post(200);
