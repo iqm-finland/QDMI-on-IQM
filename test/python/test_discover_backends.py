@@ -84,24 +84,43 @@ def test_credentials(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.parametrize(
-    "payload", [{}, {"quantum_computers": {}}, {"quantum_computers": [None]}, {"quantum_computers": [{"id": ""}]}]
+    "payload",
+    [
+        {"quantum_computers": [None]},
+        {"quantum_computers": [{"id": ""}]},
+        {"quantum_computers": [{"id": "qc-1"}]},
+        {"quantum_computers": [{"id": "qc-1", "alias": ""}]},
+        {"quantum_computers": [{"id": "qc-1", "alias": 1}]},
+    ],
 )
 def test_inventory_validation(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     """Reject malformed inventories instead of selecting an unintended computer."""
     response = Mock()
     response.json.return_value = payload
     monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
-    with pytest.raises((TypeError, ValueError), match="Expected"):
+    with pytest.raises(ValueError, match="Expected"):
+        discovery.list_quantum_computers("https://server.example", None)
+
+
+@pytest.mark.parametrize("payload", [{}, {"quantum_computers": {}}])
+def test_invalid_inventory_shape(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
+    """Report unexpected inventory types without hiding unrelated TypeErrors."""
+    response = Mock()
+    response.json.return_value = payload
+    monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
+    with pytest.raises(discovery.InvalidServerResponseError, match="Expected"):
         discovery.list_quantum_computers("https://server.example", None)
 
 
 def test_inventory_request(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Send the inventory request with credentials, timeout, and HTTP validation."""
     response = Mock()
-    response.json.return_value = {"quantum_computers": [{"id": "qc-1"}]}
+    response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
     get = Mock(return_value=response)
     monkeypatch.setattr(discovery.requests, "get", get)
-    assert discovery.list_quantum_computers("https://server.example/", EXAMPLE_VALUE) == [{"id": "qc-1"}]
+    assert discovery.list_quantum_computers("https://server.example/", EXAMPLE_VALUE) == [
+        {"id": "qc-1", "alias": "QC 1"}
+    ]
     get.assert_called_once_with(
         "https://server.example/api/v1/quantum-computers", headers={"Authorization": "Bearer example-token"}, timeout=30
     )
@@ -158,7 +177,7 @@ def test_tokens_file(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr(discovery, "list_quantum_computers", listing)
     opened = Mock(side_effect=RuntimeError("Cannot open device"))
     monkeypatch.setattr(discovery, "open_device", opened)
-    with pytest.raises(SystemExit, match="largest available: 0"):
+    with pytest.raises(SystemExit, match="Could not query properties for any of 1 quantum computers"):
         discovery.run_discovery(
             base_url="https://server.example", token=None, tokens_file=str(tokens_file), min_qubits=5
         )
@@ -230,3 +249,51 @@ def test_http_error_redacts_credentials(discovery: ModuleType, monkeypatch: pyte
     with pytest.raises(SystemExit, match="Check the server URL") as exc_info:
         discovery.main()
     assert "secret-token" not in str(exc_info.value)
+
+
+@pytest.mark.parametrize("base_url", ["http://example.com", "http://192.0.2.1"])
+def test_bearer_token_requires_tls(discovery: ModuleType, base_url: str) -> None:
+    """Never send bearer credentials to a non-loopback HTTP endpoint."""
+    with pytest.raises(ValueError, match="HTTPS"):
+        discovery.list_quantum_computers(base_url, EXAMPLE_VALUE)
+
+
+def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow local HTTP test servers without weakening remote token transport."""
+    response = Mock()
+    response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
+    get = Mock(return_value=response)
+    monkeypatch.setattr(discovery.requests, "get", get)
+    discovery.list_quantum_computers("http://127.0.0.1:5000", EXAMPLE_VALUE)
+    get.assert_called_once()
+
+
+def test_validation_error_is_reported(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Keep actionable, safe configuration errors visible to the user."""
+    monkeypatch.setenv("IQM_TOKEN", EXAMPLE_VALUE)
+    monkeypatch.setenv("IQM_TOKENS_FILE", "tokens.json")
+    monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
+    with pytest.raises(SystemExit) as exc_info:
+        discovery.main()
+    assert "Provide only one" in str(exc_info.value)
+    assert "secret-token" not in capsys.readouterr().err
+
+
+def test_invalid_server_response_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Print expected server shape errors without swallowing programming TypeErrors."""
+    response = Mock()
+    response.json.return_value = {}
+    monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
+    monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
+    with pytest.raises(SystemExit, match="Expected a quantum_computers array"):
+        discovery.main()
+
+
+def test_unexpected_type_error_is_not_hidden(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Let programming errors keep their traceback instead of looking like network failures."""
+    monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
+    monkeypatch.setattr(discovery, "run_discovery", Mock(side_effect=TypeError("bug")))
+    with pytest.raises(TypeError, match="bug"):
+        discovery.main()
