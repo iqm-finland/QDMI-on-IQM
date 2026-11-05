@@ -200,7 +200,8 @@ uv run --script examples/discover_backends.py --min-qubits 5
 
 `--base-url` overrides `IQM_SERVER_URL`, then `IQM_BASE_URL`, then the Resonance
 endpoint. Explicit authentication options override environment credentials;
-configure only one authentication source. The script skips computers whose
+configure only one authentication source. Do not embed credentials in the server
+URL; use `--token` or `--tokens-file` instead. The script skips computers whose
 properties cannot be queried and exits with an error if none meets the
 constraint. The separate REST inventory request reads the current access token
 from a tokens file; it does not refresh an expired token.
