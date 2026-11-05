@@ -6,6 +6,8 @@
 - Build: `cmake --build --preset release`
 - Run offline tests: `ctest --preset release`
 - Run a single unit test binary: `./build/release/test/unit/unit_tests`
+- For SDK packaging or installation changes, check the archive build and smoke
+  test in `.github/workflows/cpp-sdk-build.yml` and `test/sdk/smoke_archive.py`.
 - Run live tests only when explicitly intended:
   `ctest --test-dir build/release -L live --output-on-failure`
 - For debug builds, replace the `release` preset with `debug`.
