@@ -443,6 +443,10 @@ uvx nox -s docs
 
 The generated HTML site is written to `docs/_build/html/`.
 
+Documentation builds execute offline examples and cache their outputs. Use
+`uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
+explicit target to execute provider-backed notebooks.
+
 ## Preparing C++ SDK Release Assets
 
 GitHub Releases for this repository are immutable. Build and attach the five C++
@@ -467,10 +471,6 @@ workflow.
 
 The SDK archives are also built as temporary artifacts on relevant PRs. They are
 not uploaded to a Release until the manual preparation workflow succeeds.
-
-Documentation builds execute offline examples and cache their outputs. Use
-`uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
-explicit target to execute provider-backed notebooks.
 
 ## Tips for Development
 
