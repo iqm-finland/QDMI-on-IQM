@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, cast
 
 _IMPORT_ERROR: ImportError | None = None
 try:
-    from qiskit import QuantumCircuit, qpy, transpile
+    from qiskit import qpy, transpile
     from qiskit_algorithms import VQE
     from qiskit_algorithms.optimizers import L_BFGS_B
 
@@ -40,7 +40,9 @@ except ImportError as e:
     _IMPORT_ERROR = e
 
 if TYPE_CHECKING:
-    from qiskit.primitives.containers import BitArray, PrimitiveResult, SamplerPubResult
+    from qiskit.circuit import QuantumCircuit
+    from qiskit.primitives import PrimitiveResult, SamplerPubResult
+    from qiskit.primitives.containers import BitArray
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_algorithms import VQEResult
 

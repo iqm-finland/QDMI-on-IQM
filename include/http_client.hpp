@@ -25,11 +25,12 @@
 
 #include "iqm_qdmi/constants.h"
 
+#include "cpr/bearer.h"
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/response.h"
+
 #include <chrono>
-#include <cpr/bearer.h>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/response.h>
 #include <cstdint>
 #include <functional>
 #include <limits>

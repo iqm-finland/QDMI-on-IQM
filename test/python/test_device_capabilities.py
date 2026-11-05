@@ -36,6 +36,8 @@ from qiskit.compiler import transpile
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 from iqm.qdmi.qiskit import IQMBackend
 
+pytestmark = pytest.mark.live
+
 # The device transports circuit payloads and binary pulse programs.
 BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON, ProgramFormat.CUSTOM1}
 

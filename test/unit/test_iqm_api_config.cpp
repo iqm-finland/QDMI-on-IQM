@@ -19,7 +19,7 @@
 
 #include "iqm_api_config.hpp"
 
-#include <gtest/gtest.h>
+#include "gtest/gtest.h"
 
 TEST(APIConfigTest, UnifiedApiUrl) {
   const iqm::APIConfig config("http://test.url");

@@ -22,11 +22,12 @@
 
 #include "qdmi_client.hpp"
 
+#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/device.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
-#include <iqm_qdmi/constants.h>
-#include <iqm_qdmi/device.h>
 #include <map>
 #include <memory>
 #include <optional>
@@ -259,10 +260,10 @@ auto QDMIClient::get_calibration_set_id() const -> std::string {
   return calibration_set_id;
 }
 
-auto QDMIClient::get_site_index(IQM_QDMI_Site site) const -> uint64_t {
-  uint64_t site_id = 0;
+auto QDMIClient::get_site_index(IQM_QDMI_Site site) const -> size_t {
+  size_t site_id = 0;
   const int ret = IQM_QDMI_device_session_query_site_property(
-      session_, site, QDMI_SITE_PROPERTY_INDEX, sizeof(uint64_t), &site_id,
+      session_, site, QDMI_SITE_PROPERTY_INDEX, sizeof(site_id), &site_id,
       nullptr);
   throw_if_error(ret, "Failed to query the site ID");
   return site_id;

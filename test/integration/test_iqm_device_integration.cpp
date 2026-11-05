@@ -19,7 +19,12 @@
 
 #include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
+
 #include "qdmi_client.hpp"
+
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp" // NOLINT(misc-include-cleaner)
+#include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -28,12 +33,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <map>
-// NOLINTNEXTLINE(misc-include-cleaner)
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -41,6 +42,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -156,7 +158,7 @@ protected:
     auto *const q1 = eligible_single_sites.front();
     const auto q1_name = client.get_site_name(q1);
 
-    auto build_single_qubit = [&] {
+    const auto build_single_qubit = [&] {
       std::ostringstream circuit;
       circuit << R"({"name":"test_circuit","instructions":[)";
       circuit
@@ -290,7 +292,8 @@ protected:
     return build_single_qubit();
   }
 
-  [[nodiscard]] static auto build_qir_test_circuit() -> std::string {
+  [[nodiscard]] static constexpr auto build_qir_test_circuit()
+      -> std::string_view {
     return R"(; ModuleID = 'test_circuit'
 source_filename = "test_circuit"
 
@@ -977,7 +980,8 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
       QDMI_PROGRAM_FORMAT_CUSTOM2,
       QDMI_PROGRAM_FORMAT_CUSTOM3,
       QDMI_PROGRAM_FORMAT_CUSTOM4,
-      QDMI_PROGRAM_FORMAT_CUSTOM5};
+      QDMI_PROGRAM_FORMAT_CUSTOM5,
+  };
 
   for (const auto &unsupported_format : unsupported_formats) {
     EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, unsupported_format, 1,
@@ -1034,14 +1038,19 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
   const auto first_qubit_name = client.get_site_name(qubit_sites[0]);
   const auto second_qubit_name = client.get_site_name(qubit_sites[1]);
   const auto qubit_mapping = std::map<std::string, std::string>{
-      {"alice", first_qubit_name}, {"bob", second_qubit_name}};
+      {"alice", first_qubit_name},
+      {"bob", second_qubit_name},
+  };
   const auto dd_strategy = nlohmann::json{
       {"merge_contiguous_waits", true},
       {"target_qubits", {first_qubit_name, second_qubit_name}},
       {"skip_leading_wait", true},
       {"skip_trailing_wait", true},
-      {"gate_sequences",
-       {{9, "XYXYYXYX", "asap"}, {5, "YXYX", "asap"}, {2, "XX", "center"}}}};
+      {
+          "gate_sequences",
+          {{9, "XYXYYXYX", "asap"}, {5, "YXYX", "asap"}, {2, "XX", "center"}},
+      },
+  };
 
   // Transform the test program and replace the qubit names
   std::ostringstream mapping_program;
@@ -1072,11 +1081,19 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
           {"move_gate_validation", "allow_prx"},
           {"move_gate_frame_tracking", "no_detuning_correction"},
           {"dd_mode", "enabled"},
-          {"qubit_mapping",
-           nlohmann::json::array({{{"logical_name", "alice"},
-                                   {"physical_name", first_qubit_name}},
-                                  {{"logical_name", "bob"},
-                                   {"physical_name", second_qubit_name}}})},
+          {
+              "qubit_mapping",
+              nlohmann::json::array({
+                  {
+                      {"logical_name", "alice"},
+                      {"physical_name", first_qubit_name},
+                  },
+                  {
+                      {"logical_name", "bob"},
+                      {"physical_name", second_qubit_name},
+                  },
+              }),
+          },
           {"max_circuit_duration_over_t2", 0.0},
           {"active_reset_cycles", 1},
           {"dd_strategy", dd_strategy},
@@ -1110,7 +1127,7 @@ TEST_F(QDMIIntegrationTest, OptionalJobParameters) {
 // https://github.com/iqm-finland/QDMI-on-IQM/issues/170.
 TEST_F(QDMIIntegrationTest, DISABLED_JobCycleQIR) {
   constexpr size_t shots_num = 64;
-  const auto qir_program = build_qir_test_circuit();
+  const std::string qir_program{build_qir_test_circuit()};
   auto &job = jobs.emplace_back();
   job = client.submit_job(qir_program, QDMI_PROGRAM_FORMAT_QIRBASESTRING,
                           shots_num);

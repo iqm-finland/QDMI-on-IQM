@@ -78,7 +78,7 @@ public:
 
   [[nodiscard]] auto get_calibration_set_id() const -> std::string;
 
-  [[nodiscard]] auto get_site_index(IQM_QDMI_Site site) const -> uint64_t;
+  [[nodiscard]] auto get_site_index(IQM_QDMI_Site site) const -> size_t;
 
   [[nodiscard]] auto get_site_t1(IQM_QDMI_Site site) const -> uint64_t;
 
