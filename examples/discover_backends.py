@@ -40,6 +40,7 @@ This example queries properties only; it does not submit quantum jobs.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import logging
 import operator
@@ -92,7 +93,7 @@ def validate_base_url(base_url: str) -> str:
     Raises:
         ValueError: If the URL is malformed, unsupported, contains credentials, or has a query or fragment.
     """
-    if "\\" in base_url or any(char.isspace() or ord(char) < 32 for char in base_url):
+    if "\\" in base_url or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in base_url):
         msg = "The server URL must be a valid HTTP or HTTPS URL."
         raise ValueError(msg)
     try:
@@ -102,8 +103,11 @@ def validate_base_url(base_url: str) -> str:
     except ValueError as exc:
         msg = "The server URL must be a valid HTTP or HTTPS URL."
         raise ValueError(msg) from exc
-    if parsed_url.scheme not in {"http", "https"} or not hostname or (port is not None and not 0 < port < 65536):
+    if parsed_url.scheme not in {"http", "https"} or not hostname:
         msg = "The server URL must include an HTTP or HTTPS scheme and a hostname."
+        raise ValueError(msg)
+    if port == 0:
+        msg = "The server URL must use a valid port."
         raise ValueError(msg)
     if parsed_url.username is not None or parsed_url.password is not None:
         msg = "Credentials in server URLs are not supported; use --token or --tokens-file."
@@ -121,13 +125,23 @@ def resolve_credentials(token: str | None, tokens_file: str | None) -> tuple[str
         A token or tokens-file path, with the other source unset.
 
     Raises:
-        ValueError: If both authentication sources are configured.
+        ValueError: If an authentication source is empty or both are configured.
     """
+    if (token is not None and not token) or (tokens_file is not None and not tokens_file):
+        msg = "Authentication options must not be empty."
+        raise ValueError(msg)
     if token or tokens_file:
         resolved_token, resolved_file = token or None, tokens_file or None
     else:
-        resolved_token = os.getenv("IQM_TOKEN") or None
-        resolved_file = os.getenv("IQM_TOKENS_FILE") or None
+        env_token = os.getenv("IQM_TOKEN")
+        env_tokens_file = os.getenv("IQM_TOKENS_FILE")
+        if env_token is not None and not env_token and not env_tokens_file:
+            msg = "IQM_TOKEN must not be empty."
+            raise ValueError(msg)
+        if env_tokens_file is not None and not env_tokens_file and not env_token:
+            msg = "IQM_TOKENS_FILE must not be empty."
+            raise ValueError(msg)
+        resolved_token, resolved_file = env_token or None, env_tokens_file or None
     if resolved_token and resolved_file:
         msg = "Provide only one of --token/$IQM_TOKEN or --tokens-file/$IQM_TOKENS_FILE."
         raise ValueError(msg)
@@ -148,14 +162,26 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
     base_url = validate_base_url(base_url)
     url = base_url.rstrip("/") + "/api/v1/quantum-computers"
     parsed_url = urlsplit(base_url)
-    is_loopback_http = parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1", "::1"}
+    hostname = parsed_url.hostname or ""
+    try:
+        is_loopback = ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        is_loopback = hostname == "localhost"
+    is_loopback_http = parsed_url.scheme == "http" and is_loopback
     if bearer_token and parsed_url.scheme != "https" and not is_loopback_http:
         msg = "Bearer tokens require HTTPS (HTTP is allowed for loopback URLs only)."
         raise ValueError(msg)
     headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
-    response = requests.get(
-        url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
-    )
+    if is_loopback_http:
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.get(
+                url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
+            )
+    else:
+        response = requests.get(
+            url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
+        )
     if 300 <= response.status_code < 400:
         msg_0 = "Redirects are not supported for the server inventory."
         raise requests.HTTPError(msg_0)
