@@ -225,6 +225,7 @@ jobs:
       - slurm-tests
     if: >-
       always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      !contains(needs.*.result, 'abandoned') &&
       needs.change-detection.result == 'success' &&
       (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       fromJSON(needs.change-detection.outputs.run-cpp-tests)
