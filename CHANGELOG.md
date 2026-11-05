@@ -14,9 +14,11 @@ releases may include breaking changes.
 
 - ✨ Discover IQM quantum computers and select the largest matching
   `--min-qubits` with `examples/discover_backends.py`. Bearer tokens require
-  HTTPS except for loopback HTTP. Credentials embedded in server URLs are
-  rejected; empty auth values, query strings and fragments are not allowed, and
-  redirects are rejected ([#146]) ([**@marcelwa**])
+  HTTPS except for loopback HTTP with no nonempty `http_proxy`, `HTTP_PROXY`,
+  `all_proxy`, or `ALL_PROXY` variables set. This check ignores `NO_PROXY`.
+  Credentials embedded in server URLs are rejected; empty auth values, query
+  strings and fragments are not allowed, and inventory redirects are rejected
+  ([#146]) ([**@marcelwa**])
 
 ### Changed
 

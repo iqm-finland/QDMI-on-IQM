@@ -68,6 +68,10 @@ class InvalidServerResponseError(TypeError):
     """The IQM Server returned a response with an unexpected type or shape."""
 
 
+class InventoryRedirectError(requests.HTTPError):
+    """The IQM Server inventory endpoint redirected instead of returning data."""
+
+
 class _PreserveAuthorizationHeader(requests.auth.AuthBase):
     """Prevent Requests from replacing an explicit Authorization header with netrc credentials."""
 
@@ -81,7 +85,9 @@ def resolve_base_url(base_url: str | None) -> str:
     Returns:
         The explicit URL, environment URL, or Resonance endpoint.
     """
-    return validate_base_url(base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or _DEFAULT_BASE_URL)
+    if base_url is not None:
+        return validate_base_url(base_url)
+    return validate_base_url(os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or _DEFAULT_BASE_URL)
 
 
 def validate_base_url(base_url: str) -> str:
@@ -155,7 +161,7 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
         The raw `quantum_computers` entries reported by the server.
 
     Raises:
-        requests.HTTPError: If the inventory endpoint redirects or returns an unsuccessful response.
+        InventoryRedirectError: If the inventory endpoint redirects.
         InvalidServerResponseError: If the response has an unexpected type or shape.
         ValueError: If an inventory entry is malformed or a bearer token would be sent over cleartext HTTP.
     """
@@ -171,6 +177,13 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
     if bearer_token and parsed_url.scheme != "https" and not is_loopback_http:
         msg = "Bearer tokens require HTTPS (HTTP is allowed for loopback URLs only)."
         raise ValueError(msg)
+    if (
+        bearer_token
+        and is_loopback_http
+        and any(value for name, value in os.environ.items() if name.lower() in {"http_proxy", "all_proxy"})
+    ):
+        msg = "Bearer tokens with loopback HTTP are not supported when HTTP_PROXY or ALL_PROXY is set."
+        raise ValueError(msg)
     headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
     if is_loopback_http:
         with requests.Session() as session:
@@ -183,8 +196,8 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
             url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
         )
     if 300 <= response.status_code < 400:
-        msg_0 = "Redirects are not supported for the server inventory."
-        raise requests.HTTPError(msg_0)
+        msg = "Redirects are not supported for the server inventory."
+        raise InventoryRedirectError(msg)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict) or not isinstance(data.get("quantum_computers"), list):
@@ -360,6 +373,8 @@ def main() -> None:
             tokens_file=args.tokens_file,
             min_qubits=args.min_qubits,
         )
+    except InventoryRedirectError as exc:
+        sys.exit(f"Discovery failed: {exc}")
     except (requests.RequestException, OSError) as exc:
         sys.exit(f"Discovery failed ({type(exc).__name__}). Check the server URL and authentication settings.")
     except (InvalidServerResponseError, ValueError) as exc:

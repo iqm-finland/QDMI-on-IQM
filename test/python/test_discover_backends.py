@@ -25,7 +25,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 import requests
@@ -66,6 +66,13 @@ def test_base_url_precedence(discovery: ModuleType, monkeypatch: pytest.MonkeyPa
     assert discovery.resolve_base_url("https://explicit.example") == "https://explicit.example"
 
 
+def test_empty_explicit_base_url_is_rejected(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not route credentials to a fallback server when --base-url is empty."""
+    monkeypatch.setenv("IQM_SERVER_URL", "https://server.example")
+    with pytest.raises(ValueError, match="HTTP or HTTPS scheme and a hostname"):
+        discovery.resolve_base_url("")
+
+
 def test_credentials(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Resolve one authentication source and reject conflicting sources."""
     assert discovery.resolve_credentials(None, None) == (None, None)
@@ -99,7 +106,7 @@ def test_empty_explicit_credentials_are_rejected(
 def test_empty_environment_credentials_are_rejected(
     discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
-    """Keep empty environment credentials from diverging from the native driver."""
+    """Reject empty environment credentials instead of treating them as unset."""
     monkeypatch.setenv(name, "")
     with pytest.raises(ValueError, match="must not be empty"):
         discovery.resolve_credentials(None, None)
@@ -134,7 +141,7 @@ def test_invalid_inventory_shape(discovery: ModuleType, monkeypatch: pytest.Monk
         discovery.list_quantum_computers("https://server.example", None)
 
 
-def test_inventory_request(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_inventory_request(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Send the inventory request with credentials, timeout, and HTTP validation."""
     response = Mock(status_code=200)
     response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
@@ -155,6 +162,19 @@ def test_inventory_request(discovery: ModuleType, monkeypatch: pytest.MonkeyPatc
     request.headers = {"Authorization": "Bearer example-token"}
     assert auth(request) is request
     assert request.headers["Authorization"] == "Bearer example-token"
+    netrc = tmp_path / "netrc"
+    netrc.write_text("machine server.example login user password netrc-token\n", encoding="utf-8")
+    monkeypatch.setenv("NETRC", str(netrc))
+    session = discovery.requests.Session()
+    prepared = session.prepare_request(
+        discovery.requests.Request(
+            "GET",
+            "https://server.example/api/v1/quantum-computers",
+            headers={"Authorization": "Bearer example-token"},
+            auth=auth,
+        )
+    )
+    assert prepared.headers["Authorization"] == "Bearer example-token"
     response.raise_for_status.assert_called_once_with()
     response.raise_for_status.side_effect = requests.HTTPError("Unauthorized")
     with pytest.raises(requests.HTTPError):
@@ -165,7 +185,7 @@ def test_inventory_redirect_is_rejected(discovery: ModuleType, monkeypatch: pyte
     """Do not send the explicit auth header to a redirect target."""
     response = Mock(status_code=302)
     monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
-    with pytest.raises(requests.HTTPError, match="Redirects are not supported"):
+    with pytest.raises(discovery.InventoryRedirectError, match="Redirects are not supported"):
         discovery.list_quantum_computers("https://server.example", EXAMPLE_VALUE)
 
 
@@ -242,7 +262,7 @@ def test_empty_inventory(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch)
 def test_calibration_summaries(discovery: ModuleType) -> None:
     """Average only available calibration metrics and preserve missing data."""
     device = Mock(spec=Device)
-    operation = Mock()
+    operation = Mock(spec=Device.Operation)
     operation.name.return_value = "cz"
     operation.site_pairs.return_value = [(1, 2), (2, 3), (3, 4)]
     operation.fidelity.side_effect = [0.9, None, 1.0]
@@ -250,7 +270,7 @@ def test_calibration_summaries(discovery: ModuleType) -> None:
     assert discovery.calibration_summary(device) == "'cz' mean 2-qubit fidelity 0.9500 over 2 pair(s)"
     device.operations.return_value = []
     assert discovery.calibration_summary(device) == "no two-qubit gate fidelity exposed by the device"
-    sites = [Mock(), Mock()]
+    sites = [Mock(spec=Device.Site), Mock(spec=Device.Site)]
     sites[0].t1.return_value, sites[0].t2.return_value = 100, None
     sites[1].t1.return_value, sites[1].t2.return_value = None, 80
     device.regular_sites.return_value = sites
@@ -355,9 +375,9 @@ def test_base_url_requires_http_scheme_and_host(discovery: ModuleType, base_url:
         ("https://example.com:65536", "valid HTTP or HTTPS URL"),
         ("https://example.com/path with spaces", "valid HTTP or HTTPS URL"),
         (" https://example.com", "valid HTTP or HTTPS URL"),
-        ("https://example.com\\tpath", "valid HTTP or HTTPS URL"),
-        ("https://example.com\\npath", "valid HTTP or HTTPS URL"),
-        ("https://example.com\\x7fpath", "valid HTTP or HTTPS URL"),
+        ("https://example.com\tpath", "valid HTTP or HTTPS URL"),
+        ("https://example.com\npath", "valid HTTP or HTTPS URL"),
+        ("https://example.com\x7fpath", "valid HTTP or HTTPS URL"),
         (r"https:\\example.com", "valid HTTP or HTTPS URL"),
         ("https://example.com?token=secret", "query or fragment"),
         ("https://example.com?", "query or fragment"),
@@ -385,15 +405,70 @@ def test_bearer_token_requires_tls(discovery: ModuleType, base_url: str) -> None
 )
 def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, base_url: str) -> None:
     """Allow loopback HTTP directly without sending tokens to environment proxies."""
+    for name in ("http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"):
+        monkeypatch.delenv(name, raising=False)
     response = Mock(status_code=200)
     response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
-    session = Mock()
+    session = MagicMock()
     session.__enter__.return_value = session
     session.get.return_value = response
     monkeypatch.setattr(discovery.requests, "Session", Mock(return_value=session))
     discovery.list_quantum_computers(base_url, EXAMPLE_VALUE)
     assert session.trust_env is False
     session.get.assert_called_once()
+    assert session.get.call_args.kwargs["headers"] == {"Authorization": "Bearer example-token"}
+    assert isinstance(session.get.call_args.kwargs["auth"], discovery.requests.auth.AuthBase)
+    assert session.get.call_args.kwargs["allow_redirects"] is False
+    assert session.get.call_args.kwargs["timeout"] == 30
+
+
+@pytest.mark.parametrize("proxy_name", ["http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"])
+def test_loopback_http_with_environment_proxy_is_rejected(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, proxy_name: str
+) -> None:
+    """Do not pass loopback bearer credentials to the native driver's proxy."""
+    monkeypatch.setenv(proxy_name, "http://proxy.example:8080")
+    get = Mock()
+    monkeypatch.setattr(discovery.requests, "get", get)
+    with pytest.raises(ValueError, match="HTTP_PROXY or ALL_PROXY is set"):
+        discovery.list_quantum_computers("http://127.0.0.1:5000", EXAMPLE_VALUE)
+    get.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("token", "proxy_name", "proxy_value"),
+    [(None, "HTTP_PROXY", "http://proxy.example:8080"), (EXAMPLE_VALUE, "ALL_PROXY", "")],
+)
+def test_loopback_http_without_effective_proxy_or_token_is_allowed(
+    discovery: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    token: str | None,
+    proxy_name: str,
+    proxy_value: str,
+) -> None:
+    """Allow unauthenticated loopback or empty proxy variables."""
+    for name in ("http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(proxy_name, proxy_value)
+    response = Mock(status_code=200)
+    response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
+    session = MagicMock()
+    session.__enter__.return_value = session
+    session.get.return_value = response
+    monkeypatch.setattr(discovery.requests, "Session", Mock(return_value=session))
+    discovery.list_quantum_computers("http://127.0.0.1:5000", token)
+    session.get.assert_called_once()
+
+
+def test_https_token_allows_environment_proxy(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep proxy support for token-authenticated HTTPS requests."""
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.example:8080")
+    response = Mock(status_code=200)
+    response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
+    get = Mock(return_value=response)
+    monkeypatch.setattr(discovery.requests, "get", get)
+    discovery.list_quantum_computers("https://server.example", EXAMPLE_VALUE)
+    get.assert_called_once()
 
 
 def test_validation_error_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -405,6 +480,18 @@ def test_validation_error_is_reported(discovery: ModuleType, monkeypatch: pytest
         discovery.main()
     assert "Provide only one" in str(exc_info.value)
     assert EXAMPLE_VALUE not in str(exc_info.value)
+
+
+def test_redirect_error_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Show the user why an inventory redirect failed."""
+    monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
+    monkeypatch.setattr(
+        discovery,
+        "run_discovery",
+        Mock(side_effect=discovery.InventoryRedirectError("Redirects are not supported for the server inventory.")),
+    )
+    with pytest.raises(SystemExit, match="Redirects are not supported"):
+        discovery.main()
 
 
 def test_invalid_server_response_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:

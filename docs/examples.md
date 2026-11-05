@@ -192,7 +192,11 @@ queries properties without submitting jobs.
 
 Set `IQM_TOKEN` or `IQM_TOKENS_FILE`, then run. Prefer these environment
 variables over `--token`, which may appear in process listings. Bearer tokens
-require an HTTPS endpoint; loopback HTTP is allowed for local testing.
+require an HTTPS endpoint; loopback HTTP is allowed for local testing. For
+token-authenticated loopback HTTP, the script conservatively rejects any
+nonempty `http_proxy`, `HTTP_PROXY`, `all_proxy`, or `ALL_PROXY` environment
+variable. It does not account for `NO_PROXY`, so it may reject a connection that
+libcurl would send directly.
 
 ```console
 uv run --script examples/discover_backends.py --min-qubits 5
