@@ -83,19 +83,26 @@ def validate_base_url(base_url: str) -> str:
         The validated URL.
 
     Raises:
-        ValueError: If the URL is malformed, unsupported, or contains credentials.
+        ValueError: If the URL is malformed, unsupported, contains credentials, or has a query or fragment.
     """
     try:
         parsed_url = urlsplit(base_url)
         hostname = parsed_url.hostname
+        port = parsed_url.port
     except ValueError as exc:
         msg = "The server URL must be a valid HTTP or HTTPS URL."
         raise ValueError(msg) from exc
-    if parsed_url.scheme not in {"http", "https"} or not hostname:
+    if parsed_url.scheme not in {"http", "https"} or not hostname or (port is not None and not 0 < port < 65536):
         msg = "The server URL must include an HTTP or HTTPS scheme and a hostname."
         raise ValueError(msg)
     if parsed_url.username is not None or parsed_url.password is not None:
         msg = "Credentials in server URLs are not supported; use --token or --tokens-file."
+        raise ValueError(msg)
+    if parsed_url.query or parsed_url.fragment or "?" in base_url or "#" in base_url:
+        msg = "The server URL must not include a query or fragment."
+        raise ValueError(msg)
+    if "\\" in base_url or any(char.isspace() or ord(char) < 32 for char in base_url):
+        msg = "The server URL must be a valid HTTP or HTTPS URL."
         raise ValueError(msg)
     return base_url
 
@@ -217,7 +224,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
     """
     resolved_base_url = resolve_base_url(base_url)
     server = urlsplit(resolved_base_url)
-    safe_base_url = f"{server.scheme}://{server.netloc.rsplit('@', 1)[-1]}"
+    safe_base_url = f"{server.scheme}://{server.netloc}"
     log.info("Discovering quantum computers available at '%s'...", safe_base_url)
     token, tokens_file = resolve_credentials(token, tokens_file)
     bearer_token = token
@@ -234,7 +241,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
     log.info("Found %d quantum computer(s):", len(quantum_computers))
     for qc in quantum_computers:
         log.info(
-            "  - id=%s alias=%s display_name=%s",
+            "  - id=%r alias=%r display_name=%r",
             qc.get("id"),
             qc.get("alias"),
             qc.get("display_name"),
@@ -243,7 +250,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
     candidates: list[tuple[str, int, str]] = []
     for qc in quantum_computers:
         name = qc["alias"]
-        log.info("Querying properties of '%s'...", name)
+        log.info("Querying properties of %r...", name)
         try:
             device = open_device(
                 IQM_QDMI_DEVICE_ID,
@@ -257,9 +264,9 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
             quality = calibration_summary(device)
             coherence = coherence_summary(device)
         except (RuntimeError, ValueError) as exc:
-            log.warning("Skipping '%s': failed to query device properties (%s).", name, type(exc).__name__)
+            log.warning("Skipping %r: failed to query device properties (%s).", name, type(exc).__name__)
             continue
-        log.info("  '%s': status=%s, %d qubits, %s, %s", name, status, qubits, quality, coherence)
+        log.info("  %r: status=%s, %d qubits, %s, %s", name, status, qubits, quality, coherence)
         candidates.append((name, qubits, quality))
 
     if not candidates:
@@ -272,7 +279,7 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
 
     selected_alias, selected_qubits, selected_quality = max(matching, key=operator.itemgetter(1))
     log.info(
-        "Selected '%s': %d qubits (>= --min-qubits=%d), %s",
+        "Selected %r: %d qubits (>= --min-qubits=%d), %s",
         selected_alias,
         selected_qubits,
         min_qubits,
