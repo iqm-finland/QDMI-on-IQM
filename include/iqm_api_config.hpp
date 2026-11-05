@@ -55,6 +55,11 @@ enum class API_ENDPOINT : uint8_t {
   SUBMIT_CALIBRATION_JOB,
   GET_CALIBRATION_JOB_STATUS,
   ABORT_CALIBRATION_JOB,
+
+  // Iteration management endpoints
+  CREATE_ITERATION,
+  GET_ITERATION,
+  END_ITERATION,
 };
 
 /**

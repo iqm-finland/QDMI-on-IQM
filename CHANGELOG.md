@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Standalone IQM iteration creation, inspection, and explicit ending, with
+  bounded requests and separate lifecycle validation. ([#326]) ([**@marcelwa**])
+
 ### Changed
 
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
@@ -350,6 +355,7 @@ Compatible with QDMI `v1.3.0`.
 <!-- PR links -->
 
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
 [#306]: https://github.com/iqm-finland/QDMI-on-IQM/pull/306

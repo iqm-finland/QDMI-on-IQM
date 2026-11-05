@@ -19,7 +19,10 @@ jobs:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     with:
       additional-cpp-files: |
+        .github/workflows/CI.yml
         .github/workflows/cpp-*.yml
+        .github/workflows/iteration-validation.yml
+        test/iteration/**
         .github/workflows/live-tests.yml
       additional-python-files: |
         .github/workflows/live-tests.yml
@@ -217,6 +220,21 @@ jobs:
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 
+  iteration-validation:
+    name: 🔁 Iteration lifecycle
+    needs:
+      - change-detection
+      - live-tests
+    if: >-
+      always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      !contains(needs.*.result, 'abandoned') &&
+      needs.change-detection.result == 'success' && needs.live-tests.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    uses: $/.github/workflows/iteration-validation.yml
+    secrets:
+      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
+
   required-checks-pass:
     name: 🚦 Check
     needs:
@@ -236,12 +254,20 @@ jobs:
       - build-wheel
       - documentation
       - live-tests
+      - iteration-validation
     if: always()
     runs-on: ubuntu-slim
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           allowed-skips: >-
+            ${{
+              needs.change-detection.result == 'success'
+              && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+              && !contains(needs.*.result, 'abandoned')
+              && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository || !fromJSON(needs.change-detection.outputs.run-cpp-tests))
+              && 'iteration-validation,' || ''
+            }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
               && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-install-tests,' || ''
