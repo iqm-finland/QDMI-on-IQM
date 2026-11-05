@@ -85,6 +85,9 @@ def validate_base_url(base_url: str) -> str:
     Raises:
         ValueError: If the URL is malformed, unsupported, contains credentials, or has a query or fragment.
     """
+    if "\\" in base_url or any(char.isspace() or ord(char) < 32 for char in base_url):
+        msg = "The server URL must be a valid HTTP or HTTPS URL."
+        raise ValueError(msg)
     try:
         parsed_url = urlsplit(base_url)
         hostname = parsed_url.hostname
@@ -100,9 +103,6 @@ def validate_base_url(base_url: str) -> str:
         raise ValueError(msg)
     if parsed_url.query or parsed_url.fragment or "?" in base_url or "#" in base_url:
         msg = "The server URL must not include a query or fragment."
-        raise ValueError(msg)
-    if "\\" in base_url or any(char.isspace() or ord(char) < 32 for char in base_url):
-        msg = "The server URL must be a valid HTTP or HTTPS URL."
         raise ValueError(msg)
     return base_url
 
