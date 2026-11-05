@@ -81,6 +81,7 @@ iqm-sampler = "iqm.qdmi.sampler:main"
 
 [dependency-groups]
 dev = [
+  { include-group = "build" },
   { include-group = "test" },
   "nox>=2026.4.10",
 ]
@@ -93,7 +94,7 @@ test = [
   { include-group = "qiskit" },
 ]
 docs = [
-  "breathe>=4.36",
+  { include-group = "qiskit" },
   "furo>=2025.12.19",
   "myst-nb>=1.4",
   "sphinx>=9",
@@ -102,6 +103,7 @@ docs = [
   "sphinx-design>=0.7",
   "sphinx-llm>=1",
 ]
+build = [ "scikit-build-core>=1.1" ]
 qiskit = [
   "mqt-core~=4.1.1",
   "numpy>=2.1",
@@ -169,22 +171,15 @@ iqm-qdmi = { workspace = true }
 [tool.cibuildwheel]
 build = "cp3*"
 test-skip = [
+  "*-win_arm64",   # no Windows ARM64 wheels for qiskit and dependencies
   "cp3??t-*",      # no freethreading qiskit wheels
-  "cp*-win_arm64", # no numpy, qiskit, ... wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
 ]
 archs = "auto64"
 build-frontend = "uv"
-environment-pass = [
-  "IQM_BASE_URL",
-  "IQM_QC_ALIAS",
-  "IQM_TOKEN",
-  "IQM_LOG_LEVEL",
-  "IQM_CPP_API_LOG_LEVEL",
-]
 test-command = "pytest test/python"
 test-groups = [ "test" ]
-test-sources = [ "test/python" ]
+test-sources = [ "test/python", "pyproject.toml" ]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
@@ -231,7 +226,6 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
-per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true
@@ -282,6 +276,8 @@ allowed-unresolved-imports = [ "mqt.bench.**", "qiskit_nature.**", "qiskit_algor
 
 [tool.pytest]
 addopts = [
+  "-m",
+  "not live",
   "-ra",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
@@ -293,8 +289,10 @@ filterwarnings = [
   "ignore:.*Unknown solver options.*::",
   # UserWarning for unmapped operations
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
+  "ignore:.*Device operation 'measure_012' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
+markers = [ "live: explicit provider access" ]
 minversion = "9.0"
 strict = true
 testpaths = [ "test/python" ]

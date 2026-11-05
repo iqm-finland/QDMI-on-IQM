@@ -125,9 +125,9 @@ def qiskit_to_iqm_json(circuit: QuantumCircuit, backend: QDMIBackend) -> str:
         JSON string representation of the circuit in IQM format.
 
     Raises:
-        UnsupportedOperationError: If the circuit contains operations not supported
-            by IQM hardware.
-        TranslationError: If the serialization fails.
+        mqt.core.plugins.qiskit.exceptions.UnsupportedOperationError: If the circuit
+            contains operations not supported by IQM hardware.
+        mqt.core.plugins.qiskit.exceptions.TranslationError: If the serialization fails.
 
     Examples:
         >>> from qiskit import QuantumCircuit

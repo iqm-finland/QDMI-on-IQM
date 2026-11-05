@@ -8,16 +8,15 @@ permissions: {}
 
 jobs:
   build-sdist:
-    name: 🐍 Packaging
-    uses: $/.github/workflows/python-packaging-sdist.yml
+    name: 🚀 CD
     permissions:
       contents: read
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
 
-  # Builds wheels on all supported platforms using cibuildwheel.
-  # The wheels are uploaded as GitHub artifacts `dev-cibw-*` or `cibw-*`, depending on whether
-  # the workflow is triggered from a PR or a release, respectively.
   build-wheel:
-    name: 🐍 Packaging
+    name: 🚀 CD
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -29,35 +28,32 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
-    uses: $/.github/workflows/python-packaging-cibuildwheel.yml
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
     with:
       runs-on: ${{ matrix.runs-on }}
-    secrets:
-      IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
-    permissions:
-      contents: read
 
-  # Downloads the previously generated artifacts and deploys to PyPI on published releases.
   deploy:
+    name: 🚀 Publish
+    needs: [build-sdist, build-wheel]
     if: github.event_name == 'release' && github.event.action == 'published'
-    name: 🚀 Deploy to PyPI
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/iqm-qdmi
-    needs: [build-sdist, build-wheel]
-    permissions:
-      attestations: write # Needed to attest the built artifacts
-      contents: read
-      id-token: write # Needed to attest and to publish to PyPI
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cibw-*
           path: dist
           merge-multiple: true
-      - name: Generate artifact attestation for sdist and wheel(s)
+
+      - name: Generate artifact attestation for sdist and wheels
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*
+
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

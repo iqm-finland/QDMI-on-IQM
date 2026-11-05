@@ -4,6 +4,7 @@ kernelspec:
   name: python3
 language_info:
   name: python
+  pygments_lexer: ipython3
 mystnb:
   number_source_lines: true
 ---
@@ -111,9 +112,8 @@ returns it in results.
 
 ## Sampler and Estimator Primitives
 
-{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
-{py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and
-{py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing
+{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see `sampler()`
+and `estimator()`) for constructing
 {py:class}`~qiskit.primitives.BackendSamplerV2` and
 {py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
 backend instance.

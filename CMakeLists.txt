@@ -33,10 +33,6 @@ endif()
 option(USE_INSTALLED_IQM_QDMI_DEVICE
        "Use an installed version of the IQM QDMI Device to build tests" OFF)
 
-if(USE_INSTALLED_IQM_QDMI_DEVICE)
-  find_package(iqm-qdmi-device REQUIRED ${PROJECT_VERSION})
-endif()
-
 # Generate compile_commands.json to make it easier to work with clang based
 # tools
 set(CMAKE_EXPORT_COMPILE_COMMANDS
@@ -58,8 +54,16 @@ endif()
 
 option(BUILD_IQM_QDMI_TESTS "Build tests for the IQM QDMI device"
        ${IQM_QDMI_MASTER_PROJECT})
-option(BUILD_IQM_QDMI_DOCS "Build documentation for the IQM QDMI device" OFF)
+option(BUILD_IQM_QDMI_DOCS "Build API documentation" OFF)
 option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+
+if(BUILD_IQM_QDMI_DOCS AND USE_INSTALLED_IQM_QDMI_DEVICE)
+  message(FATAL_ERROR "Documentation requires a source build")
+endif()
+
+if(USE_INSTALLED_IQM_QDMI_DEVICE)
+  find_package(iqm-qdmi-device REQUIRED ${PROJECT_VERSION})
+endif()
 
 # Configure runtime sanitizers. This has to happen before the external
 # dependencies are declared so that they are instrumented as well.

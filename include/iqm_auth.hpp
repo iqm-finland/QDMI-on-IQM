@@ -23,7 +23,8 @@
 
 #pragma once
 
-#include <cpr/bearer.h>
+#include "cpr/bearer.h"
+
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
