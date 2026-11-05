@@ -238,6 +238,7 @@ def circuit() -> QuantumCircuit:
     return circuit
 
 
+@pytest.mark.live
 def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """Test the execution of a simple Bell state circuit."""
     circuit.measure_all()
@@ -247,6 +248,7 @@ def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.live
 def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound sampler should execute a simple circuit on the live IQM backend."""
     circuit.measure_all()
@@ -256,6 +258,7 @@ def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> No
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.live
 def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound estimator should execute a simple observable on the live IQM backend."""
     observable = SparsePauliOp("Z" * backend.num_qubits)

@@ -25,9 +25,12 @@
 
 #include "logging.hpp"
 
+#include "cpr/bearer.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
+
 #include <algorithm>
 #include <array>
-#include <cpr/bearer.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -35,8 +38,6 @@
 #include <exception>
 #include <fstream>
 #include <map>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <sstream>
@@ -84,7 +85,8 @@ std::string Base64_decode(const std::string &encoded_string) {
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1};
+      -1, -1, -1, -1,
+  };
 
   size_t i = 0;
   size_t j = 0;
@@ -116,16 +118,17 @@ std::string Base64_decode(const std::string &encoded_string) {
             : static_cast<uint32_t>(DECODE_TABLE[static_cast<unsigned char>(
                   encoded_string[i + 3])]);
 
-    triple = (sextet_a << 18) + (sextet_b << 12) + (sextet_c << 6) + sextet_d;
+    triple =
+        (sextet_a << 18U) + (sextet_b << 12U) + (sextet_c << 6U) + sextet_d;
 
     if (j < outlen) {
-      decoded[j++] = (triple >> 16) & 0xFF;
+      decoded[j++] = (triple >> 16U) & 0xFFU;
     }
     if (j < outlen) {
-      decoded[j++] = (triple >> 8) & 0xFF;
+      decoded[j++] = (triple >> 8U) & 0xFFU;
     }
     if (j < outlen) {
-      decoded[j++] = triple & 0xFF;
+      decoded[j++] = triple & 0xFFU;
     }
   }
 
@@ -150,7 +153,7 @@ std::string Read_access_token_from_file(const std::string &path) {
 
     std::stringstream buffer;
     buffer << file.rdbuf();
-    auto json_data = nlohmann::json::parse(buffer.str());
+    const auto json_data = nlohmann::json::parse(buffer.str());
 
     const std::string token = json_data.value("access_token", "");
     if (TokenManager::time_left_seconds(token) <= 0) {

@@ -178,50 +178,30 @@ Building the project requires a C++20-capable C++ compiler and
 [CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
 development package.
 
-CI runs the native integration tests and documentation notebooks with
-`IQM_TOKEN`. Set valid IQM credentials before running these checks locally. The
-Slurm smoke test submits eight shots per installation mode to the Emerald
-Resonance mock.
+CI runs offline C++ and Python checks separately from authenticated Resonance
+mock tests. Fork PRs stay offline. Wheel and release builds need no IQM
+credentials, and ordinary CI does not execute on a QPU.
 
 ### Configure and Build
 
-This project uses CMake as the main build configuration tool. Building a project
-using CMake is a two-stage process. First, CMake needs to be _configured_ by
-calling:
+Use the `release`, `debug`, `coverage` and Linux `sanitizers` CMake presets for
+native checks; `lint` prepares static analysis. Each preset has its own build
+directory:
 
 ```console
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
 ```
 
-This tells CMake to:
+Run the offline installation check with `cmake -P test/install.cmake`. It builds
+and installs the device, relocates the installation and tests a separate C
+consumer without accessing IQM. CI includes this check on Linux x86 and ARM,
+macOS and Windows.
 
-- search the current directory `.` (passed via `-S`) for a `CMakeLists.txt`
-  file,
-- process it into a directory `build` (passed via `-B`),
-- configure a `Release` build (passed via `-DCMAKE_BUILD_TYPE`) as opposed to,
-  e.g., a `Debug` build, and
-- enable building the tests (passed via `-DBUILD_IQM_QDMI_TESTS=ON`).
-
-Additional useful flags:
-
-- `-DIQM_QDMI_COVERAGE=ON` to enable code coverage support
-
-After configuring with CMake, the project can be built by calling:
-
-```console
-cmake --build build --config Release
-```
-
-This builds the project in the `build` directory (passed via `--build`). Some
-operating systems and development environments explicitly require a
-configuration to be set, which is why the `--config` flag is also passed to the
-build command. The flag `--parallel <NUMBER_OF_THREADS>` may be added to trigger
-a parallel build.
-
-Building the project this way generates:
-
-- the main project libraries in the `build/src` directory and
-- some test executables in the `build/test` directory.
+The library and test executables are written under `build/release/`. Use
+`cmake --build --preset release --parallel <NUMBER_OF_THREADS>` for a parallel
+build. Windows CI checks MSVC in both Release and Debug configurations.
 
 :::{note}
 This project uses CMake's
@@ -253,21 +233,20 @@ the code and not just exercise the code paths.
 To run the tests, use CMake's test runner
 [CTest](https://cmake.org/cmake/help/latest/manual/ctest.1.html):
 
-**Running all tests:**
+**Running offline tests:**
 
 ```console
-ctest -C Release --test-dir build --output-on-failure
+ctest --preset release
 ```
 
 **Running only unit tests (no hardware required):**
 
 ```console
-ctest -C Release --test-dir build/test/unit --output-on-failure
+ctest --test-dir build/release/test/unit --output-on-failure
 ```
 
-The integration tests also carry the `integration` CTest label, so
-`ctest -C Release --test-dir build -LE integration --output-on-failure` selects
-the same offline subset from the top-level build directory.
+Provider-access tests carry the `live` CTest label, which normal test presets
+exclude.
 
 **Running integration tests (requires IQM access):**
 
@@ -275,24 +254,30 @@ Before running the integration tests, make sure you have set the necessary
 environment variables:
 
 ```console
-export IQM_SERVER_URL="https://desired-iqm-server.com"
+export IQM_BASE_URL="https://resonance.iqm.tech"
+export IQM_QUANTUM_COMPUTER="emerald:mock"
 export IQM_TOKEN="your-api-key"
-ctest -C Release --test-dir build/test/integration --output-on-failure
+ctest --test-dir build/release -L live --output-on-failure
 ```
 
 **Generating code coverage:**
 
-To generate a code coverage report, configure the project with
-`-DIQM_QDMI_COVERAGE=ON`, build, run the tests, and then use `lcov`:
+On Linux, use the coverage preset to instrument the native implementation and
+run offline tests:
 
 ```console
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_IQM_QDMI_TESTS=ON -DIQM_QDMI_COVERAGE=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-lcov --capture --directory build --output-file coverage.info
-lcov --remove coverage.info '/usr/*' '*/test/*' '*/build/_deps/*' --output-file coverage.info
-lcov --list coverage.info
+cmake --preset coverage
+cmake --build --preset coverage
+ctest --preset coverage
 ```
+
+Collect Python coverage locally with:
+
+```console
+uvx nox -s tests-3.14 -- --cov --cov-report=xml:coverage.xml
+```
+
+Coverage checks stay offline and do not include live IQM tests.
 
 **Running the tests under sanitizers:**
 
@@ -307,7 +292,7 @@ list:
 ```console
 cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DIQM_QDMI_SANITIZERS="address;undefined"
 cmake --build build-sanitizers
-ctest --test-dir build-sanitizers --output-on-failure
+ctest --test-dir build-sanitizers -LE live --output-on-failure
 ```
 
 Use a build directory separate from your regular one: the flags apply to the
@@ -402,14 +387,18 @@ dependency versions for a specific Python version.
 uvx nox -s minimums-3.14
 ```
 
+Normal and minimum-version sessions exclude `live` tests, including in a
+credentialed shell. `uvx nox -s live-tests` requires credentials and an explicit
+`IQM_QUANTUM_COMPUTER` mock selector.
+
 ### Running the Python examples
 
 Run the full example suite via the dedicated nox session before opening or
 updating a PR:
 
 ```console
-uvx nox -s examples -- --backend sim  # simulator (no IQM access required)
-uvx nox -s examples                   # real IQM hardware
+uvx nox -s examples                   # local simulation
+uvx nox -s examples -- --backend iqm  # explicit live IQM access
 ```
 
 For a walkthrough of each example, environment setup, and CLI options, see the
@@ -421,9 +410,10 @@ If you touch one of these examples, update the corresponding documentation in
 ## Working on the Documentation
 
 The documentation is written in [Markdown](https://www.markdownguide.org/) and
-built with Sphinx + MyST, using Doxygen XML via Breathe for the C/C++ API and
-AutoAPI for the Python package. The documentation source files can be found in
-the `docs/` directory.
+built with Sphinx + MyST, using Doxygen for the C/C++ API and AutoAPI for the
+Python package. The documentation source files are in `docs/`.
+
+Install Doxygen 1.15 or newer on `PATH` to build the API reference.
 
 ### Writing Documentation
 
@@ -477,6 +467,10 @@ workflow.
 
 The SDK archives are also built as temporary artifacts on relevant PRs. They are
 not uploaded to a Release until the manual preparation workflow succeeds.
+
+Documentation builds execute offline examples and cache their outputs. Use
+`uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
+explicit target to execute provider-backed notebooks.
 
 ## Tips for Development
 

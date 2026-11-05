@@ -86,10 +86,9 @@ any binary or wheel.
 
 | Dependency          | Version    | License      | Purpose                                                 |
 | :------------------ | :--------- | :----------- | :------------------------------------------------------ |
-| [Doxygen]           | 1.16.1     | GNU GPL v2   | API documentation generation                            |
+| [Doxygen]           | ≥1.15      | GNU GPL v2   | API documentation generation                            |
 | [Sphinx]            | ≥8.1.3     | BSD-2-Clause | Documentation site generator                            |
 | [MyST-NB]           | ≥1.3.0     | BSD-3-Clause | Markdown and notebook pages                             |
-| [Breathe]           | ≥4.36.0    | BSD License  | Doxygen XML to Sphinx bridge                            |
 | [Sphinx AutoAPI]    | ≥3.6.1     | MIT License  | Python API reference pages                              |
 | [Furo]              | ≥2025.9.25 | MIT License  | Sphinx HTML theme                                       |
 | [Sphinx Copybutton] | ≥0.5.2     | MIT License  | Copy-to-clipboard buttons for code blocks               |
@@ -110,7 +109,6 @@ Used for local development workflows, **not shipped** in any binary or wheel.
 | :--------- | :--------- | :--------- | :--------------------------------------------------------------- |
 | [nox]      | ≥2026.4.10 | Apache-2.0 | Session runner for tests, linting, docs, packaging, and examples |
 
-[Breathe]: https://github.com/breathe-doc/breathe
 [CPR]: https://github.com/libcpr/cpr
 [curl]: https://curl.se/
 [Doxygen]: https://github.com/doxygen/doxygen
