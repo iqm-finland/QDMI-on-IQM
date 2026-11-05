@@ -15,10 +15,11 @@ Welcome to the end-to-end tutorial. This guide walks you step by step through
 driving real quantum workloads on IQM systems using QDMI-on-IQM and the packaged
 {py:class}`~iqm.qdmi.qiskit.IQMBackend`.
 
-Whether you want to estimate molecular ground-state energies with [QSCI][qsci]
-or benchmark hardware with [MQT Bench][mqt-bench], the example scripts in this
-repository provide a practical starting point. This tutorial focuses on two
-application areas:
+Whether you want to estimate molecular ground-state energies with [QSCI][qsci],
+benchmark hardware with [MQT Bench][mqt-bench], or discover which IQM quantum
+computer to target in the first place, the example scripts in this repository
+provide a practical starting point. This tutorial focuses on three application
+areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature]
   to estimate the ground-state energy of an H2 molecule.
@@ -26,6 +27,8 @@ application areas:
   [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
   [QFT][quantum-fourier-transform], [graph states][graph-state],
   [W states][w-state], [Grover][grover], or [Quantum Phase Estimation][qpe].
+- **Backend discovery:** enumerating the quantum computers available on an IQM
+  Server and selecting one that satisfies a qubit-count constraint.
 
 :::{important}
 The example scripts live in the QDMI-on-IQM repository and are not shipped with
@@ -70,6 +73,7 @@ uvx nox -s examples
 # Run specific examples
 ./examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
 ./examples/mqt_bench.py --benchmark ghz --shots 128
+./examples/discover_backends.py --min-qubits 5
 ```
 
 ## Quantum Chemistry
@@ -170,6 +174,60 @@ expected bitstrings (all 0s and all 1s for the GHZ state):
 Now try running the same script with `--backend iqm` to see how the distribution
 looks on real hardware. Remember to set the required environment variables for
 authentication before running the script.
+
+## Discovering and Selecting Backends
+
+`examples/discover_backends.py` lists the quantum computers on an IQM Server and
+selects the largest meeting `--min-qubits`. It reports status, qubit count,
+T1/T2, and two-qubit gate fidelity through MQT Core 4's public
+`mqt.core.qdmi.Device` API. Status and calibration data are informational;
+selection uses only qubit count, with inventory order breaking ties. The script
+queries properties without submitting jobs.
+
+```{literalinclude} ../examples/discover_backends.py
+:language: python
+:caption: examples/discover_backends.py
+:start-after: "# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception"
+```
+
+Set `IQM_TOKEN` or `IQM_TOKENS_FILE`, then run. Prefer these environment
+variables over `--token`, which may appear in process listings. Bearer tokens
+require an HTTPS endpoint; loopback HTTP is allowed for local testing. For
+token-authenticated loopback HTTP, the script conservatively rejects any
+nonempty `http_proxy`, `HTTP_PROXY`, `all_proxy`, or `ALL_PROXY` environment
+variable. It does not account for `NO_PROXY`, so it may reject a connection that
+libcurl would send directly.
+
+```console
+uv run --script examples/discover_backends.py --min-qubits 5
+```
+
+`--base-url` overrides `IQM_SERVER_URL`, then `IQM_BASE_URL`, then the Resonance
+endpoint. Explicit authentication options override environment credentials;
+configure only one authentication source. Do not embed credentials in the server
+URL; use `--token` or `--tokens-file` instead. The URL must use HTTP or HTTPS
+and must not include a query string or fragment. Authentication values must be
+nonempty, and the inventory endpoint must not redirect. The script skips
+computers whose properties cannot be queried and exits with an error if none
+meets the constraint. The separate REST inventory request reads the current
+access token from a tokens file; it does not refresh an expired token. The
+inventory request also uses `CURL_CA_BUNDLE` or `SSL_CERT_FILE` for a private
+CA, and uses the system CA bundle on Linux when neither is set. These settings
+take precedence over the Requests-specific `REQUESTS_CA_BUNDLE`.
+
+Exercise the local DDSIM simulator without contacting an IQM Server:
+
+```{code-cell} ipython3
+!../examples/discover_backends.py --backend sim --min-qubits 5
+```
+
+:::{note}
+MQT Core's registry discovers registered device definitions, not the quantum
+computers behind an IQM Server. This example uses `api/v1/quantum-computers` for
+that inventory, then `builtin_driver.open_device` to open fresh sessions by
+quantum computer ID. Using IDs avoids an ambient `IQM_QC_ID` overriding
+discovery.
+:::
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
 [ghz-state]: https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state

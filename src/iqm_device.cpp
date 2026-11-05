@@ -58,6 +58,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -230,6 +231,9 @@ struct IQM_QDMI_Site_impl_d {
 struct IQM_QDMI_Operation_impl_d {
   std::string name_;
   std::string implementation_;
+  std::unordered_set<std::pair<IQM_QDMI_Site, IQM_QDMI_Site>,
+                     IQM_QDMI_Device_Session_impl_d::Pair_hash>
+      site_pairs_;
 };
 
 // NOLINTBEGIN(bugprone-macro-parentheses)
@@ -622,6 +626,12 @@ int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
         std::make_unique<IQM_QDMI_Operation_impl_d>());
     operation->name_ = gate_name;
     operation->implementation_ = default_implementation;
+    if (loci.front().size() == 2) {
+      operation->site_pairs_.reserve(loci.size());
+      for (const auto &locus : loci) {
+        operation->site_pairs_.emplace(locus[0], locus[1]);
+      }
+    }
     session->operations_ptr_.emplace_back(operation.get());
     session->operations_map_[gate_name] = operation.get();
     session->operations_sites_map_[operation.get()] = std::move(loci);
@@ -2401,19 +2411,16 @@ int IQM_QDMI_device_session_query_operation_property(
   }
 
   if (sites != nullptr) {
-    // wrap the sites parameter in a vector
-    auto sites_vec = std::vector<IQM_QDMI_Site>(sites, sites + num_sites);
-    // need to find this vector in the list of available sites
-    auto it = std::ranges::find(available_sites_for_op, sites_vec);
-    // MOVE is directional and must stay ordered as [qubit, resonator].
-    const bool is_directional = operation->name_ == "move";
-    if (it == available_sites_for_op.end() && num_op_sites == 2 &&
-        !is_directional) {
-      // try with reversed sites
-      std::ranges::reverse(sites_vec);
-      it = std::ranges::find(available_sites_for_op, sites_vec);
-    }
-    if (it == available_sites_for_op.end()) {
+    if (num_op_sites == 2) {
+      if (!operation->site_pairs_.contains({sites[0], sites[1]}) &&
+          (operation->name_ == "move" ||
+           !operation->site_pairs_.contains({sites[1], sites[0]}))) {
+        return QDMI_ERROR_INVALIDARGUMENT;
+      }
+    } else if (std::ranges::find(
+                   available_sites_for_op,
+                   std::vector<IQM_QDMI_Site>(sites, sites + num_sites)) ==
+               available_sites_for_op.end()) {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
   }
