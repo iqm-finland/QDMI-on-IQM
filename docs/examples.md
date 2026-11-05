@@ -189,7 +189,9 @@ queries properties without submitting jobs.
 :start-after: "# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception"
 ```
 
-Set `IQM_TOKEN` or `IQM_TOKENS_FILE`, then run:
+Set `IQM_TOKEN` or `IQM_TOKENS_FILE`, then run. Prefer these environment
+variables over `--token`, which may appear in process listings. Bearer tokens
+require an HTTPS endpoint; loopback HTTP is allowed for local testing.
 
 ```console
 uv run --script examples/discover_backends.py --min-qubits 5
