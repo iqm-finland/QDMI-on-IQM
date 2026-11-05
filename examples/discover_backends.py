@@ -73,7 +73,31 @@ def resolve_base_url(base_url: str | None) -> str:
     Returns:
         The explicit URL, environment URL, or Resonance endpoint.
     """
-    return base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or _DEFAULT_BASE_URL
+    return validate_base_url(base_url or os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or _DEFAULT_BASE_URL)
+
+
+def validate_base_url(base_url: str) -> str:
+    """Require an HTTP(S) server URL without embedded credentials.
+
+    Returns:
+        The validated URL.
+
+    Raises:
+        ValueError: If the URL is malformed, unsupported, or contains credentials.
+    """
+    try:
+        parsed_url = urlsplit(base_url)
+        hostname = parsed_url.hostname
+    except ValueError as exc:
+        msg = "The server URL must be a valid HTTP or HTTPS URL."
+        raise ValueError(msg) from exc
+    if parsed_url.scheme not in {"http", "https"} or not hostname:
+        msg = "The server URL must include an HTTP or HTTPS scheme and a hostname."
+        raise ValueError(msg)
+    if parsed_url.username is not None or parsed_url.password is not None:
+        msg = "Credentials in server URLs are not supported; use --token or --tokens-file."
+        raise ValueError(msg)
+    return base_url
 
 
 def resolve_credentials(token: str | None, tokens_file: str | None) -> tuple[str | None, str | None]:
@@ -106,6 +130,7 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
         InvalidServerResponseError: If the response has an unexpected type or shape.
         ValueError: If an inventory entry is malformed or a bearer token would be sent over cleartext HTTP.
     """
+    base_url = validate_base_url(base_url)
     url = base_url.rstrip("/") + "/api/v1/quantum-computers"
     parsed_url = urlsplit(base_url)
     is_loopback_http = parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1", "::1"}
