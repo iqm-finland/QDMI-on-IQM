@@ -181,7 +181,7 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
   std::string protocol_error;
   if (!json.is_discarded() && json.is_object() && received_success) {
     if (const auto it = json.find("id"); it != json.end() && it->is_string()) {
-      auto returned_id = it->get<std::string>();
+      auto &returned_id = it->get_ref<std::string &>();
       if (Normalize_uuid(returned_id.data(), returned_id.size()) &&
           (create || returned_id == id)) {
         // Retain ownership before decoding state or allocating diagnostics.
@@ -233,10 +233,8 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
           continue;
         }
         auto &text = value.get_ref<std::string &>();
-        size_t pos = 0;
-        while ((pos = text.find(secret, pos)) != std::string::npos) {
-          text.replace(pos, secret.size(), "[redacted]");
-          pos += std::string_view{"[redacted]"}.size();
+        if (text.find(secret) != std::string::npos) {
+          text = "[redacted]";
         }
       }
     }
