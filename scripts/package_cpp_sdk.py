@@ -201,7 +201,8 @@ def make_archive(prefix: Path, output: Path) -> None:
     with tarfile.open(output, "w:gz") as archive:
         for path in sorted(prefix.rglob("*")):
             archive.add(path, arcname=Path("iqm-qdmi-device") / path.relative_to(prefix), recursive=False)
-    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    with output.open("rb") as archive_file:
+        digest = hashlib.file_digest(archive_file, "sha256").hexdigest()
     (output.parent / f"{output.name}.sha256").write_text(f"{digest}  {output.name}\n", encoding="utf-8")
 
 

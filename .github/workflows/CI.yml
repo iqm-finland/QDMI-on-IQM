@@ -28,6 +28,7 @@ jobs:
         .github/workflows/live-tests.yml
         .github/workflows/python-*.yml
         examples/**
+        scripts/package_cpp_sdk.py
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
