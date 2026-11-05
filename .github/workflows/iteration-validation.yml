@@ -47,7 +47,7 @@ jobs:
       - name: Create, inspect, and end without a device session
         if: always() && steps.build.outcome == 'success'
         env:
-          CANCELLED_BEFORE_START: ${{ cancelled() }}
+          CANCELLED_BEFORE_START: ${{ job.status == 'cancelled' }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
         run: |
