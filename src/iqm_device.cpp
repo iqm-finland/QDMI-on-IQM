@@ -1490,9 +1490,8 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   // A failed response can still represent an accepted remote job.
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
-      job_submission_url, token, *job->session_->connection_pool_, payload,
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_,
-      &job->session_->rate_limit_);
+      job_submission_url, token, *job->session_->connection_pool_, payload, {},
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1543,16 +1542,15 @@ int IQM_QDMI_device_job_submit_calibration(IQM_QDMI_Device_Job job) try {
   if (job->programs_.size() != 1) {
     return QDMI_ERROR_NOTSUPPORTED;
   }
-  const auto program = std::string{Program_contents(job->programs_.front())};
+  const auto program = Program_contents(job->programs_.front());
   const auto job_submission_url = job->session_->api_config_->url(
       iqm::API_ENDPOINT::SUBMIT_CALIBRATION_JOB);
   const auto token = job->session_->token_manager_->get_bearer_token();
   // A failed response can still represent an accepted remote job.
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
-      job_submission_url, token, *job->session_->connection_pool_, program,
-      {{"Expect", "100-continue"}}, job->session_->request_timeout_,
-      &job->session_->rate_limit_);
+      job_submission_url, token, *job->session_->connection_pool_, program, {},
+      job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
