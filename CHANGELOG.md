@@ -19,8 +19,6 @@ releases may include breaking changes.
 - 💥 Remove `MoveGate` and provider target construction. Compile star-device
   circuits with `backend.compile` before submission. ([#321])
   ([**@burgholzer**])
-- ♻️ Keep Slurm deployment and integration checks in MQT Core. ([#321])
-  ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).

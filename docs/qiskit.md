@@ -103,10 +103,8 @@ resonators. Use `backend.compile`, Core's `compile_program` with
 `submit_program`, or the
 [PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html).
 See the
-[Core compiler guide](https://mqt.readthedocs.io/projects/core/en/latest/mlir/mqt_compiler_collection.html)
-for compilation options and
-[Core #2927](https://github.com/munich-quantum-toolkit/core/pull/2927) for
-resonator routing.
+[Core compiler guide](https://mqt.readthedocs.io/projects/core/en/latest/mlir/target_compilation.html)
+for compilation options and resonator routing.
 
 ## Measurement results
 
@@ -130,9 +128,8 @@ name.
 
 ## Sampler and Estimator Primitives
 
-{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
-{py:meth}`~mqt.core.plugins.qiskit.QDMIBackend.sampler` and
-{py:meth}`~mqt.core.plugins.qiskit.QDMIBackend.estimator`) for constructing
+{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see `sampler()`
+and `estimator()`) for constructing
 {py:class}`~qiskit.primitives.BackendSamplerV2` and
 {py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
 backend instance.

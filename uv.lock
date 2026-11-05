@@ -806,7 +806,7 @@ dev = [
 ]
 docs = [
     { name = "furo" },
-    { name = "mqt-core" },
+    { name = "mqt-core", extra = ["qiskit"] },
     { name = "myst-nb" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -871,13 +871,13 @@ dev = [
 ]
 docs = [
     { name = "furo", specifier = ">=2025.12.19" },
-    { name = "mqt-core", specifier = "~=4.1.1" },
+    { name = "mqt-core", extras = ["qiskit"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=e893afc6c9a3d1d5b2d04faa02178e18f289824b" },
     { name = "myst-nb", specifier = ">=1.4" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
     { name = "numpy", marker = "python_full_version >= '3.15'", specifier = ">=2.5.2" },
-    { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.1" },
+    { name = "qiskit", extras = ["qasm3-import"], specifier = ">=2.5" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
     { name = "sphinx", specifier = ">=9" },
     { name = "sphinx-autoapi", specifier = ">=3.6.1" },

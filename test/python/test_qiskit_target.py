@@ -69,3 +69,9 @@ def test_compile_and_submit_sirius(offline_backend: IQMBackend, offline_submissi
     first_measure = names.index("measure")
     assert "move" not in names[first_measure:]
     assert offline_submissions[0]["shots"] == 4
+
+
+@pytest.mark.parametrize("offline_backend", ["extra_operations"], indirect=True)
+def test_target_accepts_iqm_extra_operations(offline_backend: IQMBackend) -> None:
+    """Extra native operations do not prevent constructing the shared Core target."""
+    assert {"prx_12", "measure_012", "r", "measure"} <= offline_backend.target.operation_names

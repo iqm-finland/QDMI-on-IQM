@@ -60,6 +60,8 @@ def offline_backend(
         for gate in gates:
             for implementation in metadata[2]["gates"][gate]["implementations"].values():
                 implementation["loci"] = [locus for locus in implementation["loci"] if "QB1" not in locus]
+    if variant == "extra_operations":
+        metadata[2]["gates"]["measure_012"] = metadata[2]["gates"]["measure"]
     if variant == "resonator":
         metadata[1][0]["computational_resonators"] = ["CR1"]
         metadata[1][0]["connectivity"] += [["QB1", "CR1"], ["QB2", "CR1"]]
