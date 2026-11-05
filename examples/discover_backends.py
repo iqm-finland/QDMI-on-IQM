@@ -67,6 +67,13 @@ class InvalidServerResponseError(TypeError):
     """The IQM Server returned a response with an unexpected type or shape."""
 
 
+class _PreserveAuthorizationHeader(requests.auth.AuthBase):
+    """Prevent Requests from replacing an explicit Authorization header with netrc credentials."""
+
+    def __call__(self, request: requests.PreparedRequest) -> requests.PreparedRequest:
+        return request
+
+
 def resolve_base_url(base_url: str | None) -> str:
     """Resolve the IQM Server endpoint.
 
@@ -134,6 +141,7 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
         The raw `quantum_computers` entries reported by the server.
 
     Raises:
+        requests.HTTPError: If the inventory endpoint redirects or returns an unsuccessful response.
         InvalidServerResponseError: If the response has an unexpected type or shape.
         ValueError: If an inventory entry is malformed or a bearer token would be sent over cleartext HTTP.
     """
@@ -145,7 +153,12 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
         msg = "Bearer tokens require HTTPS (HTTP is allowed for loopback URLs only)."
         raise ValueError(msg)
     headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
-    response = requests.get(url, headers=headers, timeout=30)
+    response = requests.get(
+        url, headers=headers, timeout=30, auth=_PreserveAuthorizationHeader(), allow_redirects=False
+    )
+    if 300 <= response.status_code < 400:
+        msg_0 = "Redirects are not supported for the server inventory."
+        raise requests.HTTPError(msg_0)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict) or not isinstance(data.get("quantum_computers"), list):
