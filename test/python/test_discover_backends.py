@@ -135,7 +135,7 @@ def test_selection_and_failed_properties(
     discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, min_qubits: int
 ) -> None:
     """Use explicit IDs, skip failures, and select by size with stable ties."""
-    inventory = [{"id": name} for name in ("broken", "small", "large", "tied")]
+    inventory = [{"id": name, "alias": name} for name in ("broken", "small", "large", "tied")]
     monkeypatch.setattr(discovery, "list_quantum_computers", Mock(return_value=inventory))
     monkeypatch.setenv("IQM_QC_ID", "unrelated-computer")
     broken = Mock(spec=Device)
@@ -173,7 +173,7 @@ def test_tokens_file(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp
     """Read the listing token and pass the same file to the native device session."""
     tokens_file = tmp_path / "tokens.json"
     tokens_file.write_text(json.dumps({"access_token": EXAMPLE_VALUE}), encoding="utf-8")
-    listing = Mock(return_value=[{"id": "qc-1"}])
+    listing = Mock(return_value=[{"id": "qc-1", "alias": "QC 1"}])
     monkeypatch.setattr(discovery, "list_quantum_computers", listing)
     opened = Mock(side_effect=RuntimeError("Cannot open device"))
     monkeypatch.setattr(discovery, "open_device", opened)
@@ -244,11 +244,30 @@ def test_positive_minimum(
 
 def test_http_error_redacts_credentials(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Do not expose exception text containing authentication data."""
+    monkeypatch.setenv("IQM_TOKEN", EXAMPLE_VALUE)
     monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
-    monkeypatch.setattr(discovery.requests, "get", Mock(side_effect=requests.HTTPError("secret-token")))
+    monkeypatch.setattr(discovery.requests, "get", Mock(side_effect=requests.HTTPError(EXAMPLE_VALUE)))
     with pytest.raises(SystemExit, match="Check the server URL") as exc_info:
         discovery.main()
-    assert "secret-token" not in str(exc_info.value)
+    assert EXAMPLE_VALUE not in str(exc_info.value)
+
+
+def test_base_url_log_redacts_userinfo(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Do not write URL credentials into application logs."""
+    monkeypatch.setattr(discovery, "list_quantum_computers", Mock(return_value=[]))
+    caplog.set_level(logging.INFO)
+    with pytest.raises(SystemExit, match="No quantum computers reported") as exc_info:
+        discovery.run_discovery(
+            base_url="https://alice:password@example.com", token=None, tokens_file=None, min_qubits=5
+        )
+    assert "alice" not in caplog.text
+    assert "password" not in caplog.text
+    assert "https://example.com" in caplog.text
+    assert "alice" not in str(exc_info.value)
+    assert "password" not in str(exc_info.value)
+    assert "https://example.com" in str(exc_info.value)
 
 
 @pytest.mark.parametrize("base_url", ["http://example.com", "http://192.0.2.1"])
@@ -268,9 +287,7 @@ def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.Mon
     get.assert_called_once()
 
 
-def test_validation_error_is_reported(
-    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_validation_error_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep actionable, safe configuration errors visible to the user."""
     monkeypatch.setenv("IQM_TOKEN", EXAMPLE_VALUE)
     monkeypatch.setenv("IQM_TOKENS_FILE", "tokens.json")
@@ -278,7 +295,7 @@ def test_validation_error_is_reported(
     with pytest.raises(SystemExit) as exc_info:
         discovery.main()
     assert "Provide only one" in str(exc_info.value)
-    assert "secret-token" not in capsys.readouterr().err
+    assert EXAMPLE_VALUE not in str(exc_info.value)
 
 
 def test_invalid_server_response_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
