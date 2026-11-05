@@ -3141,7 +3141,7 @@ TEST_F(DeviceIntegrationMockTest, OperationLocusValidationPreservesDirection) {
   ASSERT_EQ(IQM_QDMI_device_session_query_operation_property(
                 session, move, 0, nullptr, 0, nullptr,
                 QDMI_OPERATION_PROPERTY_SITES, sizeof(reported),
-                reported.data(), nullptr),
+                static_cast<void *>(reported.data()), nullptr),
             QDMI_SUCCESS);
   EXPECT_EQ(reported[0], sites[0]);
   EXPECT_EQ(reported[1], sites[1]);
