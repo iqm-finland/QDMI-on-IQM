@@ -47,6 +47,7 @@ import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import requests
 from mqt.core.qdmi.builtin_driver import open_device
@@ -60,6 +61,10 @@ log = logging.getLogger(__name__)
 
 _SIMULATOR_DEVICE = "mqt.ddsim.default"
 _DEFAULT_BASE_URL = "https://resonance.iqm.tech"
+
+
+class InvalidServerResponseError(TypeError):
+    """The IQM Server returned a response with an unexpected type or shape."""
 
 
 def resolve_base_url(base_url: str | None) -> str:
@@ -98,20 +103,32 @@ def list_quantum_computers(base_url: str, bearer_token: str | None) -> list[dict
         The raw `quantum_computers` entries reported by the server.
 
     Raises:
-        TypeError: If the response lacks a quantum_computers array.
-        ValueError: If an inventory entry lacks a valid ID.
+        InvalidServerResponseError: If the response has an unexpected type or shape.
+        ValueError: If an inventory entry is malformed or a bearer token would be sent over cleartext HTTP.
     """
     url = base_url.rstrip("/") + "/api/v1/quantum-computers"
+    parsed_url = urlsplit(base_url)
+    is_loopback_http = parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1", "::1"}
+    if bearer_token and parsed_url.scheme != "https" and not is_loopback_http:
+        msg = "Bearer tokens require HTTPS (HTTP is allowed for loopback URLs only)."
+        raise ValueError(msg)
     headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else {}
     response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict) or not isinstance(data.get("quantum_computers"), list):
         msg = "Expected a quantum_computers array in the IQM Server response."
-        raise TypeError(msg)
+        raise InvalidServerResponseError(msg)
     quantum_computers = data["quantum_computers"]
-    if any(not isinstance(qc, dict) or not isinstance(qc.get("id"), str) or not qc["id"] for qc in quantum_computers):
-        msg = "Expected every quantum computer to have a nonempty string ID."
+    if any(
+        not isinstance(qc, dict)
+        or not isinstance(qc.get("id"), str)
+        or not qc["id"]
+        or not isinstance(qc.get("alias"), str)
+        or not qc["alias"]
+        for qc in quantum_computers
+    ):
+        msg = "Expected every quantum computer to have nonempty string ID and alias values."
         raise ValueError(msg)
     return quantum_computers
 
@@ -212,11 +229,14 @@ def run_discovery(*, base_url: str | None, token: str | None, tokens_file: str |
             status = device.status().name
             quality = calibration_summary(device)
             coherence = coherence_summary(device)
-        except (RuntimeError, ValueError):
-            log.warning("Skipping '%s': failed to query device properties.", name)
+        except (RuntimeError, ValueError) as exc:
+            log.warning("Skipping '%s': failed to query device properties (%s).", name, type(exc).__name__)
             continue
         log.info("  '%s': status=%s, %d qubits, %s, %s", name, status, qubits, quality, coherence)
         candidates.append((name, qubits, quality))
+
+    if not candidates:
+        sys.exit(f"Could not query properties for any of {len(quantum_computers)} quantum computers.")
 
     matching = [candidate for candidate in candidates if candidate[1] >= min_qubits]
     if not matching:
@@ -246,7 +266,9 @@ def main() -> None:
     parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
     parser.add_argument("--min-qubits", type=int, default=5)
     parser.add_argument("--base-url", default=None, help="Defaults to $IQM_SERVER_URL, $IQM_BASE_URL, or Resonance.")
-    parser.add_argument("--token", default=None, help="Defaults to $IQM_TOKEN.")
+    parser.add_argument(
+        "--token", default=None, help="Defaults to $IQM_TOKEN; command-line tokens may appear in process listings."
+    )
     parser.add_argument("--tokens-file", default=None, help="Defaults to $IQM_TOKENS_FILE.")
     args = parser.parse_args()
     if args.min_qubits < 1:
@@ -265,8 +287,14 @@ def main() -> None:
             tokens_file=args.tokens_file,
             min_qubits=args.min_qubits,
         )
-    except (requests.RequestException, OSError, TypeError, ValueError) as exc:
+    except requests.RequestException as exc:
         sys.exit(f"Discovery failed ({type(exc).__name__}). Check the server URL and authentication settings.")
+    except OSError as exc:
+        sys.exit(f"Discovery failed ({type(exc).__name__}). Check the server URL and authentication settings.")
+    except InvalidServerResponseError as exc:
+        sys.exit(f"Discovery failed: {exc}")
+    except ValueError as exc:
+        sys.exit(f"Discovery failed: {exc}")
 
 
 if __name__ == "__main__":
