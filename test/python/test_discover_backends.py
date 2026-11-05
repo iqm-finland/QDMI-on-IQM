@@ -84,6 +84,28 @@ def test_credentials(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.parametrize(
+    ("token", "tokens_file"),
+    [("", None), (None, "")],
+)
+def test_empty_explicit_credentials_are_rejected(
+    discovery: ModuleType, token: str | None, tokens_file: str | None
+) -> None:
+    """Do not silently fall back to environment credentials for empty options."""
+    with pytest.raises(ValueError, match="Authentication options must not be empty"):
+        discovery.resolve_credentials(token, tokens_file)
+
+
+@pytest.mark.parametrize("name", ["IQM_TOKEN", "IQM_TOKENS_FILE"])
+def test_empty_environment_credentials_are_rejected(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """Keep empty environment credentials from diverging from the native driver."""
+    monkeypatch.setenv(name, "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        discovery.resolve_credentials(None, None)
+
+
+@pytest.mark.parametrize(
     "payload",
     [
         {"quantum_computers": [None]},
@@ -329,11 +351,18 @@ def test_base_url_requires_http_scheme_and_host(discovery: ModuleType, base_url:
     ("base_url", "message"),
     [
         ("https://example.com:abc", "valid HTTP or HTTPS URL"),
+        ("https://example.com:0", "valid port"),
+        ("https://example.com:65536", "valid HTTP or HTTPS URL"),
         ("https://example.com/path with spaces", "valid HTTP or HTTPS URL"),
         (" https://example.com", "valid HTTP or HTTPS URL"),
+        ("https://example.com\\tpath", "valid HTTP or HTTPS URL"),
+        ("https://example.com\\npath", "valid HTTP or HTTPS URL"),
+        ("https://example.com\\x7fpath", "valid HTTP or HTTPS URL"),
         (r"https:\\example.com", "valid HTTP or HTTPS URL"),
         ("https://example.com?token=secret", "query or fragment"),
+        ("https://example.com?", "query or fragment"),
         ("https://example.com#fragment", "query or fragment"),
+        ("https://example.com#", "query or fragment"),
     ],
 )
 def test_base_url_rejects_invalid_port_query_and_fragment(discovery: ModuleType, base_url: str, message: str) -> None:
@@ -350,14 +379,21 @@ def test_bearer_token_requires_tls(discovery: ModuleType, base_url: str) -> None
         discovery.list_quantum_computers(base_url, EXAMPLE_VALUE)
 
 
-def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Allow local HTTP test servers without weakening remote token transport."""
+@pytest.mark.parametrize(
+    "base_url",
+    ["http://127.0.0.1:5000", "http://127.0.0.2:5000", "http://[::1]:5000", "http://LOCALHOST:5000"],
+)
+def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, base_url: str) -> None:
+    """Allow loopback HTTP directly without sending tokens to environment proxies."""
     response = Mock(status_code=200)
     response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
-    get = Mock(return_value=response)
-    monkeypatch.setattr(discovery.requests, "get", get)
-    discovery.list_quantum_computers("http://127.0.0.1:5000", EXAMPLE_VALUE)
-    get.assert_called_once()
+    session = Mock()
+    session.__enter__.return_value = session
+    session.get.return_value = response
+    monkeypatch.setattr(discovery.requests, "Session", Mock(return_value=session))
+    discovery.list_quantum_computers(base_url, EXAMPLE_VALUE)
+    assert session.trust_env is False
+    session.get.assert_called_once()
 
 
 def test_validation_error_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
