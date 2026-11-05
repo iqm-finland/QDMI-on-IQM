@@ -15,8 +15,8 @@ releases may include breaking changes.
 - ✨ Discover IQM quantum computers and select the largest matching
   `--min-qubits` with `examples/discover_backends.py`. Bearer tokens require
   HTTPS except for loopback HTTP. Credentials embedded in server URLs are
-  rejected, and query strings or fragments are not allowed ([#146])
-  ([**@marcelwa**])
+  rejected, query strings or fragments are not allowed, and redirects are
+  rejected ([#146]) ([**@marcelwa**])
 
 ### Changed
 
