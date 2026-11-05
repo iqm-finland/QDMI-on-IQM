@@ -364,12 +364,14 @@ TEST_F(IterationManagement, RedirectsAreNotFollowedAndCredentialsAreRedacted) {
               QDMI_ERROR_FATAL);
   }
   EXPECT_EQ(http_.post_urls().size(), 4);
-  http_.queue_post(403,
-                   R"({"message":"test-token","request_id":"test-token"})");
+  http_.queue_post(
+      403,
+      R"({"message":"prefix test-token test-token suffix","request_id":"test-token","error_code":"forbidden"})");
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_ERROR_PERMISSIONDENIED);
   EXPECT_EQ(diagnostics()["message"], "[redacted]");
   EXPECT_EQ(diagnostics()["request_id"], "[redacted]");
+  EXPECT_EQ(diagnostics()["error_code"], "forbidden");
 }
 
 TEST_F(IterationManagement, SeparateClientsOwnCredentialsPoolsAndQuota) {
