@@ -95,7 +95,7 @@ def test_credentials(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> 
 )
 def test_inventory_validation(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     """Reject malformed inventories instead of selecting an unintended computer."""
-    response = Mock()
+    response = Mock(status_code=200)
     response.json.return_value = payload
     monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
     with pytest.raises(ValueError, match="Expected"):
@@ -105,7 +105,7 @@ def test_inventory_validation(discovery: ModuleType, monkeypatch: pytest.MonkeyP
 @pytest.mark.parametrize("payload", [{}, {"quantum_computers": {}}])
 def test_invalid_inventory_shape(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     """Report unexpected inventory types without hiding unrelated TypeErrors."""
-    response = Mock()
+    response = Mock(status_code=200)
     response.json.return_value = payload
     monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
     with pytest.raises(discovery.InvalidServerResponseError, match="Expected"):
@@ -114,20 +114,37 @@ def test_invalid_inventory_shape(discovery: ModuleType, monkeypatch: pytest.Monk
 
 def test_inventory_request(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Send the inventory request with credentials, timeout, and HTTP validation."""
-    response = Mock()
+    response = Mock(status_code=200)
     response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
     get = Mock(return_value=response)
     monkeypatch.setattr(discovery.requests, "get", get)
     assert discovery.list_quantum_computers("https://server.example/", EXAMPLE_VALUE) == [
         {"id": "qc-1", "alias": "QC 1"}
     ]
-    get.assert_called_once_with(
-        "https://server.example/api/v1/quantum-computers", headers={"Authorization": "Bearer example-token"}, timeout=30
-    )
+    get.assert_called_once()
+    (request_url,) = get.call_args.args
+    assert request_url == "https://server.example/api/v1/quantum-computers"
+    assert get.call_args.kwargs["headers"] == {"Authorization": "Bearer example-token"}
+    assert get.call_args.kwargs["timeout"] == 30
+    assert get.call_args.kwargs["allow_redirects"] is False
+    auth = get.call_args.kwargs["auth"]
+    assert isinstance(auth, discovery.requests.auth.AuthBase)
+    request = discovery.requests.PreparedRequest()
+    request.headers = {"Authorization": "Bearer example-token"}
+    assert auth(request) is request
+    assert request.headers["Authorization"] == "Bearer example-token"
     response.raise_for_status.assert_called_once_with()
     response.raise_for_status.side_effect = requests.HTTPError("Unauthorized")
     with pytest.raises(requests.HTTPError):
         discovery.list_quantum_computers("https://server.example", None)
+
+
+def test_inventory_redirect_is_rejected(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not send the explicit auth header to a redirect target."""
+    response = Mock(status_code=302)
+    monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
+    with pytest.raises(requests.HTTPError, match="Redirects are not supported"):
+        discovery.list_quantum_computers("https://server.example", EXAMPLE_VALUE)
 
 
 @pytest.mark.parametrize("min_qubits", [5, 11])
@@ -335,7 +352,7 @@ def test_bearer_token_requires_tls(discovery: ModuleType, base_url: str) -> None
 
 def test_loopback_http_is_allowed(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Allow local HTTP test servers without weakening remote token transport."""
-    response = Mock()
+    response = Mock(status_code=200)
     response.json.return_value = {"quantum_computers": [{"id": "qc-1", "alias": "QC 1"}]}
     get = Mock(return_value=response)
     monkeypatch.setattr(discovery.requests, "get", get)
@@ -356,7 +373,7 @@ def test_validation_error_is_reported(discovery: ModuleType, monkeypatch: pytest
 
 def test_invalid_server_response_is_reported(discovery: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     """Print expected server shape errors without swallowing programming TypeErrors."""
-    response = Mock()
+    response = Mock(status_code=200)
     response.json.return_value = {}
     monkeypatch.setattr(discovery.requests, "get", Mock(return_value=response))
     monkeypatch.setattr(sys, "argv", ["discover_backends.py"])
