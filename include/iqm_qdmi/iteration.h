@@ -71,8 +71,9 @@ IQM_QDMI_iteration_client_diagnostics(IQM_QDMI_Iteration_Client client);
  * mandatory (no size-query mode). Retain an ID even on partial decoding
  * failure. Never automatically retry ambiguous creation; reconcile through
  * server listing. All timeouts are positive milliseconds; the operation
- * deadline includes quota waits/retries and caps each request. Redirects are
- * not followed.
+ * deadline includes quota waits/retries and caps each HTTP request. Token-file
+ * reads and response decoding are synchronous and can exceed it. Redirects
+ * are not followed.
  * @return Existing QDMI status codes; diagnostics distinguish server reasons.
  */
 IQM_QDMI_EXPORT int
@@ -85,7 +86,8 @@ IQM_QDMI_iteration_create(IQM_QDMI_Iteration_Client client, const char *qc,
  * @brief Inspect a canonical UUID; result may alias iteration_id.
  * @details Retains the input ID on failure; rejects mismatching response IDs.
  * Known states are waiting, active, completed, cancelled, and failed. Unknown
- * states fail closed and remain in diagnostics. Result is mandatory.
+ * states fail closed and remain in diagnostics unless redacted. Result is
+ * mandatory.
  * @return Existing QDMI status codes, including TIMEOUT for local expiry.
  */
 IQM_QDMI_EXPORT int IQM_QDMI_iteration_get(IQM_QDMI_Iteration_Client client,

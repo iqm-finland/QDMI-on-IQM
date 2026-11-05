@@ -19,6 +19,7 @@ command arguments.
 
 ```c
 #include <iqm_qdmi/iteration.h>
+#include <stdio.h>
 
 IQM_QDMI_Iteration_Client client = NULL;
 IQM_QDMI_Iteration_Result result = {0};
@@ -26,8 +27,13 @@ int status = IQM_QDMI_iteration_client_alloc(NULL, NULL, NULL, 30000, &client);
 if (status == QDMI_SUCCESS) {
     status = IQM_QDMI_iteration_create(client, "emerald:mock", 60, 60,
                                       30000, &result);
-    /* Retain result.iteration_id even when create reports an error. */
-    /* Inspect and explicitly end this ID before freeing the client. */
+    if (result.iteration_id[0] != '\0') {
+        /* Record the ID, including partial create failures. */
+        printf("Iteration to reconcile: %s\n", result.iteration_id);
+        status = IQM_QDMI_iteration_end(client, result.iteration_id,
+                                       30000, &result);
+        /* On failure or HTTP 202, inspect this ID until terminal. */
+    }
 }
 IQM_QDMI_iteration_client_free(client);
 ```
@@ -44,9 +50,9 @@ runs or waits.
 ID on failure and reject a mismatching server ID. Server UUIDs are normalized to
 lowercase. Known states are `waiting`, `active`, `completed`, `cancelled`, and
 `failed`. The last three are terminal. Unknown states are protocol errors; the
-result state stays empty and diagnostics retain the original value. An active
-state alone does not prove future job acceptance: an iteration may already be
-ending. The server activates waiting iterations automatically.
+result state stays empty and diagnostics retain the value unless redacted. An
+active state alone does not prove future job acceptance: an iteration may
+already be ending. The server activates waiting iterations automatically.
 
 End returns its POST response without polling. HTTP 200 means ended; 202 means
 in-flight work is still finishing. After 202, inspect immediately, then sleep 1,
@@ -57,27 +63,29 @@ it up to five minutes after the iteration ends.
 
 ## Errors and deadlines
 
-Each positive `timeout_ms` bounds the entire operation using a monotonic clock,
+Each positive `timeout_ms` sets a monotonic deadline for HTTP requests,
 including quota waits and 429 retries. Each HTTP attempt is capped by both the
 client request timeout and the remaining operation budget. Defaults in the
 example are 30 seconds; use smaller remaining budgets when cleaning up. A
 sub-millisecond remainder expires instead of becoming an unlimited request.
-Local transport/deadline expiry returns `QDMI_ERROR_TIMEOUT`. Other errors use
-the existing QDMI HTTP mapping: 401/403 permission denied, 404 not found,
-400/429 invalid argument, and server/protocol failures fatal. Inspect
-`error_code` to distinguish authentication, access, unavailable iteration mode,
-and missing iterations. A quota block lasting the entire budget can prevent
-confirmed cleanup.
+Synchronous token-file reads and response decoding cannot be interrupted by this
+deadline; the call can therefore take longer. Use an explicit token to avoid
+file I/O during an operation. Local transport/deadline expiry returns
+`QDMI_ERROR_TIMEOUT`. Other errors use the existing QDMI HTTP mapping: 401/403
+permission denied, 404 not found, 400/429 invalid argument, and server/protocol
+failures fatal. Inspect `error_code` to distinguish authentication, access,
+unavailable iteration mode, and missing iterations. A quota block lasting the
+entire budget can prevent confirmed cleanup.
 
 `IQM_QDMI_iteration_client_diagnostics` borrows a NUL-terminated JSON string
 until the next operation or free. Copy it promptly. It contains HTTP status and
 selected server `error_code`, `message`, and `request_id`, without arbitrary
 headers or response fields. The result preserves HTTP status and any confirmed
-ID on partial failure. Recoverable allocation failure returns
-`QDMI_ERROR_OUTOFMEM` without discarding an already confirmed ID. No HTTP
-response means status zero. The pinned JSON dependency can terminate under
-severe memory exhaustion during destruction; that process termination cannot
-become a QDMI error (see
+ID on partial failure. Fields containing the bearer token become `[redacted]`.
+Recoverable allocation failure returns `QDMI_ERROR_OUTOFMEM` without discarding
+an already confirmed ID. No HTTP response means status zero. The pinned JSON
+dependency can terminate under severe memory exhaustion during destruction; that
+process termination cannot become a QDMI error (see
 [upstream issue 5135](https://github.com/nlohmann/json/issues/5135)).
 
 Management requests verify TLS and do not follow redirects. Explicit 429
