@@ -20,12 +20,14 @@
 /** @file
  * @brief Standalone IQM iteration management.
  */
-#include "cpr/connection_pool.h"
+#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/iteration.h"
+
 #include "http_client.hpp"
 #include "iqm_api_config.hpp"
 #include "iqm_auth.hpp"
-#include "iqm_qdmi/constants.h"
-#include "iqm_qdmi/iteration.h"
+
+#include "cpr/connection_pool.h"
 
 #include <algorithm>
 #include <array>
@@ -189,8 +191,9 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
         const auto state = json.find("status");
         if (state != json.end() && state->is_string()) {
           const auto &text = state->get_ref<const std::string &>();
-          constexpr std::array known{"waiting", "active", "completed",
-                                     "cancelled", "failed"};
+          constexpr std::array known{
+              "waiting", "active", "completed", "cancelled", "failed",
+          };
           if (std::ranges::find(known, text) != known.end()) {
             std::memcpy(result.state, text.c_str(), text.size() + 1);
             valid = true;
@@ -380,8 +383,10 @@ int IQM_QDMI_iteration_create(IQM_QDMI_Iteration_Client client, const char *qc,
       }
       return QDMI_ERROR_INVALIDARGUMENT;
     }
-    auto body = nlohmann::json{{"qc", selector},
-                               {"max_duration_seconds", max_duration_seconds}};
+    auto body = nlohmann::json{
+        {"qc", selector},
+        {"max_duration_seconds", max_duration_seconds},
+    };
     if (idle_timeout_seconds != 0) {
       body["idle_timeout_seconds"] = idle_timeout_seconds;
     }

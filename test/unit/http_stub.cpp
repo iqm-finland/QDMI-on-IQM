@@ -21,15 +21,16 @@
 
 #include "http_client.hpp"
 
+#include "cpr/bearer.h"
+#include "cpr/connection_pool.h"
+#include "cpr/cprtypes.h"
+#include "cpr/error.h"
+#include "cpr/response.h"
+#include "gtest/gtest.h"
+
 #include <chrono>
-#include <cpr/bearer.h>
-#include <cpr/connection_pool.h>
-#include <cpr/cprtypes.h>
-#include <cpr/error.h>
-#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -118,17 +119,19 @@ HttpStub::HttpStub() {
     now_ += std::chrono::seconds{seconds};
   };
 
-  hooks.now = [this]() { return now_; };
+  hooks.now = [this] { return now_; };
 }
 
 HttpStub::~HttpStub() { http::internal::Reset_hooks(); }
 
 HttpStub &HttpStub::queue_get(const int64_t status_code, std::string body,
                               cpr::Header headers) {
-  get_responses_.push_back({.status_code = status_code,
-                            .body = std::move(body),
-                            .connection_error = false,
-                            .headers = std::move(headers)});
+  get_responses_.push_back({
+      .status_code = status_code,
+      .body = std::move(body),
+      .connection_error = false,
+      .headers = std::move(headers),
+  });
   return *this;
 }
 
@@ -140,10 +143,12 @@ HttpStub &HttpStub::queue_get_connection_error() {
 
 HttpStub &HttpStub::queue_post(const int64_t status_code, std::string body,
                                cpr::Header headers) {
-  post_responses_.push_back({.status_code = status_code,
-                             .body = std::move(body),
-                             .connection_error = false,
-                             .headers = std::move(headers)});
+  post_responses_.push_back({
+      .status_code = status_code,
+      .body = std::move(body),
+      .connection_error = false,
+      .headers = std::move(headers),
+  });
   return *this;
 }
 

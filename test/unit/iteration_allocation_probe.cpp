@@ -17,10 +17,12 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "cpr/response.h"
-#include "http_client.hpp"
 #include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/iteration.h"
+
+#include "http_client.hpp"
+
+#include "cpr/response.h"
 
 #include <cstddef>
 #include <cstdlib>

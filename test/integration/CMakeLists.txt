@@ -32,9 +32,9 @@ if(WIN32)
 endif()
 
 # These tests need a live IQM backend, so they carry a CTest label that lets a
-# caller select them with `ctest -L integration` or skip them with `-LE`.
+# caller select them with `ctest -L live` or skip them with `-LE`.
 gtest_discover_tests(
   integration_tests
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" LABELS
-             integration DISCOVERY_TIMEOUT 60)
+             live DISCOVERY_TIMEOUT 60)

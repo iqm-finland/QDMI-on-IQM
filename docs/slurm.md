@@ -79,16 +79,3 @@ Administrators can put shared non-secret settings in `/etc/mqt-core/qdmi.json`
 and expose the workload environment through site defaults or a software module.
 See [device configuration](usage.md#session-configuration) for quantum computer
 IDs, aliases, and their precedence.
-
-## Exercise the integration
-
-[MQT Core's cluster playground](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
-is a concrete deployment with a shared quantum access partition and several
-device implementations. Follow its build instructions to install the current
-main branches for this development setup.
-
-The
-[Slurm smoke test](https://github.com/iqm-finland/QDMI-on-IQM/tree/main/test/slurm)
-uses that playground to run an authenticated eight-shot Qiskit job on the
-Emerald Resonance mock using the installed wheel. Its README describes the
-required credentials and commands.

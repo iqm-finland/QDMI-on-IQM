@@ -17,14 +17,16 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/iteration.h"
+
 #include "../iteration/iteration_management_smoke.hpp"
-#include "cpr/connection_pool.h"
-#include "cpr/response.h"
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
-#include "iqm_qdmi/constants.h"
-#include "iqm_qdmi/iteration.h"
+
+#include "cpr/connection_pool.h"
+#include "cpr/response.h"
 
 #include <array>
 #include <chrono>
@@ -149,8 +151,12 @@ TEST_F(IterationManagement, ValidatesEveryArgumentBeforeNetworkActivity) {
               QDMI_ERROR_INVALIDARGUMENT);
     EXPECT_STREQ(result_.iteration_id, ID);
   }
-  for (const auto *id : {static_cast<const char *>(nullptr), "", "not-a-uuid",
-                         "12345678/1234-1234-abcd-123456789abc"}) {
+  for (const auto *id : {
+           static_cast<const char *>(nullptr),
+           "",
+           "not-a-uuid",
+           "12345678/1234-1234-abcd-123456789abc",
+       }) {
     EXPECT_EQ(IQM_QDMI_iteration_get(client_, id, 30000, &result_),
               QDMI_ERROR_INVALIDARGUMENT);
     EXPECT_EQ(IQM_QDMI_iteration_end(client_, id, 30000, &result_),
@@ -179,10 +185,15 @@ TEST_F(IterationManagement, AcceptsDurationBoundariesAndExplicitIdle) {
 }
 
 TEST_F(IterationManagement, RetainsConfirmedIdOnStateOrDiagnosticsFailure) {
-  for (const auto &state : {nlohmann::json("future-state"), nlohmann::json(42),
-                            nlohmann::json(nullptr)}) {
-    auto body = nlohmann::json{{"id", "12345678-1234-1234-ABCD-123456789ABC"},
-                               {"status", state}};
+  for (const auto &state : {
+           nlohmann::json("future-state"),
+           nlohmann::json(42),
+           nlohmann::json(nullptr),
+       }) {
+    const auto body = nlohmann::json{
+        {"id", "12345678-1234-1234-ABCD-123456789ABC"},
+        {"status", state},
+    };
     http_.queue_post(200, body.dump());
     EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
               QDMI_ERROR_FATAL);
@@ -190,11 +201,14 @@ TEST_F(IterationManagement, RetainsConfirmedIdOnStateOrDiagnosticsFailure) {
     EXPECT_STREQ(result_.state, "");
     EXPECT_EQ(result_.http_status, 200);
   }
-  http_.queue_post(200, nlohmann::json{{"id", ID},
-                                       {"status", "waiting"},
-                                       {"request_id", 42},
-                                       {"future", "ignored"}}
-                            .dump());
+  http_.queue_post(200,
+                   nlohmann::json{
+                       {"id", ID},
+                       {"status", "waiting"},
+                       {"request_id", 42},
+                       {"future", "ignored"},
+                   }
+                       .dump());
   EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
             QDMI_SUCCESS);
   EXPECT_STREQ(result_.iteration_id, ID);
@@ -222,9 +236,12 @@ TEST_F(IterationManagement, DoesNotRetryUncertainCreation) {
 }
 
 TEST_F(IterationManagement, PreservesInputIdAcrossErrorsAndRejectsMismatches) {
-  for (const auto *body : {"{}", "{",
-                           "{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\","
-                           "\"status\":\"active\"}"}) {
+  for (const auto *body : {
+           "{}",
+           "{",
+           "{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\","
+           "\"status\":\"active\"}",
+       }) {
     std::strcpy(result_.iteration_id, ID);
     http_.queue_get(200, body);
     EXPECT_EQ(
@@ -235,13 +252,14 @@ TEST_F(IterationManagement, PreservesInputIdAcrossErrorsAndRejectsMismatches) {
 }
 
 TEST_F(IterationManagement, MapsHttpErrorsAndSelectsDiagnostics) {
-  for (const auto [http, expected] :
-       {std::pair{400, QDMI_ERROR_INVALIDARGUMENT},
-        {401, QDMI_ERROR_PERMISSIONDENIED},
-        {403, QDMI_ERROR_PERMISSIONDENIED},
-        {404, QDMI_ERROR_NOTFOUND},
-        {429, QDMI_ERROR_INVALIDARGUMENT},
-        {500, QDMI_ERROR_FATAL}}) {
+  for (const auto [http, expected] : {
+           std::pair{400, QDMI_ERROR_INVALIDARGUMENT},
+           {401, QDMI_ERROR_PERMISSIONDENIED},
+           {403, QDMI_ERROR_PERMISSIONDENIED},
+           {404, QDMI_ERROR_NOTFOUND},
+           {429, QDMI_ERROR_INVALIDARGUMENT},
+           {500, QDMI_ERROR_FATAL},
+       }) {
     http_.queue_post(
         http,
         R"({"error_code":"server_reason","message":"reason","request_id":"trace","credentials":"excluded"})",
@@ -311,13 +329,14 @@ TEST_F(IterationManagement, NullClientAndAllocationFailuresAreContained) {
 
 TEST_F(IterationManagement, ContainsBoundaryExceptionsAndPreservesConfirmedId) {
   auto &hook = iqm::http::internal::Get_hooks().post;
-  for (const auto &[exception, expected] :
-       std::array{std::pair{std::make_exception_ptr(std::bad_alloc{}),
-                            QDMI_ERROR_OUTOFMEM},
-                  std::pair{std::make_exception_ptr(
-                                iqm::ClientAuthenticationError{"secret"}),
-                            QDMI_ERROR_PERMISSIONDENIED},
-                  std::pair{std::make_exception_ptr(42), QDMI_ERROR_FATAL}}) {
+  for (const auto &[exception, expected] : std::array{
+           std::pair{std::make_exception_ptr(std::bad_alloc{}),
+                     QDMI_ERROR_OUTOFMEM},
+           std::pair{std::make_exception_ptr(
+                         iqm::ClientAuthenticationError{"secret"}),
+                     QDMI_ERROR_PERMISSIONDENIED},
+           std::pair{std::make_exception_ptr(42), QDMI_ERROR_FATAL},
+       }) {
     hook = [exception](const auto &...) -> cpr::Response {
       std::rethrow_exception(exception);
     };
@@ -412,9 +431,12 @@ class IterationSmoke : public ::testing::Test {
 protected:
   iqm::test_support::HttpStub http_;
   std::filesystem::path scratch_;
-  static constexpr std::array VARIABLES{"IQM_SERVER_URL", "IQM_TOKEN",
-                                        "IQM_TOKENS_FILE",
-                                        "IQM_ITERATION_SCRATCH_FILE"};
+  static constexpr std::array VARIABLES{
+      "IQM_SERVER_URL",
+      "IQM_TOKEN",
+      "IQM_TOKENS_FILE",
+      "IQM_ITERATION_SCRATCH_FILE",
+  };
   std::array<std::optional<std::string>, VARIABLES.size()> previous_;
   static void set(const char *key, const char *value) {
 #ifdef _WIN32

@@ -70,8 +70,6 @@ target_link_libraries(
   PRIVATE qdmi::qdmi_project_warnings nlohmann_json::nlohmann_json)
 
 if(ENABLE_COVERAGE)
-  if(TARGET qdmi::qdmi_coverage_flags)
-    target_link_libraries(${QDMI_INTERNAL_TARGET_NAME}
-                          PUBLIC qdmi::qdmi_coverage_flags)
-  endif()
+  target_link_libraries(${QDMI_INTERNAL_TARGET_NAME}
+                        PUBLIC qdmi::qdmi_coverage_flags)
 endif()

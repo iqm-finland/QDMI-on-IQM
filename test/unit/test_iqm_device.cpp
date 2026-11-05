@@ -17,28 +17,30 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
+#include "iqm_qdmi/calibration.h"
+#include "iqm_qdmi/device.h"
+
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
-#include "iqm_qdmi/calibration.h"
-#include "iqm_qdmi/device.h"
 #include "logging.hpp"
 #include "qdmi_client.hpp"
+
+#include "cpr/response.h"
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cpr/response.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <new>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -1327,7 +1329,11 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto, const auto) -> cpr::Response { throw 42; };
+                const auto, const auto) -> cpr::Response {
+    // Exercise the C ABI's catch-all handler for non-standard exceptions.
+    // NOLINTNEXTLINE(bugprone-std-exception-baseclass)
+    throw 42;
+  };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
             QDMI_ERROR_FATAL);
@@ -1797,7 +1803,8 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReplaceAtomically) {
       R"({"circuits":[]})",
       R"({"shots":2})",
       R"({"calibration_set_id":null})",
-      R"({"duration":1e400})"};
+      R"({"duration":1e400})",
+  };
   for (const auto &invalid : invalid_options) {
     EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
                   job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, invalid.size() + 1,
@@ -1826,8 +1833,10 @@ TEST_F(DeviceJobMockTest, RunRequestOptionsReplaceAtomically) {
   http_stub.queue_post(200, R"({"id":"options-job"})");
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   auto expected = nlohmann::json::parse(options);
-  expected["circuits"] = {nlohmann::json::parse(TEST_CIRCUIT_IQM_JSON),
-                          nlohmann::json::parse(second)};
+  expected["circuits"] = {
+      nlohmann::json::parse(TEST_CIRCUIT_IQM_JSON),
+      nlohmann::json::parse(second),
+  };
   expected["shots"] = 1;
   expected["calibration_set_id"] = "f0fb4be5-e913-4a04-8c94-18d1bd842def";
   EXPECT_EQ(nlohmann::json::parse(http_stub.post_bodies().front()), expected);
@@ -2825,10 +2834,12 @@ TEST_F(DeviceIntegrationMockTest, DebugLogsPreserveResponseBodies) {
   queue_successful_initialization();
 
   EXPECT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
-  for (const auto &body : {list_quantum_computers_response,
-                           get_static_quantum_architectures_response,
-                           get_dynamic_quantum_architectures_response,
-                           get_calibration_set_quality_metrics_response}) {
+  for (const auto &body : {
+           list_quantum_computers_response,
+           get_static_quantum_architectures_response,
+           get_dynamic_quantum_architectures_response,
+           get_calibration_set_quality_metrics_response,
+       }) {
     EXPECT_NE(logs.str().find(body), std::string::npos);
   }
 }
@@ -3421,17 +3432,24 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
       std::rethrow_exception(exception);
     };
   };
-  const auto restore_transport = [&]() {
+  const auto restore_transport = [&] {
     hooks.get = stub_get;
     hooks.post = stub_post;
   };
   const std::array<std::pair<std::exception_ptr, int>, 4> mappings{
-      {{std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
-        QDMI_ERROR_PERMISSIONDENIED},
-       {std::make_exception_ptr(std::bad_alloc{}), QDMI_ERROR_OUTOFMEM},
-       {std::make_exception_ptr(std::runtime_error{"transport failure"}),
-        QDMI_ERROR_FATAL},
-       {std::make_exception_ptr(42), QDMI_ERROR_FATAL}}};
+      {
+          {
+              std::make_exception_ptr(iqm::ClientAuthenticationError{"denied"}),
+              QDMI_ERROR_PERMISSIONDENIED,
+          },
+          {std::make_exception_ptr(std::bad_alloc{}), QDMI_ERROR_OUTOFMEM},
+          {
+              std::make_exception_ptr(std::runtime_error{"transport failure"}),
+              QDMI_ERROR_FATAL,
+          },
+          {std::make_exception_ptr(42), QDMI_ERROR_FATAL},
+      },
+  };
 
   ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
                         TEST_CIRCUIT_IQM_JSON),
@@ -3694,8 +3712,10 @@ TEST_F(DeviceTest, CalibrationSelectorValidatesInput) {
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
                 strlen(invalid) + 1, invalid),
             QDMI_ERROR_INVALIDARGUMENT);
-  for (const auto *invalid_uuid : {"f0fb4be5/e913-4a04-8c94-18d1bd842def",
-                                   "f0fb4be5-e913-4a04-8c94-18d1bd842dez"}) {
+  for (const auto *invalid_uuid : {
+           "f0fb4be5/e913-4a04-8c94-18d1bd842def",
+           "f0fb4be5-e913-4a04-8c94-18d1bd842dez",
+       }) {
     EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                   session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4,
                   strlen(invalid_uuid) + 1, invalid_uuid),
