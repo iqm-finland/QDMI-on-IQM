@@ -252,19 +252,53 @@ def test_http_error_redacts_credentials(discovery: ModuleType, monkeypatch: pyte
     assert EXAMPLE_VALUE not in str(exc_info.value)
 
 
-@pytest.mark.parametrize("base_url", ["https://alice:password@example.com", "http://alice:password@example.com"])
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://alice:password@example.com",
+        "http://alice:password@example.com",
+        "https://@example.com",
+        "https://:password@example.com",
+    ],
+)
 def test_url_credentials_are_rejected_before_transport(
-    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, base_url: str
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, base_url: str
 ) -> None:
     """Never forward credentials embedded in the server URL."""
     get = Mock()
+    open_device = Mock()
     monkeypatch.setattr(discovery.requests, "get", get)
+    monkeypatch.setattr(discovery, "open_device", open_device)
+    caplog.set_level(logging.INFO)
     with pytest.raises(ValueError, match="Credentials in server URLs are not supported"):
         discovery.list_quantum_computers(base_url, None)
     get.assert_not_called()
     with pytest.raises(ValueError, match="Credentials in server URLs are not supported"):
         discovery.run_discovery(base_url=base_url, token=None, tokens_file=None, min_qubits=5)
     get.assert_not_called()
+    open_device.assert_not_called()
+    assert "alice" not in caplog.text
+    assert "password" not in caplog.text
+
+
+def test_server_inventory_values_are_escaped_in_logs(
+    discovery: ModuleType, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Keep server-controlled newlines from forging log records."""
+    inventory = [{"id": "id\nforged", "alias": "alias\nforged", "display_name": "name\nforged"}]
+    monkeypatch.setattr(discovery, "list_quantum_computers", Mock(return_value=inventory))
+    monkeypatch.setattr(discovery, "open_device", Mock(side_effect=RuntimeError))
+    caplog.set_level(logging.INFO)
+    with pytest.raises(SystemExit, match="Could not query properties"):
+        discovery.run_discovery(base_url="https://example.com", token=None, tokens_file=None, min_qubits=5)
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(
+        r"id='id\nforged'" in message
+        and r"alias='alias\nforged'" in message
+        and r"display_name='name\nforged'" in message
+        for message in messages
+    )
+    assert all("\nforged" not in message for message in messages)
 
 
 @pytest.mark.parametrize("base_url", ["example.com", "ftp://example.com"])
@@ -272,6 +306,24 @@ def test_base_url_requires_http_scheme_and_host(discovery: ModuleType, base_url:
     """Reject malformed endpoints before logging or sending requests."""
     with pytest.raises(ValueError, match="HTTP or HTTPS scheme and a hostname"):
         discovery.resolve_base_url(base_url)
+
+
+@pytest.mark.parametrize(
+    ("base_url", "message"),
+    [
+        ("https://example.com:abc", "valid HTTP or HTTPS URL"),
+        ("https://example.com/path with spaces", "valid HTTP or HTTPS URL"),
+        (" https://example.com", "valid HTTP or HTTPS URL"),
+        (r"https:\\example.com", "valid HTTP or HTTPS URL"),
+        ("https://example.com?token=secret", "query or fragment"),
+        ("https://example.com#fragment", "query or fragment"),
+    ],
+)
+def test_base_url_rejects_invalid_port_query_and_fragment(discovery: ModuleType, base_url: str, message: str) -> None:
+    """Reject malformed or ambiguous endpoints before they can reach a request or device."""
+    with pytest.raises(ValueError, match=message) as exc_info:
+        discovery.resolve_base_url(base_url)
+    assert "secret" not in str(exc_info.value)
 
 
 @pytest.mark.parametrize("base_url", ["http://example.com", "http://192.0.2.1"])
