@@ -256,7 +256,7 @@ Before running the integration tests, make sure you have set the necessary
 environment variables:
 
 ```console
-export IQM_BASE_URL="https://resonance.iqm.tech"
+export IQM_SERVER_URL="https://resonance.iqm.tech"
 export IQM_QUANTUM_COMPUTER="emerald:mock"
 export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
@@ -392,7 +392,8 @@ uvx nox -s minimums-3.14
 Normal and minimum-version sessions exclude `live` tests, including in a
 credentialed shell. Use `uvx nox -s live-tests` for an explicitly selected mock
 or QPU. Provide `IQM_TOKEN` or `IQM_TOKENS_FILE` and select the backend with
-`IQM_QUANTUM_COMPUTER`, `IQM_QC_ALIAS`, or `IQM_QC_ID`.
+`IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`. The legacy `IQM_QC_ALIAS` alias is also
+supported.
 
 ### Running the Python examples
 

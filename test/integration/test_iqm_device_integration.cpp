@@ -77,18 +77,26 @@ protected:
             ? std::make_optional<std::string>(tokens_file_env)
             : std::nullopt;
 
-    const auto *base_url_env = std::getenv("IQM_BASE_URL");
+    const auto *base_url_env = std::getenv("IQM_SERVER_URL");
+    if (base_url_env == nullptr || *base_url_env == '\0') {
+      base_url_env = std::getenv("IQM_BASE_URL");
+    }
     const std::string base_url =
-        (base_url_env != nullptr) ? base_url_env : "https://resonance.iqm.tech";
+        (base_url_env != nullptr && *base_url_env != '\0')
+            ? base_url_env
+            : "https://resonance.iqm.tech";
 
     const auto *qc_id_env = std::getenv("IQM_QC_ID");
     const std::optional<std::string> qc_id =
         (qc_id_env != nullptr) ? std::make_optional<std::string>(qc_id_env)
                                : std::nullopt;
 
-    const auto *qc_alias_env = std::getenv("IQM_QC_ALIAS");
+    const auto *qc_alias_env = std::getenv("IQM_QUANTUM_COMPUTER");
+    if (qc_alias_env == nullptr || *qc_alias_env == '\0') {
+      qc_alias_env = std::getenv("IQM_QC_ALIAS");
+    }
     const std::optional<std::string> qc_alias =
-        (qc_alias_env != nullptr)
+        (qc_alias_env != nullptr && *qc_alias_env != '\0')
             ? std::make_optional<std::string>(qc_alias_env)
             : std::nullopt;
     requested_qc_alias = qc_alias;
