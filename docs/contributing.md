@@ -180,7 +180,9 @@ development package.
 
 CI runs offline C++ and Python checks separately from authenticated Resonance
 mock tests. Fork PRs stay offline. Wheel and release builds need no IQM
-credentials, and ordinary CI does not execute on a QPU.
+credentials, and ordinary CI does not execute on a QPU. The reusable live
+workflow accepts a JSON array of aliases through `iqm-qc-aliases`, for example
+`["emerald"]` for a QPU.
 
 ### Configure and Build
 
@@ -388,8 +390,9 @@ uvx nox -s minimums-3.14
 ```
 
 Normal and minimum-version sessions exclude `live` tests, including in a
-credentialed shell. `uvx nox -s live-tests` requires credentials and an explicit
-`IQM_QUANTUM_COMPUTER` mock selector.
+credentialed shell. Use `uvx nox -s live-tests` for an explicitly selected mock
+or QPU. Provide `IQM_TOKEN` or `IQM_TOKENS_FILE` and select the backend with
+`IQM_QUANTUM_COMPUTER`, `IQM_QC_ALIAS`, or `IQM_QC_ID`.
 
 ### Running the Python examples
 
