@@ -10,15 +10,23 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Run PennyLane QNodes with `iqm.qdmi` using MQT Core compilation and
+  execution. Install the `pennylane` extra. ([#321]) ([**@burgholzer**])
+
 ### Changed
 
-- 💥 Use Core's native IQM serialization, including MOVE and logical result
-  reconstruction. Remove `qiskit_to_iqm_json`, its serializer entry point and
-  `physical_qubits`; wire indices denote physical site IDs, including gaps. Keep
-  circuit metadata in local results. ([#321]) ([**@burgholzer**])
-- 💥 Remove `MoveGate` and provider target construction. Compile star-device
-  circuits with `backend.compile` before submission. ([#321])
-  ([**@burgholzer**])
+- 💥 Use MQT Core for IQM JSON serialization and classical-bit result ordering.
+  Replace `qiskit_to_iqm_json` and its serializer entry point with MQT Core's
+  `serialize_program`. ([#321]) ([**@burgholzer**])
+- 💥 Remove `physical_qubits`; native circuit qubit indices identify device
+  sites, including gaps. ([#321]) ([**@burgholzer**])
+- 💥 Replace `MoveGate` with `Gate("move", 2, [])`. Compile circuits for devices
+  with computational resonators with `backend.compile` before submission.
+  ([#321]) ([**@burgholzer**])
+- ♻️ Keep Qiskit circuit metadata in local results instead of sending it to IQM.
+  ([#321]) ([**@burgholzer**])
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -206,8 +214,8 @@ releases may include breaking changes.
   ([**@marcelwa**])
 - 🐛 Fix a potential histogram buffer size mismatch ([#181]) ([**@marcelwa**])
 - 🐛 Report the number of qubits without the computational resonators, which
-  inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on Star-topology devices ([#182])
-  ([**@marcelwa**])
+  inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on devices with computational
+  resonators ([#182]) ([**@marcelwa**])
 - 🐛 Contain exceptions so they do not escape the C interface ([#175], [#188])
   ([**@burgholzer**], [**@marcelwa**])
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM

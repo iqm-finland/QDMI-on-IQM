@@ -32,14 +32,13 @@ native build. These are **not shipped** in any binary or wheel.
 
 ## Optional Python Integration Dependencies
 
-These are installed when users request the `qiskit` extra via
-`iqm-qdmi[qiskit]`. They live in the user's Python environment and are
-**not bundled** inside the wheel itself.
+The `qiskit` and `pennylane` extras install their adapters and MQT Core in the
+user's Python environment. These dependencies are not bundled in the wheel.
 
-| Dependency | Version              | License     | Purpose                                                                  |
-| :--------- | :------------------- | :---------- | :----------------------------------------------------------------------- |
-| [MQT Core] | ~=4.1.1              | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
-| [Qiskit]   | ≥2.1                 | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
+| Dependency | Version     | License     | Purpose                                                                  |
+| :--------- | :---------- | :---------- | :----------------------------------------------------------------------- |
+| [MQT Core] | ≥4.1.2.dev0 | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
+| [Qiskit]   | ≥2.5        | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
 
 ## End-to-End Example Dependencies
 

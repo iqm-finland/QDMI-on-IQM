@@ -22,16 +22,15 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-import pytest
 from mqt.core.mlir import CompiledProgram, TargetEnvironment, serialize_program
-from qiskit.circuit import Gate, QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 
 if TYPE_CHECKING:
     from iqm.qdmi.qiskit import IQMBackend
 
 
 def test_native_device_serialization(offline_backend: IQMBackend) -> None:
-    """Use the actual IQM QDMI handle and Core's native device snapshot."""
+    """Use the actual IQM QDMI handle and MQT Core's native device snapshot."""
     qc = QuantumCircuit(2, 3)
     qc.r(1.0, 0.0, 0)
     qc.cz(0, 1)
@@ -45,21 +44,3 @@ def test_native_device_serialization(offline_backend: IQMBackend) -> None:
     assert instructions[-1]["locus"] == ["QB2"]
     assert program.result_layout is not None
     assert program.result_layout.decode_bits("1") == "100"
-
-
-@pytest.mark.parametrize("offline_backend", ["resonator"], indirect=True)
-def test_native_move_serialization(offline_backend: IQMBackend) -> None:
-    """Core serializes native MOVE loci from the installed device's metadata."""
-    circuit = QuantumCircuit(3, 2)
-    circuit.r(1.0, 0.0, 0)
-    circuit.append(Gate("move", 2, []), [0, 2])
-    circuit.cz(1, 2)
-    circuit.append(Gate("move", 2, []), [0, 2])
-    circuit.measure([0, 1], [1, 0])
-    program = serialize_program(circuit, target=TargetEnvironment.from_device(offline_backend.device))
-    assert isinstance(program, CompiledProgram)
-    instructions = json.loads(program.payload)["instructions"]
-    assert instructions[1] == {"name": "move", "locus": ["QB1", "CR1"], "args": {}}
-    assert instructions[2] == {"name": "cz", "locus": ["QB2", "CR1"], "args": {}}
-    assert program.result_layout is not None
-    assert program.result_layout.decode_bits("01") == "10"

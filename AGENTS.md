@@ -77,6 +77,12 @@ explicit invocation, valid credentials, and an appropriate target.
 - MUST add or update tests for every code change, including regression tests for
   bug fixes.
 - MUST keep changes focused and avoid unrelated refactors or formatting.
+- DO NOT leak conversation, prompt, or iteration history into code comments,
+  pull request descriptions, or other maintainer-facing prose. Write for readers
+  who have not seen the conversation.
+- PREFER comments that explain the current behavior and rationale. Avoid
+  past-facing wording such as "preserve the existing behavior"; explain the
+  actual backwards-compatibility constraint instead.
 - MUST follow existing patterns in neighboring source and test files.
 - MUST document new user-facing behavior and update `CHANGELOG.md` for
   noteworthy user-facing changes.

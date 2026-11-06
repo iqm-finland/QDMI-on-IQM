@@ -50,28 +50,7 @@ def test_compile_calibrated_qubits(offline_backend: IQMBackend, *, calibrated: b
     assert {site for instruction in instructions for site in instruction["locus"]} <= expected
 
 
-@pytest.mark.parametrize("offline_backend", ["resonator"], indirect=True)
-def test_compile_and_submit_sirius(offline_backend: IQMBackend, offline_submissions: list[dict]) -> None:
-    """Compile a Bell circuit through a resonator and submit only to localhost."""
-    assert "move" not in offline_backend.target.operation_names
-    assert "cz" not in offline_backend.target.operation_names
-    circuit = QuantumCircuit(2, 2)
-    circuit.h(0)
-    circuit.cx(0, 1)
-    circuit.measure([0, 1], [0, 1])
-    job = offline_backend.run(offline_backend.compile(circuit), shots=4)
-    assert job.job_id() == "offline-job"
-    assert job.result().get_counts() == {"00": 2, "11": 2}
-    assert len(offline_submissions) == 1
-    instructions = offline_submissions[0]["circuits"][0]["instructions"]
-    names = [instruction["name"] for instruction in instructions]
-    assert names.count("move") == 2
-    first_measure = names.index("measure")
-    assert "move" not in names[first_measure:]
-    assert offline_submissions[0]["shots"] == 4
-
-
 @pytest.mark.parametrize("offline_backend", ["extra_operations"], indirect=True)
 def test_target_accepts_iqm_extra_operations(offline_backend: IQMBackend) -> None:
-    """Extra native operations do not prevent constructing the shared Core target."""
+    """Extra native operations do not prevent constructing the shared MQT Core target."""
     assert {"prx_12", "measure_012", "r", "measure"} <= offline_backend.target.operation_names

@@ -21,9 +21,6 @@ install the `iqm-qdmi` package with the `qiskit` extra:
 uv pip install "iqm-qdmi[qiskit]"
 ```
 
-For development, `uv sync --extra qiskit` uses the Core revision pinned in this
-checkout.
-
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from
 {py:mod}`iqm.qdmi.qiskit` and used with Qiskit's transpilation and execution
 interfaces.
@@ -48,8 +45,9 @@ print(result.get_counts())
 Follow MQT Core's
 [compile-and-run guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/qdmi_backend.html)
 for native compilation and result handling. Qiskit's `transpile(qc, backend)`
-supports devices with direct qubit connectivity. Star devices use Core
-compilation.
+supports devices with direct qubit connectivity. Devices with computational
+resonators use MQT Core compilation. MQT Core places qubits only on sites with
+calibrated single-qubit gates and measurement, using the device's site indices.
 
 Select any stable ID from the
 [installed catalogue](usage.md#using-the-device-with-mqt-core).
@@ -71,20 +69,15 @@ token-file defaults. Explicit arguments and driver configuration can override
 manifest values.
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
-and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), Core's
-IQM JSON exporter uses these units. Applications submitting IQM JSON directly
-must use the same format. PRX angles and phases must be floating-point JSON
-numbers, including integral values such as `0.0`; Core emits this
-representation.
+and `phase` fields, as specified by
+[IQM Client](https://docs.iqm.tech/iqm-client/). Applications submitting IQM
+JSON directly must use floating-point JSON numbers for PRX angles and phases,
+including integral values such as `0.0`.
 
-## Calibrated qubits
+## Devices with computational resonators
 
-MQT Core places qubits only on sites with calibrated single-qubit gates and
-measurement, preserving physical site indices.
-
-## Sirius star devices
-
-Core inserts MOVE operations when compiling for a star topology:
+MQT Core inserts MOVE operations to route two-qubit gates through computational
+resonators:
 
 ```python
 from qiskit import QuantumCircuit
@@ -99,11 +92,11 @@ result = backend.run(backend.compile(circuit), shots=128).result()
 ```
 
 Qiskit's `transpile` and primitives do not route two-qubit gates through
-resonators. Use `backend.compile`, Core's `compile_program` with
+resonators. Use `backend.compile`, MQT Core's `compile_program` with
 `submit_program`, or the
 [PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html).
 See the
-[Core compiler guide](https://mqt.readthedocs.io/projects/core/en/latest/mlir/target_compilation.html)
+[MQT Core compiler guide](https://mqt.readthedocs.io/projects/core/en/latest/mlir/target_compilation.html)
 for compilation options and resonator routing.
 
 ## Measurement results
@@ -112,8 +105,9 @@ Ordered samples are included by default (`memory=True`). Use
 `result.get_memory()` to access them, or pass `memory=False` to return counts
 only.
 
-Each measured qubit's last gate must precede its measurement. Core reconstructs
-classical bits from the measured-site results; see its guide linked above.
+Each measured qubit's last gate must precede its measurement. MQT Core
+reconstructs the circuit's classical-bit order from the measurement results; see
+the compile-and-run guide linked above.
 
 Hand-written MOVE circuits use `Gate("move", 2, [])` from
 {py:class}`qiskit.circuit.Gate` and `serialize_program`, preserving ordered

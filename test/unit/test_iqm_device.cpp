@@ -885,7 +885,7 @@ TEST_F(DeviceIntegrationMockTest, QueueWithoutALengthIsNotReportedAsIdle) {
 }
 
 TEST_F(DeviceIntegrationMockTest, QubitCountExcludesComputationalResonators) {
-  // A Star-topology device: three qubits around one computational resonator.
+  // Three qubits coupled to one computational resonator.
   http_stub.queue_get(200, list_quantum_computers_response);
   http_stub.queue_get(200, R"([
       {

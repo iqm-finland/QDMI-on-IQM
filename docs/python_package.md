@@ -83,7 +83,7 @@ command-line scripts are exposed:
 
 The sampler and offloader transpile with Qiskit; the estimator expects a native
 ansatz. They require direct qubit connectivity for two-qubit circuits and do not
-route through Sirius resonators.
+route through computational resonators.
 
 ### `iqm-sampler` Usage
 

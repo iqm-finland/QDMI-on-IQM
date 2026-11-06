@@ -51,7 +51,7 @@ The
 also submits IQM sampler and estimator jobs through `srun`. IQM supports IQM
 JSON and QIR. The
 [MQT Core PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html)
-also compiles to IQM JSON and reconstructs the requested logical results.
+also compiles to IQM JSON and reconstructs the requested measurement results.
 
 ## Prepare the cluster
 

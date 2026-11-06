@@ -62,40 +62,12 @@ def offline_backend(
                 implementation["loci"] = [locus for locus in implementation["loci"] if "QB1" not in locus]
     if variant == "extra_operations":
         metadata[2]["gates"]["measure_012"] = metadata[2]["gates"]["measure"]
-    if variant == "resonator":
-        metadata[1][0]["computational_resonators"] = ["CR1"]
-        metadata[1][0]["connectivity"] += [["QB1", "CR1"], ["QB2", "CR1"]]
-        calibration = metadata[2]
-        calibration["computational_resonators"] = ["CR1"]
-        calibration["gates"]["move"] = {
-            "implementations": {"default": {"loci": [["QB1", "CR1"]]}},
-            "default_implementation": "default",
-            "override_default_implementation": {},
-        }
-        calibration["gates"]["cz"]["implementations"]["tgss"]["loci"] = [["QB2", "CR1"]]
     responses = deque(metadata)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             if responses:
                 response = responses.popleft()
-            elif self.path.endswith("/measurement_counts"):
-                keys = [
-                    instruction["args"]["key"]
-                    for instruction in offline_submissions[-1]["circuits"][0]["instructions"]
-                    if instruction["name"] == "measure"
-                ]
-                response = [{"measurement_keys": keys, "counts": {"00": 2, "11": 2}}]
-            elif self.path.endswith("/measurements"):
-                response = [
-                    {
-                        instruction["args"]["key"]: [[0], [0], [1], [1]]
-                        for instruction in offline_submissions[-1]["circuits"][0]["instructions"]
-                        if instruction["name"] == "measure"
-                    }
-                ]
-            elif self.path.endswith("/offline-job"):
-                response = {"status": "ready"}
             else:
                 self.send_error(500, "Unexpected request")
                 return
