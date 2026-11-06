@@ -53,12 +53,13 @@ jobs:
         env: *iqm-mock
         run: uvx nox -s live-tests
 
-      - name: Python mock metadata
+      - name: Python resonator mock tests
         if: matrix.mock == 'sirius:mock'
         env: *iqm-mock
         run: >-
           uvx nox -s live-tests -- test/python/test_device_capabilities.py
-          -k 'device_advertises_exactly_its_supported_formats or device_reports_queue_length'
+          test/python/test_qiskit_backend.py
+          -k 'device_advertises_exactly_its_supported_formats or device_reports_queue_length or native_compilation_on_mock'
 
   installation:
     name: ☁️ Live C++ installation · IQM mock · ${{ matrix.runs-on }}

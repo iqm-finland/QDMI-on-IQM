@@ -1,130 +1,60 @@
 # Dependencies
 
-This project relies on several third-party libraries and tools. Below is a
-comprehensive list of these dependencies along with their purposes, versions,
-and licenses.
+[CMake dependencies] and [package metadata] define dependency versions and
+bounds. `uv.lock` records the resolved Python environment.
 
-## Core Runtime Dependencies
+## Runtime dependencies
 
-These dependencies are linked into the shared library and
-**shipped with every built wheel or binary**, except system curl on macOS.
+CPR and nlohmann/json are compiled into the device library. curl is linked
+statically on Linux and Windows; macOS uses the system library. QDMI supplies
+interface headers, including the generated IQM declarations installed with the
+development package; no QDMI driver library is linked into the device.
 
-| Dependency      | Version | License                        | Purpose                                                    |
-| :-------------- | :------ | :----------------------------- | :--------------------------------------------------------- |
-| [QDMI]          | 1.4.0   | Apache-2.0 with LLVM-exception | QDMI specification and interface headers                   |
-| [nlohmann/json] | 3.12.0  | MIT License                    | JSON parsing and serialization                             |
-| [CPR]           | 1.15.1  | MIT License                    | C++ Requests HTTP client library for backend communication |
-| [curl]          | 8.23.0  | curl License                   | HTTP transport                                             |
+| Dependency      | Version                         | License                        | Purpose                        |
+| :-------------- | :------------------------------ | :----------------------------- | :----------------------------- |
+| [QDMI]          | 1.4.0                           | Apache-2.0 WITH LLVM-exception | Device interface and headers   |
+| [nlohmann/json] | 3.12.0                          | MIT                            | JSON parsing and serialization |
+| [CPR]           | 1.15.1                          | MIT                            | C++ HTTP client                |
+| [curl]          | 8.23.0; system version on macOS | curl                           | HTTP transport                 |
+| [OpenSSL]       | ≥3; Linux                       | Apache-2.0                     | TLS                            |
 
-```{note}
-Linux wheels also bundle OpenSSL 3 (Apache-2.0); updating it requires a new
-wheel release. The device's LLVM exception does not apply to OpenSSL.
-```
+Linux wheels bundle OpenSSL; native builds use the installed OpenSSL development
+package. Windows uses Schannel and macOS uses system curl's TLS implementation.
+Updating a bundled library requires rebuilding the wheel.
 
-## Build Dependencies
+## Optional Python integrations
 
-Used to build the Python package and bridge packaging with the CMake-based
-native build. These are **not shipped** in any binary or wheel.
+The base package requires Python 3.11 or newer and has no Python runtime
+dependencies. Python execution uses [MQT Core]'s QDMI client. Framework extras
+install packages into the Python environment, not into the device wheel.
 
-| Dependency          | Version | License    | Purpose                                    |
-| :------------------ | :------ | :--------- | :----------------------------------------- |
-| [scikit-build-core] | ≥1.0.1  | Apache-2.0 | Python build backend and CMake integration |
+| Extra       | Dependencies                                       | Purpose                                                     |
+| :---------- | :------------------------------------------------- | :---------------------------------------------------------- |
+| `qiskit`    | MQT Core with Qiskit support and Qiskit Algorithms | Qiskit backend, primitives, and sampler/estimator utilities |
+| `pennylane` | MQT Core with PennyLane support                    | Finite-shot QNodes                                          |
 
-## Optional Python Integration Dependencies
+Qiskit and PennyLane can be installed independently. MQT Core's extras define
+their supported versions; [package metadata] records all dependency bounds. See
+[Qiskit](qiskit.md) and [PennyLane](pennylane.md) for installation and usage.
+The native C/C++ library does not depend on MQT Core or a Python framework.
 
-These are installed when users request the `qiskit` extra via
-`iqm-qdmi[qiskit]`. They live in the user's Python environment and are
-**not bundled** inside the wheel itself.
+## Build dependencies
 
-| Dependency | Version              | License     | Purpose                                                                  |
-| :--------- | :------------------- | :---------- | :----------------------------------------------------------------------- |
-| [MQT Core] | ~=4.1.1              | MIT License | QDMI-aware Qiskit provider, backend, sampler, and estimator integrations |
-| [Qiskit]   | ≥2.1                 | Apache-2.0  | Quantum circuit construction, transpilation, and primitive interfaces    |
+Native builds require a C++20 compiler, CMake 3.24 or newer, and Git. Linux
+builds also require OpenSSL development headers. Python packaging uses
+`scikit-build-core`; documentation uses Sphinx and Doxygen. The `build`, `test`,
+and `docs` dependency groups install tools for their respective tasks. See
+[contributing](contributing.md) for build and validation commands.
 
-## End-to-End Example Dependencies
+The [examples](examples.md) declare workload-specific dependencies in their
+[PEP 723](https://peps.python.org/pep-0723/) script metadata. These packages are
+not required by the device library.
 
-On top of the Python integration dependencies, the example scripts rely on
-additional libraries to construct and execute their workloads. The scripts in
-`examples/` declare these dependencies in their own
-[PEP 723](https://peps.python.org/pep-0723/) metadata. These dependencies are
-resolved when the scripts are executed locally and are **not shipped** as part
-of the `iqm-qdmi` wheel.
-
-| Dependency      | Version | License     | Applies to         | Purpose                                         |
-| :-------------- | :------ | :---------- | :----------------- | :---------------------------------------------- |
-| [MQT Bench]     | ≥2.2.2  | MIT License | Benchmark examples | Standardized benchmark circuit generation       |
-| [Qiskit Nature] | ≥0.7.2  | Apache-2.0  | QSCI example       | Electronic-structure modeling and qubit mapping |
-
-## Test Dependencies
-
-Used for testing only, **not shipped** in any binary or wheel.
-
-### C++ Tests
-
-| Dependency   | Version | License      | Purpose                          |
-| :----------- | :------ | :----------- | :------------------------------- |
-| [googletest] | 1.17.0  | BSD-3-Clause | C++ unit and integration testing |
-
-### Python Tests
-
-| Dependency               | Version | License      | Purpose                         |
-| :----------------------- | :------ | :----------- | :------------------------------ |
-| [pytest]                 | ≥9.0.1  | MIT License  | Testing framework               |
-| [pytest-console-scripts] | ≥1.4.1  | MIT License  | Testing CLI entry points        |
-| [pytest-cov]             | ≥7.0.0  | MIT License  | Test coverage reporting         |
-| [pytest-sugar]           | ≥1.1.1  | BSD-3-Clause | Prettier test output formatting |
-| [pytest-xdist]           | ≥3.8.0  | MIT License  | Parallel test execution         |
-
-## Documentation Dependencies
-
-Used to generate the documentation site and API reference, **not shipped** in
-any binary or wheel.
-
-| Dependency          | Version    | License      | Purpose                                                 |
-| :------------------ | :--------- | :----------- | :------------------------------------------------------ |
-| [Doxygen]           | ≥1.15      | GNU GPL v2   | API documentation generation                            |
-| [Sphinx]            | ≥8.1.3     | BSD-2-Clause | Documentation site generator                            |
-| [MyST-NB]           | ≥1.3.0     | BSD-3-Clause | Markdown and notebook pages                             |
-| [Sphinx AutoAPI]    | ≥3.6.1     | MIT License  | Python API reference pages                              |
-| [Furo]              | ≥2025.9.25 | MIT License  | Sphinx HTML theme                                       |
-| [Sphinx Copybutton] | ≥0.5.2     | MIT License  | Copy-to-clipboard buttons for code blocks               |
-| [Sphinx Design]     | ≥0.6.1     | MIT License  | Layout and UI directives such as cards, grids, and tabs |
-
-```{note}
-Doxygen is licensed under GNU GPL v2, but
-[documents produced by Doxygen are derivative works of the input, not of Doxygen itself](https://www.doxygen.nl/manual/), <!-- rumdl-disable-line MD013 -->
-and are therefore not affected by the GPL. The generated documentation remains
-under the project's own license terms.
-```
-
-## Development Dependencies
-
-Used for local development workflows, **not shipped** in any binary or wheel.
-
-| Dependency | Version    | License    | Purpose                                                          |
-| :--------- | :--------- | :--------- | :--------------------------------------------------------------- |
-| [nox]      | ≥2026.4.10 | Apache-2.0 | Session runner for tests, linting, docs, packaging, and examples |
-
+[CMake dependencies]: https://github.com/iqm-finland/QDMI-on-IQM/blob/main/cmake/ExternalDependencies.cmake
+[package metadata]: https://github.com/iqm-finland/QDMI-on-IQM/blob/main/pyproject.toml
 [CPR]: https://github.com/libcpr/cpr
 [curl]: https://curl.se/
-[Doxygen]: https://github.com/doxygen/doxygen
-[Furo]: https://github.com/pradyunsg/furo
-[googletest]: https://github.com/google/googletest
-[MQT Bench]: https://mqt.readthedocs.io/projects/bench/
 [MQT Core]: https://mqt.readthedocs.io/projects/core/
-[MyST-NB]: https://github.com/executablebooks/MyST-NB
 [nlohmann/json]: https://github.com/nlohmann/json
-[nox]: https://github.com/wntrblm/nox
-[pytest]: https://github.com/pytest-dev/pytest
-[pytest-console-scripts]: https://github.com/kvas-it/pytest-console-scripts
-[pytest-cov]: https://github.com/pytest-dev/pytest-cov
-[pytest-sugar]: https://github.com/Teemu/pytest-sugar
-[pytest-xdist]: https://github.com/pytest-dev/pytest-xdist
+[OpenSSL]: https://openssl-library.org/
 [QDMI]: https://github.com/Munich-Quantum-Software-Stack/qdmi
-[Qiskit]: https://github.com/Qiskit/qiskit
-[Qiskit Nature]: https://github.com/qiskit-community/qiskit-nature
-[scikit-build-core]: https://github.com/scikit-build/scikit-build-core
-[Sphinx]: https://github.com/sphinx-doc/sphinx
-[Sphinx AutoAPI]: https://github.com/readthedocs/sphinx-autoapi
-[Sphinx Copybutton]: https://github.com/executablebooks/sphinx-copybutton
-[Sphinx Design]: https://github.com/executablebooks/sphinx-design
