@@ -27,7 +27,7 @@ else()
       CACHE STRING "Minimum QDMI version")
   set(QDMI_VERSION 1.4.0
       CACHE STRING "QDMI version")
-  set(QDMI_REV "999ca9c9cce4fb63b844b5aea3f81c3a9a754abd" # QDMI query conformance tests
+  set(QDMI_REV "b08081e86fab65a17ab969d021dfb24f601d7136" # QDMI query conformance tests
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -156,25 +156,6 @@ if(BUILD_IQM_QDMI_TESTS)
   FetchContent_Declare(googletest URL ${GTEST_URL} FIND_PACKAGE_ARGS
                                       ${GTEST_VERSION} NAMES GTest)
   list(APPEND FETCH_PACKAGES googletest)
-endif()
-
-if(BUILD_IQM_QDMI_DOCS)
-  set(CMAKE_POLICY_DEFAULT_CMP0116
-      NEW
-      CACHE STRING
-            "Set the default CMP0116 policy to NEW for documentation builds")
-  set(DOXYGEN_MIN_VERSION
-      1.15.0
-      CACHE STRING "Doxygen version")
-  set(DOXYGEN_REV
-      "669aeeefca743c148e2d935b3d3c69535c7491e6" # v1.16.1
-      CACHE STRING "Doxygen identifier (tag, branch or commit hash)")
-  FetchContent_Declare(
-    Doxygen
-    GIT_REPOSITORY https://github.com/doxygen/doxygen.git
-    GIT_TAG ${DOXYGEN_REV}
-    FIND_PACKAGE_ARGS ${DOXYGEN_MIN_VERSION})
-  list(APPEND FETCH_PACKAGES Doxygen)
 endif()
 
 FetchContent_MakeAvailable(${FETCH_PACKAGES})

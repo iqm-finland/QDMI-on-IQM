@@ -4,6 +4,7 @@ kernelspec:
   name: python3
 language_info:
   name: python
+  pygments_lexer: ipython3
 mystnb:
   number_source_lines: true
 ---
@@ -79,6 +80,10 @@ command-line scripts are exposed:
 - `iqm-estimator` (see the {py:mod}`~iqm.qdmi.estimator` entry point module):
   Variational Quantum Eigensolver (VQE) parameter estimation for a serialized
   ansatz and observable.
+
+The sampler and offloader transpile with Qiskit; the estimator expects a native
+ansatz. They require direct qubit connectivity for two-qubit circuits and do not
+route through computational resonators.
 
 ### `iqm-sampler` Usage
 

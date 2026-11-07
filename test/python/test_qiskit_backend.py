@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
+from mqt.core.mlir import CompiledProgram
 from qiskit.circuit import QuantumCircuit
 from qiskit.compiler import transpile
 from qiskit.quantum_info import SparsePauliOp
@@ -133,8 +135,8 @@ def test_iqm_backend_prefers_explicit_arguments_over_environment(
     }
 
 
-def test_iqm_backend_preserves_existing_registration(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An existing configured definition should win over the packaged fallback."""
+def test_iqm_backend_uses_configured_registration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The configured device definition takes precedence over the packaged default."""
     captured = _stub_backend_construction(monkeypatch)
     monkeypatch.delenv("IQM_SERVER_URL", raising=False)
     monkeypatch.delenv("IQM_BASE_URL", raising=False)
@@ -238,6 +240,7 @@ def circuit() -> QuantumCircuit:
     return circuit
 
 
+@pytest.mark.live
 def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """Test the execution of a simple Bell state circuit."""
     circuit.measure_all()
@@ -247,6 +250,7 @@ def test_iqm_backend(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.live
 def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound sampler should execute a simple circuit on the live IQM backend."""
     circuit.measure_all()
@@ -256,6 +260,7 @@ def test_iqm_backend_sampler(circuit: QuantumCircuit, backend: IQMBackend) -> No
     assert sum(counts.values()) == 8
 
 
+@pytest.mark.live
 def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> None:
     """The bound estimator should execute a simple observable on the live IQM backend."""
     observable = SparsePauliOp("Z" * backend.num_qubits)
@@ -271,7 +276,7 @@ def test_iqm_backend_estimator(circuit: QuantumCircuit, backend: IQMBackend) -> 
 
 
 def test_iqm_backend_selects_calibration_before_target_creation(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Use the existing MQT session hook before constructing the backend target."""
+    """Select the session calibration before constructing the backend target."""
     captured = _stub_backend_construction(monkeypatch)
     calibration_id = "f0fb4be5-e913-4a04-8c94-18d1bd842def"
     IQMBackend(calibration_set_id=calibration_id.upper())
@@ -300,3 +305,17 @@ def test_iqm_backend_reports_effective_calibration(monkeypatch: pytest.MonkeyPat
     device.query_custom_property.return_value = None
     with pytest.raises(RuntimeError, match="did not report"):
         _ = backend.calibration_set_id
+
+
+@pytest.mark.live
+def test_native_compilation_on_mock(circuit: QuantumCircuit, backend: IQMBackend) -> None:
+    """Compile and execute against the explicitly selected Resonance mock."""
+    circuit.measure_all()
+    program = backend.compile(circuit)
+    assert isinstance(program, CompiledProgram)
+    instructions = json.loads(program.payload)["instructions"]
+    if any((site.name() or "").startswith("CR") for site in backend.device.sites()):
+        assert any(instruction["name"] == "move" for instruction in instructions)
+    result = backend.run(program, shots=8).result()
+    assert sum(result.get_counts().values()) == 8
+    assert len(result.get_memory()) == 8

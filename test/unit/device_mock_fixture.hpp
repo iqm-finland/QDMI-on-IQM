@@ -23,9 +23,10 @@
 
 #pragma once
 
-#include "http_stub.hpp"
 #include "iqm_qdmi/constants.h"
 #include "iqm_qdmi/device.h"
+
+#include "http_stub.hpp"
 
 #include <cstdlib>
 #include <gtest/gtest.h>

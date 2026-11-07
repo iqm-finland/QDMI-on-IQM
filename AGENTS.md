@@ -2,15 +2,13 @@
 
 ## C++
 
-- Configure:
-  `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IQM_QDMI_TESTS=ON`
-- Build: `cmake --build build --config Release`
-- Run unit tests without IQM access:
-  `ctest -C Release --test-dir build/test/unit --output-on-failure`
-- Run a single unit test binary: `./build/test/unit/unit_tests`
-- Run all configured tests:
-  `ctest -C Release --test-dir build --output-on-failure`
-- For debug builds, replace `Release` with `Debug`.
+- Configure: `cmake --preset release`
+- Build: `cmake --build --preset release`
+- Run offline tests: `ctest --preset release`
+- Run a single unit test binary: `./build/release/test/unit/unit_tests`
+- Run live tests only when explicitly intended:
+  `ctest --test-dir build/release -L live --output-on-failure`
+- For debug builds, replace the `release` preset with `debug`.
 
 Integration tests under `test/integration/` require access to an IQM backend.
 Set the required `IQM_*` environment variables and run them only when live IQM
@@ -26,8 +24,8 @@ access is explicitly intended.
   `uvx nox -s examples -- --backend sim`
 - Run a targeted test: `uvx nox -s tests-3.14 -- -k <test-expression>`
 
-The default examples session targets real IQM hardware. Do not run it without
-explicit intent, valid credentials, and an appropriate target.
+The examples session defaults to local simulation. Live checks require an
+explicit invocation, valid credentials, and an appropriate target.
 
 ## Documentation
 
@@ -35,13 +33,6 @@ explicit intent, valid credentials, and an appropriate target.
 - Build documentation: `uvx nox -s docs`
 - Check links: `uvx nox -s docs -- -b linkcheck`
 - Generated HTML: `docs/_build/html/`
-
-## Slurm Integration
-
-- MQT Core owns the shared Slurm runner and Docker cluster.
-- `test/slurm/` contains an SDK workload for the Emerald Resonance mock. Its
-  README describes the required credentials and eight-shot workload. Run it only
-  when live IQM access is explicitly intended.
 
 ## Tech Stack
 
@@ -72,7 +63,7 @@ explicit intent, valid credentials, and an appropriate target.
 
 - Sphinx and MyST
 - Furo theme
-- Doxygen and Breathe for C/C++ API documentation
+- Doxygen for C/C++ API documentation
 - AutoAPI for Python API documentation
 
 ## Development Guidelines
@@ -86,6 +77,12 @@ explicit intent, valid credentials, and an appropriate target.
 - MUST add or update tests for every code change, including regression tests for
   bug fixes.
 - MUST keep changes focused and avoid unrelated refactors or formatting.
+- DO NOT leak conversation, prompt, or iteration history into code comments,
+  pull request descriptions, or other maintainer-facing prose. Write for readers
+  who have not seen the conversation.
+- PREFER comments that explain the current behavior and rationale. Avoid
+  past-facing wording such as "preserve the existing behavior"; explain the
+  actual backwards-compatibility constraint instead.
 - MUST follow existing patterns in neighboring source and test files.
 - MUST document new user-facing behavior and update `CHANGELOG.md` for
   noteworthy user-facing changes.

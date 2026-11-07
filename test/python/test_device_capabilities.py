@@ -36,6 +36,8 @@ from qiskit.compiler import transpile
 from iqm.qdmi import IQM_QDMI_DEVICE_ID
 from iqm.qdmi.qiskit import IQMBackend
 
+pytestmark = pytest.mark.live
+
 # Every IQM quantum computer accepts these two.
 BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON}
 
@@ -65,11 +67,11 @@ def device(backend: IQMBackend) -> Device:
     del backend
     return open_device(
         IQM_QDMI_DEVICE_ID,
-        base_url=os.getenv("IQM_BASE_URL") or None,
+        base_url=os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL") or None,
         token=os.getenv("IQM_TOKEN"),
         auth_file=Path(tokens_file) if tokens_file else None,
         custom1=os.getenv("IQM_QC_ID"),
-        custom2=os.getenv("IQM_QC_ALIAS"),
+        custom2=os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS"),
     )
 
 

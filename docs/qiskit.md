@@ -4,6 +4,7 @@ kernelspec:
   name: python3
 language_info:
   name: python
+  pygments_lexer: ipython3
 mystnb:
   number_source_lines: true
 ---
@@ -17,7 +18,7 @@ open-source, MIT-licensed MQT Core library. To use the wrapper, make sure to
 install the `iqm-qdmi` package with the `qiskit` extra:
 
 ```console
-uv pip install iqm-qdmi[qiskit]
+uv pip install "iqm-qdmi[qiskit]"
 ```
 
 Then, the {py:class}`~iqm.qdmi.qiskit.IQMBackend` class can be imported from
@@ -27,7 +28,6 @@ interfaces.
 ```{code-cell} ipython3
 from iqm.qdmi.qiskit import IQMBackend
 from qiskit.circuit import QuantumCircuit
-from qiskit.compiler import transpile
 
 backend = IQMBackend(device_id="iqm.emerald.mock")
 ```
@@ -38,10 +38,16 @@ qc.h(0)
 qc.cx(0, 1)
 qc.measure_all()
 
-transpiled_qc = transpile(qc, backend)
-result = backend.run(transpiled_qc, shots=128).result()
+result = backend.run(backend.compile(qc), shots=128).result()
 print(result.get_counts())
 ```
+
+Follow MQT Core's
+[compile-and-run guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/qdmi_backend.html)
+for native compilation and result handling. Qiskit's `transpile(qc, backend)`
+supports devices with direct qubit connectivity. Devices with computational
+resonators use MQT Core compilation. MQT Core places qubits only on sites with
+calibrated single-qubit gates and measurement, using the device's site indices.
 
 Select any stable ID from the
 [installed catalogue](usage.md#using-the-device-with-mqt-core).
@@ -63,22 +69,35 @@ token-file defaults. Explicit arguments and driver configuration can override
 manifest values.
 
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
-and `phase` fields. Like [IQM Client](https://docs.iqm.tech/iqm-client/), the
-Qiskit serializer uses these units. Applications submitting IQM JSON directly
-must use the same format.
+and `phase` fields, as specified by
+[IQM Client](https://docs.iqm.tech/iqm-client/). Applications submitting IQM
+JSON directly must use floating-point JSON numbers for PRX angles and phases,
+including integral values such as `0.0`.
 
-## Calibrated qubits
+## Devices with computational resonators
 
-`IQMBackend` builds its Qiskit target from qubits with both PRX and measurement
-calibrations, together with the device's computational resonators. At least one
-calibrated qubit is required.
+MQT Core inserts MOVE operations to route two-qubit gates through computational
+resonators:
 
-Circuit qubit indices and `initial_layout` entries refer to this target. For
-example, if QB2 is unavailable on a three-qubit device, target indices 0 and 1
-refer to QB1 and QB3. Inspect `backend.physical_qubits` for the corresponding
-device site indices; the IQM JSON serializer uses this mapping for instruction
-loci. The underlying QDMI device and generic MQT Core `QDMIBackend` expose
-physical site indices.
+```python
+from qiskit import QuantumCircuit
+from iqm.qdmi.qiskit import IQMBackend
+
+backend = IQMBackend(device_id="iqm.sirius.mock")
+circuit = QuantumCircuit(2, 2)
+circuit.h(0)
+circuit.cx(0, 1)
+circuit.measure([0, 1], [0, 1])
+result = backend.run(backend.compile(circuit), shots=128).result()
+```
+
+Qiskit's `transpile` and primitives do not route two-qubit gates through
+resonators. Use `backend.compile`, MQT Core's `compile_program` with
+`submit_program`, or the
+[PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html).
+See the
+[MQT Core compiler guide](https://mqt.readthedocs.io/projects/core/en/latest/mlir/target_compilation.html)
+for compilation options and resonator routing.
 
 ## Measurement results
 
@@ -86,40 +105,34 @@ Ordered samples are included by default (`memory=True`). Use
 `result.get_memory()` to access them, or pass `memory=False` to return counts
 only.
 
-Measurements must follow all gates and write every classical bit exactly once;
-each qubit may be measured once. The serializer orders terminal measurements by
-classical-bit index, including across registers, so counts and memory use the
-Qiskit register layout. Barriers in the readout suffix precede the serialized
-measurements. Circuits with unused classical bits or intermediate measurements
-are rejected before submission.
+Each measured qubit's last gate must precede its measurement. MQT Core
+reconstructs the circuit's classical-bit order from the measurement results; see
+the compile-and-run guide linked above.
+
+Hand-written MOVE circuits use `Gate("move", 2, [])` from
+{py:class}`qiskit.circuit.Gate` and `serialize_program`, preserving ordered
+qubit/resonator loci.
 
 ## Circuit Metadata
 
-The IQM JSON serializer preserves `QuantumCircuit.metadata` in the native
-program's `metadata` field without modifying the circuit. Empty metadata remains
-`{}`. Values follow Python's JSON encoding: dictionaries, lists, tuples (encoded
-as arrays), strings, booleans, `None`, integers, and finite floating-point
-numbers are supported. Object keys must be strings at every nesting level, so
-that keys such as `1` and `"1"` cannot collide after conversion to JSON.
-
-If any value is unsupported (such as NumPy arrays or custom Python objects), or
-the metadata has circular references or nonfinite numbers, the serializer drops
-the whole metadata with a warning and submits the circuit. Convert such values
-explicitly to keep them. This preserves metadata in the submitted IQM program;
-it does not add a metadata retrieval API or guarantee that a remote service
-returns it in results.
+Circuit names and `QuantumCircuit.metadata` remain in the local Qiskit result
+header. Arbitrary metadata is not sent to the IQM service. The shared compiler's
+IQM payload uses its entry-point name, `main`, independently of the circuit
+name.
 
 ## Sampler and Estimator Primitives
 
-{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see
-{py:meth}`~iqm.qdmi.qiskit.IQMBackend.sampler` and
-{py:meth}`~iqm.qdmi.qiskit.IQMBackend.estimator`) for constructing
+{py:class}`~iqm.qdmi.qiskit.IQMBackend` provides small helpers (see `sampler()`
+and `estimator()`) for constructing
 {py:class}`~qiskit.primitives.BackendSamplerV2` and
 {py:class}`~qiskit.primitives.BackendEstimatorV2` primitives bound to the
 backend instance.
 
 ```{code-cell} ipython3
-sampler_job = backend.sampler().run([(transpiled_qc,)], shots=128)
+from qiskit import transpile
+
+native_qc = transpile(qc, backend)
+sampler_job = backend.sampler().run([(native_qc,)], shots=128)
 counts = sampler_job.result()[0].data["meas"].get_counts()
 print(f"Counts: {counts}")
 ```
@@ -127,10 +140,10 @@ print(f"Counts: {counts}")
 ```{code-cell} ipython3
 from qiskit.quantum_info import SparsePauliOp
 
-transpiled_qc.remove_final_measurements(inplace=True)
+native_qc.remove_final_measurements(inplace=True)
 observable = SparsePauliOp("Z" * backend.num_qubits)
 
-estimator_job = backend.estimator().run([(transpiled_qc, observable)])
+estimator_job = backend.estimator().run([(native_qc, observable)])
 data = estimator_job.result()[0].data
 print(f"Expectation values: {data['evs']}")
 print(f"Standard deviations: {data['stds']}")
@@ -144,7 +157,7 @@ Configure execution with IQM `CircuitJobDefinition` fields in
 ```python
 backend.set_options(run_request_options={"dd_mode": "enabled"})
 job = backend.run(
-    transpile(qc, backend),
+    backend.compile(qc),
     shots=128,
     run_request_options={"dd_mode": "enabled", "active_reset_cycles": 2},
 )

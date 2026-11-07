@@ -19,11 +19,12 @@
 
 #include "logging.hpp"
 
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
+
 #include <cstdlib>
-#include <gtest/gtest.h>
 #include <iostream>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <sstream>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)

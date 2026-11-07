@@ -53,12 +53,13 @@ name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
 [project.optional-dependencies]
+pennylane = [ "mqt-core[pennylane]>=4.1.2.dev0" ]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core[qiskit]>=4.1.2.dev0",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
-  "qiskit[qasm3-import]>=2.1",
+  "qiskit>=2.5",
   "qiskit-algorithms>=0.4",
 ]
 
@@ -75,16 +76,19 @@ iqm-sampler = "iqm.qdmi.sampler:main"
 
 [project.entry-points]
 "mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
-# Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
-"mqt.core.qiskit.program_serializers".IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
+
+[project.entry-points."pennylane.plugins"]
+"iqm.qdmi" = "iqm.qdmi.pennylane:IQMDevice"
 
 
 [dependency-groups]
 dev = [
+  { include-group = "build" },
   { include-group = "test" },
   "nox>=2026.4.10",
 ]
 test = [
+  "mqt-core[pennylane]>=4.1.2.dev0",
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.1",
@@ -93,7 +97,8 @@ test = [
   { include-group = "qiskit" },
 ]
 docs = [
-  "breathe>=4.36",
+  "mqt-core[pennylane]>=4.1.2.dev0",
+  { include-group = "qiskit" },
   "furo>=2025.12.19",
   "myst-nb>=1.4",
   "sphinx>=9",
@@ -102,13 +107,14 @@ docs = [
   "sphinx-design>=0.7",
   "sphinx-llm>=1",
 ]
+build = [ "scikit-build-core>=1.1" ]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core[qiskit]>=4.1.2.dev0",
   "numpy>=2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
-  "qiskit[qasm3-import]>=2.1",
+  "qiskit>=2.5",
   "qiskit-algorithms>=0.4",
 ]
 
@@ -164,27 +170,21 @@ cache-keys = [
 
 [tool.uv.sources]
 iqm-qdmi = { workspace = true }
+mqt-core = { git = "https://github.com/munich-quantum-toolkit/core.git", rev = "25854e4e3b3c06f4f68fe9052f75bdccbb4e7684" }
 
 
 [tool.cibuildwheel]
 build = "cp3*"
 test-skip = [
+  "*-win_arm64",   # no Windows ARM64 wheels for qiskit and dependencies
   "cp3??t-*",      # no freethreading qiskit wheels
-  "cp*-win_arm64", # no numpy, qiskit, ... wheels
   "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
 ]
 archs = "auto64"
 build-frontend = "uv"
-environment-pass = [
-  "IQM_BASE_URL",
-  "IQM_QC_ALIAS",
-  "IQM_TOKEN",
-  "IQM_LOG_LEVEL",
-  "IQM_CPP_API_LOG_LEVEL",
-]
+before-test = 'uv pip install --group "{project}/pyproject.toml:test"'
 test-command = "pytest test/python"
-test-groups = [ "test" ]
-test-sources = [ "test/python" ]
+test-sources = [ "test/python", "pyproject.toml" ]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
@@ -231,7 +231,6 @@ per-file-ignores."python/iqm/qdmi/estimator.py" = [ "T201" ]
 per-file-ignores."python/iqm/qdmi/offloader.py" = [ "PLW0717" ]
 per-file-ignores."python/iqm/qdmi/sampler.py" = [ "T201" ]
 per-file-ignores."test/python/**" = [ "INP001", "T20" ]
-per-file-ignores."test/slurm/**" = [ "INP001" ]
 isort.known-first-party = [ "iqm.qdmi" ]
 pydocstyle.convention = "google"
 future-annotations = true
@@ -282,19 +281,26 @@ allowed-unresolved-imports = [ "mqt.bench.**", "qiskit_nature.**", "qiskit_algor
 
 [tool.pytest]
 addopts = [
+  "-m",
+  "not live",
   "-ra",
   "--numprocesses=auto", # Automatically use all available CPU cores for parallel testing
 ]
 filterwarnings = [
   "error",
+  # PennyLane pins Autograd <1.9; its wraps helper returns in finally.
+  "ignore:'return' in a 'finally' block:SyntaxWarning:.*autograd[./\\\\]wrap_util",
+  "default:.* is newer than the .*tested:UserWarning",
   # SciPy solver deprecation
   "ignore:.*The `disp` and `iprint` options of the L-BFGS-B solver are deprecated.*:DeprecationWarning:",
   # SciPy OptimizeWarning for unknown options
   "ignore:.*Unknown solver options.*::",
   # UserWarning for unmapped operations
   "ignore:.*Device operation 'prx_12' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
+  "ignore:.*Device operation 'measure_012' cannot be mapped to a Qiskit gate and will be skipped.*:UserWarning:",
 ]
 log_level = "INFO"
+markers = [ "live: explicit provider access" ]
 minversion = "9.0"
 strict = true
 testpaths = [ "test/python" ]
