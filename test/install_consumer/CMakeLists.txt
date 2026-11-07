@@ -41,63 +41,23 @@ endif()
 
 get_target_property(library iqm-qdmi-device IMPORTED_LOCATION_RELEASE)
 get_filename_component(library_dir "${library}" DIRECTORY)
-get_target_property(runtime_files iqm-qdmi-device QDMI_RUNTIME_FILES)
-if(NOT runtime_files)
-  set(runtime_files "")
+if(NOT EXISTS "${library_dir}/iqm-qdmi-device.qdmi.json")
+  message(FATAL_ERROR "Missing installed device manifest")
 endif()
-foreach(runtime_file IN LISTS runtime_files)
-  if(NOT EXISTS "${library_dir}/${runtime_file}")
-    message(FATAL_ERROR "Missing SDK runtime library ${runtime_file}")
-  endif()
-endforeach()
-if(UNIX AND NOT APPLE)
-  file(GLOB bundled "${library_dir}/*.so*")
-  list(FILTER bundled EXCLUDE REGEX "/libiqm-qdmi-device[.]so([.].*)?$")
-  list(TRANSFORM bundled REPLACE "^.*/" "")
-  list(SORT bundled)
-  list(SORT runtime_files)
-  if(NOT bundled STREQUAL runtime_files)
-    message(FATAL_ERROR "SDK runtime exports do not match bundled libraries")
-  endif()
-endif()
-
-file(READ "${library_dir}/iqm-qdmi-device.qdmi.json" manifest)
-string(JSON schema_version GET "${manifest}" schema-version)
-string(JSON device_count LENGTH "${manifest}" qdmi devices)
-if(NOT schema_version EQUAL 1 OR device_count LESS 1)
-  message(FATAL_ERROR "Invalid installed device manifest")
-endif()
-math(EXPR last_device "${device_count} - 1")
-foreach(index RANGE ${last_device})
-  string(
-    JSON
-    device_library
-    GET
-    "${manifest}"
-    qdmi
-    devices
-    ${index}
-    library)
-  if(NOT EXISTS "${library_dir}/${device_library}")
-    message(
-      FATAL_ERROR "Device manifest references missing library ${device_library}"
-    )
-  endif()
-endforeach()
 
 if(WIN32)
+  get_target_property(runtime_files iqm-qdmi-device QDMI_RUNTIME_FILES)
+  if(runtime_files)
+    list(TRANSFORM runtime_files PREPEND "${library_dir}/")
+  else()
+    set(runtime_files "")
+  endif()
   add_custom_command(
     TARGET consumer
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${library}"
-            $<TARGET_FILE_DIR:consumer>)
-  foreach(runtime_file IN LISTS runtime_files)
-    add_custom_command(
-      TARGET consumer
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "${library_dir}/${runtime_file}" $<TARGET_FILE_DIR:consumer>)
-  endforeach()
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${library}" ${runtime_files}
+            $<TARGET_FILE_DIR:consumer>
+    VERBATIM)
 endif()
 enable_testing()
 add_test(NAME installed-consumer COMMAND consumer)

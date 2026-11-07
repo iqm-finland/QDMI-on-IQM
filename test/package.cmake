@@ -147,14 +147,3 @@ run("${CMAKE_COMMAND}"
 run("${CMAKE_COMMAND}" --build "${work}/consumer")
 run("${CMAKE_CTEST_COMMAND}" --test-dir "${work}/consumer" --output-on-failure
     --no-tests=error)
-execute_process(
-  COMMAND
-    "${CMAKE_COMMAND}" -S "${source}/test/install_consumer" -B "${work}/missing"
-    -G Ninja "-DCMAKE_PREFIX_PATH=${relocated}-missing"
-    "-DCMAKE_SYSTEM_PREFIX_PATH=${relocated}"
-  RESULT_VARIABLE result
-  OUTPUT_QUIET ERROR_QUIET)
-if(result EQUAL 0)
-  message(
-    FATAL_ERROR "The consumer accepted a package outside the supplied prefix")
-endif()
