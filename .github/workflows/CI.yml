@@ -30,6 +30,7 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/CD.yml
         .github/cpp-sdk.json
+        test/install_consumer/**
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
