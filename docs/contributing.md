@@ -453,28 +453,19 @@ explicit target to execute provider-backed notebooks.
 
 ## Preparing C++ SDK Release Assets
 
-GitHub Releases for this repository are immutable. Build and attach the five C++
-SDK archives to the Release Drafter draft **before** publishing it:
+GitHub Releases are immutable. After merging the release version to `main`, run
+**Prepare C++ SDK release assets** from `main` with the matching draft tag. The
+workflow reuses wheel packaging, tests the extracted native SDKs and stages the
+archives with `SHA256SUMS` and `SOURCE_SHA` on the draft. Verify these assets
+before publishing; CD checks their source commit before publishing to PyPI.
 
-1. Merge the release changes to `main`. Ensure the draft's `vX.Y.Z` tag matches
-   the version in `CMakeLists.txt`.
-2. Run the **Prepare C++ SDK release assets** workflow from `main`, supplying
-   the draft tag. It builds Linux x86-64 and arm64, macOS arm64, and Windows
-   x86-64 and arm64 archives, then extracts and tests each one. It then creates
-   the `vX.Y.Z` tag at the commit it built and attaches the archives to the
-   draft.
-3. Confirm that the draft has all five archives, `SHA256SUMS`, and `SOURCE_SHA`.
-   Merges to `main` after the tag belong to the next release, but Release
-   Drafter still lists them in the draft notes; remove them before publishing.
-4. Publish the draft. GitHub releases the existing tag, and the CD workflow
-   publishes the Python distributions to PyPI. It refuses to publish when the
-   tag differs from `SOURCE_SHA`.
+The workflow pins the tag to the commit it built. Later merges belong to the
+next release; remove their entries from the draft notes before publishing. To
+stage a newer commit, delete the unpublished tag and rerun preparation.
 
-To stage a newer commit before publishing, delete the tag and rerun the
-workflow.
-
-The SDK archives are also built as temporary artifacts on relevant PRs. They are
-not uploaded to a Release until the manual preparation workflow succeeds.
+`.github/cpp-sdk.json` defines the SDK platforms. CI assembles and tests SDKs
+from its wheel artifacts with `test/package.cmake`, using the same consumer as
+the installation check.
 
 ## Tips for Development
 

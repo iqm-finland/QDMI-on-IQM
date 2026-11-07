@@ -28,8 +28,8 @@ else()
     DESTINATION "${LICENSE_INSTALL_DIR}"
     COMPONENT ${QDMI_TARGET_NAME}_Runtime)
 endif()
-set(LICENSE_DEPENDENCIES cpr nlohmann_json curl)
-set(LICENSE_FILENAMES LICENSE LICENSE.MIT COPYING)
+set(LICENSE_DEPENDENCIES qdmi cpr nlohmann_json curl)
+set(LICENSE_FILENAMES LICENSE LICENSE LICENSE.MIT COPYING)
 foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
   FetchContent_GetProperties(${DEPENDENCY})
   if(${DEPENDENCY}_SOURCE_DIR)
@@ -39,6 +39,45 @@ foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
       COMPONENT ${QDMI_TARGET_NAME}_Runtime)
   endif()
 endforeach()
+
+# manylinux distributions provide notices for the OpenSSL libraries bundled by
+# auditwheel.
+if(SKBUILD
+   AND UNIX
+   AND NOT APPLE)
+  find_program(RPM_EXECUTABLE rpm)
+  if(RPM_EXECUTABLE)
+    get_filename_component(openssl_library "${OPENSSL_CRYPTO_LIBRARY}" REALPATH)
+    execute_process(
+      COMMAND "${RPM_EXECUTABLE}" -qf --qf "%{NAME}" "${openssl_library}"
+      OUTPUT_VARIABLE openssl_package
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE openssl_package_result
+      ERROR_QUIET)
+    if(openssl_package_result EQUAL 0)
+      execute_process(COMMAND "${RPM_EXECUTABLE}" -ql "${openssl_package}"
+                      OUTPUT_VARIABLE openssl_files COMMAND_ERROR_IS_FATAL ANY)
+      string(REPLACE "\n" ";" openssl_files "${openssl_files}")
+      set(openssl_notices "")
+      foreach(file IN LISTS openssl_files)
+        if(file MATCHES "/licenses/"
+           AND EXISTS "${file}"
+           AND NOT IS_DIRECTORY "${file}")
+          list(APPEND openssl_notices "${file}")
+        endif()
+      endforeach()
+      if(NOT openssl_notices)
+        message(
+          FATAL_ERROR
+            "OpenSSL license notices are missing from ${openssl_package}")
+      endif()
+      install(
+        FILES ${openssl_notices}
+        DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
+        COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+    endif()
+  endif()
+endif()
 
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})

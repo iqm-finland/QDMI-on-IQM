@@ -19,12 +19,7 @@
 
 #include "iqm_qdmi/device.h"
 
-int main() {
-  IQM_QDMI_Device_Session session = nullptr;
-  if (IQM_QDMI_device_session_alloc(&session) != QDMI_SUCCESS ||
-      session == nullptr) {
-    return 1;
-  }
-  IQM_QDMI_device_session_free(session);
-  return 0;
+int main(void) {
+  return IQM_QDMI_device_initialize() != QDMI_SUCCESS ||
+         IQM_QDMI_device_finalize() != QDMI_SUCCESS;
 }
