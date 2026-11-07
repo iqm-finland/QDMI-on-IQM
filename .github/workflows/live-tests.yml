@@ -1,6 +1,11 @@
 name: ☁️ Live tests
 on:
   workflow_call:
+    inputs:
+      iqm-qc-aliases:
+        description: JSON array of IQM quantum computer aliases to test.
+        type: string
+        default: '["emerald:mock", "garnet:mock", "sirius:mock"]'
     secrets:
       IQM_TOKEN:
         required: true
@@ -9,14 +14,11 @@ permissions:
 
 jobs:
   integration:
-    name: ☁️ Live tests · IQM mock
+    name: ☁️ Live tests · IQM · ${{ matrix.backend }}
     strategy:
       fail-fast: false
       matrix:
-        mock:
-          - emerald:mock
-          - garnet:mock
-          - sirius:mock
+        backend: ${{ fromJSON(inputs.iqm-qc-aliases) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
@@ -39,23 +41,21 @@ jobs:
           cmake --preset release
           cmake --build --preset release --parallel 4
 
-      - name: C++ mock tests
-        env: &iqm-mock
+      - name: C++ live tests
+        env: &iqm-live
           IQM_SERVER_URL: https://resonance.iqm.tech
-          IQM_BASE_URL: https://resonance.iqm.tech
-          IQM_QUANTUM_COMPUTER: ${{ matrix.mock }}
-          IQM_QC_ALIAS: ${{ matrix.mock }}
+          IQM_QUANTUM_COMPUTER: ${{ matrix.backend }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
         run: ctest --test-dir build/release -L live --output-on-failure --timeout 600 --parallel 1
 
-      - name: Python mock tests
-        if: matrix.mock != 'sirius:mock'
-        env: *iqm-mock
+      - name: Python live tests
+        if: matrix.backend != 'sirius:mock'
+        env: *iqm-live
         run: uvx nox -s live-tests
 
       - name: Python resonator mock tests
-        if: matrix.mock == 'sirius:mock'
-        env: *iqm-mock
+        if: matrix.backend == 'sirius:mock'
+        env: *iqm-live
         run: >-
           uvx nox -s live-tests -- test/python/test_device_capabilities.py
           test/python/test_qiskit_backend.py
@@ -131,7 +131,6 @@ jobs:
       - name: Test
         env:
           IQM_QUANTUM_COMPUTER: "emerald:mock"
-          IQM_QC_ALIAS: emerald:mock
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_LOG_LEVEL: "DEBUG"
         run: ctest -C Release --output-on-failure --test-dir build -L live --timeout 600 --parallel 1

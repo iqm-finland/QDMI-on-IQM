@@ -81,7 +81,7 @@ parameters for the session:
   `IQM_QC_ID`.
 - **Quantum Computer Alias** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional
   alias of the specific quantum computer to use. If not set, falls back to
-  `IQM_QC_ALIAS`.
+  `IQM_QUANTUM_COMPUTER`, then the legacy `IQM_QC_ALIAS` alias.
 - **HTTP Request Timeout** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3`): Optional
   positive `uint64_t` duration in milliseconds applied to every HTTP request
   made by the session. If not set, each request uses the default one-hour
