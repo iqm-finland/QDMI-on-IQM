@@ -125,22 +125,6 @@ jobs:
       runs-on: ${{ matrix.runs-on }}
       apt-packages: libssl-dev zlib1g-dev
 
-  build-cpp-sdk:
-    name: 📦 Assemble C++ SDK
-    needs: [change-detection, build-wheel]
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
-          - macos-26
-          - windows-2025
-          - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@c218dcbc1cf41cc338d13e3331c651492b592365 # codex/add-cpp-sdk-packaging
-    with:
-      runs-on: ${{ matrix.runs-on }}
-
   cpp-linter:
     name: 🇨 Lint
     needs: change-detection
@@ -211,6 +195,22 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
 
+  build-cpp-sdk:
+    name: 📦 Assemble C++ SDK
+    needs: [change-detection, build-wheel]
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@c218dcbc1cf41cc338d13e3331c651492b592365 # codex/add-cpp-sdk-packaging
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
   documentation:
     name: 📚 Documentation
     permissions:
@@ -250,7 +250,6 @@ jobs:
       - cpp-coverage
       - cpp-sanitizers
       - cpp-install-tests
-      - build-cpp-sdk
       - cpp-linter
       - python-tests
       - python-coverage
@@ -258,6 +257,7 @@ jobs:
       - python-linter
       - build-sdist
       - build-wheel
+      - build-cpp-sdk
       - documentation
       - live-tests
     if: always()
@@ -285,7 +285,7 @@ jobs:
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests)
               && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'build-cpp-sdk,build-sdist,build-wheel,' || ''
+              && 'build-sdist,build-wheel,build-cpp-sdk,' || ''
             }}
             ${{
               github.event_name == 'pull_request'
