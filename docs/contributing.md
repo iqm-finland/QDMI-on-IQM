@@ -451,6 +451,22 @@ Documentation builds execute offline examples and cache their outputs. Use
 `uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
 explicit target to execute provider-backed notebooks.
 
+## Preparing C++ SDK Release Assets
+
+GitHub Releases are immutable. After merging the release version to `main`, run
+**Prepare C++ SDK release assets** from `main` with the matching draft tag. The
+workflow reuses wheel packaging, tests the extracted native SDKs and stages the
+archives with `SHA256SUMS` and `SOURCE_SHA` on the draft. Verify these assets
+before publishing; CD checks their source commit before publishing to PyPI.
+
+The workflow pins the tag to the commit it built. Later merges belong to the
+next release; remove their entries from the draft notes before publishing. To
+stage a newer commit, delete the unpublished tag and rerun preparation.
+
+`.github/cpp-sdk.json` defines the SDK platforms. CI assembles and tests SDKs
+from its wheel artifacts with `test/package.cmake`, using the same consumer as
+the installation check.
+
 ## Tips for Development
 
 If something goes wrong, the CI pipeline will notify you. Here are some tips for

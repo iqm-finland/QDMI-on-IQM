@@ -19,12 +19,17 @@ jobs:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
     with:
       additional-cpp-files: |
+        .github/workflows/CI.yml
         .github/workflows/cpp-*.yml
         .github/workflows/live-tests.yml
       additional-python-files: |
         .github/workflows/live-tests.yml
         .github/workflows/python-*.yml
         examples/**
+      additional-cd-files: |
+        .github/workflows/CI.yml
+        .github/workflows/CD.yml
+        .github/cpp-sdk.json
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -115,6 +120,7 @@ jobs:
       clang-version: 23
       files-changed-only: true
       cpp-linter-extra-args: "-Wunused-template"
+      cpp-linter-ignore-extra: "test/install_consumer/**"
 
   python-tests:
     name: 🐍 Test
@@ -188,6 +194,22 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
 
+  cpp-sdk:
+    name: 📦 SDK
+    needs: [change-detection, build-wheel]
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@57e07b7c19b9faa56e8ac2dfd94f15de4d7904eb # codex/add-cpp-sdk-packaging
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
   documentation:
     name: 📚 Documentation
     permissions:
@@ -224,6 +246,7 @@ jobs:
       - cpp-tests-ubuntu
       - cpp-tests-macos
       - cpp-tests-windows
+      - cpp-sdk
       - cpp-sanitizers
       - cpp-coverage
       - cpp-linter
@@ -244,11 +267,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-install-tests,' || ''
-            }}
-            ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
@@ -265,7 +284,7 @@ jobs:
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests)
               && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'build-sdist,build-wheel,' || ''
+              && 'build-sdist,build-wheel,cpp-sdk,' || ''
             }}
             ${{
               github.event_name == 'pull_request'

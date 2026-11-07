@@ -45,6 +45,29 @@ jobs:
       name: pypi
       url: https://pypi.org/p/iqm-qdmi
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Staging sets SOURCE_SHA only after verifying all SDK assets.
+      - name: Check C++ SDK assets before publishing to PyPI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          release_dir=$(mktemp -d)
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$release_dir" \
+            --pattern '*.tar.gz' --pattern SHA256SUMS --pattern SOURCE_SHA
+          test "$(cat "$release_dir/SOURCE_SHA")" = "$GITHUB_SHA"
+          package=$(jq -r .package .github/cpp-sdk.json)
+          count=$(jq '.platforms | length' .github/cpp-sdk.json)
+          test "$(find "$release_dir" -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq "$count"
+          test "$(wc -l < "$release_dir/SHA256SUMS")" -eq "$count"
+          while IFS= read -r triple; do
+            archive="${package}_${RELEASE_TAG}_${triple}.tar.gz"
+            test -f "$release_dir/$archive"
+            awk -v name="$archive" '$2 == name {found++} END {exit found == 1 ? 0 : 1}' "$release_dir/SHA256SUMS"
+          done < <(jq -r '.platforms[]' .github/cpp-sdk.json)
+          (cd "$release_dir" && sha256sum -c SHA256SUMS)
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cibw-*

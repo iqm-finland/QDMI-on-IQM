@@ -1,0 +1,136 @@
+name: 📦 Prepare C++ SDK release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Tag of the Release Drafter draft, such as v1.5.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-sdk-release-${{ inputs.release-tag }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: 🔍 SDK release
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write # Draft releases are hidden from read-only tokens.
+    outputs:
+      matrix: ${{ steps.check.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release draft and version
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          version=$(sed -n 's/^[[:space:]]*VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt | head -n 1)
+          test "$RELEASE_TAG" = "v$version"
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          if result=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --silent 2>&1); then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$GITHUB_SHA"
+          elif [[ "$result" != *"HTTP 404"* ]]; then
+            printf '%s\n' "$result" >&2
+            exit 1
+          fi
+          matrix=$(jq -c '{include: [.platforms | keys[] | {"runs-on": .}]}' .github/cpp-sdk.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build-wheel:
+    name: 🚀 CD
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.preflight.outputs.matrix) }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
+  build:
+    name: 📦 SDK
+    needs: [preflight, build-wheel]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.preflight.outputs.matrix) }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@57e07b7c19b9faa56e8ac2dfd94f15de4d7904eb # codex/add-cpp-sdk-packaging
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
+  stage:
+    name: 🚀 Stage SDK assets
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cpp-sdk-*
+          path: dist
+          merge-multiple: true
+      - name: Verify full matrix and source commit
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          package=$(jq -r .package .github/cpp-sdk.json)
+          count=$(jq '.platforms | length' .github/cpp-sdk.json)
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq "$count"
+          test "$(find dist -maxdepth 1 -name '*.tar.gz.json' | wc -l)" -eq "$count"
+          while IFS= read -r triple; do
+            archive="${package}_${RELEASE_TAG}_${triple}.tar.gz"
+            jq -e --arg archive "$archive" --arg sha "$GITHUB_SHA" \
+              '.archive == $archive and .["source-sha"] == $sha and (.sha256 | test("^[0-9a-f]{64}$"))' \
+              "dist/$archive.json" > /dev/null
+            printf '%s  %s\n' "$(jq -r .sha256 "dist/$archive.json")" "$archive"
+          done > dist/SHA256SUMS < <(jq -r '.platforms[]' .github/cpp-sdk.json)
+          (cd dist && sha256sum -c SHA256SUMS)
+      # Publishing onto an existing tag ignores the draft's target, which
+      # Release Drafter moves to main on every push.
+      - name: Tag source commit and upload verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          if result=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --silent 2>&1); then
+            :
+          elif [[ "$result" == *"HTTP 404"* ]]; then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA" --silent
+          else
+            printf '%s\n' "$result" >&2
+            exit 1
+          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$GITHUB_SHA"
+          assets=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          if printf '%s\n' "$assets" | grep -Fqx SOURCE_SHA; then
+            gh release delete-asset "$RELEASE_TAG" SOURCE_SHA --repo "$GITHUB_REPOSITORY" --yes
+          fi
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          verify_dir=$(mktemp -d)
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$verify_dir" \
+            --pattern '*.tar.gz' --pattern SHA256SUMS
+          package=$(jq -r .package .github/cpp-sdk.json)
+          count=$(jq '.platforms | length' .github/cpp-sdk.json)
+          test "$(find "$verify_dir" -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq "$count"
+          test "$(wc -l < "$verify_dir/SHA256SUMS")" -eq "$count"
+          while IFS= read -r triple; do
+            archive="${package}_${RELEASE_TAG}_${triple}.tar.gz"
+            test -f "$verify_dir/$archive"
+            awk -v name="$archive" '$2 == name {found++} END {exit found == 1 ? 0 : 1}' "$verify_dir/SHA256SUMS"
+          done < <(jq -r '.platforms[]' .github/cpp-sdk.json)
+          (cd "$verify_dir" && sha256sum -c SHA256SUMS)
+          echo "$GITHUB_SHA" > dist/SOURCE_SHA
+          gh release upload "$RELEASE_TAG" dist/SOURCE_SHA --repo "$GITHUB_REPOSITORY"
