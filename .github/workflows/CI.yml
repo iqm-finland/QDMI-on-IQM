@@ -22,6 +22,7 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/live-tests.yml
       additional-python-files: |
+        .github/workflows/CI.yml
         .github/workflows/live-tests.yml
         .github/workflows/python-*.yml
         examples/**
@@ -89,6 +90,15 @@ jobs:
       runs-on: ${{ matrix.runs-on }}
       preset-name: ${{ matrix.preset }}
 
+  cpp-coverage:
+    name: 🇨 Coverage
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    permissions:
+      contents: read
+      id-token: write
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+
   cpp-sanitizers:
     name: 🇨 Sanitizers
     needs: change-detection
@@ -98,14 +108,38 @@ jobs:
       runs-on: ubuntu-26.04
       preset-name: sanitizers
 
-  cpp-coverage:
-    name: 🇨 Coverage
+  cpp-install-tests:
+    name: 📦 C++ installation
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    permissions:
-      contents: read
-      id-token: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d4d04564988a7d3c4a3ebf6a1f2c88ae73e5ab0c # codex/add-cpp-install-tests
+    with:
+      runs-on: ${{ matrix.runs-on }}
+      apt-packages: libssl-dev zlib1g-dev
+
+  build-cpp-sdk:
+    name: 📦 Assemble C++ SDK
+    needs: [change-detection, build-wheel]
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@57e07b7c19b9faa56e8ac2dfd94f15de4d7904eb # codex/add-cpp-sdk-packaging
+    with:
+      runs-on: ${{ matrix.runs-on }}
 
   cpp-linter:
     name: 🇨 Lint
@@ -153,39 +187,6 @@ jobs:
     with:
       enable-ty: true
       enable-mypy: false
-
-  cpp-install-tests:
-    name: 📦 C++ installation
-    needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
-          - macos-26
-          - windows-2025
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d4d04564988a7d3c4a3ebf6a1f2c88ae73e5ab0c # codex/add-cpp-install-tests
-    with:
-      runs-on: ${{ matrix.runs-on }}
-      apt-packages: libssl-dev zlib1g-dev
-
-  build-cpp-sdk:
-    name: 📦 Assemble C++ SDK
-    needs: [change-detection, build-wheel]
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
-          - macos-26
-          - windows-2025
-          - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@57e07b7c19b9faa56e8ac2dfd94f15de4d7904eb # codex/add-cpp-sdk-packaging
-    with:
-      runs-on: ${{ matrix.runs-on }}
 
   build-sdist:
     name: 📦 Build source distribution
@@ -246,15 +247,15 @@ jobs:
       - cpp-tests-ubuntu
       - cpp-tests-macos
       - cpp-tests-windows
-      - cpp-sanitizers
       - cpp-coverage
+      - cpp-sanitizers
+      - cpp-install-tests
+      - build-cpp-sdk
       - cpp-linter
       - python-tests
       - python-coverage
       - python-examples
       - python-linter
-      - cpp-install-tests
-      - build-cpp-sdk
       - build-sdist
       - build-wheel
       - documentation
@@ -267,7 +268,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-install-tests,cpp-sanitizers,cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-coverage,cpp-sanitizers,cpp-install-tests,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)

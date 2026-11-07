@@ -454,10 +454,11 @@ explicit target to execute provider-backed notebooks.
 ## Releasing
 
 Merge the stable version update, then push its version tag, such as `v1.5.1`.
-`CD` builds the Python distributions and C++ SDK archives from that tag. After
-all checks pass, it updates the Release Drafter notes for the tagged commit,
-attaches the C++ SDK archives and `SHA256SUMS` to the draft, and publishes the
-GitHub release. It then publishes the same Python distributions to PyPI.
+`CD.yml` builds the Python distributions and C++ SDK archives from that tag.
+After all checks pass, it updates the Release Drafter notes for the tagged
+commit, attaches the C++ SDK archives and `SHA256SUMS` to the draft, and
+publishes the GitHub release. It then publishes the same Python distributions to
+PyPI.
 
 Retry failed jobs in the original workflow run to reuse its build artifacts. The
 workflow can also be dispatched against a version tag. Published GitHub releases

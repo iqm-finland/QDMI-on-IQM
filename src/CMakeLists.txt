@@ -55,17 +55,10 @@ if(SKBUILD
       RESULT_VARIABLE openssl_package_result
       ERROR_QUIET)
     if(openssl_package_result EQUAL 0)
-      execute_process(COMMAND "${RPM_EXECUTABLE}" -ql "${openssl_package}"
-                      OUTPUT_VARIABLE openssl_files COMMAND_ERROR_IS_FATAL ANY)
-      string(REPLACE "\n" ";" openssl_files "${openssl_files}")
-      set(openssl_notices "")
-      foreach(file IN LISTS openssl_files)
-        if(file MATCHES "/licenses/"
-           AND EXISTS "${file}"
-           AND NOT IS_DIRECTORY "${file}")
-          list(APPEND openssl_notices "${file}")
-        endif()
-      endforeach()
+      file(
+        GLOB openssl_notices
+        LIST_DIRECTORIES false
+        "/usr/share/licenses/${openssl_package}/*")
       if(NOT openssl_notices)
         message(
           FATAL_ERROR
