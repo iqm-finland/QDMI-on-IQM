@@ -18,6 +18,8 @@
  */
 
 #include "iqm_qdmi/calibration.h"
+#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/device.h"
 
 #include "device_mock_fixture.hpp"
 #include "http_client.hpp"
