@@ -40,7 +40,8 @@ foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
   endif()
 endforeach()
 
-# manylinux distributions provide notices for the OpenSSL libraries bundled by
+# OpenSSL comes from the system, so FetchContent cannot supply its license
+# notices. Include them with the libraries bundled into Linux wheels by
 # auditwheel.
 if(SKBUILD
    AND UNIX

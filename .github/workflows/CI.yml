@@ -110,7 +110,7 @@ jobs:
       preset-name: sanitizers
 
   cpp-install-tests:
-    name: 📦 C++ installation
+    name: 🇨 Installation
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
     strategy:
@@ -121,6 +121,7 @@ jobs:
           - ubuntu-26.04-arm
           - macos-26
           - windows-2025
+          - windows-11-arm
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d4d04564988a7d3c4a3ebf6a1f2c88ae73e5ab0c # codex/add-cpp-install-tests
     with:
       runs-on: ${{ matrix.runs-on }}
