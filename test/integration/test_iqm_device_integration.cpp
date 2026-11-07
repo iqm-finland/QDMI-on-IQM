@@ -515,9 +515,7 @@ TEST_F(QDMIIntegrationTest, QueuePropertiesOnGarnetMock) {
 }
 
 TEST_F(QDMIIntegrationTest, QuerySiteProperties) {
-  // The site list covers the qubits and, on Star-topology devices, the
-  // computational resonators as well, so it is at least as long as the qubit
-  // count and longer whenever the device has resonators.
+  // Sites include qubits and computational resonators.
   const auto sites = client.get_sites();
   const auto qubits_num = client.get_qubits_num();
   EXPECT_GE(sites.size(), qubits_num);

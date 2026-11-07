@@ -27,7 +27,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: "3.14"
           enable-cache: true
@@ -53,12 +53,13 @@ jobs:
         env: *iqm-live
         run: uvx nox -s live-tests
 
-      - name: Python mock metadata
+      - name: Python resonator mock tests
         if: matrix.backend == 'sirius:mock'
         env: *iqm-live
         run: >-
           uvx nox -s live-tests -- test/python/test_device_capabilities.py
-          -k 'device_advertises_exactly_its_supported_formats or device_reports_queue_length'
+          test/python/test_qiskit_backend.py
+          -k 'device_advertises_exactly_its_supported_formats or device_reports_queue_length or native_compilation_on_mock'
 
   installation:
     name: ☁️ Live C++ installation · IQM mock · ${{ matrix.runs-on }}
@@ -91,7 +92,7 @@ jobs:
 
       - name: Set up ccache
         if: runner.os != 'Windows'
-        uses: Chocobo1/setup-ccache-action@efeb0f4b0670854c2190fd2389da92c399ff5ceb # v1.5.10
+        uses: Chocobo1/setup-ccache-action@ccc034167d57f9a0f3248c21b633819fcf331757 # v1.5.11
         with:
           prepend_symlinks_to_path: false
           override_cache_key: c++-tests-install-${{ matrix.runs-on }}
