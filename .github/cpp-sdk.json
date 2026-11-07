@@ -1,6 +1,6 @@
 {
   "package": "iqm-qdmi-device",
-  "native-prefix": "iqm/qdmi/data",
+  "install-prefix": "iqm/qdmi/data",
   "cmake-target": "iqm-qdmi-device",
   "runtime-property": "QDMI_RUNTIME_FILES",
   "platforms": {

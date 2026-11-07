@@ -15,7 +15,7 @@ releases may include breaking changes.
 - ✨ Run PennyLane QNodes with `iqm.qdmi` using MQT Core compilation and
   execution. Install the `pennylane` extra. ([#321]) ([**@burgholzer**])
 - 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
-  Releases ([#270]) ([**@marcelwa**])
+  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**])
 
 ### Changed
 

@@ -42,7 +42,7 @@ application so the device DLL and its companion DLLs can be found.
 The Linux archives target glibc 2.28 or newer and use the host's compatible C++
 runtime and CA trust store. The macOS archive targets Apple Silicon and macOS
 13.3 or newer. Windows archives target MSVC-compatible x86-64 and arm64 systems
-with the Visual C++ runtime installed. Native binaries remain specific to their
+with the Visual C++ runtime installed. C++ binaries remain specific to their
 operating system and CPU architecture; use a matching archive.
 
 [Releases page]: https://github.com/iqm-finland/QDMI-on-IQM/releases

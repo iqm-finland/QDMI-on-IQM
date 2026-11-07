@@ -1,41 +1,148 @@
 name: CD 🚀
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - v*
   workflow_dispatch:
 
 permissions: {}
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  check-release:
+    name: 🔍 Check release
+    permissions:
+      contents: read
+    runs-on: ubuntu-slim
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.version.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+
+      - name: Check tag and project version
+        id: version
+        run: |
+          version=$(uv version --short)
+          if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ || "$GITHUB_REF" != "refs/tags/v$version" ]]; then
+            echo "Release requires a stable X.Y.Z version and its matching vX.Y.Z tag." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          matrix=$(jq -c '{include: [.platforms | keys[] | {"runs-on": .}]}' .github/cpp-sdk.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build-sdist:
-    name: 🚀 CD
+    name: 📦 Build source distribution
+    needs: check-release
     permissions:
       contents: read
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
 
   build-wheel:
-    name: 🚀 CD
+    name: 📦 Build wheels
+    needs: check-release
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        runs-on:
-          [
-            ubuntu-26.04,
-            ubuntu-26.04-arm,
-            macos-26,
-            windows-2025,
-            windows-11-arm,
-          ]
+      matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
     with:
       runs-on: ${{ matrix.runs-on }}
 
+  build-cpp-sdk:
+    name: 📦 Assemble C++ SDK
+    needs: [check-release, build-wheel]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@57e07b7c19b9faa56e8ac2dfd94f15de4d7904eb # codex/add-cpp-sdk-packaging
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
+  publish-release:
+    name: 🚀 Publish GitHub release
+    needs: [check-release, build-sdist, build-cpp-sdk]
+    permissions:
+      contents: write
+    runs-on: ubuntu-slim
+    concurrency:
+      group: release-draft
+      cancel-in-progress: false
+    steps:
+      - name: Check for an existing release
+        id: existing
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { data: commit } = await github.rest.repos.getCommit({
+              ...context.repo,
+              ref: context.ref,
+            });
+            if (commit.sha !== context.sha) {
+              throw new Error('Release tag moved after this workflow started.');
+            }
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({
+                ...context.repo,
+                tag: context.ref.slice('refs/tags/'.length),
+              });
+              return !data.draft;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              return false;
+            }
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.existing.outputs.result != 'true'
+        with:
+          pattern: cpp-sdk-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        if: steps.existing.outputs.result != 'true'
+        run: cd dist && sha256sum *.tar.gz > SHA256SUMS
+
+      - name: Prepare release notes for the tagged commit
+        if: steps.existing.outputs.result != 'true'
+        id: notes
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+        with:
+          tag: ${{ github.ref_name }}
+          version: ${{ needs.check-release.outputs.version }}
+          commitish: ${{ github.sha }}
+          publish: false
+
+      - name: Attach archives and publish
+        if: steps.existing.outputs.result != 'true'
+        # Upload every asset before finalizing the immutable release.
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4 # zizmor: ignore[superfluous-actions]
+        with:
+          tag_name: ${{ github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.notes.outputs.name }}
+          body: ${{ steps.notes.outputs.body }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+
   deploy:
-    name: 🚀 Publish
-    needs: [build-sdist, build-wheel]
-    if: github.event_name == 'release' && github.event.action == 'published'
+    name: 🚀 Publish to PyPI
+    needs: [build-sdist, build-wheel, publish-release]
     permissions:
       attestations: write
       contents: read
@@ -45,29 +152,6 @@ jobs:
       name: pypi
       url: https://pypi.org/p/iqm-qdmi
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # Staging sets SOURCE_SHA only after verifying all SDK assets.
-      - name: Check C++ SDK assets before publishing to PyPI
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          release_dir=$(mktemp -d)
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$release_dir" \
-            --pattern '*.tar.gz' --pattern SHA256SUMS --pattern SOURCE_SHA
-          test "$(cat "$release_dir/SOURCE_SHA")" = "$GITHUB_SHA"
-          package=$(jq -r .package .github/cpp-sdk.json)
-          count=$(jq '.platforms | length' .github/cpp-sdk.json)
-          test "$(find "$release_dir" -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq "$count"
-          test "$(wc -l < "$release_dir/SHA256SUMS")" -eq "$count"
-          while IFS= read -r triple; do
-            archive="${package}_${RELEASE_TAG}_${triple}.tar.gz"
-            test -f "$release_dir/$archive"
-            awk -v name="$archive" '$2 == name {found++} END {exit found == 1 ? 0 : 1}' "$release_dir/SHA256SUMS"
-          done < <(jq -r '.platforms[]' .github/cpp-sdk.json)
-          (cd "$release_dir" && sha256sum -c SHA256SUMS)
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cibw-*
@@ -80,3 +164,5 @@ jobs:
           subject-path: dist/*
 
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true

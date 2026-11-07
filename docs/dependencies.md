@@ -18,7 +18,7 @@ development package; no QDMI driver library is linked into the device.
 | [curl]          | 8.23.0; system version on macOS | curl                           | HTTP transport                 |
 | [OpenSSL]       | ≥3; Linux                       | Apache-2.0                     | TLS                            |
 
-Linux wheels and SDK archives bundle OpenSSL; native builds use the installed
+Linux wheels and SDK archives bundle OpenSSL; C++ builds use the installed
 OpenSSL development package. Windows uses Schannel and macOS uses system curl's
 TLS implementation. SDK archives include dependency notices under `licenses/`
 and use the operating system runtime and CA trust store. Updating a bundled

@@ -19,7 +19,7 @@ cmake_minimum_required(VERSION 3.24)
 get_filename_component(source "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(work "${source}/build/sdk")
 file(READ "${source}/.github/cpp-sdk.json" config)
-foreach(key package native-prefix cmake-target runtime-property)
+foreach(key package install-prefix cmake-target runtime-property)
   string(JSON ${key} GET "${config}" "${key}")
 endforeach()
 string(JSON triple GET "${config}" platforms "$ENV{SDK_PLATFORM}")
@@ -27,8 +27,8 @@ if(NOT package MATCHES "^[A-Za-z_][A-Za-z0-9_.-]*$"
    OR NOT cmake-target MATCHES "^[A-Za-z_][A-Za-z0-9_:.-]*$"
    OR NOT runtime-property MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
    OR NOT triple MATCHES "^[a-z0-9_]+(-[a-z0-9_]+)+$"
-   OR IS_ABSOLUTE "${native-prefix}"
-   OR native-prefix MATCHES "(^|/)[.][.](/|$)|[\\\\:]")
+   OR IS_ABSOLUTE "${install-prefix}"
+   OR install-prefix MATCHES "(^|/)[.][.](/|$)|[\\\\:]")
   message(FATAL_ERROR "Invalid SDK configuration")
 endif()
 
@@ -65,12 +65,11 @@ foreach(entry IN LISTS extracted)
   endif()
 endforeach()
 set(prefix "${work}/prefix/${package}")
-file(COPY "${work}/wheel/${native-prefix}/" DESTINATION "${prefix}")
+file(COPY "${work}/wheel/${install-prefix}/" DESTINATION "${prefix}")
 file(GLOB notices "${work}/wheel/*.dist-info/licenses")
 list(LENGTH notices count)
 if(NOT count EQUAL 1 OR NOT IS_DIRECTORY "${prefix}/include")
-  message(
-    FATAL_ERROR "The wheel must contain native headers and license notices")
+  message(FATAL_ERROR "The wheel must contain SDK headers and license notices")
 endif()
 file(COPY ${notices} DESTINATION "${prefix}")
 
@@ -123,16 +122,15 @@ string(REGEX REPLACE "^Version: *" "" version "${version}")
 if(NOT version MATCHES "^[A-Za-z0-9][A-Za-z0-9.+_-]*$")
   message(FATAL_ERROR "Invalid wheel version")
 endif()
+include("${prefix}/share/cmake/${package}/${package}-config-version.cmake")
+if(NOT version VERSION_EQUAL PACKAGE_VERSION)
+  message(FATAL_ERROR "Wheel and CMake package versions differ")
+endif()
 set(name "${package}_v${version}_${triple}.tar.gz")
 file(MAKE_DIRECTORY "${source}/dist")
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -E tar czf "${source}/dist/${name}" "${package}"
   WORKING_DIRECTORY "${work}/prefix" COMMAND_ERROR_IS_FATAL ANY)
-file(SHA256 "${source}/dist/${name}" checksum)
-file(
-  WRITE "${source}/dist/${name}.json"
-  "{\"archive\":\"${name}\",\"source-sha\":\"$ENV{GITHUB_SHA}\",\"sha256\":\"${checksum}\"}\n"
-)
 file(ARCHIVE_EXTRACT INPUT "${source}/dist/${name}" DESTINATION
      "${work}/extracted")
 file(REMOVE_RECURSE "${work}/prefix" "${work}/wheel")
