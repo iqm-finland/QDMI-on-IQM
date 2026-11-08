@@ -122,7 +122,7 @@ jobs:
           - macos-26
           - windows-2025
           - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d4d04564988a7d3c4a3ebf6a1f2c88ae73e5ab0c # codex/add-cpp-install-tests
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d810ec0a3f6b2df6782207ee8923dc72fa853ed1 # codex/add-cpp-install-tests
     with:
       runs-on: ${{ matrix.runs-on }}
       apt-packages: libssl-dev zlib1g-dev
@@ -209,7 +209,7 @@ jobs:
           - macos-26
           - windows-2025
           - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@c218dcbc1cf41cc338d13e3331c651492b592365 # codex/add-cpp-sdk-packaging
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@fb4a2de7a53c6b60ec26709cf7c4e50f6a44687b # codex/add-cpp-sdk-packaging
     with:
       runs-on: ${{ matrix.runs-on }}
 

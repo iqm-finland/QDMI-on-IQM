@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@c218dcbc1cf41cc338d13e3331c651492b592365 # codex/add-cpp-sdk-packaging
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@fb4a2de7a53c6b60ec26709cf7c4e50f6a44687b # codex/add-cpp-sdk-packaging
     with:
       runs-on: ${{ matrix.runs-on }}
 
