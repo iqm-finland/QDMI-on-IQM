@@ -34,7 +34,7 @@ print(result.get_counts())
 Request the Emerald Resonance mock's license on the site's quantum partition:
 
 ```bash
-srun --partition=quantum --licenses=iqm.emerald.mock:1 python bell.py
+srun --partition=quantum --licenses=iqm.emerald.mock python bell.py
 ```
 
 For requests with alternative devices, use the granted resource from Slurm's
