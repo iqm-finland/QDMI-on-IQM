@@ -172,7 +172,7 @@ in the Contributing guide.
 
 The installed CMake target identifies its device manifest through
 `QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
-the symbol prefix and relative library path. Applications using MQT Core 4.1 or
+the symbol prefix and relative library path. Applications using MQT Core 4.2 or
 later can copy the device library and manifest beside their executables. This
 integration requires CMake 3.28 or later.
 
@@ -181,7 +181,7 @@ component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
 the build and install steps.
 
 ```cmake
-find_package(mqt-core 4.1.1 CONFIG REQUIRED COMPONENTS Development)
+find_package(mqt-core 4.2.0 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)
