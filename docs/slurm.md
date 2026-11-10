@@ -73,7 +73,7 @@ Register each device ID as a Slurm license. For example,
 Resonance mock. A cluster availability monitor can reserve this license while
 the device is unavailable; give it separate site-owned IQM credentials and
 network access to Resonance. See the
-[Slurm deployment guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+[Slurm deployment guide](https://github.com/munich-quantum-software/orchestrator)
 for scheduler configuration and monitoring.
 
 Administrators can put shared non-secret settings in `/etc/mqt-core/qdmi.json`

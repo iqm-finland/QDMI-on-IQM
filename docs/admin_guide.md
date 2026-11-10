@@ -1,7 +1,7 @@
 # Administer IQM workloads on Slurm
 
 Follow
-[MQT Core's Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+[MQSC Orchestrator](https://github.com/munich-quantum-software/orchestrator)
 for scheduler configuration, license counts, and job environments.
 
 Install the IQM device implementation in the workload environment on the compute
