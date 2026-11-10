@@ -10,6 +10,8 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-10
+
 ### Added
 
 - ✨ Run PennyLane QNodes with `iqm.qdmi` using MQT Core compilation and
@@ -17,6 +19,11 @@ releases may include breaking changes.
 
 ### Changed
 
+- ⬆️ Update MQT Core to 4.2.0 ([#333]) ([**@denialhaag**]).
+- 📝 Use MQSC Orchestrator for Slurm deployment and monitoring ([#333])
+  ([**@denialhaag**]).
+- 👷 Consolidate CI and documentation builds, keep ordinary tests offline, and
+  support explicit live-backend selection ([#322], [#329]) ([**@denialhaag**]).
 - 💥 Use MQT Core for IQM JSON serialization and classical-bit result ordering.
   Replace `qiskit_to_iqm_json` and its serializer entry point with MQT Core's
   `serialize_program`. ([#321]) ([**@burgholzer**])
@@ -352,7 +359,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.2.0...v1.3.0
@@ -364,7 +372,10 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
+[#329]: https://github.com/iqm-finland/QDMI-on-IQM/pull/329
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#322]: https://github.com/iqm-finland/QDMI-on-IQM/pull/322
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308
