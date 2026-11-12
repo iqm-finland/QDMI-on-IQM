@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -74,3 +75,22 @@ def test_run_request_defaults_and_overrides(offline_backend: IQMBackend, offline
         assert submission == (expected or {})
         assert offline_backend.options.run_request_options == default
         assert offline_backend.options.memory is True
+
+
+def test_reuse_compiled_batch_with_run_options(offline_backend: IQMBackend, offline_submissions: list[dict]) -> None:
+    """Reuse Core's native payloads while selecting execution options per run."""
+    circuit = QuantumCircuit(2, 3)
+    circuit.h(0)
+    circuit.cx(0, 1)
+    circuit.measure([0, 1], [2, 0])
+    programs = offline_backend.compile([circuit, circuit])
+    assert isinstance(programs, list)
+    payloads = [json.loads(program.payload) for program in programs]
+    assert not offline_submissions
+    for cycles in (1, 2):
+        offline_backend.run(programs, shots=10, memory=False, run_request_options={"active_reset_cycles": cycles})
+        submission = offline_submissions.pop()
+        assert submission["circuits"] == payloads
+        assert submission["active_reset_cycles"] == cycles
+        assert submission["shots"] == 10
+        assert submission["calibration_set_id"] == offline_backend.calibration_set_id
