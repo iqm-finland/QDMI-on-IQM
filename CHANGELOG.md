@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ⚡️ Reduce simulator setup time for local and Slurm sampling and estimation.
+  ([**@marcelwa**])
+
 ## [1.6.0] - 2026-11-10
 
 ### Added
