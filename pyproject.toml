@@ -22,7 +22,7 @@ requires = [ "scikit-build-core>=1.1" ]
 
 [project]
 name = "iqm-qdmi"
-version = "1.5.0"
+version = "1.6.0"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -55,14 +55,15 @@ email = "developers@iqm.tech"
 [project.optional-dependencies]
 pulla = [
   "iqm-client>=36,<37; python_version<'3.15'",
-  "mqt-core~=4.1.1",
+  "mqt-core>=4.2",
 ]
+pennylane = [ "mqt-core[pennylane]>=4.2" ]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core[qiskit]>=4.2",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
-  "qiskit[qasm3-import]>=2.1",
+  "qiskit>=2.5",
   "qiskit-algorithms>=0.4",
 ]
 
@@ -79,8 +80,9 @@ iqm-sampler = "iqm.qdmi.sampler:main"
 
 [project.entry-points]
 "mqt.core.qdmi.manifests".iqm = "iqm.qdmi"
-# Lets any MQT Core QDMI backend over an IQM device submit IQM JSON.
-"mqt.core.qiskit.program_serializers".IQM_JSON = "iqm.qdmi.serializers:qiskit_to_iqm_json"
+
+[project.entry-points."pennylane.plugins"]
+"iqm.qdmi" = "iqm.qdmi.pennylane:IQMDevice"
 
 
 [dependency-groups]
@@ -90,6 +92,7 @@ dev = [
   "nox>=2026.4.10",
 ]
 test = [
+  "mqt-core[pennylane]>=4.2",
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.1",
@@ -98,6 +101,7 @@ test = [
   { include-group = "qiskit" },
 ]
 docs = [
+  "mqt-core[pennylane]>=4.2",
   { include-group = "qiskit" },
   "furo>=2025.12.19",
   "myst-nb>=1.4",
@@ -109,12 +113,12 @@ docs = [
 ]
 build = [ "scikit-build-core>=1.1" ]
 qiskit = [
-  "mqt-core~=4.1.1",
+  "mqt-core[qiskit]>=4.2",
   "numpy>=2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
-  "qiskit[qasm3-import]>=2.1",
+  "qiskit>=2.5",
   "qiskit-algorithms>=0.4",
 ]
 
@@ -181,8 +185,8 @@ test-skip = [
 ]
 archs = "auto64"
 build-frontend = "uv"
+before-test = 'uv pip install --group "{project}/pyproject.toml:test"'
 test-command = "pytest test/python"
-test-groups = [ "test" ]
 test-sources = [ "test/python", "pyproject.toml" ]
 
 [tool.cibuildwheel.macos]
@@ -287,6 +291,9 @@ addopts = [
 ]
 filterwarnings = [
   "error",
+  # PennyLane pins Autograd <1.9; its wraps helper returns in finally.
+  "ignore:'return' in a 'finally' block:SyntaxWarning:.*autograd[./\\\\]wrap_util",
+  "default:.* is newer than the .*tested:UserWarning",
   # SciPy solver deprecation
   "ignore:.*The `disp` and `iprint` options of the L-BFGS-B solver are deprecated.*:DeprecationWarning:",
   # SciPy OptimizeWarning for unknown options

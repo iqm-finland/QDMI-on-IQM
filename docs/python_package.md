@@ -81,6 +81,10 @@ command-line scripts are exposed:
   Variational Quantum Eigensolver (VQE) parameter estimation for a serialized
   ansatz and observable.
 
+The sampler and offloader transpile with Qiskit; the estimator expects a native
+ansatz. They require direct qubit connectivity for two-qubit circuits and do not
+route through computational resonators.
+
 ### `iqm-sampler` Usage
 
 For example, to execute a QPY circuit file (`bell.qpy`):
@@ -146,7 +150,7 @@ always passed as an explicit `--partition`, which takes precedence over it.
 
 :::{important}
 Use the
-[MQT Core Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+[MQSC Orchestrator](https://github.com/munich-quantum-software/orchestrator)
 for scheduler setup, device selection, and job submission.
 :::
 
@@ -268,6 +272,12 @@ The `pulla` extra supports Python 3.11–3.14. The
 [pulse example](examples.md#pulse-level-execution) compiles a circuit, submits
 the serialized program through QDMI, and deserializes the acquisition arrays
 with IQM's SDK. The caller owns and can reuse the IQM client and compiler.
+
+MQT Core 4.2 handles circuit compilation, IQM JSON serialization, resonator
+routing, and logical result ordering through the [Qiskit backend](qiskit.md) and
+[PennyLane device](pennylane.md). These circuit APIs do not generate
+`RunDefinition` programs or decode pulse acquisitions. Use the direct QDMI
+driver for binary pulse transport, as the example does.
 
 Set the repetitions in the compiler settings. QDMI shot parameters are
 unsupported for pulse jobs because repetitions are part of the program. Assign
