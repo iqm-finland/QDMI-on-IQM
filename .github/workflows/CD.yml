@@ -107,15 +107,10 @@ jobs:
             } catch (error) {
               if (error.status !== 404) throw error;
             }
-            try {
-              const { data } = await github.rest.repos.getReleaseByTag({
-                ...context.repo,
-                tag,
-              });
-              if (!data.draft) return true;
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            const release = releases.find(release => release.tag_name === tag);
+            if (release && !release.draft) return true;
+            core.setOutput('release-id', release?.id ?? '');
             const { data: previous } = await github.rest.repos.getLatestRelease(context.repo);
             core.setOutput('previous-tag', previous.tag_name);
             const { data: notes } = await github.rest.repos.generateReleaseNotes({
@@ -152,13 +147,11 @@ jobs:
 
       - name: Attach archives and publish
         if: steps.existing.outputs.result != 'true'
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
-        with:
-          token: ${{ steps.create-token.outputs.token }}
-          tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
-          name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
-          body: |
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RELEASE_ID: ${{ steps.existing.outputs.release-id }}
+          RELEASE_NAME: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
+          RELEASE_BODY: |
             ## 👀 What Changed
 
             _Please refer to the [changelog](https://github.com/${{ github.repository }}/blob/${{ env.RELEASE_TAG }}/CHANGELOG.md) for a structured overview of the changes._
@@ -168,10 +161,43 @@ jobs:
             ${{ steps.existing.outputs.new-contributors }}
 
             **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.existing.outputs.previous-tag }}...${{ env.RELEASE_TAG }}
-          fail_on_unmatched_files: true
-          files: |
-            dist/*.tar.gz
-            dist/SHA256SUMS
+        with:
+          github-token: ${{ steps.create-token.outputs.token }}
+          retries: 3
+          script: |
+            const fs = require('node:fs');
+            const files = fs.readdirSync('dist').filter(name =>
+              name.endsWith('.tar.gz') || name === 'SHA256SUMS'
+            );
+            if (!files.includes('SHA256SUMS') || !files.some(name => name.endsWith('.tar.gz'))) {
+              throw new Error('Release requires SDK archives and SHA256SUMS.');
+            }
+            const parameters = {
+              ...context.repo,
+              tag_name: process.env.RELEASE_TAG,
+              target_commitish: context.sha,
+              name: process.env.RELEASE_NAME,
+              body: process.env.RELEASE_BODY,
+              draft: true,
+            };
+            const releaseId = Number(process.env.RELEASE_ID);
+            const { data: release } = releaseId
+              ? await github.rest.repos.updateRelease({ ...parameters, release_id: releaseId })
+              : await github.rest.repos.createRelease(parameters);
+            for (const name of files) {
+              const existing = release.assets.find(asset => asset.name === name);
+              if (existing) {
+                await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: existing.id });
+              }
+              await github.rest.repos.uploadReleaseAsset({
+                ...context.repo,
+                release_id: release.id,
+                name,
+                data: fs.readFileSync(`dist/${name}`),
+                headers: { 'content-type': name.endsWith('.tar.gz') ? 'application/gzip' : 'text/plain' },
+              });
+            }
+            await github.rest.repos.updateRelease({ ...context.repo, release_id: release.id, draft: false });
 
   deploy:
     name: 🚀 Publish to PyPI
