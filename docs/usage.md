@@ -81,7 +81,7 @@ parameters for the session:
   `IQM_QC_ID`.
 - **Quantum Computer Alias** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional
   alias of the specific quantum computer to use. If not set, falls back to
-  `IQM_QC_ALIAS`.
+  `IQM_QUANTUM_COMPUTER`, then the legacy `IQM_QC_ALIAS` alias.
 - **HTTP Request Timeout** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3`): Optional
   positive `uint64_t` duration in milliseconds applied to every HTTP request
   made by the session. If not set, each request uses the default one-hour
@@ -172,7 +172,7 @@ in the Contributing guide.
 
 The installed CMake target identifies its device manifest through
 `QDMI_MANIFEST_NAME`. The manifest contains stable device IDs, session defaults,
-the symbol prefix and relative library path. Applications using MQT Core 4.1 or
+the symbol prefix and relative library path. Applications using MQT Core 4.2 or
 later can copy the device library and manifest beside their executables. This
 integration requires CMake 3.28 or later.
 
@@ -181,7 +181,7 @@ component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
 the build and install steps.
 
 ```cmake
-find_package(mqt-core 4.1.1 CONFIG REQUIRED COMPONENTS Development)
+find_package(mqt-core 4.2.0 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)
@@ -319,10 +319,10 @@ The following properties about the device can be queried via the
 - `QDMI_DEVICE_PROPERTY_CUSTOM1`: The current calibration set ID used by the
   session.
 
-**Note:** Sites and qubits are not the same quantity. On Star-topology devices
-the site list also contains the computational resonators, so it is longer than
-the qubit count. Allocate registers from `QDMI_DEVICE_PROPERTY_QUBITSNUM` and
-address hardware through the site list.
+**Note:** Sites and qubits are not the same quantity. On devices with
+computational resonators, the site list also contains these resonators, so it is
+longer than the qubit count. Allocate registers from
+`QDMI_DEVICE_PROPERTY_QUBITSNUM` and address hardware through the site list.
 
 The following properties about every site (qubit) can be queried via the
 `IQM_QDMI_device_session_query_site_property` function:

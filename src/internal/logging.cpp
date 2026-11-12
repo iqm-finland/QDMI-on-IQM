@@ -38,7 +38,7 @@ namespace {
 
 /// The environment variable that names the log level.
 constexpr auto LOG_LEVEL_VARIABLE = "IQM_LOG_LEVEL";
-/// The variable LOG_LEVEL_VARIABLE replaced, still read as a fallback.
+/// Compatibility alias used when IQM_LOG_LEVEL is unset.
 constexpr auto DEPRECATED_LOG_LEVEL_VARIABLE = "IQM_CPP_API_LOG_LEVEL";
 
 /**

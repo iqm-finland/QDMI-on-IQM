@@ -81,6 +81,10 @@ command-line scripts are exposed:
   Variational Quantum Eigensolver (VQE) parameter estimation for a serialized
   ansatz and observable.
 
+The sampler and offloader transpile with Qiskit; the estimator expects a native
+ansatz. They require direct qubit connectivity for two-qubit circuits and do not
+route through computational resonators.
+
 ### `iqm-sampler` Usage
 
 For example, to execute a QPY circuit file (`bell.qpy`):
@@ -146,7 +150,7 @@ always passed as an explicit `--partition`, which takes precedence over it.
 
 :::{important}
 Use the
-[MQT Core Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+[MQSC Orchestrator](https://github.com/munich-quantum-software/orchestrator)
 for scheduler setup, device selection, and job submission.
 :::
 

@@ -42,6 +42,7 @@ including the Qiskit backend and its sampler and estimator primitives.
 
 examples
 qiskit
+pennylane
 usage
 iteration-mode
 python_package
