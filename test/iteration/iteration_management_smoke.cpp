@@ -293,11 +293,6 @@ int main(const int argc, char **argv) {
       (argc == 2 && std::string_view{argv[1]} != "--cleanup-only")) {
     return 1;
   }
-  try {
-    return iqm::test_support::Iteration_management_smoke(argc == 2);
-  } catch (const std::exception &error) {
-    std::cerr << error.what() << '\n';
-    return 1;
-  }
+  return iqm::test_support::Iteration_management_smoke(argc == 2);
 }
 #endif

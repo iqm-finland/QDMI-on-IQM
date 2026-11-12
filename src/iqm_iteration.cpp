@@ -335,11 +335,7 @@ int IQM_QDMI_iteration_client_alloc(const char *base_url, const char *token,
 }
 
 void IQM_QDMI_iteration_client_free(IQM_QDMI_Iteration_Client client) {
-  try {
-    delete client;
-  } catch (...) { // NOLINT(bugprone-empty-catch)
-    // No exception may cross the C ABI.
-  }
+  delete client;
 }
 
 const char *

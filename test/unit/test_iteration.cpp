@@ -46,7 +46,6 @@
 // POSIX environment functions are not part of the C++ <cstdlib> contract.
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #endif
-#include <iostream>
 #include <iterator>
 #include <limits>
 #include <nlohmann/json.hpp>
@@ -119,6 +118,9 @@ TEST_F(IterationManagement, CreateGetEndWithoutSessionAndWithAliasedId) {
       IQM_QDMI_iteration_get(client_, result_.iteration_id, 30000, &result_),
       QDMI_SUCCESS);
   EXPECT_STREQ(result_.state, "completed");
+  ASSERT_EQ(http_.get_connection_pools().size(), 3);
+  EXPECT_EQ(http_.get_connection_pools()[0], http_.get_connection_pools()[1]);
+  EXPECT_EQ(http_.get_connection_pools()[0], http_.get_connection_pools()[2]);
   EXPECT_EQ(http_.post_urls().size(), 2);
   EXPECT_EQ(http_.post_timeouts().front(), milliseconds{10000});
 }
@@ -523,49 +525,6 @@ TEST_F(IterationManagement, UnknownStateNeverExposesCredentials) {
   EXPECT_EQ(std::string(IQM_QDMI_iteration_client_diagnostics(client_))
                 .find("test-token"),
             std::string::npos);
-}
-
-TEST_F(IterationManagement, ReusedClientPerformanceProbe) {
-  for (const auto count : {10, 1000}) {
-    for (const bool reuse : {true, false}) {
-      const auto start_requests = http_.get_urls().size();
-      for (int i = 0; i < count; ++i) {
-        http_.queue_get(200, Reply("active"));
-      }
-      const auto start = std::chrono::steady_clock::now();
-      for (int i = 0; i < count; ++i) {
-        IQM_QDMI_Iteration_Client current = client_;
-        if (!reuse) {
-          ASSERT_EQ(IQM_QDMI_iteration_client_alloc("https://example.test",
-                                                    "test-token", nullptr,
-                                                    10000, &current),
-                    QDMI_SUCCESS);
-        }
-        ASSERT_EQ(IQM_QDMI_iteration_get(current, ID, 30000, &result_),
-                  QDMI_SUCCESS);
-        ASSERT_STREQ(result_.iteration_id, ID);
-        ASSERT_STREQ(result_.state, "active");
-        if (!reuse) {
-          IQM_QDMI_iteration_client_free(current);
-        }
-      }
-      const auto elapsed =
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::steady_clock::now() - start)
-              .count();
-      EXPECT_EQ(http_.get_urls().size() - start_requests,
-                static_cast<size_t>(count));
-      if (reuse) {
-        for (size_t i = start_requests; i < http_.get_connection_pools().size();
-             ++i) {
-          EXPECT_EQ(http_.get_connection_pools()[i],
-                    http_.get_connection_pools()[start_requests]);
-        }
-      }
-      std::cout << "PERF reads=" << count << " reuse=" << reuse
-                << " requests=" << count << " elapsed_us=" << elapsed << '\n';
-    }
-  }
 }
 
 TEST_F(IterationManagement,
