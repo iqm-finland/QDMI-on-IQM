@@ -20,7 +20,7 @@ releases may include breaking changes.
 
 ### Changed
 
-- Return the HTTP-derived QDMI error for failed circuit and calibration
+- 🐛 Return the HTTP-derived QDMI error for failed circuit and calibration
   submissions instead of always returning `QDMI_ERROR_FATAL` ([#200])
   ([**@marcelwa**], [**@burgholzer**]).
 

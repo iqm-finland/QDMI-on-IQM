@@ -273,11 +273,9 @@ The `pulla` extra supports Python 3.11–3.14. The
 the serialized program through QDMI, and deserializes the acquisition arrays
 with IQM's SDK. The caller owns and can reuse the IQM client and compiler.
 
-MQT Core 4.2 handles circuit compilation, IQM JSON serialization, resonator
+MQT Core handles circuit compilation, IQM JSON serialization, resonator
 routing, and logical result ordering through the [Qiskit backend](qiskit.md) and
-[PennyLane device](pennylane.md). These circuit APIs do not generate
-`RunDefinition` programs or decode pulse acquisitions. Use the direct QDMI
-driver for binary pulse transport, as the example does.
+[PennyLane device](pennylane.md).
 
 Set the repetitions in the compiler settings. QDMI shot parameters are
 unsupported for pulse jobs because repetitions are part of the program. Assign
