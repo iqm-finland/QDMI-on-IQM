@@ -590,8 +590,9 @@ compiled into the `RunDefinition`, and the device forwards the payload without
 reading it, so setting or querying the parameter returns
 `QDMI_ERROR_NOTSUPPORTED`. Set the repetition count in the compiler settings
 with `settings.set_shots(shots)`. Circuit run-request options are also
-unsupported. The caller owns the compiled calibration; the QDMI job calibration
-property returns `QDMI_ERROR_NOTSUPPORTED` for pulse jobs.
+unsupported. The caller owns the compiled calibration; the calibration set ID
+property (`QDMI_DEVICE_JOB_PROPERTY_CUSTOM1`) returns `QDMI_ERROR_NOTSUPPORTED`
+for pulse jobs.
 
 `IQM_QDMI_device_session_retrieve_device_job_by_id` recognizes the IQM Server's
 `run` job type, so a later session can reopen a pulse-level job and retrieve
