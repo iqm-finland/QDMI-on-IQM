@@ -273,8 +273,8 @@ The `pulla` extra supports Python 3.11–3.14. The
 the serialized program through QDMI, and deserializes the acquisition arrays
 with IQM's SDK. The caller owns and can reuse the IQM client and compiler.
 
-MQT Core handles circuit compilation, IQM JSON serialization, resonator
-routing, and logical result ordering through the [Qiskit backend](qiskit.md) and
+MQT Core handles circuit compilation, IQM JSON serialization, resonator routing,
+and logical result ordering through the [Qiskit backend](qiskit.md) and
 [PennyLane device](pennylane.md).
 
 Set the repetitions in the compiler settings. QDMI shot parameters are
