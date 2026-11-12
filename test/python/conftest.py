@@ -85,7 +85,9 @@ def offline_backend(
         def do_POST(self) -> None:
             payload = self.rfile.read(int(self.headers["Content-Length"]))
             offline_submissions.append(
-                {"pulse": payload} if self.headers["Content-Type"] == "application/protobuf" else json.loads(payload)
+                {"pulse": payload, "expect": self.headers.get("Expect")}
+                if self.headers["Content-Type"] == "application/protobuf"
+                else json.loads(payload)
             )
             body = json.dumps({"id": "offline-job"}).encode()
             self.send_response(200)

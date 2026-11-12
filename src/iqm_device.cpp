@@ -1512,8 +1512,7 @@ int IQM_QDMI_device_job_submit_run(IQM_QDMI_Device_Job job) {
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, token, *job->session_->connection_pool_,
-      job->programs_.front(),
-      {{"Content-Type", "application/protobuf"}, {"Expect", "100-continue"}},
+      job->programs_.front(), {{"Content-Type", "application/protobuf"}},
       job->session_->request_timeout_, &job->session_->rate_limit_);
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {

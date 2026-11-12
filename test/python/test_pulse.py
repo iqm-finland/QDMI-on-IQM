@@ -34,7 +34,7 @@ def test_pulse_binary_round_trip(offline_backend: IQMBackend, offline_submission
     """Preserve binary programs and cached artifacts, including retrieved jobs."""
     device = offline_backend.device
     job = device.submit_job(payload, ProgramFormat.CUSTOM1)
-    assert offline_submissions == [{"pulse": payload}]
+    assert offline_submissions == [{"pulse": payload, "expect": None}]
     assert job.check() == Job.Status.DONE
     artifact = b"\x08\x00\xff\x00"
     assert job.get_custom_result(CustomProperty.CUSTOM2, bytes) == artifact

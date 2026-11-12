@@ -383,8 +383,7 @@ TEST(HttpClientTest, PostLogsOnlyTheSizeOfProtobufData) {
 
   const auto response = iqm::http::Post(
       "https://example.test/run", std::nullopt, connection_pool,
-      std::string{"x\0y", 3},
-      {{"Content-Type", "application/protobuf"}, {"Expect", "100-continue"}});
+      std::string{"x\0y", 3}, {{"Content-Type", "application/protobuf"}});
 
   EXPECT_EQ(iqm::http::Handle_response(response), QDMI_SUCCESS);
   EXPECT_NE(logger_capture.str().find("POST data: 3 protobuf byte(s)"),
