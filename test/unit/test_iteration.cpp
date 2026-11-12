@@ -46,6 +46,7 @@
 // POSIX environment functions are not part of the C++ <cstdlib> contract.
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #endif
+#include <ios>
 #include <iterator>
 #include <limits>
 #include <nlohmann/json.hpp>
