@@ -532,3 +532,12 @@ def test_vqe_result_pickle_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert result.optimizer_result.nfev == expected.optimizer_result.nfev
     assert result.optimizer_result.njev == expected.optimizer_result.njev
     assert result.optimizer_result.nit == expected.optimizer_result.nit
+
+
+@pytest.mark.parametrize("sampler", [True, False])
+@pytest.mark.parametrize("num_qubits", [0, 2])
+def test_simulator_backend_width(*, sampler: bool, num_qubits: int) -> None:
+    """Size simulator targets to the circuit, or use the default for zero qubits."""
+    builder = offloader.build_sampler if sampler else offloader.build_estimator
+    primitive = builder(simulator=True, num_qubits=num_qubits)
+    assert primitive.backend.num_qubits == (num_qubits or 65535)
