@@ -1,8 +1,5 @@
 name: CD 🚀
 on:
-  push:
-    tags:
-      - v*
   workflow_dispatch:
 
 permissions: {}
@@ -30,12 +27,12 @@ jobs:
         with:
           enable-cache: false
 
-      - name: Check tag and project version
+      - name: Check branch and project version
         id: version
         run: |
           version=$(uv version --short)
-          if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ || "$GITHUB_REF" != "refs/tags/v$version" ]]; then
-            echo "Release requires a stable X.Y.Z version and its matching vX.Y.Z tag." >&2
+          if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ || "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Release requires a stable X.Y.Z version on main." >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -83,20 +80,26 @@ jobs:
       group: release-draft
       queue: max
       cancel-in-progress: false
+    env:
+      RELEASE_TAG: v${{ needs.check-release.outputs.version }}
     steps:
       - name: Check for an existing release
         id: existing
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { data: commit } = await github.rest.repos.getCommit({
-              ...context.repo,
-              ref: context.ref,
-            });
-            if (commit.sha !== context.sha) {
-              throw new Error('Release tag moved after this workflow started.');
+            const tag = process.env.RELEASE_TAG;
+            try {
+              const { data: commit } = await github.rest.repos.getCommit({
+                ...context.repo,
+                ref: `refs/tags/${tag}`,
+              });
+              if (commit.sha !== context.sha) {
+                throw new Error('Release tag points to a different commit.');
+              }
+            } catch (error) {
+              if (error.status !== 404) throw error;
             }
-            const tag = context.ref.slice('refs/tags/'.length);
             try {
               const { data } = await github.rest.repos.getReleaseByTag({
                 ...context.repo,
@@ -126,21 +129,31 @@ jobs:
         if: steps.existing.outputs.result != 'true'
         run: cd dist && sha256sum *.tar.gz > SHA256SUMS
 
-      - name: Prepare release notes for the tagged commit
+      - name: Prepare release notes
         if: steps.existing.outputs.result != 'true'
         id: notes
         uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         with:
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.RELEASE_TAG }}
           version: ${{ needs.check-release.outputs.version }}
           commitish: ${{ github.sha }}
           publish: false
+
+      - name: Create release token
+        if: steps.existing.outputs.result != 'true'
+        id: create-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
 
       - name: Attach archives and publish
         if: steps.existing.outputs.result != 'true'
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.ref_name }}
+          token: ${{ steps.create-token.outputs.token }}
+          tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ github.sha }}
           name: ${{ steps.notes.outputs.name }}
           body: ${{ steps.notes.outputs.body }}
