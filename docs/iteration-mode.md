@@ -61,25 +61,6 @@ uncertain end within that same budget: ending is idempotent. Do not keep ending
 after a confirmed 202. In-flight work can outlast cleanup; the server may allow
 it up to five minutes after the iteration ends.
 
-## Prepare workloads before reserving time
-
-With MQT Core 4.2, compile a circuit batch once with
-`programs = backend.compile(circuits)` before creating an iteration. Compilation
-uses one target snapshot and returns reusable native payloads, including
-resonator routing and logical result mappings. Reuse these with
-`backend.run(programs, ...)` to keep compilation outside the iteration's idle
-budget. Keep the backend's quantum computer and calibration consistent with the
-reservation and compiled target.
-
-Bind circuit parameters before compilation. Reusing a `CompiledProgram` repeats
-that bound circuit; `backend.run` cannot bind new parameter values to it.
-Execution options remain per run; they are not baked into compiled payloads. Use
-`memory=False` when only counts are needed to avoid fetching ordered shots. Keep
-each `CompiledProgram` intact so MQT Core can restore classical-bit order. See
-[Qiskit execution](qiskit.md) for submission and result handling. Compilation
-and freeing a backend do not create or end an iteration; lifecycle ownership
-remains with the caller.
-
 ## Errors and deadlines
 
 Each positive `timeout_ms` sets a monotonic deadline for HTTP requests,
