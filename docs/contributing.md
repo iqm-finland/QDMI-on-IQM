@@ -462,7 +462,7 @@ changelog and the changes since the previous release. The workflow then
 publishes the same Python distributions to PyPI.
 
 The `APP_ID` and `APP_PRIVATE_KEY` secrets must identify a GitHub App installed
-on this repository with permission to write repository contents.
+on this repository with write access to repository contents and workflows.
 
 Retry failed jobs in the original workflow run to reuse its build artifacts. The
 workflow leaves published GitHub releases unchanged on retries.
