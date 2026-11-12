@@ -39,6 +39,7 @@ TRANSPILE_OPTIMIZATION_LEVEL = 2
 def build_sampler(
     *,
     simulator: bool,
+    num_qubits: int,
     base_url: str | None = None,
     tokens_file: str | None = None,
     qc_id: str | None = None,
@@ -51,7 +52,9 @@ def build_sampler(
         its `backend` property.
     """
     if simulator:
-        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).sampler()
+        return QDMIBackend.from_device_id(
+            _SIMULATOR_DEVICE_ID, custom1=str(num_qubits) if num_qubits else None
+        ).sampler()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.sampler()
@@ -60,6 +63,7 @@ def build_sampler(
 def build_estimator(
     *,
     simulator: bool,
+    num_qubits: int,
     base_url: str | None = None,
     tokens_file: str | None = None,
     qc_id: str | None = None,
@@ -72,7 +76,9 @@ def build_estimator(
         as its `backend` property.
     """
     if simulator:
-        return QDMIBackend.from_device_id(_SIMULATOR_DEVICE_ID).estimator()
+        return QDMIBackend.from_device_id(
+            _SIMULATOR_DEVICE_ID, custom1=str(num_qubits) if num_qubits else None
+        ).estimator()
 
     backend = IQMBackend(base_url=base_url, tokens_file=tokens_file, qc_id=qc_id, qc_alias=qc_alias)
     return backend.estimator()
