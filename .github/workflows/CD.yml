@@ -81,9 +81,17 @@ jobs:
     with:
       runs-on: ${{ matrix.runs-on }}
 
-  publish-release:
-    name: 🚀 Publish GitHub release
-    needs: [check-release, build-sdist, build-cpp-sdk]
+  approve-release:
+    name: 🔐 Approve release
+    needs: [build-sdist, build-cpp-sdk]
+    runs-on: ubuntu-slim
+    environment: release
+    steps:
+      - run: echo "Release approved."
+
+  publish-github:
+    name: 🚀 Publish to GitHub
+    needs: [check-release, approve-release]
     permissions:
       contents: write
     runs-on: ubuntu-slim
@@ -208,9 +216,9 @@ jobs:
             }
             await github.rest.repos.updateRelease({ ...context.repo, release_id: release.id, draft: false });
 
-  deploy:
+  publish-pypi:
     name: 🚀 Publish to PyPI
-    needs: [build-sdist, build-wheel, publish-release]
+    needs: [build-sdist, build-wheel, publish-github]
     permissions:
       attestations: write
       contents: read
