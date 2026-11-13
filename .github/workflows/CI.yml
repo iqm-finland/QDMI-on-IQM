@@ -207,7 +207,7 @@ jobs:
       - python-tests
       - build-wheel
     if: >-
-      !cancelled()
+      always()
       && !contains(needs.*.result, 'failure')
       && !contains(needs.*.result, 'cancelled')
       && (

@@ -147,14 +147,13 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     concurrency:
-      group: iqm-iteration-emerald-mock
+      group: iqm-iteration-emerald:mock
       cancel-in-progress: false
       queue: max
     env:
       IQM_SERVER_URL: https://resonance.iqm.tech
       IQM_QC_ALIAS: emerald:mock
       CMAKE_BUILD_PARALLEL_LEVEL: 4
-      IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ success() && !cancelled() }}
@@ -175,6 +174,7 @@ jobs:
         env:
           CANCELLED_BEFORE_START: ${{ job.status == 'cancelled' }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+          IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
         run: |
           if [[ "$CANCELLED_BEFORE_START" == true ]]; then
             exit 0
@@ -184,6 +184,7 @@ jobs:
         if: always()
         env:
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
+          IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
         run: |
           if [[ -x ./build/release/test/iteration/iteration_management_smoke ]]; then
             ./build/release/test/iteration/iteration_management_smoke --cleanup-only
