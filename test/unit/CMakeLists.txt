@@ -31,3 +31,19 @@ target_link_libraries(
                      iqm::qdmi_device_internals nlohmann_json::nlohmann_json)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
+
+# HTTP hooks and device calls must share the same in-process state.
+if(NOT COMMAND add_qdmi_device_query_tests)
+  message(
+    FATAL_ERROR
+      "QDMI must provide add_qdmi_device_query_tests; use the pinned QDMI_REV")
+endif()
+add_qdmi_device_query_tests(
+  iqm_query_tests
+  PREFIX
+  IQM
+  TARGET
+  iqm::qdmi_device_internals
+  FIXTURE_HEADER
+  "${CMAKE_CURRENT_SOURCE_DIR}/device_mock_fixture.hpp")
+target_sources(iqm_query_tests PRIVATE http_stub.cpp)
