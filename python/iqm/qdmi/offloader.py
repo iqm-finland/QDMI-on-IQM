@@ -364,7 +364,8 @@ def estimate(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        estimator = build_estimator(simulator=simulator, num_qubits=ansatz.num_qubits)
+        num_qubits = max(ansatz.num_qubits, operator.num_qubits)
+        estimator = build_estimator(simulator=simulator, num_qubits=num_qubits)
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
         return vqe.compute_minimum_eigenvalue(operator=operator)
 
