@@ -77,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     estimator = build_estimator(
         simulator=args.simulator,
+        num_qubits=ansatz.num_qubits,
         base_url=args.base_url,
         tokens_file=args.tokens_file,
         qc_id=args.qc_id,
