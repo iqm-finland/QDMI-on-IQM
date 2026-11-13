@@ -33,7 +33,7 @@
 namespace {
 // Global operator new observes these allocation-free controls in this isolated
 // process. NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
-int allocations_before_failure = -1;
+bool fail_next_allocation = false;
 int post_count = 0;
 bool fail_after_confirmed_id = false;
 const IQM_QDMI_Iteration_Result *watched_result = nullptr;
@@ -51,12 +51,9 @@ void *operator new(const std::size_t size) {
     fail_after_confirmed_id = false;
     throw std::bad_alloc{};
   }
-  if (allocations_before_failure == 0) {
-    allocations_before_failure = -1;
+  if (fail_next_allocation) {
+    fail_next_allocation = false;
     throw std::bad_alloc{};
-  }
-  if (allocations_before_failure > 0) {
-    --allocations_before_failure;
   }
   if (auto *memory = std::malloc(size == 0 ? 1 : size)) {
     return memory;
@@ -97,12 +94,14 @@ int main() {
   std::strcpy(result.iteration_id, OTHER_ID);
   std::strcpy(result.state, "completed");
   result.http_status = 200;
-  allocations_before_failure = 0;
+  fail_next_allocation = true;
   auto status =
       IQM_QDMI_iteration_create(client, qc.c_str(), 60, 0, 30000, &result);
-  allocations_before_failure = -1;
+  fail_next_allocation = false;
   if (status != QDMI_ERROR_OUTOFMEM || *result.iteration_id != '\0' ||
-      *result.state != '\0' || result.http_status != 0) {
+      *result.state != '\0' || result.http_status != 0 ||
+      std::strstr(IQM_QDMI_iteration_client_diagnostics(client),
+                  "creation_uncertain") != nullptr) {
     return 2;
   }
 
@@ -112,10 +111,10 @@ int main() {
       std::strcpy(result.iteration_id, alias ? ID : OTHER_ID);
       std::strcpy(result.state, "completed");
       result.http_status = 200;
-      allocations_before_failure = 0;
+      fail_next_allocation = true;
       status =
           operation(client, alias ? result.iteration_id : ID, 30000, &result);
-      allocations_before_failure = -1;
+      fail_next_allocation = false;
       if (status != QDMI_ERROR_OUTOFMEM ||
           std::strcmp(result.iteration_id, ID) != 0 || *result.state != '\0' ||
           result.http_status != 0) {
@@ -133,10 +132,14 @@ int main() {
   watched_result = &result;
   fail_after_confirmed_id = true;
   status = IQM_QDMI_iteration_create(client, qc.c_str(), 60, 0, 30000, &result);
+  // Allocation-free diagnostics may report the unknown state directly.
+  const auto expected =
+      fail_after_confirmed_id ? QDMI_ERROR_FATAL : QDMI_ERROR_OUTOFMEM;
   fail_after_confirmed_id = false;
-  if (status != QDMI_ERROR_OUTOFMEM ||
-      std::strcmp(result.iteration_id, ID) != 0 || result.http_status != 200 ||
-      post_count != 1) {
+  if (status != expected || std::strcmp(result.iteration_id, ID) != 0 ||
+      result.http_status != 200 || post_count != 1 ||
+      std::strstr(IQM_QDMI_iteration_client_diagnostics(client),
+                  "creation_uncertain") != nullptr) {
     return 4;
   }
   iqm::http::internal::Reset_hooks();

@@ -72,8 +72,11 @@ def iteration_library() -> ctypes.CDLL:
 
 
 @pytest.mark.parametrize("status", [301, 302, 307, 308])
-def test_management_never_replays_redirect(iteration_library: ctypes.CDLL, status: int) -> None:
+def test_management_never_replays_redirect(
+    iteration_library: ctypes.CDLL, status: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A real CPR request must not follow redirects or forward authorization."""
+    monkeypatch.setenv("no_proxy", "127.0.0.1")
     requests: list[tuple[str, str | None]] = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -93,7 +96,7 @@ def test_management_never_replays_redirect(iteration_library: ctypes.CDLL, statu
             """Suppress local HTTP test logs."""
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
-    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     worker.start()
     client = ctypes.c_void_p()
     try:

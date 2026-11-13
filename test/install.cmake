@@ -72,15 +72,18 @@ cmake_minimum_required(VERSION 3.24)
 project(installed-consumer LANGUAGES C)
 find_package(@package@ REQUIRED CONFIG PATHS "@relocated@" NO_DEFAULT_PATH)
 add_executable(consumer main.c)
-target_compile_features(consumer PRIVATE c_std_11)
-target_link_libraries(consumer PRIVATE iqm-qdmi-device)
-if(WIN32)
-  add_custom_command(TARGET consumer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      $<TARGET_FILE:iqm-qdmi-device> $<TARGET_FILE_DIR:consumer>)
-endif()
+add_executable(iteration-consumer "@source@/test/iteration/iteration_exports.c")
 enable_testing()
-add_test(NAME installed-consumer COMMAND consumer)
+foreach(target consumer iteration-consumer)
+  target_compile_features(${target} PRIVATE c_std_11)
+  target_link_libraries(${target} PRIVATE iqm-qdmi-device)
+  if(WIN32)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:iqm-qdmi-device> $<TARGET_FILE_DIR:${target}>)
+  endif()
+  add_test(NAME installed-${target} COMMAND ${target})
+endforeach()
 ]=]
   @ONLY)
 run("${CMAKE_COMMAND}" -S "${consumer}" -B "${work}/consumer-${suffix}"
