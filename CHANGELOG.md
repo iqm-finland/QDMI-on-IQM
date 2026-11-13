@@ -15,7 +15,7 @@ releases may include breaking changes.
 ### Added
 
 - ✨ Run PennyLane QNodes with `iqm.qdmi` using MQT Core compilation and
-  execution. Install the `pennylane` extra. ([#321]) ([**@burgholzer**])
+  execution. Install the `pennylane` extra ([#321]) ([**@burgholzer**]).
 
 ### Changed
 
@@ -24,14 +24,14 @@ releases may include breaking changes.
   ([**@denialhaag**]).
 - 💥 Use MQT Core for IQM JSON serialization and classical-bit result ordering.
   Replace `qiskit_to_iqm_json` and its serializer entry point with MQT Core's
-  `serialize_program`. ([#321]) ([**@burgholzer**])
+  `serialize_program` ([#321]) ([**@burgholzer**]).
 - 💥 Remove `physical_qubits`; native circuit qubit indices identify device
-  sites, including gaps. ([#321]) ([**@burgholzer**])
+  sites, including gaps ([#321]) ([**@burgholzer**]).
 - 💥 Replace `MoveGate` with `Gate("move", 2, [])`. Compile circuits for devices
-  with computational resonators with `backend.compile` before submission.
-  ([#321]) ([**@burgholzer**])
-- ♻️ Keep Qiskit circuit metadata in local results instead of sending it to IQM.
-  ([#321]) ([**@burgholzer**])
+  with computational resonators with `backend.compile` before submission
+  ([#321]) ([**@burgholzer**]).
+- ♻️ Keep Qiskit circuit metadata in local results instead of sending it to IQM
+  ([#321]) ([**@burgholzer**]).
 - ⬆️ Update CPR to 1.15.1 and curl to 8.23.0 ([#311]) ([**@burgholzer**]).
 - ♻️ Follow HTTP 301, 302, and 303 redirects from POST requests with GET by
   default ([#311]) ([**@burgholzer**]).
@@ -71,7 +71,7 @@ releases may include breaking changes.
   session `CUSTOM4` or `IQMBackend(calibration_set_id=...)`, expose its
   effective UUID, and keep every session on its initial calibration when a
   calibration job returns a new set ([#271]) ([**@burgholzer**],
-  [**@marcelwa**])
+  [**@marcelwa**]).
 - ✨ Catalogue stable IDs for Garnet, Emerald, Sirius, and their mocks, and open
   them through `IQMBackend(device_id=...)` ([#274]) ([**@burgholzer**]).
 - ✨ Expose calibration submission through the IQM-specific
@@ -85,19 +85,19 @@ releases may include breaking changes.
   `run_request_options` in `set_options` and per-run overrides. Validate
   complete JSON buffers and reject `heralding_mode="zeros"` before submission
   because it may discard shots ([#272], [#293]) ([**@marcelwa**],
-  [**@burgholzer**])
+  [**@burgholzer**]).
 - ✨ Slow down before the IQM Server API rate limit blocks the account, waiting
   out the quota window instead of taking a 30-second block.
   `IQM_RATE_LIMIT_THRESHOLD_PERCENT` moves the threshold or turns it off
-  ([#214]) ([**@marcelwa**])
+  ([#214]) ([**@marcelwa**]).
 - ✨ Accept `IQM_SERVER_URL` and `IQM_QUANTUM_COMPUTER` as the canonical
   environment variables for IQM Server and quantum computer selection, while
   keeping `IQM_BASE_URL` and `IQM_QC_ALIAS` as aliases ([#217])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - ✨ Add `partition` and `nodes` keyword arguments to `iqm.qdmi.offloader`'s
   `sample`/`estimate`, with the partition also resolvable from
   `IQM_SLURM_PARTITION`, so a site whose quantum partition is not named
-  `quantum` can use the offloader ([#202]) ([**@marcelwa**])
+  `quantum` can use the offloader ([#202]) ([**@marcelwa**]).
 
 ### Changed
 
@@ -110,7 +110,7 @@ releases may include breaking changes.
   independent sessions through the MQT Core QDMI driver. Explicit device
   selection takes precedence over environment defaults ([#274])
   ([**@burgholzer**]).
-- 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**])
+- 👷 Enable testing on Python 3.15 ([#291]) ([**@denialhaag**]).
 - 💥 Drop the QDMI calibration advisory property. IQM schedules recalibration
   itself and does not require clients to trigger it ([#229], [#266])
   ([**@marcelwa**], [**@burgholzer**]).
@@ -120,12 +120,12 @@ releases may include breaking changes.
   ([#277]) ([**@burgholzer**]).
 - 💥 Use native Qiskit primitives with MQT Core 4, preserving genuine shot order
   and using estimator precision `1/64` (4,096 shots per measurement circuit) by
-  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**])
+  default ([#246], [#254]) ([**@marcelwa**], [**@denialhaag**]).
 - 💥 Drop support for x86 macOS and stop publishing the respective wheels
-  ([#220]) ([**@denialhaag**])
+  ([#220]) ([**@denialhaag**]).
 - ⬆️ Raise the macOS deployment target to 13.3 ([#220])
-  ([**@denialhaag**])
-- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**])
+  ([**@denialhaag**]).
+- 💥 Require Python 3.11 or newer ([#220]) ([**@denialhaag**]).
 
 ### Removed
 
@@ -141,31 +141,31 @@ releases may include breaking changes.
   [**@burgholzer**]).
 - 🐛 Restrict `IQMBackend` targets to qubits with calibrated PRX and measurement
   operations, preserving physical site names during IQM JSON serialization
-  ([#293]) ([**@burgholzer**])
+  ([#293]) ([**@burgholzer**]).
 - 🩹 Restrict Linux and macOS exports to the QDMI device ABI and IQM
   calibration, preventing host libcurl interference on Linux and hiding bundled
-  dependencies on macOS ([#284]) ([**@marcelwa**])
+  dependencies on macOS ([#284]) ([**@marcelwa**]).
 - 🐛 Preserve circuit metadata in IQM JSON serialization, dropping it with a
-  warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**])
+  warning when it cannot be represented as JSON ([#273]) ([**@marcelwa**]).
 - 🩹 Serialize PRX rotation and phase angles in radians using the current IQM
-  JSON fields ([#231]) ([**@burgholzer**])
+  JSON fields ([#231]) ([**@burgholzer**]).
 - 🩹 Report backend job failure messages at the default log level ([#231])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - 🩹 Preserve joint sampling counts across all classical registers in offloaded
-  results ([#231]) ([**@burgholzer**])
+  results ([#231]) ([**@burgholzer**]).
 - 🐛 Discover the host CA bundle in Linux wheels, fixing TLS on Debian/Ubuntu
   and SUSE, and honor `CURL_CA_BUNDLE` and `SSL_CERT_FILE` overrides ([#268])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - 🩹 Skip disabled log message formatting and use original HTTP response bodies
-  in debug output, including malformed JSON ([#260]) ([**@burgholzer**])
+  in debug output, including malformed JSON ([#260]) ([**@burgholzer**]).
 - 🐛 Link unit tests with MinGW on Windows by compiling consumers of the
   internal object library without DLL import decorations ([#242])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - 🐛 Decode base64url JWT payloads, so an access token whose payload encodes to
-  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**])
+  a `-` or `_` is no longer reported as expired ([#232]) ([**@marcelwa**]).
 - ⬆️ Require Qiskit 2.1 on all supported Python versions so the minimum
   environments install and run ([#218], [#220], [#246]) ([**@burgholzer**],
-  [**@marcelwa**])
+  [**@marcelwa**]).
 
 ## [1.4.0] - 2026-08-25
 
@@ -174,186 +174,186 @@ releases may include breaking changes.
 - ✨ Take over the IQM JSON serialization and the `MoveGate` from MQT Core,
   which removed both in 3.9.1, and advertise the serializer through MQT Core's
   `mqt.core.qiskit.program_serializers` entry point group so any QDMI backend
-  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**])
+  over an IQM device keeps submitting IQM JSON ([#189]) ([**@marcelwa**]).
 - ✨ Accept `IQM_LOG_LEVEL` as the environment variable that selects the log
   level, injected by the SPANK plugin through `iqm_log_level` and
   `--iqm-log-level`. `IQM_CPP_API_LOG_LEVEL` still works as a deprecated alias
-  ([#206]) ([**@marcelwa**])
+  ([#206]) ([**@marcelwa**]).
 - ✅ Cover the device's queue length, a queued job's position, retrieval of an
   existing job by ID, and its advertised program formats through MQT Core's
-  Python QDMI API ([#195]) ([**@marcelwa**])
+  Python QDMI API ([#195]) ([**@marcelwa**]).
 - 👷 Add an `IQM_QDMI_SANITIZERS` CMake option for building with
   AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or
   MemorySanitizer, and run the C++ test suite under ASan and UBSan in CI
-  ([#173]) ([**@marcelwa**])
-- 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**])
+  ([#173]) ([**@marcelwa**]).
+- 🐍 Start building CPython 3.15 wheels ([#177]) ([**@denialhaag**]).
 - ✨ Expose current device queue length and queued job position through QDMI,
   refreshing IQM job status for every position query ([#172])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - ✨ Add a `licenses` keyword argument to `iqm.qdmi.offloader`'s `sample`/
   `estimate`, forwarded as `--licenses` on `srun`, so callers can request the
   Slurm license a site administrator may require via the SPANK plugin's
-  `iqm_require_license` option ([#162]) ([**@marcelwa**])
+  `iqm_require_license` option ([#162]) ([**@marcelwa**]).
 - ✨ Support retrieving existing IQM circuit jobs by ID ([#160])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 
 ### Fixed
 
 - 🔒️ Log raw HTTP error-response bodies at `DEBUG` instead of `ERROR`, keeping
   only their size and content type at the default log level ([#205])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - 🐛 Keep authentication working past January 2038 by reading JWT expiry times
-  as 64-bit values ([#205]) ([**@marcelwa**])
+  as 64-bit values ([#205]) ([**@marcelwa**]).
 - 🐛 Survive a calibration set whose gate loci or coherence times have an
   unexpected shape, dropping the affected gate or metric instead of crashing or
-  misreporting it ([#204]) ([**@marcelwa**])
+  misreporting it ([#204]) ([**@marcelwa**]).
 - 🐛 Report a cancellation that the server refuses because the job already
   finished as `QDMI_ERROR_INVALIDARGUMENT` rather than
   `QDMI_ERROR_PERMISSIONDENIED`, which said the session was not allowed to use
-  the job interface ([#199]) ([**@marcelwa**])
+  the job interface ([#199]) ([**@marcelwa**]).
 - 🐛 Report the status the quantum computer is actually in, instead of pinning a
   session to busy from its first job submission onwards ([#190])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - 🐛 Keep a job checkable when a status or cancellation request fails, instead
   of permanently reporting a still-running job as failed ([#187])
-  ([**@marcelwa**])
-- 🐛 Fix a potential histogram buffer size mismatch ([#181]) ([**@marcelwa**])
+  ([**@marcelwa**]).
+- 🐛 Fix a potential histogram buffer size mismatch ([#181]) ([**@marcelwa**]).
 - 🐛 Report the number of qubits without the computational resonators, which
   inflated `QDMI_DEVICE_PROPERTY_QUBITSNUM` on devices with computational
-  resonators ([#182]) ([**@marcelwa**])
+  resonators ([#182]) ([**@marcelwa**]).
 - 🐛 Contain exceptions so they do not escape the C interface ([#175], [#188])
-  ([**@burgholzer**], [**@marcelwa**])
+  ([**@burgholzer**], [**@marcelwa**]).
 - 🐛 Serialize move-gate and active-reset options using the canonical IQM
-  RunRequest field names ([#169]) ([**@burgholzer**])
+  RunRequest field names ([#169]) ([**@burgholzer**]).
 - 🩹 Preserve exact program bytes across QDMI job parameter updates and property
-  queries ([#159]) ([**@burgholzer**])
+  queries ([#159]) ([**@burgholzer**]).
 - 🩹 Keep IQM shot and histogram bitstrings in the measurement-key and qubit
-  order specified by IQM's result metadata ([#158]) ([**@burgholzer**])
+  order specified by IQM's result metadata ([#158]) ([**@burgholzer**]).
 
 ### Changed
 
 - ⬆️ Update MQT Core to 3.9.0, moving to its `mqt.core.qdmi.driver` namespace
   and its explicit sampler and estimator shot and precision defaults ([#195])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - ⬆️ Update QDMI to v1.3.3, and publish the device target's stable ID and symbol
   prefix through QDMI's `configure_qdmi_device_target` ([#195])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - ⚡️ Reuse HTTP connections within each QDMI device session to reduce TCP/TLS
   setup during initialization and subsequent requests ([#163])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 
 ## [1.3.0] - 2026-07-31
 
 ### Added
 
 - ✨ Validate IQM backend and target-QC availability once per node for each
-  Slurm job step before launching tasks ([#136]) ([**@burgholzer**])
+  Slurm job step before launching tasks ([#136]) ([**@burgholzer**]).
 - ✨ Export the stable IQM device ID and symbol prefix on the installed CMake
   target so MQT Core can synthesize relocatable manifests ([#140])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - ✨ Add `iqm.qdmi.offloader` module exposing programmatic `sample` and
   `estimate` functions (including `qc_id`/`qc_alias` SPANK device-selection
   parameters) for Slurm job submissions ([#104], [#130], [#133])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 - ✨ Validate Slurm `--licenses` alignment with the targeted QC alias in the
   SPANK plugin, enabling admins to enforce Slurm-native concurrency limits on
-  on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**])
+  on-premise QCs ([#114], [#134]) ([**@marcelwa**], [**@burgholzer**]).
 - 📝 Add an integration scenarios analysis comparing IQM integration paths
   (direct C++/Python usage, Slurm + SPANK offloading, Spack install, and
   non-Slurm schedulers as forward-looking guidance) and an administrator guide
   walking through standing up IQM access on a Slurm cluster ([#147])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 
 ### Changed
 
 - ⚡️ Cache SPANK validation per node and job step, isolate it from daemon-only
   environment variables, bound each launch-time request to 30 seconds by
   default, emit task diagnostics once per node and step, and require Slurm 20.02
-  or newer ([#136]) ([**@burgholzer**])
+  or newer ([#136]) ([**@burgholzer**]).
 - ⬆️ Update `mqt-core` to version 3.8.0 and use its stable device registry with
-  per-backend device sessions ([#140]) ([**@burgholzer**])
+  per-backend device sessions ([#140]) ([**@burgholzer**]).
 - ♻️ Further align C++ HTTP and authentication handling with [cpr] abstractions
-  ([#122]) ([**@burgholzer**])
+  ([#122]) ([**@burgholzer**]).
 
 ### Fixed
 
 - 🩹 Preserve a configured `iqm.default` endpoint unless `IQMBackend` receives
-  an explicit or environment-provided base URL ([#140]) ([**@burgholzer**])
+  an explicit or environment-provided base URL ([#140]) ([**@burgholzer**]).
 - 🩹 Fix rate limit handling and retry logic for API requests ([#122])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 
 ## [1.2.0] - 2026-07-09
 
 ### Added
 
 - ✨ Expose the current calibration set ID as a device property via
-  `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**])
+  `QDMI_DEVICE_PROPERTY_CUSTOM1` ([#108]) ([**@burgholzer**]).
 - ✨ Add `iqm-sampler` and `iqm-estimator` CLI entrypoints leveraging
-  `IQMBackend`'s primitives ([#92]) ([**@marcelwa**])
+  `IQMBackend`'s primitives ([#92]) ([**@marcelwa**]).
 - ✨ Implement Slurm SPANK plugin for injecting IQM environment variables and
-  session parameters into Slurm jobs ([#74], [#117]) ([**@marcelwa**])
+  session parameters into Slurm jobs ([#74], [#117]) ([**@marcelwa**]).
 - ✨ Support environment variable fallbacks (`IQM_BASE_URL`, `IQM_QC_ID`, and
-  `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**])
+  `IQM_QC_ALIAS`) for session initialization ([#74]) ([**@marcelwa**]).
 
 ### Fixed
 
 - 🩹 Ensure the QDMI device can handle devices with computational resonators
-  ([#107]) ([**@burgholzer**])
+  ([#107]) ([**@burgholzer**]).
 
 ### Changed
 
-- ⬆️ Update `mqt-core` to version 3.7.0 ([#120]) ([**@denialhaag**])
-- ⬆️ Update QDMI to version 1.3.2 ([#120]) ([**@denialhaag**])
+- ⬆️ Update `mqt-core` to version 3.7.0 ([#120]) ([**@denialhaag**]).
+- ⬆️ Update QDMI to version 1.3.2 ([#120]) ([**@denialhaag**]).
 - ♻️ Rewrite the C++ HTTP client to use [cpr] instead of direct `libcurl` calls
-  ([#105]) ([**@marcelwa**])
+  ([#105]) ([**@marcelwa**]).
 - ♻️ Considerably simplify the internal HTTP client implementation ([#105])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 
 ## [1.1.1] - 2026-06-01
 
 ### Fixed
 
 - 🩹 Decouple MQT Core and Qiskit dependency resolution to avoid potential
-  cyclic dependency issues ([#78]) ([**@marcelwa**])
+  cyclic dependency issues ([#78]) ([**@marcelwa**]).
 
 ## [1.1.0] - 2026-05-22
 
 ### Added
 
 - ✨ Add end-to-end examples and documentation for running experiments on IQM
-  hardware ([#53]) ([**@marcelwa**], [**@burgholzer**])
+  hardware ([#53]) ([**@marcelwa**], [**@burgholzer**]).
 - 🚸 Add explicit retry logic to avoid hitting API rate limits ([#52], [#73])
-  ([**@marcelwa**], [**@burgholzer**])
+  ([**@marcelwa**], [**@burgholzer**]).
 - ✨ Add Qiskit-compatible `IQMBackend` wrapper including Sampler and Estimator
-  primitives ([#37]) ([**@marcelwa**], [**@burgholzer**])
+  primitives ([#37]) ([**@marcelwa**], [**@burgholzer**]).
 
 ### Changed
 
 - ♻️ Consistently use `IQM_TOKEN` instead of `RESONANCE_API_KEY` for
-  authentication ([#67]) ([**@marcelwa**])
+  authentication ([#67]) ([**@marcelwa**]).
 - ♻️ Consistently enforce explicit authentication parameters to take precedence
-  over environment variables ([#67]) ([**@marcelwa**])
+  over environment variables ([#67]) ([**@marcelwa**]).
 - 📝 Restructure documentation for better clarity and navigation ([#53])
-  ([**@burgholzer**])
+  ([**@burgholzer**]).
 - 📝 Update Spack package guide with latest release and installation
-  instructions ([#53]) ([**@burgholzer**])
-- 📝 Reduce redundancy across documentation ([#53]) ([**@burgholzer**])
+  instructions ([#53]) ([**@burgholzer**]).
+- 📝 Reduce redundancy across documentation ([#53]) ([**@burgholzer**]).
 - 🚚 Replace `meetiqm.com` with new `iqm.tech` domain in documentation and
-  codebase ([#56]) ([**@iqmtjm**], [**@marcelwa**])
+  codebase ([#56]) ([**@iqmtjm**], [**@marcelwa**]).
 - 🚸 Demote warnings from missing calibration endpoints to debug level ([#51])
-  ([**@marcelwa**])
+  ([**@marcelwa**]).
 
 ## [1.0.1] - 2026-04-27
 
 ### Fixed
 
-- 🐛 Fix CD workflow runner ([#49]) ([**@burgholzer**])
+- 🐛 Fix CD workflow runner ([#49]) ([**@burgholzer**]).
 
 ## [1.0.0] - 2026-04-27
 
 Compatible with QDMI `v1.3.0`.
 
-- 🎉 Initial release ([**@burgholzer**], [**@marcelwa**])
+- 🎉 Initial release ([**@burgholzer**], [**@marcelwa**]).
 
 <!-- Version links -->
 
