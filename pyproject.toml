@@ -53,6 +53,10 @@ name = "IQM Finland Oy"
 email = "developers@iqm.tech"
 
 [project.optional-dependencies]
+pulla = [
+  "iqm-client>=36,<37; python_version<'3.15'",
+  "mqt-core>=4.2",
+]
 pennylane = [ "mqt-core[pennylane]>=4.2" ]
 qiskit = [
   "mqt-core[qiskit]>=4.2",

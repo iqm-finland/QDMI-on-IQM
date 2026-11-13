@@ -396,6 +396,8 @@ The QDMI device currently supports the following program formats:
   profile programs as strings.
 - **IQM JSON** (`QDMI_PROGRAM_FORMAT_IQMJSON`): IQM's native JSON circuit
   format.
+- **Pulse-level programs** (`QDMI_PROGRAM_FORMAT_CUSTOM1`): a serialized IQM
+  `RunDefinition` protobuf, described under "Submitting Pulse-Level Jobs" below.
 
 Pass QIR and JSON programs as strings with exactly one trailing NUL byte. The
 program-list setter copies all programs before returning. They share the format,
@@ -545,6 +547,56 @@ measurement data, not state vectors or probability distributions:
   `QDMI_JOB_RESULT_PROBABILITIES_SPARSE_VALUES`
 
 Attempting to retrieve these formats will return `QDMI_ERROR_NOTSUPPORTED`.
+
+## Submitting Pulse-Level Jobs
+
+QDMI has no program format of its own for pulse-level programs, so this device
+carries one in `QDMI_PROGRAM_FORMAT_CUSTOM1`. The program is a serialized IQM
+`RunDefinition` protobuf, the same payload IQM's own client submits, and the
+device forwards it to the IQM Server byte for byte without reading it.
+
+Because the payload is binary, its length is the byte count, with no terminator:
+
+```cpp
+const size_t size = payload.size();
+const void *program = payload.data();
+IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM1, 1, &size,
+                                 &program);
+IQM_QDMI_device_job_submit(job);
+```
+
+A pulse job accepts one binary program, containing the complete compiled sweep.
+The program and results use index zero.
+
+Results come back as the raw `sweep_results` artifact via the
+`QDMI_JOB_RESULT_CUSTOM2` job result, again as protobuf bytes with no
+terminator. Shot and histogram results are not available for a pulse-level job,
+because the IQM Server produces no measurement artifacts for one; asking for
+them returns `QDMI_ERROR_NOTSUPPORTED`.
+
+:::{note}
+Use IQM's SDK to compile the payload and deserialize the acquisition arrays; see
+[Pulse-Level Programs](python_package.md#pulse-level-programs).
+:::
+
+Pulse-level jobs use their own submission and artifact endpoints, but share
+status and cancellation with circuit jobs:
+
+- Submit: `/api/v1/jobs/<quantum_computer>/run`
+- Results: `/api/v1/jobs/<job_id>/artifacts/sweep_results`
+
+`QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM` does not apply. The repetition count is
+compiled into the `RunDefinition`, and the device forwards the payload without
+reading it, so setting or querying the parameter returns
+`QDMI_ERROR_NOTSUPPORTED`. Set the repetition count in the compiler settings
+with `settings.set_shots(shots)`. Circuit run-request options are also
+unsupported. The caller owns the compiled calibration; the calibration set ID
+property (`QDMI_DEVICE_JOB_PROPERTY_CUSTOM1`) returns `QDMI_ERROR_NOTSUPPORTED`
+for pulse jobs.
+
+`IQM_QDMI_device_session_retrieve_device_job_by_id` recognizes the IQM Server's
+`run` job type, so a later session can reopen a pulse-level job and retrieve
+`QDMI_JOB_RESULT_CUSTOM2`.
 
 ## Triggering Calibration Jobs
 

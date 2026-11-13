@@ -63,6 +63,8 @@ def offline_backend(
     if variant == "extra_operations":
         metadata[2]["gates"]["measure_012"] = metadata[2]["gates"]["measure"]
     responses = deque(metadata)
+    if variant == "pulse":
+        responses.extend([{"status": "ready", "type": "run"}, b"\x08\x00\xff\x00"] * 2)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -71,15 +73,22 @@ def offline_backend(
             else:
                 self.send_error(500, "Unexpected request")
                 return
-            body = json.dumps(response).encode()
+            body = response if isinstance(response, bytes) else json.dumps(response).encode()
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+            self.send_header(
+                "Content-Type", "application/protobuf" if isinstance(response, bytes) else "application/json"
+            )
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
         def do_POST(self) -> None:
-            offline_submissions.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            payload = self.rfile.read(int(self.headers["Content-Length"]))
+            offline_submissions.append(
+                {"pulse": payload, "expect": self.headers.get("Expect")}
+                if self.headers["Content-Type"] == "application/protobuf"
+                else json.loads(payload)
+            )
             body = json.dumps({"id": "offline-job"}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

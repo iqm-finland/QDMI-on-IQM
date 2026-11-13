@@ -369,11 +369,16 @@ QDMI_STATUS Handle_response(const cpr::Response &response,
   }
 
   const auto response_code = response.status_code;
+  const auto response_content_type = response.header.find("Content-Type");
+  const auto is_successful_protobuf =
+      response_code >= 200 && response_code < 300 &&
+      response_content_type != response.header.end() &&
+      response_content_type->second.starts_with("application/protobuf");
 
   // Parse JSON response for IQM-specific errors and messages
   nlohmann::json json_response; // NOLINT(misc-include-cleaner)
   bool has_json = false;
-  if (!response.text.empty()) {
+  if (!response.text.empty() && !is_successful_protobuf) {
     try {
       json_response = nlohmann::json::parse(response.text);
       has_json = true;
@@ -543,13 +548,20 @@ cpr::Response Get(const cpr::Url &url,
 cpr::Response
 Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
      const cpr::ConnectionPool &connection_pool, const std::string_view data,
+     const cpr::Header &additional_headers,
      const std::chrono::milliseconds timeout, Rate_limit_budget *rate_limit) {
   LOG_INFO("Performing POST request to " + url.str());
   if (!data.empty()) {
-    LOG_DEBUG(std::string{"POST data: "}.append(data));
+    const auto content_type = additional_headers.find("Content-Type");
+    LOG_DEBUG(content_type != additional_headers.end() &&
+                      content_type->second.starts_with("application/protobuf")
+                  ? "POST data: " + std::to_string(data.size()) +
+                        " protobuf byte(s)"
+                  : "POST data: " + std::string{data});
   }
   const auto &hooks = internal::Get_hooks();
-  const cpr::Header headers{{"Content-Type", "application/json"}};
+  auto headers = additional_headers;
+  headers.try_emplace("Content-Type", "application/json");
   return internal::Perform_with_retries(
       url, timeout, rate_limit, [&](const auto remaining) {
         return hooks.post(url, bearer_token, connection_pool, headers, data,

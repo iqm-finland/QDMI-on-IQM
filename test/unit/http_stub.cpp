@@ -90,7 +90,12 @@ HttpStub::HttpStub() {
                       const cpr::ConnectionPool &connection_pool,
                       const cpr::Header &headers, const std::string_view body,
                       const std::chrono::milliseconds timeout) {
-    EXPECT_EQ(headers.at("Content-Type"), "application/json");
+    const auto content_type = headers.find("Content-Type");
+    EXPECT_NE(content_type, headers.end());
+    if (content_type != headers.end()) {
+      EXPECT_TRUE(content_type->second == "application/json" ||
+                  content_type->second == "application/protobuf");
+    }
     EXPECT_FALSE(headers.contains("Expect"));
     post_urls_.push_back(url.str());
     post_bodies_.emplace_back(body);
