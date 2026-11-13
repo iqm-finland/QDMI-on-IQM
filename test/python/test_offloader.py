@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 import pytest
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter, ParameterVector
+from qiskit.circuit.library import RealAmplitudes
 from qiskit.primitives.containers import BitArray, DataBin, PrimitiveResult, SamplerPubResult
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms import VQEResult
@@ -76,6 +77,18 @@ def test_estimate_local_simulator() -> None:
     params = list(optimal_parameters.values())
     assert len(params) == 1
     assert math.isfinite(float(params[0]))
+
+
+@pytest.mark.filterwarnings("ignore:.*(RealAmplitudes|TwoLocal|NLocal|BlueprintCircuit).*:DeprecationWarning")
+def test_estimate_local_simulator_with_wider_operator() -> None:
+    """Allow VQE to resize a blueprint ansatz to the operator width."""
+    ansatz = RealAmplitudes(1, reps=1, flatten=True)
+    operator = SparsePauliOp.from_list([("ZZ", 1.0)])
+
+    result = offloader.estimate(ansatz, operator, maxiter=2, local=True, simulator=True)
+
+    assert result.optimal_circuit is not None
+    assert result.optimal_circuit.num_qubits == 2
 
 
 def test_sample_slurm_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -532,3 +545,12 @@ def test_vqe_result_pickle_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert result.optimizer_result.nfev == expected.optimizer_result.nfev
     assert result.optimizer_result.njev == expected.optimizer_result.njev
     assert result.optimizer_result.nit == expected.optimizer_result.nit
+
+
+@pytest.mark.parametrize("sampler", [True, False])
+@pytest.mark.parametrize("num_qubits", [0, 2])
+def test_simulator_backend_width(*, sampler: bool, num_qubits: int) -> None:
+    """Size simulator targets to the circuit, or use the default for zero qubits."""
+    builder = offloader.build_sampler if sampler else offloader.build_estimator
+    primitive = builder(simulator=True, num_qubits=num_qubits)
+    assert primitive.backend.num_qubits == (num_qubits or 65535)

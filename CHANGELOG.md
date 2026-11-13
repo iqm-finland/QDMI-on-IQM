@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ⚡️ Reduce simulator setup time for local and Slurm sampling and estimation
+  ([#334]) ([**@marcelwa**]).
+
 ## [1.6.0] - 2026-11-10
 
 ### Added
@@ -370,6 +375,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321

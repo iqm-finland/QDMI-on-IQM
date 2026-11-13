@@ -69,6 +69,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     sampler = build_sampler(
         simulator=args.simulator,
+        num_qubits=circuit.num_qubits,
         base_url=args.base_url,
         tokens_file=args.tokens_file,
         qc_id=args.qc_id,
