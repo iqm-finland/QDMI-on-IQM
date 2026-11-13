@@ -12,8 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
-- ✨ Standalone IQM iteration creation, inspection, and explicit ending, with
-  bounded requests and separate lifecycle validation. ([#326]) ([**@marcelwa**])
+- ✨ Create, inspect, and end IQM iterations from C or C++ without opening a
+  device session. ([#326]) ([**@marcelwa**])
 
 ## [1.6.0] - 2026-11-10
 
