@@ -262,6 +262,32 @@ export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
 ```
 
+**Checking iteration management:**
+
+The live-test workflow checks iteration creation and cleanup on `emerald:mock`
+after the other live tests finish. To run this check yourself, configure the
+credentials described above, then run:
+
+```console
+cmake --preset release
+cmake --build --preset release --target iteration_management_smoke
+unset IQM_QC_ID
+export IQM_QC_ALIAS="emerald:mock"
+export IQM_ITERATION_SCRATCH_FILE="$(pwd)/build/iteration-ids.txt"
+./build/release/test/iteration/iteration_management_smoke
+./build/release/test/iteration/iteration_management_smoke --cleanup-only
+```
+
+The check creates a reservation with a 60-second duration, waits up to 120
+seconds for activation, then tries to end it. It is excluded from default builds
+and CTest. The file records created IDs until cleanup confirms they have ended.
+Keep it if cleanup fails, and rerun `--cleanup-only` with the same credentials.
+Cleanup has a separate 30-second budget.
+
+CI serializes this check across runs and attempts cleanup even after
+cancellation. Runner loss or force cancellation can still leave reservations
+behind; ask the service administrator to reconcile them if the ID file is lost.
+
 **Generating code coverage:**
 
 On Linux, use the coverage preset to instrument the native implementation and
