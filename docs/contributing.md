@@ -272,7 +272,7 @@ credentials described above, then run:
 cmake --preset release
 cmake --build --preset release --target iteration_management_smoke
 unset IQM_QC_ID
-export IQM_QC_ALIAS="emerald:mock"
+export IQM_QUANTUM_COMPUTER="emerald:mock"
 export IQM_ITERATION_SCRATCH_FILE="$(pwd)/build/iteration-ids.txt"
 ./build/release/test/iteration/iteration_management_smoke
 ./build/release/test/iteration/iteration_management_smoke --cleanup-only

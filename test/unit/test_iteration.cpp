@@ -448,10 +448,9 @@ protected:
   iqm::test_support::HttpStub http_;
   std::filesystem::path scratch_;
   static constexpr std::array VARIABLES{
-      "IQM_SERVER_URL",
-      "IQM_TOKEN",
-      "IQM_TOKENS_FILE",
-      "IQM_ITERATION_SCRATCH_FILE",
+      "IQM_SERVER_URL",       "IQM_TOKEN",
+      "IQM_TOKENS_FILE",      "IQM_ITERATION_SCRATCH_FILE",
+      "IQM_QUANTUM_COMPUTER", "IQM_QC_ID",
   };
   std::array<std::optional<std::string>, VARIABLES.size()> previous_;
   void SetUp() override {
@@ -484,11 +483,14 @@ protected:
   }
 };
 TEST_F(IterationSmoke, LifecycleRemovesScratchOnlyAfterTerminalConfirmation) {
+  Set_env("IQM_QUANTUM_COMPUTER", "garnet:mock");
   http_.queue_post(200, Reply()).queue_post(202, Reply("active"));
   http_.queue_get(200, Reply("active"))
       .queue_get(200, Reply("active"))
       .queue_get(200, Reply("completed"));
-  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(false), 0);
+  ASSERT_EQ(iqm::test_support::Iteration_management_smoke(false), 0);
+  EXPECT_EQ(nlohmann::json::parse(http_.post_bodies().front())["qc"],
+            "garnet:mock");
   EXPECT_EQ(std::filesystem::file_size(scratch_), 0);
   EXPECT_EQ(http_.post_urls().size(), 2);
   EXPECT_EQ(http_.get_urls().size(), 3);

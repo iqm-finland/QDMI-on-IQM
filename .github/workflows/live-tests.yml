@@ -152,23 +152,27 @@ jobs:
       queue: max
     env:
       IQM_SERVER_URL: https://resonance.iqm.tech
-      IQM_QC_ALIAS: emerald:mock
+      IQM_QUANTUM_COMPUTER: emerald:mock
       CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ success() && !cancelled() }}
         with:
           persist-credentials: false
+
       - name: Install build dependencies
         if: ${{ success() && !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
+
       - name: Configure standalone live target
         if: ${{ success() && !cancelled() }}
         run: cmake --preset release
+
       - name: Build
         id: build
         if: ${{ success() && !cancelled() }}
         run: cmake --build --preset release --target iteration_management_smoke
+
       - name: Create, inspect, and end without a device session
         if: always() && steps.build.outcome == 'success'
         env:
@@ -180,6 +184,7 @@ jobs:
             exit 0
           fi
           ./build/release/test/iteration/iteration_management_smoke
+
       - name: Reconcile confirmed IDs
         if: always()
         env:

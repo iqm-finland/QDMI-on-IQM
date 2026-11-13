@@ -227,7 +227,7 @@ int Iteration_management_smoke(const bool cleanup_only) {
     }
     const char *qc = std::getenv("IQM_QC_ID");
     if (qc == nullptr || *qc == '\0') {
-      qc = std::getenv("IQM_QC_ALIAS");
+      qc = std::getenv("IQM_QUANTUM_COMPUTER");
     }
     if (qc == nullptr || *qc == '\0') {
       qc = "emerald:mock";
