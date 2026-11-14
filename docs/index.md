@@ -44,6 +44,7 @@ examples
 qiskit
 pennylane
 usage
+iteration-mode
 python_package
 slurm
 

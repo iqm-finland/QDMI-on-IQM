@@ -1300,7 +1300,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     throw iqm::ClientAuthenticationError{"expired token"};
   };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1310,6 +1310,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
+                const auto,
                 const auto) -> cpr::Response { throw std::bad_alloc{}; };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
@@ -1318,7 +1319,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     throw std::runtime_error{"transport hook failed"};
   };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1328,7 +1329,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     // Exercise the C ABI's catch-all handler for non-standard exceptions.
     // NOLINTNEXTLINE(bugprone-std-exception-baseclass)
     throw 42;
@@ -2567,7 +2568,8 @@ TEST_F(DeviceIntegrationMockTest, SessionInitializationContainsCxxExceptions) {
   const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
                                            const int expected_status) {
     get_hook = [exception](const auto &, const auto &, const auto &,
-                           const auto &, const auto) -> cpr::Response {
+                           const auto &, const auto,
+                           const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     EXPECT_EQ(IQM_QDMI_device_session_init(session), expected_status);
@@ -3277,7 +3279,8 @@ TEST_F(DeviceIntegrationMockTest, QueueLengthQueryContainsCxxExceptions) {
   const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
                                            const int expected_status) {
     get_hook = [exception](const auto &, const auto &, const auto &,
-                           const auto &, const auto) -> cpr::Response {
+                           const auto &, const auto,
+                           const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     size_t queue_length = 0;
@@ -3442,11 +3445,12 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
   auto stub_post = hooks.post;
   const auto throw_from_transport = [&](const std::exception_ptr &exception) {
     hooks.get = [exception](const auto &, const auto &, const auto &,
-                            const auto &, const auto) -> cpr::Response {
+                            const auto &, const auto,
+                            const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     hooks.post = [exception](const auto &, const auto &, const auto &,
-                             const auto &, const auto &,
+                             const auto &, const auto &, const auto,
                              const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };

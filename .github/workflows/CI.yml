@@ -19,6 +19,7 @@ jobs:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
     with:
       additional-cpp-files: |
+        .github/workflows/CI.yml
         .github/workflows/cpp-*.yml
         .github/workflows/live-tests.yml
       additional-python-files: |
@@ -206,7 +207,7 @@ jobs:
       - python-tests
       - build-wheel
     if: >-
-      !cancelled()
+      always()
       && !contains(needs.*.result, 'failure')
       && !contains(needs.*.result, 'cancelled')
       && (
@@ -214,6 +215,8 @@ jobs:
         || github.event.pull_request.head.repo.full_name == github.repository
       )
     uses: $/.github/workflows/live-tests.yml
+    with:
+      run-iteration-test: ${{ fromJSON(needs.change-detection.outputs.run-cpp-tests) }}
     secrets:
       IQM_TOKEN: ${{ secrets.RESONANCE_API_KEY }}
 

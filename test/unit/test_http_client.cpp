@@ -396,10 +396,11 @@ TEST(HttpClientTest, PostBorrowsBodyAcrossRetriesWithoutRequestingContinue) {
     auto stub_post = post_hook;
     post_hook = [&](const auto &url, const auto &token, const auto &pool,
                     const auto &headers, const std::string_view body,
-                    const auto timeout) {
+                    const auto timeout, const auto follow_redirects) {
       EXPECT_EQ(body.data(), payload.data());
       EXPECT_EQ(body, payload);
-      return stub_post(url, token, pool, headers, body, timeout);
+      return stub_post(url, token, pool, headers, body, timeout,
+                       follow_redirects);
     };
 
     EXPECT_EQ(iqm::http::Post("https://example.test/jobs", std::nullopt,

@@ -35,32 +35,56 @@ const std::unordered_map<API_ENDPOINT, std::string> URLS = {
     {API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "api/v1/jobs/%s/circuit"},
     {API_ENDPOINT::GET_JOB_STATUS, "api/v1/jobs/%s"},
     {API_ENDPOINT::GET_JOB_PAYLOAD, "api/v1/jobs/%s/payload"},
-    {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
-     "api/v1/jobs/%s/artifacts/measurement_counts"},
-    {API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,
-     "api/v1/jobs/%s/artifacts/measurements"},
+    {
+        API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
+        "api/v1/jobs/%s/artifacts/measurement_counts",
+    },
+    {
+        API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS,
+        "api/v1/jobs/%s/artifacts/measurements",
+    },
     {API_ENDPOINT::CANCEL_JOB, "api/v1/jobs/%s/cancel"},
 
     // Quantum computer endpoints
     {API_ENDPOINT::GET_QUANTUM_COMPUTERS, "api/v1/quantum-computers"},
-    {API_ENDPOINT::GET_QUANTUM_COMPUTER_HEALTH,
-     "api/v1/quantum-computers/%s/health"},
-    {API_ENDPOINT::GET_QUEUE_AVAILABILITY,
-     "api/v1/quantum-computers/%s/queue-availability"},
-    {API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
-     "api/v1/quantum-computers/%s/artifacts/static-quantum-architectures"},
-    {API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
-     "api/v1/calibration-sets/%s/%s/dynamic-quantum-architecture"},
-    {API_ENDPOINT::GET_CALIBRATION_SET_QUALITY_METRICS,
-     "api/v1/calibration-sets/%s/%s/metrics"},
+    {
+        API_ENDPOINT::GET_QUANTUM_COMPUTER_HEALTH,
+        "api/v1/quantum-computers/%s/health",
+    },
+    {
+        API_ENDPOINT::GET_QUEUE_AVAILABILITY,
+        "api/v1/quantum-computers/%s/queue-availability",
+    },
+    {
+        API_ENDPOINT::GET_STATIC_QUANTUM_ARCHITECTURE,
+        "api/v1/quantum-computers/%s/artifacts/static-quantum-architectures",
+    },
+    {
+        API_ENDPOINT::GET_DYNAMIC_QUANTUM_ARCHITECTURE,
+        "api/v1/calibration-sets/%s/%s/dynamic-quantum-architecture",
+    },
+    {
+        API_ENDPOINT::GET_CALIBRATION_SET_QUALITY_METRICS,
+        "api/v1/calibration-sets/%s/%s/metrics",
+    },
 
     // Calibration job endpoints (legacy - may not be available)
     {API_ENDPOINT::COCOS_HEALTH, "cocos/health"},
     {API_ENDPOINT::SUBMIT_CALIBRATION_JOB, "cocos/api/v4/calibration/runs"},
-    {API_ENDPOINT::GET_CALIBRATION_JOB_STATUS,
-     "cocos/api/v4/calibration/runs/%s/status"},
-    {API_ENDPOINT::ABORT_CALIBRATION_JOB,
-     "cocos/api/v4/calibration/runs/%s/abort"}};
+    {
+        API_ENDPOINT::GET_CALIBRATION_JOB_STATUS,
+        "cocos/api/v4/calibration/runs/%s/status",
+    },
+    {
+        API_ENDPOINT::ABORT_CALIBRATION_JOB,
+        "cocos/api/v4/calibration/runs/%s/abort",
+    },
+
+    // Iteration management endpoints
+    {API_ENDPOINT::CREATE_ITERATION, "api/v1/iterations"},
+    {API_ENDPOINT::GET_ITERATION, "api/v1/iterations/%s"},
+    {API_ENDPOINT::END_ITERATION, "api/v1/iterations/%s/end"},
+};
 } // namespace
 
 APIConfig::APIConfig(std::string iqm_server_url)
