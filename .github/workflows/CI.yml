@@ -19,12 +19,18 @@ jobs:
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-change-detection.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
     with:
       additional-cpp-files: |
-        .github/workflows/cpp-*.yml
+        .github/workflows/CI.yml
         .github/workflows/live-tests.yml
       additional-python-files: |
+        .github/workflows/CI.yml
         .github/workflows/live-tests.yml
         .github/workflows/python-*.yml
         examples/**
+      additional-cd-files: |
+        .github/workflows/CI.yml
+        .github/workflows/CD.yml
+        .github/cpp-sdk.json
+        test/install_consumer/**
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -85,6 +91,15 @@ jobs:
       runs-on: ${{ matrix.runs-on }}
       preset-name: ${{ matrix.preset }}
 
+  cpp-coverage:
+    name: 🇨 Coverage
+    needs: change-detection
+    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
+    permissions:
+      contents: read
+      id-token: write
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+
   cpp-sanitizers:
     name: 🇨 Sanitizers
     needs: change-detection
@@ -94,14 +109,23 @@ jobs:
       runs-on: ubuntu-26.04
       preset-name: sanitizers
 
-  cpp-coverage:
-    name: 🇨 Coverage
+  cpp-install-tests:
+    name: 🇨 Installation
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    permissions:
-      contents: read
-      id-token: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-coverage.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-install-tests.yml@d810ec0a3f6b2df6782207ee8923dc72fa853ed1 # codex/add-cpp-install-tests
+    with:
+      runs-on: ${{ matrix.runs-on }}
+      apt-packages: libssl-dev zlib1g-dev
 
   cpp-linter:
     name: 🇨 Lint
@@ -115,6 +139,7 @@ jobs:
       clang-version: 23
       files-changed-only: true
       cpp-linter-extra-args: "-Wunused-template"
+      cpp-linter-ignore-extra: "test/install_consumer/**"
 
   python-tests:
     name: 🐍 Test
@@ -149,30 +174,14 @@ jobs:
       enable-ty: true
       enable-mypy: false
 
-  cpp-install-tests:
-    name: 📦 C++ installation
-    needs: change-detection
-    if: fromJSON(needs.change-detection.outputs.run-cpp-tests)
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
-          - macos-26
-          - windows-2025
-    uses: $/.github/workflows/cpp-install-tests.yml
-    with:
-      runs-on: ${{ matrix.runs-on }}
-
   build-sdist:
-    name: 🚀 CD
+    name: 📦 Build source distribution
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
 
   build-wheel:
-    name: 🚀 CD
+    name: 📦 Build wheels
     needs: change-detection
     if: fromJSON(needs.change-detection.outputs.run-python-tests) || fromJSON(needs.change-detection.outputs.run-cd)
     strategy:
@@ -185,6 +194,22 @@ jobs:
           - windows-2025
           - windows-11-arm
     uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@d6345b25f19cb7223ac883e5333ae9d63ae9238b # v2.5.9
+    with:
+      runs-on: ${{ matrix.runs-on }}
+
+  build-cpp-sdk:
+    name: 📦 Assemble C++ SDK
+    needs: [change-detection, build-wheel]
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-sdk.yml@fb4a2de7a53c6b60ec26709cf7c4e50f6a44687b # codex/add-cpp-sdk-packaging
     with:
       runs-on: ${{ matrix.runs-on }}
 
@@ -224,16 +249,17 @@ jobs:
       - cpp-tests-ubuntu
       - cpp-tests-macos
       - cpp-tests-windows
-      - cpp-sanitizers
       - cpp-coverage
+      - cpp-sanitizers
+      - cpp-install-tests
       - cpp-linter
       - python-tests
       - python-coverage
       - python-examples
       - python-linter
-      - cpp-install-tests
       - build-sdist
       - build-wheel
+      - build-cpp-sdk
       - documentation
       - live-tests
     if: always()
@@ -244,11 +270,7 @@ jobs:
           allowed-skips: >-
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-sanitizers,cpp-install-tests,' || ''
-            }}
-            ${{
-              !fromJSON(needs.change-detection.outputs.run-cpp-tests)
-              && 'cpp-coverage,' || ''
+              && 'cpp-tests-ubuntu,cpp-tests-macos,cpp-tests-windows,cpp-coverage,cpp-sanitizers,cpp-install-tests,' || ''
             }}
             ${{
               !fromJSON(needs.change-detection.outputs.run-cpp-linter)
@@ -265,7 +287,7 @@ jobs:
             ${{
               !fromJSON(needs.change-detection.outputs.run-python-tests)
               && !fromJSON(needs.change-detection.outputs.run-cd)
-              && 'build-sdist,build-wheel,' || ''
+              && 'build-sdist,build-wheel,build-cpp-sdk,' || ''
             }}
             ${{
               github.event_name == 'pull_request'

@@ -28,8 +28,8 @@ else()
     DESTINATION "${LICENSE_INSTALL_DIR}"
     COMPONENT ${QDMI_TARGET_NAME}_Runtime)
 endif()
-set(LICENSE_DEPENDENCIES cpr nlohmann_json curl)
-set(LICENSE_FILENAMES LICENSE LICENSE.MIT COPYING)
+set(LICENSE_DEPENDENCIES qdmi cpr nlohmann_json curl)
+set(LICENSE_FILENAMES LICENSE LICENSE LICENSE.MIT COPYING)
 foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
   FetchContent_GetProperties(${DEPENDENCY})
   if(${DEPENDENCY}_SOURCE_DIR)
@@ -39,6 +39,39 @@ foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
       COMPONENT ${QDMI_TARGET_NAME}_Runtime)
   endif()
 endforeach()
+
+# OpenSSL comes from the system, so FetchContent cannot supply its license
+# notices. Include them with the libraries bundled into Linux wheels by
+# auditwheel.
+if(SKBUILD
+   AND UNIX
+   AND NOT APPLE)
+  find_program(RPM_EXECUTABLE rpm)
+  if(RPM_EXECUTABLE)
+    get_filename_component(openssl_library "${OPENSSL_CRYPTO_LIBRARY}" REALPATH)
+    execute_process(
+      COMMAND "${RPM_EXECUTABLE}" -qf --qf "%{NAME}" "${openssl_library}"
+      OUTPUT_VARIABLE openssl_package
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE openssl_package_result
+      ERROR_QUIET)
+    if(openssl_package_result EQUAL 0)
+      file(
+        GLOB openssl_notices
+        LIST_DIRECTORIES false
+        "/usr/share/licenses/${openssl_package}/*")
+      if(NOT openssl_notices)
+        message(
+          FATAL_ERROR
+            "OpenSSL license notices are missing from ${openssl_package}")
+      endif()
+      install(
+        FILES ${openssl_notices}
+        DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
+        COMPONENT ${QDMI_TARGET_NAME}_Runtime)
+    endif()
+  endif()
+endif()
 
 # Generate QDMI headers with the specified prefix
 generate_prefixed_qdmi_headers(${QDMI_PREFIX})

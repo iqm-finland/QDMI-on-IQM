@@ -451,6 +451,25 @@ Documentation builds execute offline examples and cache their outputs. Use
 `uvx nox --non-interactive -s docs -- --live` with valid IQM credentials and an
 explicit target to execute provider-backed notebooks.
 
+## Releasing
+
+Merge the stable version update, then run `CD.yml` on `main` from the Actions
+tab, entering the project version, such as `1.6.0`. The workflow checks that it
+matches `pyproject.toml`, builds the Python distributions and C++ SDK archives,
+and waits for approval through the `release` environment. After approval, it
+attaches the archives and `SHA256SUMS` before publishing the GitHub release. The
+release creates its version tag at the built commit and links to that tag's
+changelog and the changes since the previous release. The workflow then
+publishes the same Python distributions to PyPI.
+
+Configure the `release` environment with required reviewers and restrict it to
+`main` in the repository settings. The `APP_ID` and `APP_PRIVATE_KEY` secrets
+must identify a GitHub App installed on this repository with write access to
+repository contents and workflows.
+
+Retry failed jobs in the original workflow run to reuse its build artifacts. The
+workflow leaves published GitHub releases unchanged on retries.
+
 ## Tips for Development
 
 If something goes wrong, the CI pipeline will notify you. Here are some tips for
