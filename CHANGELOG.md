@@ -10,10 +10,12 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-15
+
 ### Changed
 
-- ⬆️ Require MQT Core 4.2.1 and Python 3.11.5 or newer ([#341])
-  ([**@marcelwa**], [**@burgholzer**]).
+- ⬆️ Update MQT Core to 4.2.1 ([#341]) ([**@marcelwa**], [**@burgholzer**]).
+- ⬆️ Require Python 3.11.5 or newer ([#341]) ([**@burgholzer**]).
 - ⚡️ Reduce simulator setup time for local and Slurm sampling and estimation
   ([#334]) ([**@marcelwa**]).
 
@@ -364,7 +366,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
