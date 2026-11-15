@@ -1,13 +1,12 @@
 version = 1
 revision = 5
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 resolution-markers = [
     "python_full_version >= '3.15'",
     "python_full_version == '3.14.*'",
     "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-    "python_full_version < '3.11.5'",
+    "python_full_version < '3.12'",
 ]
 
 [[package]]
@@ -118,27 +117,8 @@ wheels = [
 
 [[package]]
 name = "beautifulsoup4"
-version = "4.6.3"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version < '3.11.5'",
-]
-sdist = { url = "https://files.pythonhosted.org/packages/88/df/86bffad6309f74f3ff85ea69344a078fc30003270c8df6894fca7a3c72ff/beautifulsoup4-4.6.3.tar.gz", hash = "sha256:90f8e61121d6ae58362ce3bed8cd997efb00c914eae0ff3d363c32f9a9822d10", size = 167469, upload-time = "2018-08-12T16:39:49.655Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/0a/47fdf541c97fd9b6a610cb5fd518175308a7cc60569962e776ac52420387/beautifulsoup4-4.6.3-py3-none-any.whl", hash = "sha256:194ec62a25438adcb3fdb06378b26559eda1ea8a747367d34c33cef9c7f48d57", size = 90375, upload-time = "2018-08-12T16:39:48.02Z" },
-]
-
-[[package]]
-name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15'",
-    "python_full_version == '3.14.*'",
-    "python_full_version == '3.13.*'",
-    "python_full_version == '3.12.*'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-]
 dependencies = [
     { name = "soupsieve" },
     { name = "typing-extensions" },
@@ -698,8 +678,7 @@ version = "2025.12.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accessible-pygments" },
-    { name = "beautifulsoup4", version = "4.6.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11.5'" },
-    { name = "beautifulsoup4", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11.5'" },
+    { name = "beautifulsoup4" },
     { name = "pygments" },
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "sphinx", version = "9.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.12.*'" },
@@ -897,8 +876,8 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mqt-core", extras = ["pennylane"], marker = "extra == 'pennylane'", git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
-    { name = "mqt-core", extras = ["qiskit"], marker = "extra == 'qiskit'", git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
+    { name = "mqt-core", extras = ["pennylane"], marker = "extra == 'pennylane'", specifier = ">=4.2.1" },
+    { name = "mqt-core", extras = ["qiskit"], marker = "extra == 'qiskit'", specifier = ">=4.2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13' and extra == 'qiskit'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14' and extra == 'qiskit'", specifier = ">=2.3.2" },
     { name = "numpy", marker = "python_full_version >= '3.15' and extra == 'qiskit'", specifier = ">=2.5.2" },
@@ -910,8 +889,8 @@ provides-extras = ["pennylane", "qiskit"]
 [package.metadata.requires-dev]
 build = [{ name = "scikit-build-core", specifier = ">=1.1" }]
 dev = [
-    { name = "mqt-core", extras = ["pennylane"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
-    { name = "mqt-core", extras = ["qiskit"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
+    { name = "mqt-core", extras = ["pennylane"], specifier = ">=4.2.1" },
+    { name = "mqt-core", extras = ["qiskit"], specifier = ">=4.2.1" },
     { name = "nox", specifier = ">=2026.4.10" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
@@ -928,8 +907,8 @@ dev = [
 ]
 docs = [
     { name = "furo", specifier = ">=2025.12.19" },
-    { name = "mqt-core", extras = ["pennylane"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
-    { name = "mqt-core", extras = ["qiskit"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
+    { name = "mqt-core", extras = ["pennylane"], specifier = ">=4.2.1" },
+    { name = "mqt-core", extras = ["qiskit"], specifier = ">=4.2.1" },
     { name = "myst-nb", specifier = ">=1.4" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
@@ -944,7 +923,7 @@ docs = [
     { name = "sphinx-llm", specifier = ">=1" },
 ]
 qiskit = [
-    { name = "mqt-core", extras = ["qiskit"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
+    { name = "mqt-core", extras = ["qiskit"], specifier = ">=4.2.1" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
@@ -953,8 +932,8 @@ qiskit = [
     { name = "qiskit-algorithms", specifier = ">=0.4" },
 ]
 test = [
-    { name = "mqt-core", extras = ["pennylane"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
-    { name = "mqt-core", extras = ["qiskit"], git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" },
+    { name = "mqt-core", extras = ["pennylane"], specifier = ">=4.2.1" },
+    { name = "mqt-core", extras = ["qiskit"], specifier = ">=4.2.1" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.3.2" },
@@ -1243,10 +1222,23 @@ wheels = [
 
 [[package]]
 name = "mqt-core"
-version = "4.2.1.dev21+gf984f2c49"
-source = { git = "https://github.com/munich-quantum-toolkit/core.git?rev=f984f2c49f1df1f6021ff16ec8fed22b0e683fcd#f984f2c49f1df1f6021ff16ec8fed22b0e683fcd" }
+version = "4.2.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nanobind-backend" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b6/10/a35dc7df7392365071e8f19584707128dd9646063728a5abb6a9ab4177f6/mqt_core-4.2.1.tar.gz", hash = "sha256:6627cc7b9abfa2f9a4e8e11b879e6abc3066fa8e7adb4c9560132bede56a8f5d", size = 2242637, upload-time = "2026-11-15T06:15:34.263Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/a0/708df4b0b6cb56c500d9b2c4f25fd3d4bef65c170d2c3feb875958164a03/mqt_core-4.2.1-cp311-abi3-macosx_13_0_arm64.whl", hash = "sha256:d28f2291b412651566ade2ad22d7733629201de43bd9f893652e77d51b2b1b5f", size = 37222309, upload-time = "2026-11-15T06:15:05.785Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/dd/19d140e4643686342221cc8e173af756c9ab8a37a1222c2e9692d850062b/mqt_core-4.2.1-cp311-abi3-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a531f35c9c8c4b0365ac7b73de318f32d223aeabd6632cd17d65c10b63478e47", size = 38925530, upload-time = "2026-11-15T06:15:08.759Z" },
+    { url = "https://files.pythonhosted.org/packages/31/06/32c3c360acd934f977e7dad1edf4882956f7ed6bb0e3bad3e4d18d6db13d/mqt_core-4.2.1-cp311-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0bcea80b54c3622c1783feb949c0b8009e1ca6b165fbac7098eae477891c31b7", size = 41133539, upload-time = "2026-11-15T06:15:11.704Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/14/35e3f50a0964bbf0ff6026c3abfb3087e27dcf21f9f007eca206648f70e5/mqt_core-4.2.1-cp311-abi3-win_amd64.whl", hash = "sha256:c8d00975c167c9ed83b1e493c55f45153c97b3727882f4e85a28113ed65f479d", size = 32000789, upload-time = "2026-11-15T06:15:14.42Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/16/879123d2c7c7602ee699a2c42438fbf2c862b7946e2fe2205d96ba147e54/mqt_core-4.2.1-cp311-abi3-win_arm64.whl", hash = "sha256:8126df1975d39e1a3252420991cf49ce4cc9a893a46ee19d0196f7c4e0032dd8", size = 30254011, upload-time = "2026-11-15T06:15:17.609Z" },
+    { url = "https://files.pythonhosted.org/packages/92/02/61323f0047f2b76f8eee6ac438bfc5cae9f648f87ee27df98eb68969a1f4/mqt_core-4.2.1-cp315-abi3t-macosx_13_0_arm64.whl", hash = "sha256:e1acfaf8d606b5760a850ad7f6cce27cb0f7b71665b9df9999f0e8f5764649c5", size = 37219824, upload-time = "2026-11-15T06:15:20.646Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/5e/5a810e5e9fb669160cbc09bcc92be14a8bc95c15b181a02f9680b91c2e12/mqt_core-4.2.1-cp315-abi3t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a74bf8295eafac17420c2ba665ec4fb3a30095aef47af37209e805f4e0de2ead", size = 38923244, upload-time = "2026-11-15T06:15:23.526Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/ed/64aa5f93f6fecbebabe751cb8af5cc22ed95dbba98f5794368e4c1b8308d/mqt_core-4.2.1-cp315-abi3t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0f88ffd18f2a802995e781c1ad6c35410bbb66e6540207c4bed8e39cbd53e37d", size = 41132571, upload-time = "2026-11-15T06:15:26.23Z" },
+    { url = "https://files.pythonhosted.org/packages/23/ee/7f7e0f6818b5fef4a33d85186e5ee536304a574de32d6c71b3c1b1b022c1/mqt_core-4.2.1-cp315-abi3t-win_amd64.whl", hash = "sha256:2631c7ba73961d5896ebc950a19d85e9bc922022999f8cbb54a8eca9f6ed30df", size = 32725937, upload-time = "2026-11-15T06:15:29.361Z" },
+    { url = "https://files.pythonhosted.org/packages/82/ec/303a28d8728897420f6f1d6fd2e376137036ef65629c70d794938a2447f6/mqt_core-4.2.1-cp315-abi3t-win_arm64.whl", hash = "sha256:1af6bd83bd3467d164fefbb9505e5f511d75b020d0786c1b19928cc78b0d5d4a", size = 31288920, upload-time = "2026-11-15T06:15:31.881Z" },
 ]
 
 [package.optional-dependencies]
@@ -1392,8 +1384,7 @@ name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-    "python_full_version < '3.11.5'",
+    "python_full_version < '3.12'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
 wheels = [
@@ -1440,8 +1431,7 @@ name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-    "python_full_version < '3.11.5'",
+    "python_full_version < '3.12'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz", hash = "sha256:f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda", size = 20735807, upload-time = "2026-05-18T23:37:14.07Z" }
 wheels = [
@@ -2266,8 +2256,7 @@ name = "scipy"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-    "python_full_version < '3.11.5'",
+    "python_full_version < '3.12'",
 ]
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
@@ -2458,8 +2447,7 @@ name = "sphinx"
 version = "9.0.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11.5' and python_full_version < '3.12'",
-    "python_full_version < '3.11.5'",
+    "python_full_version < '3.12'",
 ]
 dependencies = [
     { name = "alabaster" },
