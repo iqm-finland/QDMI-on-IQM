@@ -150,7 +150,7 @@ always passed as an explicit `--partition`, which takes precedence over it.
 
 :::{important}
 Use the
-[MQT Core Slurm guide](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/slurm.html)
+[MQSC Orchestrator](https://github.com/munich-quantum-software/orchestrator)
 for scheduler setup, device selection, and job submission.
 :::
 
