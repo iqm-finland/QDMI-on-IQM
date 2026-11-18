@@ -29,6 +29,7 @@ a 30-second timeout.
 ```c
 #include <iqm_qdmi/iteration.h>
 #include <stdio.h>
+#include <string.h>
 
 IQM_QDMI_Iteration_Client client = NULL;
 IQM_QDMI_Iteration_Result result = {0};
@@ -90,14 +91,14 @@ cancellation if you have an iteration ID:
 status = IQM_QDMI_iteration_end(client, result.iteration_id, 30000, &result);
 if (status != QDMI_SUCCESS) {
     fprintf(stderr, "%s\n", IQM_QDMI_iteration_client_diagnostics(client));
-} else if (result.http_status == 202) {
+} else if (strcmp(result.state, "active") == 0 || strcmp(result.state, "waiting") == 0) {
     /* Check this ID with iteration_get until its status shows it has ended. */
     printf("Waiting for running work to finish\n");
 }
 ```
 
-On success, HTTP status `200` means the iteration has ended. Status `202` means
-running work is still finishing: check its status until it is `completed`,
+HTTP status `202` acknowledges an asynchronous end request. Confirm termination
+from the returned state, polling if necessary until it is `completed`,
 `cancelled`, or `failed`. Start with a one-second delay and increase it to at
 most five seconds between checks. Set a cleanup deadline; running work can take
 up to five minutes to finish.

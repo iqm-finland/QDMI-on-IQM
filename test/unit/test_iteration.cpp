@@ -365,21 +365,7 @@ TEST_F(IterationManagement,
   }
 }
 
-TEST_F(IterationManagement, RedirectsAreNotFollowedAndCredentialsAreRedacted) {
-  auto &hook = iqm::http::internal::Get_hooks().post;
-  const auto stub = hook;
-  hook = [&](const auto &url, const auto &token, const auto &pool,
-             const auto &headers, const auto body, const auto timeout,
-             const bool follow) {
-    EXPECT_FALSE(follow);
-    return stub(url, token, pool, headers, body, timeout, follow);
-  };
-  for (const auto code : {301, 302, 307, 308}) {
-    http_.queue_post(code, "{}", {{"Location", "https://other.test"}});
-    EXPECT_EQ(IQM_QDMI_iteration_create(client_, "qc", 60, 0, 30000, &result_),
-              QDMI_ERROR_FATAL);
-  }
-  EXPECT_EQ(http_.post_urls().size(), 4);
+TEST_F(IterationManagement, CredentialsAreRedacted) {
   http_.queue_post(
       403,
       R"({"message":"prefix test-token test-token suffix","request_id":"test-token","error_code":"forbidden"})");
@@ -564,8 +550,9 @@ TEST_F(IterationManagement, OversizedRetryAfterCannotBecomeNegativeSleep) {
   EXPECT_EQ(http_.sleep_call_count(), 0);
 }
 
-TEST_F(IterationSmoke, UnreadableScratchCannotReportSuccessfulReconciliation) {
+TEST_F(IterationSmoke, UnusableScratchPreventsCreationAndReconciliation) {
   std::filesystem::create_directory(scratch_);
+  EXPECT_EQ(iqm::test_support::Iteration_management_smoke(false), 1);
   EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
   EXPECT_TRUE(http_.get_urls().empty());
   EXPECT_TRUE(http_.post_urls().empty());
@@ -592,6 +579,7 @@ TEST_F(IterationSmoke, FailedScratchWritePreservesOtherUnconfirmedIds) {
   EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
   std::ifstream file{scratch_};
   EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}), original);
+  EXPECT_EQ(http_.get_urls().size(), 2);
   std::filesystem::remove(blocked);
 }
 
@@ -614,6 +602,7 @@ TEST_F(IterationSmoke, FailedAtomicReplacementPreservesOtherUnconfirmedIds) {
   EXPECT_NE(CloseHandle(locked), 0);
   std::ifstream file{scratch_};
   EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}), original);
+  EXPECT_EQ(http_.get_urls().size(), 2);
 }
 #endif
 
@@ -646,13 +635,15 @@ TEST_F(IterationSmoke, SuccessfulAtomicReplacementRetainsOnlyUnconfirmedIds) {
   constexpr const char *other = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   {
     std::ofstream file{scratch_};
-    file << ID << '\n' << other << '\n';
+    file << ID << '\n' << other << "\ninvalid1\ninvalid2\n";
   }
   http_.queue_get(200, Reply("completed")).queue_get(404, "{}");
   EXPECT_EQ(iqm::test_support::Iteration_management_smoke(true), 1);
+  ASSERT_EQ(http_.get_timeouts().size(), 2);
+  EXPECT_LE(http_.get_timeouts().front(), std::chrono::milliseconds{7500});
   std::ifstream file{scratch_};
   EXPECT_EQ(std::string(std::istreambuf_iterator<char>{file}, {}),
-            std::string(other) + "\n");
+            std::string(other) + "\ninvalid1\ninvalid2\n");
   EXPECT_TRUE(http_.post_urls().empty());
 }
 } // namespace

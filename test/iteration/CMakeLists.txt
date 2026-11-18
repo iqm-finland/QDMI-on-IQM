@@ -22,8 +22,6 @@ target_compile_features(iteration_management_smoke PRIVATE cxx_std_20)
 target_link_libraries(iteration_management_smoke
                       PRIVATE ${QDMI_TARGET_NAME} qdmi::qdmi_project_warnings)
 if(WIN32)
-  # Avoid Windows min/max macros and make the device DLL available at runtime.
-  target_compile_definitions(iteration_management_smoke PRIVATE NOMINMAX)
   add_custom_command(
     TARGET iteration_management_smoke
     POST_BUILD

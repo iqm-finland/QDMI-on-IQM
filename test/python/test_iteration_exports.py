@@ -71,19 +71,24 @@ def iteration_library() -> ctypes.CDLL:
     return lib
 
 
-@pytest.mark.parametrize("status", [301, 302, 307, 308])
+@pytest.mark.parametrize(
+    ("operation", "status"), [("create", 301), ("create", 302), ("create", 307), ("create", 308), ("get", 307)]
+)
 def test_management_never_replays_redirect(
-    iteration_library: ctypes.CDLL, status: int, monkeypatch: pytest.MonkeyPatch
+    iteration_library: ctypes.CDLL, operation: str, status: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A real CPR request must not follow redirects or forward authorization."""
     monkeypatch.setenv("no_proxy", "127.0.0.1")
     requests: list[tuple[str, str | None]] = []
 
+    iteration_id = b"12345678-1234-1234-1234-123456789abc"
+    path = "/api/v1/iterations" if operation == "create" else f"/api/v1/iterations/{iteration_id.decode()}"
+
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
             requests.append((self.path, self.headers.get("Authorization")))
             self.rfile.read(int(self.headers.get("Content-Length", "0")))
-            if self.path == "/api/v1/iterations":
+            if self.path == path:
                 self.send_response(status)
                 self.send_header("Location", "/redirected")
             else:
@@ -105,9 +110,13 @@ def test_management_never_replays_redirect(
             iteration_library.IQM_QDMI_iteration_client_alloc(url, b"test-token", None, 1000, ctypes.byref(client)) == 0
         )
         result = IterationResult()
-        assert iteration_library.IQM_QDMI_iteration_create(client, b"qc", 60, 0, 1000, ctypes.byref(result)) != 0
+        if operation == "create":
+            code = iteration_library.IQM_QDMI_iteration_create(client, b"qc", 60, 0, 1000, ctypes.byref(result))
+        else:
+            code = iteration_library.IQM_QDMI_iteration_get(client, iteration_id, 1000, ctypes.byref(result))
+        assert code != 0
         assert result.http_status == status
-        assert requests == [("/api/v1/iterations", "Bearer test-token")]
+        assert requests == [(path, "Bearer test-token")]
     finally:
         iteration_library.IQM_QDMI_iteration_client_free(client)
         server.shutdown()

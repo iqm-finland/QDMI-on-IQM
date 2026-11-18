@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -37,9 +38,6 @@
 #include <system_error>
 #include <thread>
 #include <vector>
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 namespace iqm::test_support {
 namespace {
@@ -103,13 +101,6 @@ std::vector<std::string> Read_ids(const std::string &path) {
   }
   return ids;
 }
-void Save_id(const std::string &path, const std::string &id) {
-  std::ofstream file{path, std::ios::app};
-  file << id << '\n' << std::flush;
-  if (!file) {
-    throw std::runtime_error("Cannot persist confirmed iteration ID");
-  }
-}
 void Remove_id(const std::string &path, const std::string &id) {
   const auto ids = Read_ids(path);
   const std::filesystem::path temporary{path + ".tmp"};
@@ -131,15 +122,7 @@ void Remove_id(const std::string &path, const std::string &id) {
     if (!file) {
       throw std::runtime_error("Cannot close scratch replacement");
     }
-#ifdef _WIN32
-    const std::filesystem::path original{path};
-    if (MoveFileExW(temporary.c_str(), original.c_str(),
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0) {
-      throw std::runtime_error("Cannot replace scratch IDs");
-    }
-#else
     std::filesystem::rename(temporary, path);
-#endif
   } catch (...) {
     file.close();
     std::error_code ignored;
@@ -213,12 +196,22 @@ int Iteration_management_smoke(const bool cleanup_only) {
     if (cleanup_only) {
       const auto deadline = Clock::now() + seconds{30};
       bool clean = true;
-      for (const auto &id : Read_ids(scratch)) {
+      const auto ids = Read_ids(scratch);
+      auto remaining = std::ssize(ids);
+      for (const auto &id : ids) {
+        const auto now = Clock::now();
+        const auto until = now + (deadline - now) / remaining--;
+
         if (!Canonical_id(id)) {
           std::cerr << "Invalid scratch ID; no request issued\n";
           clean = false;
-        } else if (Budget(deadline) > 0 && Cleanup(raw, id, deadline)) {
-          Remove_id(scratch, id);
+        } else if (Budget(until) > 0 && Cleanup(raw, id, until)) {
+          try {
+            Remove_id(scratch, id);
+          } catch (const std::exception &error) {
+            std::cerr << error.what() << '\n';
+            clean = false;
+          }
         } else {
           clean = false;
         }
@@ -236,12 +229,19 @@ int Iteration_management_smoke(const bool cleanup_only) {
     std::string id;
     bool success = false;
     try {
+      std::ofstream ledger{scratch, std::ios::app};
+      if (!ledger) {
+        throw std::runtime_error("Cannot open scratch file before creation");
+      }
       const auto created =
           IQM_QDMI_iteration_create(raw, qc, 60, 60, 30000, &result);
       if (*result.iteration_id != '\0') {
         id = result.iteration_id;
-        Save_id(scratch,
-                id); // Persist even when create retained an ID on failure.
+        ledger << id << '\n';
+        ledger.close();
+        if (!ledger) {
+          throw std::runtime_error("Cannot persist confirmed iteration ID");
+        }
       }
       Report(raw, result);
       if (created == QDMI_SUCCESS) {

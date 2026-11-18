@@ -51,7 +51,6 @@ struct IQM_QDMI_Iteration_Client_impl {
   iqm::http::Rate_limit_budget quota_;
   std::chrono::milliseconds request_timeout_;
   std::string diagnostics_ = "{}";
-  const char *fallback_ = nullptr;
   std::array<char, 192> emergency_{};
   bool creation_uncertain_ = false;
 
@@ -124,7 +123,6 @@ void Emergency(IQM_QDMI_Iteration_Client client,
                 result == nullptr ? 0 : result->http_status, message,
                 client->creation_uncertain_ ? R"(,"creation_uncertain":true)"
                                             : "");
-  client->fallback_ = client->emergency_.data();
 }
 
 template <typename Operation>
@@ -132,7 +130,7 @@ int Boundary(IQM_QDMI_Iteration_Client client,
              IQM_QDMI_Iteration_Result *result, Operation operation) noexcept {
   try {
     if (client != nullptr) {
-      client->fallback_ = nullptr;
+      client->emergency_.front() = '\0';
       client->creation_uncertain_ = false;
       client->diagnostics_.clear();
     }
@@ -179,7 +177,7 @@ int Request(IQM_QDMI_Iteration_Client client, const iqm::API_ENDPOINT endpoint,
   const bool received_success =
       response.status_code >= 200 && response.status_code < 300;
   std::string protocol_error;
-  if (!json.is_discarded() && json.is_object() && received_success) {
+  if (json.is_object() && received_success) {
     if (const auto it = json.find("id"); it != json.end() && it->is_string()) {
       auto &returned_id = it->get_ref<std::string &>();
       if (Normalize_uuid(returned_id.data(), returned_id.size()) &&
@@ -343,8 +341,8 @@ IQM_QDMI_iteration_client_diagnostics(IQM_QDMI_Iteration_Client client) {
   if (client == nullptr) {
     return INVALID_ARGUMENT;
   }
-  return client->fallback_ != nullptr ? client->fallback_
-                                      : client->diagnostics_.c_str();
+  return client->emergency_.front() == '\0' ? client->diagnostics_.c_str()
+                                            : client->emergency_.data();
 }
 
 int IQM_QDMI_iteration_create(IQM_QDMI_Iteration_Client client, const char *qc,

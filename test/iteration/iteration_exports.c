@@ -17,7 +17,7 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "iqm_qdmi/constants.h"
+#include "iqm_qdmi/device.h"
 #include "iqm_qdmi/iteration.h"
 
 #include <stddef.h>
@@ -45,5 +45,6 @@ int main(void) {
     return 5;
   }
   IQM_QDMI_iteration_client_free(client);
-  return 0;
+  return IQM_QDMI_device_initialize() != QDMI_SUCCESS ||
+         IQM_QDMI_device_finalize() != QDMI_SUCCESS;
 }
