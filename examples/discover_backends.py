@@ -20,7 +20,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "iqm-qdmi",
-#   "mqt-core~=4.1.1",
+#   "mqt-core>=4.2.1",
 #   "requests>=2.31",
 # ]
 # [tool.uv.sources]
