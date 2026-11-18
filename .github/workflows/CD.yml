@@ -11,7 +11,7 @@ jobs:
     name: 🚀 CD
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@4e380c0bb1774aa8b9dd53194f4a7f6575cc3d42 # v2.5.10
 
   build-wheel:
     name: 🚀 CD
@@ -28,7 +28,7 @@ jobs:
             windows-2025,
             windows-11-arm,
           ]
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@ae2d91d2b75355d005248c8e14af18a074fe3bb2 # v2.5.6
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@4e380c0bb1774aa8b9dd53194f4a7f6575cc3d42 # v2.5.10
     with:
       runs-on: ${{ matrix.runs-on }}
 

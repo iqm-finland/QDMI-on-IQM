@@ -1,0 +1,266 @@
+[
+  {
+    "quantum_computers": [
+      {
+        "id": "01966208-f3ec-73b7-890d-100000000000",
+        "station_control_version": "47.3.1",
+        "alias": "default",
+        "display_name": "My quantum computer"
+      }
+    ]
+  },
+  [
+    {
+      "computational_resonators": [],
+      "connectivity": [["QB1", "QB2"]],
+      "dut_label": "M160_W0_H01_Z99",
+      "qubits": ["QB1", "QB2"]
+    }
+  ],
+  {
+    "calibration_set_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+    "qubits": ["QB1", "QB2"],
+    "computational_resonators": [],
+    "gates": {
+      "cz": {
+        "implementations": {
+          "tgss": {
+            "loci": [["QB1", "QB2"]]
+          }
+        },
+        "default_implementation": "tgss",
+        "override_default_implementation": {}
+      },
+      "measure": {
+        "implementations": {
+          "constant": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "constant",
+        "override_default_implementation": {}
+      },
+      "measure_fidelity": {
+        "implementations": {
+          "constant": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "constant",
+        "override_default_implementation": {}
+      },
+      "prx": {
+        "implementations": {
+          "drag_gaussian": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "drag_gaussian",
+        "override_default_implementation": {}
+      },
+      "prx_12": {
+        "implementations": {
+          "modulated_drag_crf": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "modulated_drag_crf",
+        "override_default_implementation": {}
+      },
+      "cc_prx": {
+        "implementations": {
+          "prx_composite": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "prx_composite",
+        "override_default_implementation": {}
+      },
+      "reset_wait": {
+        "implementations": {
+          "reset_wait": {
+            "loci": [["QB1"], ["QB2"]]
+          }
+        },
+        "default_implementation": "reset_wait",
+        "override_default_implementation": {}
+      }
+    }
+  },
+  {
+    "calibration_set": null,
+    "created_timestamp": "2025-12-09T11:50:44.461266Z",
+    "describes_id": "f0fb4be5-e913-4a04-8c94-18d1bd842def",
+    "dut_label": "M160_W0_H01_Z99",
+    "end_timestamp": "2025-12-09T11:50:44.542799Z",
+    "invalid": false,
+    "observation_ids": null,
+    "observation_set_id": "958461bd-77af-4510-881f-6d1ce639852f",
+    "observation_set_type": "quality-metric-set",
+    "observations": [
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB1.fidelity",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59883,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.96
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB1.error_0_to_1",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59884,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.02
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB1.error_1_to_0",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59885,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.02
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB2.fidelity",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59886,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.96
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB2.error_0_to_1",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59887,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.02
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.802455",
+        "dut_field": "metrics.ssro.measure.constant.QB2.error_1_to_0",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.802455",
+        "observation_id": 59888,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.02
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.808725",
+        "dut_field": "characterization.model.QB1.t1_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.808725",
+        "observation_id": 60436,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 2e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.808725",
+        "dut_field": "characterization.model.QB1.t2_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.808725",
+        "observation_id": 60438,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 1e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.808725",
+        "dut_field": "characterization.model.QB1.t2_echo_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.808725",
+        "observation_id": 60439,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 1.5e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.808725",
+        "dut_field": "characterization.model.QB2.t1_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.808725",
+        "observation_id": 60440,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 2e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.809182",
+        "dut_field": "characterization.model.QB2.t2_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.809182",
+        "observation_id": 59994,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 1e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.809182",
+        "dut_field": "characterization.model.QB2.t2_echo_time",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.809182",
+        "observation_id": 60002,
+        "uncertainty": null,
+        "unit": "s",
+        "value": 1.5e-5
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.809338",
+        "dut_field": "metrics.rb.prx.drag_gaussian.QB1.fidelity:par=d2",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.809338",
+        "observation_id": 60293,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.99
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.809338",
+        "dut_field": "metrics.rb.prx.drag_gaussian.QB2.fidelity:par=d2",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.809338",
+        "observation_id": 60303,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.99
+      },
+      {
+        "created_timestamp": "2025-12-09T11:50:43.804245",
+        "dut_field": "metrics.irb.cz.tgss.QB1__QB2.fidelity:par=d2",
+        "invalid": false,
+        "modified_timestamp": "2025-12-09T11:50:43.804245",
+        "observation_id": 60061,
+        "uncertainty": null,
+        "unit": "",
+        "value": 0.97
+      }
+    ]
+  },
+  {
+    "services": [
+      {
+        "name": "CoCoS",
+        "status": "alive"
+      },
+      {
+        "name": "Station Control",
+        "status": "alive"
+      }
+    ],
+    "warnings": []
+  }
+]

@@ -119,13 +119,11 @@ def minimums(session: nox.Session) -> None:
 
 @nox.session(name="live-tests", python="3.14", reuse_venv=True, default=False)
 def live_tests(session: nox.Session) -> None:
-    """Run live Python checks against an explicitly selected IQM mock."""
-    if not os.environ.get("IQM_TOKEN"):
-        session.error("IQM mock tests require credentials")
-    if os.environ.get("IQM_QUANTUM_COMPUTER") not in {"emerald:mock", "garnet:mock", "sirius:mock"}:
-        session.error("live-tests requires an explicit IQM mock")
-    if os.environ.get("IQM_QC_ID") or os.environ.get("IQM_TOKENS_FILE"):
-        session.error("live-tests requires token authentication and no quantum computer ID override")
+    """Run live Python checks against an explicitly selected IQM backend."""
+    if not any(os.environ.get(name) for name in ("IQM_TOKEN", "IQM_TOKENS_FILE")):
+        session.error("Live tests require IQM credentials")
+    if not any(os.environ.get(name) for name in ("IQM_QUANTUM_COMPUTER", "IQM_QC_ALIAS", "IQM_QC_ID")):
+        session.error("live-tests requires an explicit IQM backend")
     _run_tests(session, live=True, pytest_run_args=("-n", "0"))
 
 
