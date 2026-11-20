@@ -172,7 +172,7 @@ jobs:
       - name: Build
         id: build
         if: ${{ success() && !cancelled() }}
-        run: cmake --build --preset release --target iteration_management_smoke iteration_circuit_smoke
+        run: cmake --build --preset release --target iteration_smoke
 
       - name: Create, inspect, and end without a device session
         id: management
@@ -185,7 +185,7 @@ jobs:
           if [[ "$CANCELLED_BEFORE_START" == true ]]; then
             exit 0
           fi
-          ./build/release/test/iteration/iteration_management_smoke
+          ./build/release/test/iteration/iteration_smoke
 
       - name: Run dependent circuits across two sessions
         if: always() && steps.management.outcome == 'success'
@@ -194,7 +194,7 @@ jobs:
           if [[ "$CANCELLED_BEFORE_START" == true ]]; then
             exit 0
           fi
-          ./build/release/test/iteration/iteration_circuit_smoke
+          ./build/release/test/iteration/iteration_smoke --circuits
 
       - name: Reconcile confirmed IDs
         if: always()
@@ -202,8 +202,8 @@ jobs:
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
         run: |
-          if [[ -x ./build/release/test/iteration/iteration_management_smoke ]]; then
-            ./build/release/test/iteration/iteration_management_smoke --cleanup-only
+          if [[ -x ./build/release/test/iteration/iteration_smoke ]]; then
+            ./build/release/test/iteration/iteration_smoke --cleanup-only
           elif [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
             echo "Cleanup executable missing; confirmed iteration IDs need reconciliation"
             exit 1

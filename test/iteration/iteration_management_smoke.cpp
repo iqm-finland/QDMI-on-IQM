@@ -298,15 +298,3 @@ int Iteration_management_smoke(const bool cleanup_only,
   }
 }
 } // namespace iqm::test_support
-
-#ifndef IQM_ITERATION_SMOKE_NO_MAIN
-// Keep the portable main signature used by every supported compiler.
-// NOLINTNEXTLINE(misc-const-correctness)
-int main(const int argc, char **argv) {
-  if (argc > 2 ||
-      (argc == 2 && std::string_view{argv[1]} != "--cleanup-only")) {
-    return 1;
-  }
-  return iqm::test_support::Iteration_management_smoke(argc == 2);
-}
-#endif

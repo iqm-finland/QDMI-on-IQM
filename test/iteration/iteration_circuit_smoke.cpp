@@ -119,11 +119,23 @@ void Check_circuits(const char *qc, const bool qc_is_id, const std::string &id,
 }
 } // namespace
 
-int main() {
+// Keep the portable main signature used by every supported compiler.
+// NOLINTNEXTLINE(misc-const-correctness)
+int main(const int argc, char **argv) {
+  using iqm::test_support::Iteration_management_smoke;
+  if (argc == 1) {
+    return Iteration_management_smoke(false);
+  }
+  if (argc == 2 && std::string_view{argv[1]} == "--cleanup-only") {
+    return Iteration_management_smoke(true);
+  }
+  if (argc != 2 || std::string_view{argv[1]} != "--circuits") {
+    std::cerr << "Usage: iteration_smoke [--circuits | --cleanup-only]\n";
+    return 1;
+  }
   if (IQM_QDMI_device_initialize() != QDMI_SUCCESS) {
     return 1;
   }
-  const int result =
-      iqm::test_support::Iteration_management_smoke(false, Check_circuits);
+  const int result = Iteration_management_smoke(false, Check_circuits);
   return IQM_QDMI_device_finalize() == QDMI_SUCCESS ? result : 1;
 }
