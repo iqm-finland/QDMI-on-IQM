@@ -117,6 +117,24 @@ QDMI_STATUS Handle_response(
     const cpr::Response &response,
     ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
 
+/// @brief GET with an attempt cap and absolute operation deadline; no
+/// redirects.
+cpr::Response Get(const cpr::Url &url,
+                  const std::optional<cpr::Bearer> &bearer_token,
+                  const cpr::ConnectionPool &connection_pool,
+                  std::chrono::milliseconds request_timeout,
+                  std::chrono::steady_clock::time_point deadline,
+                  Rate_limit_budget *rate_limit);
+/// @brief POST with an attempt cap and absolute operation deadline; no
+/// redirects.
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
+                   std::string_view data,
+                   std::chrono::milliseconds request_timeout,
+                   std::chrono::steady_clock::time_point deadline,
+                   Rate_limit_budget *rate_limit);
+
 namespace internal {
 /// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
 /// bundle. An empty result leaves libcurl's platform default in place.
@@ -162,13 +180,14 @@ struct Hooks {
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      std::chrono::milliseconds timeout)>
+      std::chrono::milliseconds timeout, bool follow_redirects)>
       get;
   /// Hook for POST requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      std::string_view body, std::chrono::milliseconds timeout)>
+      std::string_view body, std::chrono::milliseconds timeout,
+      bool follow_redirects)>
       post;
   /// Hook for the retry backoff delay, given a delay in seconds.
   std::function<void(int)> sleep;

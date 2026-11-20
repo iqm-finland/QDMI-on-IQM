@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Create, inspect, and end IQM iterations from C or C++ without opening a
+  device session. ([#326]) ([**@marcelwa**])
+
 ## [1.6.1] - 2026-11-15
 
 ### Changed
@@ -384,6 +389,8 @@ Compatible with QDMI `v1.3.0`.
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
+
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311
 [#308]: https://github.com/iqm-finland/QDMI-on-IQM/pull/308

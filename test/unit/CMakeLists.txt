@@ -17,17 +17,28 @@
 
 add_executable(
   unit_tests
+  ../iteration/iteration_management_smoke.cpp
   ../qdmi_client/qdmi_client.cpp
   http_stub.cpp
   test_http_client.cpp
   test_iqm_api_config.cpp
   test_iqm_auth.cpp
   test_iqm_device.cpp
+  test_iteration.cpp
   test_logging.cpp)
 target_include_directories(unit_tests PRIVATE ../qdmi_client)
+target_compile_definitions(unit_tests PRIVATE IQM_ITERATION_SMOKE_NO_MAIN)
 target_compile_features(unit_tests PRIVATE cxx_std_20)
 target_link_libraries(
   unit_tests PRIVATE GTest::gtest_main GTest::gtest qdmi::qdmi_project_warnings
                      iqm::qdmi_device_internals nlohmann_json::nlohmann_json)
 
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
+
+# Keep global allocation fault injection isolated from GoogleTest and other
+# tests.
+add_executable(iteration_allocation_probe iteration_allocation_probe.cpp)
+target_compile_features(iteration_allocation_probe PRIVATE cxx_std_20)
+target_link_libraries(iteration_allocation_probe
+                      PRIVATE iqm::qdmi_device_internals)
+add_test(NAME IterationAllocation COMMAND iteration_allocation_probe)

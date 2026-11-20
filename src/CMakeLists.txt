@@ -63,7 +63,13 @@ configure_qdmi_exports(
   PREFIX
   ${QDMI_PREFIX}
   EXTRA_SYMBOLS
-  IQM_QDMI_device_job_submit_calibration)
+  IQM_QDMI_device_job_submit_calibration
+  IQM_QDMI_iteration_client_alloc
+  IQM_QDMI_iteration_client_free
+  IQM_QDMI_iteration_client_diagnostics
+  IQM_QDMI_iteration_create
+  IQM_QDMI_iteration_get
+  IQM_QDMI_iteration_end)
 target_sources(
   ${QDMI_TARGET_NAME}
   PUBLIC FILE_SET
@@ -75,7 +81,8 @@ target_sources(
          ${PROJECT_SOURCE_DIR}/include
          FILES
          ${PUBLIC_HEADER_FILES}
-         ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/calibration.h)
+         ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/calibration.h
+         ${PROJECT_SOURCE_DIR}/include/iqm_qdmi/iteration.h)
 
 target_link_libraries(
   ${QDMI_TARGET_NAME}

@@ -65,7 +65,8 @@ HttpStub::HttpStub() {
                      const std::optional<cpr::Bearer> &bearer_token,
                      const cpr::ConnectionPool &connection_pool,
                      const cpr::Header & /*headers*/,
-                     const std::chrono::milliseconds timeout) {
+                     const std::chrono::milliseconds timeout,
+                     const bool /*follow_redirects*/) {
     get_urls_.push_back(url.str());
     get_bearer_tokens_.push_back(bearer_token);
     get_timeouts_.push_back(timeout);
@@ -89,7 +90,8 @@ HttpStub::HttpStub() {
                       const std::optional<cpr::Bearer> &bearer_token,
                       const cpr::ConnectionPool &connection_pool,
                       const cpr::Header &headers, const std::string_view body,
-                      const std::chrono::milliseconds timeout) {
+                      const std::chrono::milliseconds timeout,
+                      const bool /*follow_redirects*/) {
     EXPECT_EQ(headers.at("Content-Type"), "application/json");
     EXPECT_FALSE(headers.contains("Expect"));
     post_urls_.push_back(url.str());
