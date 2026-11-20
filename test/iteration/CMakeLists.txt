@@ -16,16 +16,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Explicit target only; live mutations must never enter default builds or CTest.
-add_executable(iteration_management_smoke EXCLUDE_FROM_ALL
-               iteration_management_smoke.cpp)
-target_compile_features(iteration_management_smoke PRIVATE cxx_std_20)
-target_link_libraries(iteration_management_smoke
-                      PRIVATE ${QDMI_TARGET_NAME} qdmi::qdmi_project_warnings)
+add_executable(iteration_smoke EXCLUDE_FROM_ALL iteration_management_smoke.cpp)
+target_compile_features(iteration_smoke PRIVATE cxx_std_20)
+target_link_libraries(iteration_smoke PRIVATE ${QDMI_TARGET_NAME}
+                                              qdmi::qdmi_project_warnings)
 if(WIN32)
   add_custom_command(
-    TARGET iteration_management_smoke
+    TARGET iteration_smoke
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
-      $<TARGET_FILE_DIR:iteration_management_smoke>)
+      $<TARGET_FILE_DIR:iteration_smoke>)
 endif()

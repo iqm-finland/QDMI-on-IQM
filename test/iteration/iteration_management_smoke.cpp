@@ -223,6 +223,9 @@ int Iteration_management_smoke(const bool cleanup_only) {
       qc = std::getenv("IQM_QUANTUM_COMPUTER");
     }
     if (qc == nullptr || *qc == '\0') {
+      qc = std::getenv("IQM_QC_ALIAS");
+    }
+    if (qc == nullptr || *qc == '\0') {
       qc = "emerald:mock";
     }
     IQM_QDMI_Iteration_Result result{};
