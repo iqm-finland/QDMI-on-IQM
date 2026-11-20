@@ -118,6 +118,9 @@ active. To use the same reservation in another session, set the same ID on that
 session. If the server refuses an iteration submission, check the device log for
 the server's error and request ID.
 
+For a shared-cluster example, see
+[Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
+
 If submission fails before you receive a job ID, check the server before
 resubmitting. A transfer timeout can occur after the server accepts the job.
 
