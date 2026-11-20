@@ -26,6 +26,7 @@
 #include "logging.hpp"
 #include "qdmi_client.hpp"
 
+#include "cpr/error.h"
 #include "cpr/response.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -578,9 +579,14 @@ protected:
 class IterationJobMockTest : public DeviceJobMockTest {
 protected:
   static constexpr char ITERATION_ID[] = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
+  static constexpr char TEST_TOKEN[] = "example-iteration-test-token";
 
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
+    ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                  session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN,
+                  sizeof(TEST_TOKEN), TEST_TOKEN),
+              QDMI_SUCCESS);
     ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
                   session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5,
                   sizeof(ITERATION_ID), ITERATION_ID),
@@ -1577,7 +1583,9 @@ TEST_F(IterationJobMockTest, StatusRequestThatUsesRemainingTimeTimesOut) {
   auto &hooks = iqm::http::internal::Get_hooks();
   hooks.get = [this, get = hooks.get](const auto &...args) {
     http_stub.advance(std::chrono::seconds{2});
-    return get(args...);
+    auto response = get(args...);
+    response.error.code = cpr::ErrorCode::OPERATION_TIMEDOUT;
+    return response;
   };
   const auto start = hooks.now();
   EXPECT_EQ(IQM_QDMI_device_job_wait(job, 2), QDMI_ERROR_TIMEOUT);
@@ -2928,6 +2936,33 @@ TEST_F(IterationJobMockTest,
   EXPECT_NE(log_capture.str().find("iteration_not_found"), std::string::npos);
   EXPECT_NE(log_capture.str().find("request-1"), std::string::npos);
   EXPECT_NE(log_capture.str().find("Missing\\niteration"), std::string::npos);
+}
+
+TEST_F(IterationJobMockTest, TransportFailureKeepsDiagnostic) {
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post_connection_error();
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+  EXPECT_NE(log_capture.str().find("Failed to connect to host"),
+            std::string::npos);
+}
+
+TEST_F(IterationJobMockTest, AuthorizationRejectionRedactsBearer) {
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post(
+      401,
+      R"({"message":"Rejected example-iteration-test-token","request_id":"request-2"})");
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+  EXPECT_EQ(log_capture.str().find(TEST_TOKEN), std::string::npos);
+  EXPECT_NE(log_capture.str().find("[redacted]"), std::string::npos);
+  EXPECT_NE(log_capture.str().find("request-2"), std::string::npos);
 }
 
 TEST_F(DeviceJobMockTest,

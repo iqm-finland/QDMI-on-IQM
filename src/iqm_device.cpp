@@ -1430,27 +1430,36 @@ std::string_view Program_contents(const std::string &stored_program) {
   return program;
 }
 
-namespace {
 void Log_iteration_submission_failure(
     const cpr::Response &response, const std::optional<cpr::Bearer> &bearer) {
   const auto body = nlohmann::json::parse(response.text, nullptr, false);
   const auto secret = bearer.has_value() ? std::string_view{bearer->GetToken()}
                                          : std::string_view{};
   auto diagnostics = nlohmann::json{{"http_status", response.status_code}};
-  const auto copy_fields = [secret](const nlohmann::json &source,
-                                    nlohmann::json &destination) {
+  const auto redact = [secret](const std::string &value) {
+    return !secret.empty() && value.find(secret) != std::string::npos
+               ? std::string{"[redacted]"}
+               : value;
+  };
+  const auto copy_fields = [&redact](const nlohmann::json &source,
+                                     nlohmann::json &destination) {
     for (const auto *key : {"error_code", "message", "request_id"}) {
       if (const auto field = source.find(key);
           field != source.end() && field->is_string()) {
-        const auto &value = field->get_ref<const std::string &>();
-        destination[key] =
-            !secret.empty() && value.find(secret) != std::string::npos
-                ? "[redacted]"
-                : value;
+        destination[key] = redact(field->get_ref<const std::string &>());
       }
     }
   };
   copy_fields(body, diagnostics);
+  if (response.error) {
+    diagnostics["message"] = redact(response.error.message);
+  } else if (!body.is_object() && !response.text.empty()) {
+    diagnostics["response_bytes"] = response.text.size();
+    if (const auto type = response.header.find("content-type");
+        type != response.header.end()) {
+      diagnostics["content_type"] = redact(type->second);
+    }
+  }
   if (const auto errors = body.find("errors");
       errors != body.end() && errors->is_array()) {
     for (const auto &error : *errors) {
@@ -1465,7 +1474,6 @@ void Log_iteration_submission_failure(
             diagnostics.dump(-1, ' ', true,
                              nlohmann::json::error_handler_t::replace));
 }
-} // namespace
 
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
@@ -1835,10 +1843,6 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
   while (!deadline.has_value() || clock.now() < *deadline) {
     const auto ret =
         Check_job(job, &status, iteration_job ? deadline : std::nullopt);
-    const auto now = clock.now();
-    if (iteration_job && deadline.has_value() && now >= *deadline) {
-      break;
-    }
     if (ret != QDMI_SUCCESS) {
       return ret;
     }
@@ -1849,8 +1853,8 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
     }
     auto sleep = std::chrono::duration_cast<milliseconds>(delay);
     if (iteration_job && deadline.has_value()) {
-      sleep = std::min(
-          sleep, std::chrono::duration_cast<milliseconds>(*deadline - now));
+      sleep = std::min(sleep, std::chrono::duration_cast<milliseconds>(
+                                  *deadline - clock.now()));
       if (sleep <= milliseconds::zero()) {
         break;
       }

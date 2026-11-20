@@ -90,6 +90,7 @@ lowercase iteration UUID as 36 characters followed by a NUL.
 
 ```c
 #include <iqm_qdmi/device.h>
+#include <string.h>
 
 status = IQM_QDMI_device_initialize();
 if (status != QDMI_SUCCESS) {
@@ -116,6 +117,9 @@ You can submit IQM JSON or QIR circuits while the iteration is waiting or
 active. To use the same reservation in another session, set the same ID on that
 session. If the server refuses an iteration submission, check the device log for
 the server's error and request ID.
+
+If submission fails before you receive a job ID, check the server before
+resubmitting. A transfer timeout can occur after the server accepts the job.
 
 An iteration session defaults to a 30-second HTTP timeout. To override it, set
 session `CUSTOM3` before initialization with a positive `uint64_t` millisecond
