@@ -4,10 +4,10 @@ Use an iteration to reserve a quantum computer for a limited time. From C or
 C++, you can create a reservation, check its status, and end it without opening
 a QDMI device session.
 
-The functions below are available in `iqm_qdmi/iteration.h`, included with the
-native library and Python wheels. See the [C/C++ API reference](capi/index.md)
-for the full function signatures. This interface manages reservations; it does
-not submit jobs or attach them to an iteration.
+The management functions are available in `iqm_qdmi/iteration.h`, included with
+the native library and Python wheels. Use the QDMI device interface to submit
+circuits within a reservation. See the [C/C++ API reference](capi/index.md) for
+the function signatures.
 
 ## Before you start
 
@@ -81,6 +81,47 @@ if (status == QDMI_SUCCESS) {
 Leave a delay between checks and set an overall waiting limit in your
 application. If you stop waiting, end the reservation so it does not activate
 later when you no longer need it.
+
+## Run circuits within the reservation
+
+Allocate a device session for the same quantum computer and set
+`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5` before initializing it. Pass the
+lowercase iteration UUID as 36 characters followed by a NUL.
+
+```c
+#include <iqm_qdmi/device.h>
+
+status = IQM_QDMI_device_initialize();
+if (status != QDMI_SUCCESS) {
+    return 1;
+}
+
+/* Set IQM_QUANTUM_COMPUTER to the alias used to create the iteration. */
+IQM_QDMI_Device_Session session = NULL;
+status = IQM_QDMI_device_session_alloc(&session);
+if (status == QDMI_SUCCESS) {
+    status = IQM_QDMI_device_session_set_parameter(
+        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5,
+        strlen(result.iteration_id) + 1, result.iteration_id);
+}
+if (status == QDMI_SUCCESS) {
+    status = IQM_QDMI_device_session_init(session);
+}
+/* On success, submit and retrieve circuit results through the QDMI job API. */
+IQM_QDMI_device_session_free(session);
+IQM_QDMI_device_finalize();
+```
+
+You can submit IQM JSON or QIR circuits while the iteration is waiting or
+active. To use the same reservation in another session, set the same ID on that
+session. If the server refuses an iteration submission, check the device log for
+the server's error and request ID.
+
+An iteration session defaults to a 30-second HTTP timeout. To override it, set
+session `CUSTOM3` before initialization with a positive `uint64_t` millisecond
+value or a NUL-terminated string such as `timeout_ms:5000`. The native job wait
+polls at intervals of up to five seconds. A finite wait limits its polling and
+HTTP budget. If the wait times out, check the job or wait again.
 
 ## End the reservation
 
