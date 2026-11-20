@@ -57,9 +57,10 @@ access to the iteration-enabled Emerald mock. In its `build/slurm` runtime
 directory, copy the `iqm.emerald` entry in `resources.yaml` and name the copy
 `iqm.emerald.mock`. Add `license/iqm.emerald.mock` to `AccountingStorageTRES` in
 `slurm.conf` and ensure the mock is enabled in `qdmi.json`. Start the cluster
-and wait for `scontrol show licenses iqm.emerald.mock` to report
-`DisableHRES=false`. The controller probe uses the site's credentials in
-`qdmi.env`. Give the job its own credentials as described in
+and check `scontrol show licenses iqm.emerald.mock`. Wait for the `quantum`
+layer to report both `DisableHRES=false` and `DisableLayer=false`. The
+controller probe uses the site's credentials in `qdmi.env`. Give the job its own
+credentials as described in
 [Before you start](iteration-mode.md#before-you-start).
 
 Build from a checkout on shared storage, such as a private directory under
