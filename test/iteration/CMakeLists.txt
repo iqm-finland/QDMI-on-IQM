@@ -18,14 +18,21 @@
 # Explicit target only; live mutations must never enter default builds or CTest.
 add_executable(iteration_management_smoke EXCLUDE_FROM_ALL
                iteration_management_smoke.cpp)
-target_compile_features(iteration_management_smoke PRIVATE cxx_std_20)
-target_link_libraries(iteration_management_smoke
-                      PRIVATE ${QDMI_TARGET_NAME} qdmi::qdmi_project_warnings)
-if(WIN32)
-  add_custom_command(
-    TARGET iteration_management_smoke
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
-      $<TARGET_FILE_DIR:iteration_management_smoke>)
-endif()
+add_executable(iteration_circuit_smoke EXCLUDE_FROM_ALL
+               iteration_circuit_smoke.cpp iteration_management_smoke.cpp)
+target_compile_definitions(iteration_circuit_smoke
+                           PRIVATE IQM_ITERATION_SMOKE_NO_MAIN)
+target_link_libraries(iteration_circuit_smoke PRIVATE qdmi::iqm_client)
+
+foreach(target IN ITEMS iteration_management_smoke iteration_circuit_smoke)
+  target_compile_features(${target} PRIVATE cxx_std_20)
+  target_link_libraries(${target} PRIVATE ${QDMI_TARGET_NAME}
+                                          qdmi::qdmi_project_warnings)
+  if(WIN32)
+    add_custom_command(
+      TARGET ${target}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              $<TARGET_FILE:${QDMI_TARGET_NAME}> $<TARGET_FILE_DIR:${target}>)
+  endif()
+endforeach()

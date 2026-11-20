@@ -126,7 +126,7 @@ public:
   /// Retry-delay durations requested by HTTP 429 handling, in call order.
   [[nodiscard]] const std::vector<int> &sleep_durations() const;
   /// Move the stubbed clock forward without issuing a request.
-  void advance(std::chrono::milliseconds elapsed);
+  void advance(std::chrono::steady_clock::duration elapsed);
 
 private:
   std::deque<Scripted_response> get_responses_;

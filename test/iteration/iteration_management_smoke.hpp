@@ -18,7 +18,14 @@
  */
 
 #pragma once
+
+#include <string>
+
 namespace iqm::test_support {
 /// Run the opt-in lifecycle or runner-local reconciliation path.
-int Iteration_management_smoke(bool cleanup_only);
+int Iteration_management_smoke(bool cleanup_only,
+                               void (*check_circuits)(const char *qc,
+                                                      bool qc_is_id,
+                                                      const std::string &id,
+                                                      bool ended) = nullptr);
 } // namespace iqm::test_support

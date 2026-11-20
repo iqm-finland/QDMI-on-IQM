@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       run-iteration-test:
-        description: Run the iteration lifecycle check after the live tests.
+        description: Check iteration management and circuit execution after the live tests.
         type: boolean
         default: true
       iqm-qc-aliases:
@@ -153,6 +153,7 @@ jobs:
     env:
       IQM_SERVER_URL: https://resonance.iqm.tech
       IQM_QUANTUM_COMPUTER: emerald:mock
+      IQM_LOG_LEVEL: ERROR
       CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,11 +172,12 @@ jobs:
       - name: Build
         id: build
         if: ${{ success() && !cancelled() }}
-        run: cmake --build --preset release --target iteration_management_smoke
+        run: cmake --build --preset release --target iteration_management_smoke iteration_circuit_smoke
 
       - name: Create, inspect, and end without a device session
+        id: management
         if: always() && steps.build.outcome == 'success'
-        env:
+        env: &iteration-live
           CANCELLED_BEFORE_START: ${{ job.status == 'cancelled' }}
           IQM_TOKEN: ${{ secrets.IQM_TOKEN }}
           IQM_ITERATION_SCRATCH_FILE: ${{ runner.temp }}/iqm-iteration-ids.txt
@@ -184,6 +186,15 @@ jobs:
             exit 0
           fi
           ./build/release/test/iteration/iteration_management_smoke
+
+      - name: Run dependent circuits across two sessions
+        if: always() && steps.management.outcome == 'success'
+        env: *iteration-live
+        run: |
+          if [[ "$CANCELLED_BEFORE_START" == true ]]; then
+            exit 0
+          fi
+          ./build/release/test/iteration/iteration_circuit_smoke
 
       - name: Reconcile confirmed IDs
         if: always()

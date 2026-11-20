@@ -175,7 +175,11 @@ bool Cleanup(IQM_QDMI_Iteration_Client client, const std::string &id,
 }
 } // namespace
 
-int Iteration_management_smoke(const bool cleanup_only) {
+int Iteration_management_smoke(const bool cleanup_only,
+                               void (*check_circuits)(const char *qc,
+                                                      bool qc_is_id,
+                                                      const std::string &id,
+                                                      bool ended)) {
   try {
     const auto *scratch = std::getenv("IQM_ITERATION_SCRATCH_FILE");
     if (scratch == nullptr || *scratch == '\0') {
@@ -219,8 +223,12 @@ int Iteration_management_smoke(const bool cleanup_only) {
       return clean ? 0 : 1;
     }
     const char *qc = std::getenv("IQM_QC_ID");
-    if (qc == nullptr || *qc == '\0') {
+    const bool qc_is_id = qc != nullptr && *qc != '\0';
+    if (!qc_is_id) {
       qc = std::getenv("IQM_QUANTUM_COMPUTER");
+    }
+    if (qc == nullptr || *qc == '\0') {
+      qc = std::getenv("IQM_QC_ALIAS");
     }
     if (qc == nullptr || *qc == '\0') {
       qc = "emerald:mock";
@@ -255,6 +263,9 @@ int Iteration_management_smoke(const bool cleanup_only) {
             break;
           }
           if (std::string_view{result.state} == "active") {
+            if (check_circuits != nullptr) {
+              check_circuits(qc, qc_is_id, id, false);
+            }
             success = true;
             break;
           }
@@ -273,6 +284,9 @@ int Iteration_management_smoke(const bool cleanup_only) {
     if (!id.empty()) {
       if (Cleanup(raw, id, Clock::now() + seconds{30})) {
         Remove_id(scratch, id);
+        if (success && check_circuits != nullptr) {
+          check_circuits(qc, qc_is_id, id, true);
+        }
       } else {
         success = false;
       }
