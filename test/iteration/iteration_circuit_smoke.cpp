@@ -29,6 +29,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace {
 void Require_success(const int status, const std::string &operation) {
@@ -53,10 +54,10 @@ bool Run_circuit(const char *qc, const bool qc_is_id, const std::string &id,
                       session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5,
                       id.size() + 1, id.c_str()),
                   "Set iteration ID");
-  constexpr char timeout[] = "timeout_ms:5000";
+  constexpr std::string_view timeout = "timeout_ms:5000";
   Require_success(IQM_QDMI_device_session_set_parameter(
                       session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
-                      sizeof(timeout), timeout),
+                      timeout.size() + 1, timeout.data()),
                   "Set request timeout");
   Require_success(IQM_QDMI_device_session_init(session), "Initialize session");
 
@@ -83,7 +84,7 @@ bool Run_circuit(const char *qc, const bool qc_is_id, const std::string &id,
                                         sizeof(shots), &shots),
       "Set shots");
   if (ended) {
-    std::ostringstream diagnostics;
+    const std::ostringstream diagnostics;
     auto *previous = std::cerr.rdbuf(diagnostics.rdbuf());
     const int submitted = IQM_QDMI_device_job_submit(job);
     std::cerr.rdbuf(previous);
