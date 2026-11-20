@@ -31,7 +31,9 @@
 #include "iqm_auth.hpp"
 #include "logging.hpp"
 
+#include "cpr/bearer.h"
 #include "cpr/connection_pool.h"
+#include "cpr/error.h"
 #include "cpr/response.h"
 #include "nlohmann/json.hpp"
 #include "nlohmann/json_fwd.hpp"
@@ -39,6 +41,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -56,7 +59,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <thread>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -93,6 +96,7 @@ struct IQM_QDMI_Device_Session_impl_d {
 
   /// Timeout applied to each HTTP request made by this session.
   std::chrono::milliseconds request_timeout_ = std::chrono::hours{1};
+  bool request_timeout_explicit_ = false;
 
   /// HTTP connection cache shared by requests belonging to this session.
   std::unique_ptr<cpr::ConnectionPool> connection_pool_ =
@@ -119,6 +123,9 @@ struct IQM_QDMI_Device_Session_impl_d {
 
   /// Optional calibration selected before session initialization.
   std::optional<std::string> requested_calibration_set_id_;
+
+  /// Reservation for circuit submissions, owned by the caller.
+  std::optional<std::string> iteration_id_;
 
   /// Calibration set id
   std::string calibration_set_id_;
@@ -859,7 +866,12 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
   initialized.base_url_ = session->base_url_;
   initialized.token_ = session->token_;
   initialized.tokens_file_ = session->tokens_file_;
-  initialized.request_timeout_ = session->request_timeout_;
+  initialized.iteration_id_ = session->iteration_id_;
+  initialized.request_timeout_explicit_ = session->request_timeout_explicit_;
+  initialized.request_timeout_ = initialized.iteration_id_.has_value() &&
+                                         !initialized.request_timeout_explicit_
+                                     ? std::chrono::seconds{30}
+                                     : session->request_timeout_;
   initialized.connection_pool_ =
       std::make_unique<cpr::ConnectionPool>(*session->connection_pool_);
   initialized.quantum_computer_id_ = session->quantum_computer_id_;
@@ -890,10 +902,41 @@ void IQM_QDMI_device_session_free(IQM_QDMI_Device_Session session) {
   delete session;
 }
 
+namespace {
+std::optional<std::chrono::milliseconds>
+Parse_request_timeout(const size_t size, const void *value) {
+  uint64_t milliseconds = 0;
+  if (size == sizeof(milliseconds)) {
+    std::memcpy(&milliseconds, value, sizeof(milliseconds));
+  } else {
+    constexpr std::string_view prefix{"timeout_ms:"};
+    const auto text = std::string_view{static_cast<const char *>(value), size};
+    if (text.size() <= prefix.size() + 1 || !text.starts_with(prefix) ||
+        text.back() != '\0' || text[prefix.size()] < '1' ||
+        text[prefix.size()] > '9') {
+      return std::nullopt;
+    }
+    const auto *end = text.data() + text.size() - 1;
+    if (const auto parsed =
+            std::from_chars(text.data() + prefix.size(), end, milliseconds);
+        parsed.ec != std::errc{} || parsed.ptr != end) {
+      return std::nullopt;
+    }
+  }
+  if (milliseconds == 0 ||
+      std::cmp_greater(milliseconds,
+                       std::chrono::milliseconds::max().count())) {
+    return std::nullopt;
+  }
+  return std::chrono::milliseconds{
+      static_cast<std::chrono::milliseconds::rep>(milliseconds)};
+}
+} // namespace
+
 int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
                                           QDMI_Device_Session_Parameter param,
                                           const size_t size,
-                                          const void *value) {
+                                          const void *value) try {
   if (session == nullptr || (value != nullptr && size == 0) ||
       QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_SESSION_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -922,7 +965,8 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
   case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2:
     value_str = &session->quantum_computer_alias_;
     break;
-  case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4: {
+  case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4:
+  case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5: {
     if (value == nullptr) {
       return QDMI_SUCCESS;
     }
@@ -930,7 +974,7 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
     if (size != 37 || static_cast<const char *>(value)[36] != '\0') {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
-    std::string id(static_cast<const char *>(value), 36);
+    const std::string_view id{static_cast<const char *>(value), 36};
     for (size_t index = 0; index < id.size(); ++index) {
       const char character = id[index];
       if (index == 8 || index == 13 || index == 18 || index == 23) {
@@ -942,25 +986,22 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
         return QDMI_ERROR_INVALIDARGUMENT;
       }
     }
-    session->requested_calibration_set_id_ = std::move(id);
+    auto &selected = param == QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4
+                         ? session->requested_calibration_set_id_
+                         : session->iteration_id_;
+    selected = std::string{id};
     return QDMI_SUCCESS;
   }
   case QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3: {
     if (value == nullptr) {
       return QDMI_SUCCESS;
     }
-    if (size != sizeof(uint64_t)) {
+    const auto timeout = Parse_request_timeout(size, value);
+    if (!timeout.has_value()) {
       return QDMI_ERROR_INVALIDARGUMENT;
     }
-    uint64_t timeout_milliseconds = 0;
-    std::memcpy(&timeout_milliseconds, value, sizeof(timeout_milliseconds));
-    if (timeout_milliseconds == 0 ||
-        timeout_milliseconds >
-            static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
-      return QDMI_ERROR_INVALIDARGUMENT;
-    }
-    session->request_timeout_ = std::chrono::milliseconds{
-        static_cast<std::chrono::milliseconds::rep>(timeout_milliseconds)};
+    session->request_timeout_ = *timeout;
+    session->request_timeout_explicit_ = true;
     return QDMI_SUCCESS;
   }
   default:
@@ -970,6 +1011,10 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
     *value_str = std::string(static_cast<const char *>(value), size - 1);
   }
   return QDMI_SUCCESS;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
@@ -1385,6 +1430,51 @@ std::string_view Program_contents(const std::string &stored_program) {
   return program;
 }
 
+void Log_iteration_submission_failure(
+    const cpr::Response &response, const std::optional<cpr::Bearer> &bearer) {
+  const auto body = nlohmann::json::parse(response.text, nullptr, false);
+  const auto secret = bearer.has_value() ? std::string_view{bearer->GetToken()}
+                                         : std::string_view{};
+  auto diagnostics = nlohmann::json{{"http_status", response.status_code}};
+  const auto redact = [secret](const std::string &value) {
+    return !secret.empty() && value.find(secret) != std::string::npos
+               ? std::string{"[redacted]"}
+               : value;
+  };
+  const auto copy_fields = [&redact](const nlohmann::json &source,
+                                     nlohmann::json &destination) {
+    for (const auto *key : {"error_code", "message", "request_id"}) {
+      if (const auto field = source.find(key);
+          field != source.end() && field->is_string()) {
+        destination[key] = redact(field->get_ref<const std::string &>());
+      }
+    }
+  };
+  copy_fields(body, diagnostics);
+  if (response.error) {
+    diagnostics["message"] = redact(response.error.message);
+  } else if (!body.is_object() && !response.text.empty()) {
+    diagnostics["response_bytes"] = response.text.size();
+    if (const auto type = response.header.find("content-type");
+        type != response.header.end()) {
+      diagnostics["content_type"] = redact(type->second);
+    }
+  }
+  if (const auto errors = body.find("errors");
+      errors != body.end() && errors->is_array()) {
+    for (const auto &error : *errors) {
+      auto fields = nlohmann::json::object();
+      copy_fields(error, fields);
+      if (!fields.empty()) {
+        diagnostics["errors"].push_back(std::move(fields));
+      }
+    }
+  }
+  LOG_ERROR("Iteration circuit submission failed: " +
+            diagnostics.dump(-1, ' ', true,
+                             nlohmann::json::error_handler_t::replace));
+}
+
 int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   LOG_INFO("Submitting circuit job");
   auto json_program = job->run_request_options_;
@@ -1404,16 +1494,27 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
   json_program["calibration_set_id"] = job->session_->calibration_set_id_;
   json_program["shots"] = job->num_shots_;
 
-  const auto job_submission_url =
+  auto job_submission_url =
       job->session_->api_config_->url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB,
                                       *job->session_->quantum_computer_alias_);
+  const auto &iteration_id = job->session_->iteration_id_;
+  if (iteration_id.has_value()) {
+    job_submission_url.append("?iteration_id=").append(*iteration_id);
+  }
   const auto payload = json_program.dump();
   const auto token = job->session_->token_manager_->get_bearer_token();
   // A failed response can still represent an accepted remote job.
   job->status_ = QDMI_JOB_STATUS_FAILED;
   const auto job_submission_response = iqm::http::Post(
       job_submission_url, token, *job->session_->connection_pool_, payload,
-      job->session_->request_timeout_, &job->session_->rate_limit_);
+      job->session_->request_timeout_, &job->session_->rate_limit_,
+      !iteration_id.has_value());
+  if (iteration_id.has_value() &&
+      (job_submission_response.error ||
+       job_submission_response.status_code / 100 != 2)) {
+    Log_iteration_submission_failure(job_submission_response, token);
+    return QDMI_ERROR_FATAL;
+  }
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
     job->status_ = QDMI_JOB_STATUS_FAILED;
@@ -1616,8 +1717,11 @@ int IQM_QDMI_device_job_cancel(IQM_QDMI_Device_Job job) try {
   return QDMI_ERROR_FATAL;
 }
 
-int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
-                              QDMI_Job_Status *status) try {
+namespace {
+using Job_wait_clock = std::chrono::steady_clock;
+
+int Check_job(IQM_QDMI_Device_Job job, QDMI_Job_Status *status,
+              const std::optional<Job_wait_clock::time_point> deadline) try {
   if (job == nullptr || status == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1634,10 +1738,22 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
                 iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_)
           : job->session_->api_config_->url(iqm::API_ENDPOINT::GET_JOB_STATUS,
                                             job->job_id_);
-  const auto job_status_response = iqm::http::Get(
-      job_status_url, job->session_->token_manager_->get_bearer_token(),
-      *job->session_->connection_pool_, job->session_->request_timeout_,
-      &job->session_->rate_limit_);
+  auto &session = *job->session_;
+  const auto token = session.token_manager_->get_bearer_token();
+  const auto job_status_response =
+      deadline.has_value()
+          ? iqm::http::Get(job_status_url, token, *session.connection_pool_,
+                           session.request_timeout_, *deadline,
+                           &session.rate_limit_)
+          : iqm::http::Get(job_status_url, token, *session.connection_pool_,
+                           session.request_timeout_, &session.rate_limit_);
+  if (deadline.has_value() &&
+      job_status_response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT &&
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          *deadline - iqm::http::internal::Get_hooks().now()) <=
+          std::chrono::milliseconds::zero()) {
+    return QDMI_ERROR_TIMEOUT;
+  }
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
     // A failed status query says nothing about the job itself, which keeps
@@ -1682,7 +1798,6 @@ int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
   return QDMI_ERROR_FATAL;
 }
 
-namespace {
 bool IQM_QDMI_device_job_done(IQM_QDMI_Device_Job job) {
   assert(job != nullptr);
   return job->status_ == QDMI_JOB_STATUS_DONE ||
@@ -1691,43 +1806,44 @@ bool IQM_QDMI_device_job_done(IQM_QDMI_Device_Job job) {
 }
 } // namespace
 
-// All network access happens inside IQM_QDMI_device_job_check, which contains
-// its own exceptions, so no additional guard is needed here.
-int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
+int IQM_QDMI_device_job_check(IQM_QDMI_Device_Job job,
+                              QDMI_Job_Status *status) {
+  return Check_job(job, status, std::nullopt);
+}
+
+int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job,
+                             const size_t timeout) try {
   if (job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
   if (job->job_id_.empty()) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
+  if (IQM_QDMI_device_job_done(job)) {
+    return QDMI_SUCCESS;
+  }
   LOG_INFO("Waiting for job " + job->job_id_ + " to complete");
   QDMI_Job_Status status = job->status_;
-  size_t sleep_duration = 1; // Start with 1 second
-  constexpr size_t max_sleep_duration = 60;
+  using std::chrono::milliseconds;
+  using std::chrono::seconds;
+  const auto &clock = iqm::http::internal::Get_hooks();
+  const bool iteration_job =
+      !job->calibration_ && job->session_->iteration_id_.has_value();
+  const auto max_delay = iteration_job ? seconds{5} : seconds{60};
+  auto delay = seconds{1};
+  std::optional<Job_wait_clock::time_point> deadline;
   if (timeout > 0) {
-    const auto start = std::chrono::steady_clock::now();
-    while (static_cast<size_t>(std::chrono::duration<double>(
-                                   std::chrono::steady_clock::now() - start)
-                                   .count()) < timeout) {
-      if (const auto ret = IQM_QDMI_device_job_check(job, &status);
-          ret != QDMI_SUCCESS) {
-        return ret;
-      }
-      if (IQM_QDMI_device_job_done(job)) {
-        LOG_INFO("Job " + job->job_id_ + " completed with status " +
-                 std::to_string(status));
-        return QDMI_SUCCESS;
-      }
-      std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
-      // Exponential backoff: double the sleep duration, but cap it
-      sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
-    }
-    LOG_ERROR("Job " + job->job_id_ + " timed out");
-    return QDMI_ERROR_TIMEOUT;
+    const auto now = clock.now();
+    const auto available = std::chrono::duration_cast<seconds>(
+        Job_wait_clock::time_point::max() - now);
+    deadline = std::cmp_greater(timeout, available.count())
+                   ? Job_wait_clock::time_point::max()
+                   : now + seconds{static_cast<seconds::rep>(timeout)};
   }
-  while (!IQM_QDMI_device_job_done(job)) {
-    if (const auto ret = IQM_QDMI_device_job_check(job, &status);
-        ret != QDMI_SUCCESS) {
+  while (!deadline.has_value() || clock.now() < *deadline) {
+    const auto ret =
+        Check_job(job, &status, iteration_job ? deadline : std::nullopt);
+    if (ret != QDMI_SUCCESS) {
       return ret;
     }
     if (IQM_QDMI_device_job_done(job)) {
@@ -1735,11 +1851,23 @@ int IQM_QDMI_device_job_wait(IQM_QDMI_Device_Job job, const size_t timeout) {
                std::to_string(status));
       return QDMI_SUCCESS;
     }
-    std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
-    // Exponential backoff: double the sleep duration, but cap it
-    sleep_duration = (std::min)(sleep_duration * 2, max_sleep_duration);
+    auto sleep = std::chrono::duration_cast<milliseconds>(delay);
+    if (iteration_job && deadline.has_value()) {
+      sleep = std::min(sleep, std::chrono::duration_cast<milliseconds>(
+                                  *deadline - clock.now()));
+      if (sleep <= milliseconds::zero()) {
+        break;
+      }
+    }
+    clock.sleep(sleep);
+    delay = std::min(delay * 2, max_delay);
   }
-  return QDMI_SUCCESS;
+  LOG_ERROR("Job " + job->job_id_ + " timed out");
+  return QDMI_ERROR_TIMEOUT;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 namespace {

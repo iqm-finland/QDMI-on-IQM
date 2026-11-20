@@ -135,8 +135,8 @@ cpr::Response Default_post(const cpr::Url &url,
   return session.Post();
 }
 
-void Default_sleep(const int seconds) {
-  std::this_thread::sleep_for(std::chrono::seconds(seconds));
+void Default_sleep(const std::chrono::milliseconds delay) {
+  std::this_thread::sleep_for(delay);
 }
 
 std::chrono::steady_clock::time_point Default_now() {
@@ -278,7 +278,7 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
         LOG_DEBUG("Request to URL '" + url.str() + "' is holding back for " +
                   std::to_string(wait) +
                   " second(s) to let the rate-limit window replenish");
-        hooks.sleep(wait);
+        hooks.sleep(std::chrono::seconds{wait});
       } else {
         LOG_DEBUG("Request to URL '" + url.str() +
                   "' would wait out the rate-limit window, but that exceeds "
@@ -327,7 +327,7 @@ cpr::Response Perform_with_retries(const cpr::Url &url,
               " second(s) from the Retry-After header (attempt " +
               std::to_string(attempt + 1) + "/" +
               std::to_string(RATE_LIMIT_RETRY_COUNT) + ")");
-    hooks.sleep(delay_seconds);
+    hooks.sleep(retry_delay);
   }
 
   cpr::Response response;
@@ -566,10 +566,12 @@ cpr::Response Get(const cpr::Url &url,
       });
 }
 
-cpr::Response
-Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
-     const cpr::ConnectionPool &connection_pool, const std::string_view data,
-     const std::chrono::milliseconds timeout, Rate_limit_budget *rate_limit) {
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
+                   const std::string_view data,
+                   const std::chrono::milliseconds timeout,
+                   Rate_limit_budget *rate_limit, const bool follow_redirects) {
   LOG_INFO("Performing POST request to " + url.str());
   if (!data.empty()) {
     LOG_DEBUG(std::string{"POST data: "}.append(data));
@@ -579,7 +581,7 @@ Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
   return internal::Perform_with_retries(
       url, timeout, rate_limit, [&](const auto remaining) {
         return hooks.post(url, bearer_token, connection_pool, headers, data,
-                          remaining, true);
+                          remaining, follow_redirects);
       });
 }
 

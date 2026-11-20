@@ -114,9 +114,10 @@ HttpStub::HttpStub() {
     return response;
   };
 
-  hooks.sleep = [this](const int seconds) {
-    sleep_durations_.push_back(seconds);
-    now_ += std::chrono::seconds{seconds};
+  hooks.sleep = [this](const std::chrono::milliseconds delay) {
+    sleep_durations_.push_back(static_cast<int>(
+        std::chrono::duration_cast<std::chrono::seconds>(delay).count()));
+    now_ += delay;
   };
 
   hooks.now = [this] { return now_; };
@@ -202,7 +203,7 @@ const std::vector<int> &HttpStub::sleep_durations() const {
   return sleep_durations_;
 }
 
-void HttpStub::advance(const std::chrono::milliseconds elapsed) {
+void HttpStub::advance(const std::chrono::steady_clock::duration elapsed) {
   now_ += elapsed;
 }
 

@@ -262,10 +262,10 @@ export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
 ```
 
-**Checking iteration management:**
+**Checking iteration management and circuit execution:**
 
-The live-test workflow checks iteration creation and cleanup on `emerald:mock`
-after the other live tests finish. To run this check yourself, configure the
+The live-test workflow checks iteration management and runs dependent circuits
+across two sessions on `emerald:mock`. To run these checks, configure the
 credentials described above, then run:
 
 ```console
@@ -275,14 +275,15 @@ unset IQM_QC_ID
 export IQM_QUANTUM_COMPUTER="emerald:mock"
 export IQM_ITERATION_SCRATCH_FILE="$(pwd)/build/iteration-ids.txt"
 ./build/release/test/iteration/iteration_smoke
+IQM_LOG_LEVEL=ERROR ./build/release/test/iteration/iteration_smoke --circuits
 ./build/release/test/iteration/iteration_smoke --cleanup-only
 ```
 
-The check creates a reservation with a 60-second duration, waits up to 120
-seconds for activation, then tries to end it. It is excluded from default builds
-and CTest. The file records created IDs until cleanup confirms they have ended.
-Keep it if cleanup fails, and rerun `--cleanup-only` with the same credentials.
-Cleanup has a separate 30-second budget.
+Each live check creates a reservation with a 60-second duration, waits up to 120
+seconds for activation, then tries to end it. Build the target explicitly. The
+file records created IDs until cleanup confirms they have ended. Keep it if
+cleanup fails, and rerun `--cleanup-only` with the same credentials. Cleanup has
+a separate 30-second budget.
 
 CI serializes this check across runs and attempts cleanup even after
 cancellation. Runner loss or force cancellation can still leave reservations
