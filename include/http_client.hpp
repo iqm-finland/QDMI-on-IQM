@@ -100,13 +100,13 @@ cpr::Response Get(const cpr::Url &url,
 /// rate-limit retries.
 /// @param rate_limit Quota the calling session last saw, updated in place.
 /// A request belonging to no session passes nullptr and relies on Retry-After.
+/// @param follow_redirects Whether to follow server redirects.
 /// @return CPR response object.
-cpr::Response Post(const cpr::Url &url,
-                   const std::optional<cpr::Bearer> &bearer_token,
-                   const cpr::ConnectionPool &connection_pool,
-                   std::string_view data,
-                   std::chrono::milliseconds timeout = std::chrono::hours{1},
-                   Rate_limit_budget *rate_limit = nullptr);
+cpr::Response
+Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+     const cpr::ConnectionPool &connection_pool, std::string_view data,
+     std::chrono::milliseconds timeout = std::chrono::hours{1},
+     Rate_limit_budget *rate_limit = nullptr, bool follow_redirects = true);
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -189,8 +189,8 @@ struct Hooks {
       std::string_view body, std::chrono::milliseconds timeout,
       bool follow_redirects)>
       post;
-  /// Hook for the retry backoff delay, given a delay in seconds.
-  std::function<void(int)> sleep;
+  /// Hook for retry and job-polling delays.
+  std::function<void(std::chrono::milliseconds)> sleep;
   /// Hook for the monotonic clock behind request deadlines and the rate-limit
   /// window. Tests replace it with one the stubbed sleep advances.
   std::function<std::chrono::steady_clock::time_point()> now;
