@@ -28,4 +28,6 @@ int Iteration_management_smoke(bool cleanup_only,
                                                       bool qc_is_id,
                                                       const std::string &id,
                                                       bool ended) = nullptr);
+/// Run the live circuit scenario with a device session.
+int Run_iteration_circuits();
 } // namespace iqm::test_support

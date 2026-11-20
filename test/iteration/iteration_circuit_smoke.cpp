@@ -70,7 +70,7 @@ bool Run_circuit(const char *qc, const bool qc_is_id, const std::string &id,
   std::string circuit = R"({"name":"iteration-smoke","instructions":[)";
   if (flip) {
     circuit +=
-        R"({"name":"prx","locus":["QB1"],"args":{"angle":0.5,"phase":0}},)";
+        R"({"name":"prx","locus":["QB1"],"args":{"angle":0.5,"phase":0.0}},)";
   }
   circuit += R"({"name":"measure","locus":["QB1"],"args":{"key":"m"}}]})";
   const size_t size = circuit.size() + 1;
@@ -119,19 +119,7 @@ void Check_circuits(const char *qc, const bool qc_is_id, const std::string &id,
 }
 } // namespace
 
-// Keep the portable main signature used by every supported compiler.
-// NOLINTNEXTLINE(misc-const-correctness)
-int main(const int argc, char **argv) {
-  using iqm::test_support::Iteration_management_smoke;
-  if (argc == 1) {
-    return Iteration_management_smoke(false);
-  }
-  if (argc == 2 && std::string_view{argv[1]} == "--cleanup-only") {
-    return Iteration_management_smoke(true);
-  }
-  if (argc != 2 || std::string_view{argv[1]} != "--circuits") {
-    return 1;
-  }
+int iqm::test_support::Run_iteration_circuits() {
   if (IQM_QDMI_device_initialize() != QDMI_SUCCESS) {
     return 1;
   }
