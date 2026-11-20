@@ -130,7 +130,6 @@ int main(const int argc, char **argv) {
     return Iteration_management_smoke(true);
   }
   if (argc != 2 || std::string_view{argv[1]} != "--circuits") {
-    std::cerr << "Usage: iteration_smoke [--circuits | --cleanup-only]\n";
     return 1;
   }
   if (IQM_QDMI_device_initialize() != QDMI_SUCCESS) {
