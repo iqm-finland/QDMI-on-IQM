@@ -855,6 +855,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "qiskit" },
     { name = "qiskit-algorithms" },
+    { name = "requests" },
     { name = "scikit-build-core" },
 ]
 docs = [
@@ -891,6 +892,7 @@ test = [
     { name = "pytest-xdist" },
     { name = "qiskit" },
     { name = "qiskit-algorithms" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -922,6 +924,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "qiskit", specifier = ">=2.5" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
+    { name = "requests", specifier = ">=2.31" },
     { name = "scikit-build-core", specifier = ">=1.1" },
 ]
 docs = [
@@ -964,6 +967,7 @@ test = [
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "qiskit", specifier = ">=2.5" },
     { name = "qiskit-algorithms", specifier = ">=0.4" },
+    { name = "requests", specifier = ">=2.31" },
 ]
 
 [[package]]

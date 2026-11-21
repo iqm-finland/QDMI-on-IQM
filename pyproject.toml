@@ -94,6 +94,7 @@ test = [
   "pytest-cov>=7.1",
   "pytest-sugar>=1.1.1",
   "pytest-xdist>=3.8",
+  "requests>=2.31",
   { include-group = "qiskit" },
 ]
 docs = [
@@ -183,7 +184,7 @@ archs = "auto64"
 build-frontend = "uv"
 before-test = 'uv pip install --group "{project}/pyproject.toml:test"'
 test-command = "pytest test/python"
-test-sources = [ "test/python", "pyproject.toml" ]
+test-sources = [ "test/python", "pyproject.toml", "examples/discover_backends.py" ]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
