@@ -455,8 +455,8 @@ explicit target to execute provider-backed notebooks.
 
 Merge the stable version update, then run `CD.yml` on `main` from the Actions
 tab, entering the project version, such as `1.6.0`. The workflow checks that it
-matches `pyproject.toml`, builds the Python distributions and C++ SDK archives,
-and waits for approval through the `release` environment. After approval, it
+matches `pyproject.toml`, builds the Python distributions and C++ archives, and
+waits for approval through the `release` environment. After approval, it
 attaches the archives and `SHA256SUMS` before publishing the GitHub release. The
 release creates its version tag at the built commit and links to that tag's
 changelog and the changes since the previous release. The workflow then
