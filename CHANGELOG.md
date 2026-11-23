@@ -12,8 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
-- 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
-  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**])
+- 📦 Ship installable C++ archives for Linux, macOS, and Windows with GitHub
+  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**]).
 
 ## [1.6.1] - 2026-11-15
 
