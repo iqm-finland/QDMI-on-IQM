@@ -19,13 +19,11 @@ cmake_minimum_required(VERSION 3.24)
 get_filename_component(source "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(work "${source}/build/sdk")
 file(READ "${source}/.github/cpp-sdk.json" config)
-foreach(key package install-prefix cmake-target runtime-property)
+foreach(key package install-prefix)
   string(JSON ${key} GET "${config}" "${key}")
 endforeach()
 string(JSON triple GET "${config}" platforms "$ENV{SDK_PLATFORM}")
 if(NOT package MATCHES "^[A-Za-z_][A-Za-z0-9_.-]*$"
-   OR NOT cmake-target MATCHES "^[A-Za-z_][A-Za-z0-9_:.-]*$"
-   OR NOT runtime-property MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
    OR NOT triple MATCHES "^[a-z0-9_]+(-[a-z0-9_]+)+$"
    OR IS_ABSOLUTE "${install-prefix}"
    OR install-prefix MATCHES "(^|/)[.][.](/|$)|[\\\\:]")
@@ -85,7 +83,6 @@ if(APPLE AND bundled)
     FATAL_ERROR
       "Bundled macOS libraries require a tested relocation implementation")
 endif()
-set(runtime_files "")
 foreach(library IN LISTS bundled)
   get_filename_component(library_name "${library}" NAME)
   if(NOT library_name MATCHES "^[A-Za-z0-9_.+-]+$"
@@ -94,7 +91,6 @@ foreach(library IN LISTS bundled)
       FATAL_ERROR "Invalid or conflicting runtime library: ${library_name}")
   endif()
   file(COPY "${library}" DESTINATION "${library_dir}")
-  list(APPEND runtime_files "${library_name}")
 endforeach()
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
   find_program(PATCHELF_EXECUTABLE patchelf REQUIRED)
@@ -103,11 +99,6 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
     run("${PATCHELF_EXECUTABLE}" --set-rpath "$ORIGIN" "${library}")
   endforeach()
 endif()
-list(SORT runtime_files)
-file(
-  APPEND "${prefix}/share/cmake/${package}/${package}-config.cmake"
-  "\nset_property(TARGET ${cmake-target} PROPERTY ${runtime-property} \"${runtime_files}\")\n"
-)
 
 file(GLOB metadata "${work}/wheel/*.dist-info/METADATA")
 list(LENGTH metadata count)
@@ -134,16 +125,6 @@ execute_process(
 file(ARCHIVE_EXTRACT INPUT "${source}/dist/${name}" DESTINATION
      "${work}/extracted")
 file(REMOVE_RECURSE "${work}/prefix" "${work}/wheel")
-set(relocated "${work}/extracted/${package}")
-run("${CMAKE_COMMAND}"
-    -S
-    "${source}/test/install_consumer"
-    -B
-    "${work}/consumer"
-    -G
-    Ninja
-    -DCMAKE_BUILD_TYPE=Release
-    "-DCMAKE_PREFIX_PATH=${relocated}")
-run("${CMAKE_COMMAND}" --build "${work}/consumer")
-run("${CMAKE_CTEST_COMMAND}" --test-dir "${work}/consumer" --output-on-failure
-    --no-tests=error)
+set(ENV{CMAKE_GENERATOR} Ninja)
+run("${CMAKE_COMMAND}" "-Dinstalled_prefix=${work}/extracted/${package}" -P
+    "${source}/test/install.cmake")

@@ -30,7 +30,7 @@ jobs:
         .github/workflows/CI.yml
         .github/workflows/CD.yml
         .github/cpp-sdk.json
-        test/install_consumer/**
+        test/install.cmake
 
   cpp-tests-ubuntu:
     name: 🇨 Test 🐧
@@ -139,7 +139,6 @@ jobs:
       clang-version: 23
       files-changed-only: true
       cpp-linter-extra-args: "-Wunused-template"
-      cpp-linter-ignore-extra: "test/install_consumer/**"
 
   python-tests:
     name: 🐍 Test
@@ -198,7 +197,7 @@ jobs:
       runs-on: ${{ matrix.runs-on }}
 
   build-cpp-sdk:
-    name: 📦 Assemble C++ SDK
+    name: 📦 Package C++ binaries
     needs: [change-detection, build-wheel]
     strategy:
       fail-fast: false

@@ -19,7 +19,6 @@ include(GNUInstallDirs)
 
 # Copy notices from the dependencies bundled into this build.
 set(LICENSE_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/licenses/${QDMI_TARGET_NAME}")
-# scikit-build-core packages LICENSE, including OpenSSL 3's Apache-2.0 text.
 if(SKBUILD)
   set(LICENSE_INSTALL_DIR "${SKBUILD_METADATA_DIR}/licenses")
 else()
@@ -40,37 +39,11 @@ foreach(DEPENDENCY FILENAME IN ZIP_LISTS LICENSE_DEPENDENCIES LICENSE_FILENAMES)
   endif()
 endforeach()
 
-# OpenSSL comes from the system, so FetchContent cannot supply its license
-# notices. Include them with the libraries bundled into Linux wheels by
-# auditwheel.
-if(SKBUILD
-   AND UNIX
-   AND NOT APPLE)
-  find_program(RPM_EXECUTABLE rpm)
-  if(RPM_EXECUTABLE)
-    get_filename_component(openssl_library "${OPENSSL_CRYPTO_LIBRARY}" REALPATH)
-    execute_process(
-      COMMAND "${RPM_EXECUTABLE}" -qf --qf "%{NAME}" "${openssl_library}"
-      OUTPUT_VARIABLE openssl_package
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      RESULT_VARIABLE openssl_package_result
-      ERROR_QUIET)
-    if(openssl_package_result EQUAL 0)
-      file(
-        GLOB openssl_notices
-        LIST_DIRECTORIES false
-        "/usr/share/licenses/${openssl_package}/*")
-      if(NOT openssl_notices)
-        message(
-          FATAL_ERROR
-            "OpenSSL license notices are missing from ${openssl_package}")
-      endif()
-      install(
-        FILES ${openssl_notices}
-        DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
-        COMPONENT ${QDMI_TARGET_NAME}_Runtime)
-    endif()
-  endif()
+if(SKBUILD AND DEFINED IQM_OPENSSL_LICENSE)
+  install(
+    FILES "${IQM_OPENSSL_LICENSE}"
+    DESTINATION "${LICENSE_INSTALL_DIR}/openssl"
+    COMPONENT ${QDMI_TARGET_NAME}_Runtime)
 endif()
 
 # Generate QDMI headers with the specified prefix
