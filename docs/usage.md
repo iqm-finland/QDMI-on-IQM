@@ -219,7 +219,7 @@ component and a matching LLVM SDK. Follow the [MQT Core installation guide] for
 the build and install steps.
 
 ```cmake
-find_package(mqt-core 4.2.0 CONFIG REQUIRED COMPONENTS Development)
+find_package(mqt-core 4.2.1 CONFIG REQUIRED COMPONENTS Development)
 find_package(iqm-qdmi-device CONFIG REQUIRED)
 
 add_executable(my_app main.cpp)

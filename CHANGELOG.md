@@ -10,12 +10,24 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
-## [1.6.0] - 2026-11-10
-
 ### Added
 
 - 📦 Ship installable C++ SDK archives for Linux, macOS, and Windows with GitHub
   Releases ([#270]) ([**@marcelwa**], [**@denialhaag**])
+
+## [1.6.1] - 2026-11-15
+
+### Changed
+
+- ⬆️ Update MQT Core to 4.2.1 ([#341]) ([**@marcelwa**], [**@burgholzer**]).
+- ⬆️ Require Python 3.11.5 or newer ([#341]) ([**@burgholzer**]).
+- ⚡️ Reduce simulator setup time for local and Slurm sampling and estimation
+  ([#334]) ([**@marcelwa**]).
+
+## [1.6.0] - 2026-11-10
+
+### Added
+
 - ✨ Run PennyLane QNodes with `iqm.qdmi` using MQT Core compilation and
   execution. Install the `pennylane` extra. ([#321]) ([**@burgholzer**])
 
@@ -359,7 +371,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- Version links -->
 
-[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/iqm-finland/QDMI-on-IQM/compare/v1.3.0...v1.4.0
@@ -372,6 +385,8 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
+[#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321

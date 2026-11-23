@@ -27,7 +27,7 @@ dependency requires rebuilding the wheel and SDK archive.
 
 ## Optional Python integrations
 
-The base package requires Python 3.11 or newer and has no Python runtime
+The base package requires Python 3.11.5 or newer and has no Python runtime
 dependencies. Python execution uses [MQT Core]'s QDMI client. Framework extras
 install packages into the Python environment, not into the device wheel.
 

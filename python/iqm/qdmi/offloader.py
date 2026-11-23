@@ -254,7 +254,7 @@ def sample(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        sampler = build_sampler(simulator=simulator)
+        sampler = build_sampler(simulator=simulator, num_qubits=qc.num_qubits)
         qc_for_execution = transpile(qc, sampler.backend, optimization_level=TRANSPILE_OPTIMIZATION_LEVEL)
         job = sampler.run([(qc_for_execution,)], shots=shots)
         return extract_counts(job.result())
@@ -364,7 +364,8 @@ def estimate(
         )
         raise ImportError(msg) from _IMPORT_ERROR
     if local:
-        estimator = build_estimator(simulator=simulator)
+        num_qubits = max(ansatz.num_qubits, operator.num_qubits)
+        estimator = build_estimator(simulator=simulator, num_qubits=num_qubits)
         vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
         return vqe.compute_minimum_eigenvalue(operator=operator)
 
