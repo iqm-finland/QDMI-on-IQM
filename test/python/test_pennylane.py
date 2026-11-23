@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pennylane as qml
+from mqt.core.qdmi.builtin_driver import open_device
 
 from iqm.qdmi.pennylane import IQMDevice
 
@@ -51,7 +52,14 @@ def test_pennylane_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """The installed entry point delegates compilation and execution to MQT Core."""
     monkeypatch.delenv("IQM_TOKEN", raising=False)
     monkeypatch.delenv("IQM_TOKENS_FILE", raising=False)
+    # Limit the DDSIM session to the two wires used by the circuit.
+    monkeypatch.setattr(
+        "mqt.core.plugins.pennylane.device.open_device",
+        lambda device_id, **parameters: open_device(device_id, **(parameters | {"custom1": "2"})),
+    )
     device = qml.device("iqm.qdmi", device_id="mqt.ddsim.default", wires=2)
+    assert isinstance(device, IQMDevice)
+    assert device.qdmi_device.qubits_num() == 2
 
     @qml.qnode(device)
     def circuit() -> SampleMP:
