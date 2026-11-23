@@ -47,11 +47,13 @@ def test_pennylane_session_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
         assert init.call_args.kwargs["session_parameters"]["custom2"] is None
 
 
-def test_pennylane_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pennylane_entrypoint() -> None:
     """The installed entry point delegates compilation and execution to MQT Core."""
-    monkeypatch.delenv("IQM_TOKEN", raising=False)
-    monkeypatch.delenv("IQM_TOKENS_FILE", raising=False)
-    device = qml.device("iqm.qdmi", device_id="mqt.ddsim.default", wires=2)
+    # Limit the DDSIM session to the two wires used by the circuit.
+    with patch("iqm.qdmi.pennylane.session_parameters", return_value={"custom1": "2"}):
+        device = qml.device("iqm.qdmi", device_id="mqt.ddsim.default", wires=2)
+    assert isinstance(device, IQMDevice)
+    assert device.qdmi_device.qubits_num() == 2
 
     @qml.qnode(device)
     def circuit() -> SampleMP:
