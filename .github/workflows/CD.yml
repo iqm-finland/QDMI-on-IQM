@@ -55,7 +55,7 @@ jobs:
     needs: check-release
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@a09a68783480e343812b240e7ed4f68cdef90c42 # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@28a7c9dc7b154c73ec3d56a378d82c06333f5732 # codex/add-github-release-workflow
 
   build-wheel:
     name: 📦 Build wheels
@@ -65,11 +65,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@a09a68783480e343812b240e7ed4f68cdef90c42 # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@28a7c9dc7b154c73ec3d56a378d82c06333f5732 # codex/add-github-release-workflow
     with:
       runs-on: ${{ matrix.runs-on }}
 
-  build-cpp-sdk:
+  build-cpp:
     name: 📦 Package C++ binaries
     needs: [check-release, build-wheel]
     permissions:
@@ -77,13 +77,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@a09a68783480e343812b240e7ed4f68cdef90c42 # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@28a7c9dc7b154c73ec3d56a378d82c06333f5732 # codex/add-github-release-workflow
     with:
       runs-on: ${{ matrix.runs-on }}
 
   approve-release:
     name: 🔐 Approve release
-    needs: [build-sdist, build-cpp-sdk]
+    needs: [build-sdist, build-cpp]
     runs-on: ubuntu-slim
     environment: release
     steps:
@@ -94,7 +94,7 @@ jobs:
     needs: [check-release, approve-release]
     permissions:
       contents: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@a09a68783480e343812b240e7ed4f68cdef90c42 # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@28a7c9dc7b154c73ec3d56a378d82c06333f5732 # codex/add-github-release-workflow
     with:
       version: ${{ needs.check-release.outputs.version }}
       release-name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
