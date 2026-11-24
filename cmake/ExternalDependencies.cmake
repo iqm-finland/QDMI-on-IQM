@@ -45,16 +45,15 @@ else()
 endif()
 
 # renovate: datasource=github-releases depName=nlohmann/json
-set(JSON_VERSION
-    3.12.0
-    CACHE STRING "nlohmann_json version")
-set(JSON_URL
-    https://github.com/nlohmann/json/releases/download/v${JSON_VERSION}/json.tar.xz
-)
+set(JSON_VERSION 3.12.0)
+FetchContent_Declare(
+  nlohmann_json
+  URL https://github.com/nlohmann/json/releases/download/v${JSON_VERSION}/json.tar.xz
+      FIND_PACKAGE_ARGS
+      3.12.0)
 set(JSON_SystemInclude
     ON
-    CACHE INTERNAL "Treat the library headers like system headers")
-FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS 3.12.0)
+    CACHE INTERNAL "Treat JSON headers as system headers")
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -145,10 +144,10 @@ if(BUILD_IQM_QDMI_TESTS)
   set(GTEST_REV
       "52eb8108c5bdec04579160ae17225d66034bd723" # tag=v1.17.0
       CACHE STRING "GoogleTest source revision")
-  set(GTEST_URL
-      https://github.com/google/googletest/archive/${GTEST_REV}.tar.gz)
-  FetchContent_Declare(googletest URL ${GTEST_URL} FIND_PACKAGE_ARGS
-                                      ${GTEST_VERSION} NAMES GTest)
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/${GTEST_REV}.tar.gz
+        FIND_PACKAGE_ARGS ${GTEST_VERSION} NAMES GTest)
   list(APPEND FETCH_PACKAGES googletest)
 endif()
 
