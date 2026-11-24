@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.28...4.4)
+cmake_minimum_required(VERSION 3.28...4.5)
 project(
   iqm-qdmi-device
   LANGUAGES C CXX
