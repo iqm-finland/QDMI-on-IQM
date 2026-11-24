@@ -12,8 +12,7 @@ releases may include breaking changes.
 
 ### Changed
 
-- ⬆️ Require CMake 3.28 or newer for source builds ([**@denialhaag**])
-- ⬆️ Require GoogleTest 1.18 or newer for native tests ([**@denialhaag**])
+- ⬆️ Require CMake 3.28 or newer for source builds ([#355]) ([**@denialhaag**])
 
 ## [1.6.1] - 2026-11-15
 
@@ -385,6 +384,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#355]: https://github.com/iqm-finland/QDMI-on-IQM/pull/355
 [#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
