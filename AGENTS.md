@@ -45,7 +45,7 @@ explicit invocation, valid credentials, and an appropriate target.
 ### C++
 
 - C++20
-- CMake 3.24+
+- CMake 3.28+
 - `FetchContent` for dependency management in `cmake/ExternalDependencies.cmake`
 - GoogleTest for tests in `test/unit/` and `test/integration/`
 - `clang-format` and `clang-tidy` configured by `.clang-format` and
