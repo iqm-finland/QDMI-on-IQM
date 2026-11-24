@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 set(package iqm-qdmi-device)
 get_filename_component(source "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(work "${source}/build/install-check")

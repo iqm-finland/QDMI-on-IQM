@@ -4,6 +4,7 @@
   minimumReleaseAge: "7 days",
   extends: [
     "config:recommended",
+    "github>munich-quantum-toolkit/templates//renovate/cmake",
     ":gitSignOff",
     "helpers:pinGitHubActionDigestsToSemver",
     ":automergeDigest",
@@ -15,6 +16,7 @@
     ":prHourlyLimitNone",
   ],
   enabledManagers: [
+    "custom.regex",
     "github-actions",
     "pep621",
     "pip_requirements",
@@ -82,6 +84,13 @@
       matchDatasources: ["pypi"],
       matchPackageNames: ["mqt*", "iqm*"],
       minimumReleaseAge: null,
+    },
+    {
+      description: "Review FetchContent updates individually",
+      matchManagers: ["custom.regex"],
+      matchFileNames: ["cmake/ExternalDependencies.cmake"],
+      groupName: null,
+      automerge: false,
     },
   ],
 }

@@ -175,7 +175,7 @@ perfect. We will guide you through the process.
 ## Working on the C++ Library
 
 Building the project requires a C++20-capable C++ compiler and
-[CMake](https://cmake.org/) 3.24 or newer. Linux also requires the OpenSSL 3
+[CMake](https://cmake.org/) 3.28 or newer. Linux also requires the OpenSSL 3
 development package.
 
 CI runs offline C++ and Python checks separately from authenticated Resonance
