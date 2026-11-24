@@ -45,12 +45,12 @@ else()
 endif()
 
 # renovate: datasource=github-releases depName=nlohmann/json
-set(JSON_VERSION 3.12.0)
+set(JSON_TAG v3.12.0)
+string(REGEX REPLACE "^v" "" JSON_VERSION "${JSON_TAG}")
 FetchContent_Declare(
   nlohmann_json
-  URL https://github.com/nlohmann/json/releases/download/v${JSON_VERSION}/json.tar.xz
-      FIND_PACKAGE_ARGS
-      3.12.0)
+  URL https://github.com/nlohmann/json/releases/download/${JSON_TAG}/json.tar.xz
+      FIND_PACKAGE_ARGS ${JSON_VERSION})
 set(JSON_SystemInclude
     ON
     CACHE INTERNAL "Treat JSON headers as system headers")
@@ -134,20 +134,17 @@ FetchContent_Declare(
 list(APPEND FETCH_PACKAGES cpr)
 
 if(BUILD_IQM_QDMI_TESTS)
-  set(gtest_force_shared_crt
-      ON
-      CACHE BOOL "" FORCE)
   set(GTEST_VERSION
-      1.17.0
+      1.18.0
       CACHE STRING "Minimum installed GoogleTest version")
   # renovate: datasource=github-tags depName=google/googletest
   set(GTEST_REV
-      "52eb8108c5bdec04579160ae17225d66034bd723" # tag=v1.17.0
+      "063de7e9578f82b369302001269680b4b1553359" # tag=v1.18.0
       CACHE STRING "GoogleTest source revision")
   FetchContent_Declare(
     googletest
     URL https://github.com/google/googletest/archive/${GTEST_REV}.tar.gz
-        FIND_PACKAGE_ARGS ${GTEST_VERSION} NAMES GTest)
+        EXCLUDE_FROM_ALL FIND_PACKAGE_ARGS ${GTEST_VERSION} NAMES GTest)
   list(APPEND FETCH_PACKAGES googletest)
 endif()
 

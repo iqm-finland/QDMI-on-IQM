@@ -40,7 +40,7 @@ The native C/C++ library does not depend on MQT Core or a Python framework.
 
 ## Build dependencies
 
-Native builds require a C++20 compiler, CMake 3.24 or newer, and Git. Linux
+Native builds require a C++20 compiler, CMake 3.28 or newer, and Git. Linux
 builds also require OpenSSL development headers. Python packaging uses
 `scikit-build-core`; documentation uses Sphinx and Doxygen. The `build`, `test`,
 and `docs` dependency groups install tools for their respective tasks. See

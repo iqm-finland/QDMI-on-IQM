@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- ⬆️ Require CMake 3.28 or newer for source builds ([**@denialhaag**])
+- ⬆️ Require GoogleTest 1.18 or newer for native tests ([**@denialhaag**])
+
 ## [1.6.1] - 2026-11-15
 
 ### Changed
