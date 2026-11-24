@@ -28,10 +28,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from iqm.qdmi.qiskit import IQMBackend
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from iqm.qdmi.qiskit import IQMBackend
 
 
 @pytest.fixture
@@ -53,6 +53,8 @@ def offline_backend(
     Yields:
         A backend backed by the local HTTP server.
     """
+    from iqm.qdmi.qiskit import IQMBackend  # ruff: ignore[import-outside-top-level]
+
     metadata = json.loads((Path(__file__).parent / "fixtures/initialization.json").read_text())
     variant = getattr(request, "param", None)
     if variant in {"missing_prx", "missing_measure"}:
