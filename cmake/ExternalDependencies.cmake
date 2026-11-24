@@ -27,7 +27,8 @@ else()
       CACHE STRING "Minimum QDMI version")
   set(QDMI_VERSION 1.4.0
       CACHE STRING "QDMI version")
-  set(QDMI_REV "6db03d83ad602aaa9fe928b5c3fc5cce84b10061" # v1.4.0
+  # renovate: datasource=github-tags depName=Munich-Quantum-Software-Stack/QDMI
+  set(QDMI_REV "6db03d83ad602aaa9fe928b5c3fc5cce84b10061" # tag=v1.4.0
       CACHE STRING "QDMI identifier (tag, branch or commit hash)")
   set(QDMI_REPO_OWNER "Munich-Quantum-Software-Stack"
       CACHE STRING "QDMI repository owner (change when using a fork)")
@@ -43,17 +44,16 @@ else()
   list(APPEND FETCH_PACKAGES qdmi)
 endif()
 
-set(JSON_VERSION
-    3.12.0
-    CACHE STRING "nlohmann_json version")
-set(JSON_URL
-    https://github.com/nlohmann/json/releases/download/v${JSON_VERSION}/json.tar.xz
-)
+# renovate: datasource=github-releases depName=nlohmann/json
+set(JSON_VERSION 3.12.0)
+FetchContent_Declare(
+  nlohmann_json
+  URL https://github.com/nlohmann/json/releases/download/v${JSON_VERSION}/json.tar.xz
+      FIND_PACKAGE_ARGS
+      3.12.0)
 set(JSON_SystemInclude
     ON
-    CACHE INTERNAL "Treat the library headers like system headers")
-FetchContent_Declare(nlohmann_json URL ${JSON_URL} FIND_PACKAGE_ARGS
-                                       ${JSON_VERSION})
+    CACHE INTERNAL "Treat JSON headers as system headers")
 list(APPEND FETCH_PACKAGES nlohmann_json)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -124,10 +124,13 @@ set(CPR_ENABLE_INSTALL OFF)
 # Configuring curl directly avoids CPR's bundled zlib build.
 set(CPR_USE_EXISTING_CURL_TARGET ON)
 set(CPR_FORCE_OPENSSL_BACKEND OFF)
+# renovate: datasource=github-tags depName=libcpr/cpr
+set(CPR_REV "3139b2682f0b1d6af8c7ae48cf400f9d9988deec" # tag=1.15.1
+)
 FetchContent_Declare(
   cpr
   GIT_REPOSITORY https://github.com/libcpr/cpr.git
-  GIT_TAG 1.15.1)
+  GIT_TAG ${CPR_REV})
 list(APPEND FETCH_PACKAGES cpr)
 
 if(BUILD_IQM_QDMI_TESTS)
@@ -136,12 +139,15 @@ if(BUILD_IQM_QDMI_TESTS)
       CACHE BOOL "" FORCE)
   set(GTEST_VERSION
       1.17.0
-      CACHE STRING "Google Test version")
-  set(GTEST_URL
-      https://github.com/google/googletest/archive/refs/tags/v${GTEST_VERSION}.tar.gz
-  )
-  FetchContent_Declare(googletest URL ${GTEST_URL} FIND_PACKAGE_ARGS
-                                      ${GTEST_VERSION} NAMES GTest)
+      CACHE STRING "Minimum installed GoogleTest version")
+  # renovate: datasource=github-tags depName=google/googletest
+  set(GTEST_REV
+      "52eb8108c5bdec04579160ae17225d66034bd723" # tag=v1.17.0
+      CACHE STRING "GoogleTest source revision")
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/${GTEST_REV}.tar.gz
+        FIND_PACKAGE_ARGS ${GTEST_VERSION} NAMES GTest)
   list(APPEND FETCH_PACKAGES googletest)
 endif()
 
