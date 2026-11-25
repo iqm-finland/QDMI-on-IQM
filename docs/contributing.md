@@ -462,11 +462,6 @@ release creates its version tag at the built commit and links to that tag's
 changelog and the changes since the previous release. The workflow then
 publishes the same Python distributions to PyPI.
 
-Configure the `release` environment with required reviewers and restrict it to
-`main` in the repository settings. The `APP_ID` and `APP_PRIVATE_KEY` secrets
-must identify a GitHub App installed on this repository with write access to
-repository contents and workflows.
-
 Retry failed jobs in the original workflow run to reuse its build artifacts. The
 workflow leaves published GitHub releases unchanged on retries.
 

@@ -13,7 +13,7 @@ releases may include breaking changes.
 ### Added
 
 - 📦 Ship installable C++ archives for Linux, macOS, and Windows with GitHub
-  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**]).
+  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**])
 
 ### Changed
 
