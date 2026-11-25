@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       version: ${{ steps.version.outputs.version }}
-      matrix: ${{ steps.version.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,15 +46,13 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          matrix=$(jq -c '{include: [.platforms | keys[] | {"runs-on": .}]}' .github/cpp-packaging.json)
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build-sdist:
     name: 📦 Build source distribution
     needs: check-release
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@9ab6eb4a97480ebdf3ff5a5998ab56f7f2d8a94e # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
 
   build-wheel:
     name: 📦 Build wheels
@@ -64,20 +61,32 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@9ab6eb4a97480ebdf3ff5a5998ab56f7f2d8a94e # codex/add-github-release-workflow
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
     with:
       runs-on: ${{ matrix.runs-on }}
 
   build-cpp:
     name: 📦 Package C++ binaries
-    needs: [check-release, build-wheel]
+    needs: build-wheel
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.check-release.outputs.matrix) }}
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@9ab6eb4a97480ebdf3ff5a5998ab56f7f2d8a94e # codex/add-github-release-workflow
+      matrix:
+        runs-on:
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
     with:
       runs-on: ${{ matrix.runs-on }}
 
@@ -94,13 +103,10 @@ jobs:
     needs: [check-release, approve-release]
     permissions:
       contents: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@9ab6eb4a97480ebdf3ff5a5998ab56f7f2d8a94e # codex/add-github-release-workflow
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
     with:
       version: ${{ needs.check-release.outputs.version }}
       release-name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
-    secrets:
-      APP_ID: ${{ secrets.APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 
   publish-pypi:
     name: 🚀 Publish to PyPI

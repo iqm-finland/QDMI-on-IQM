@@ -54,7 +54,8 @@ set_target_properties(
   ${QDMI_TARGET_NAME}
   PROPERTIES C_VISIBILITY_PRESET hidden
              CXX_VISIBILITY_PRESET hidden
-             VISIBILITY_INLINES_HIDDEN 1)
+             VISIBILITY_INLINES_HIDDEN 1
+             INSTALL_RPATH "$<$<PLATFORM_ID:Linux>:$ORIGIN>")
 configure_qdmi_exports(
   TARGET
   ${QDMI_TARGET_NAME}
