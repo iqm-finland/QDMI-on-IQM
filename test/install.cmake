@@ -33,11 +33,12 @@ endfunction()
 if(NOT DEFINED installed_prefix)
   set(installed_prefix "${work}/relocated-${suffix}")
   run("${CMAKE_COMMAND}"
+      --preset
+      release
       -S
       "${source}"
       -B
       "${work}/producer"
-      -DCMAKE_BUILD_TYPE=Release
       -DBUILD_IQM_QDMI_TESTS=OFF)
   run("${CMAKE_COMMAND}" --build "${work}/producer" --config Release)
   foreach(component Runtime Development)
@@ -70,7 +71,7 @@ file(
   "${consumer}/CMakeLists.txt"
   CONTENT
   [=[
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 project(installed-consumer LANGUAGES C)
 find_package(@package@ REQUIRED CONFIG PATHS "@installed_prefix@" NO_DEFAULT_PATH)
 add_executable(consumer main.c)
