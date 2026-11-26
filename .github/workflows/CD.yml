@@ -47,34 +47,16 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-  build-sdist:
-    name: 📦 Build source distribution
+  build-python:
+    name: 📦 Package Python distributions
     needs: check-release
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
-
-  build-wheel:
-    name: 📦 Build wheels
-    needs: check-release
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        runs-on:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
-          - macos-26
-          - windows-2025
-          - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
-    with:
-      runs-on: ${{ matrix.runs-on }}
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-cibuildwheel.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
 
   build-cpp:
     name: 📦 Package C++ binaries
-    needs: build-wheel
+    needs: build-python
     permissions:
       contents: read
     strategy:
@@ -86,13 +68,13 @@ jobs:
           - macos-26
           - windows-2025
           - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
     with:
       runs-on: ${{ matrix.runs-on }}
 
   approve-release:
     name: 🔐 Approve release
-    needs: [build-sdist, build-cpp]
+    needs: [build-python, build-cpp]
     runs-on: ubuntu-slim
     environment: release
     steps:
@@ -103,14 +85,14 @@ jobs:
     needs: [check-release, approve-release]
     permissions:
       contents: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@ecf3ea764a21b5dbc86db529fd8d987897c785ff # main
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
     with:
       version: ${{ needs.check-release.outputs.version }}
       release-name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
 
   publish-pypi:
     name: 🚀 Publish to PyPI
-    needs: [build-sdist, build-wheel, publish-github]
+    needs: [build-python, publish-github]
     permissions:
       attestations: write
       contents: read
