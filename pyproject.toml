@@ -176,9 +176,9 @@ iqm-qdmi = { workspace = true }
 [tool.cibuildwheel]
 build = "cp3*"
 test-skip = [
-  "*-win_arm64",   # no Windows ARM64 wheels for qiskit and dependencies
-  "cp3??t-*",      # no freethreading qiskit wheels
-  "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
+  "cp3??-win_arm64", # no Windows ARM64 wheels for qiskit and dependencies
+  "cp314t-*",        # MQT Core supports free-threaded CPython from 3.15
+  "*-musllinux_*",   # no musllinux wheels for MQT Core
 ]
 archs = "auto64"
 build-frontend = "uv"
@@ -201,6 +201,15 @@ before-all = "yum install -y openssl3-devel zlib-devel"
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
 before-all = "apk add openssl-dev zlib-dev"
+
+[[tool.cibuildwheel.overrides]]
+select = "cp3??t-*"
+before-test = ""
+test-command = [
+  'python -c "import sys, iqm.qdmi, mqt.core.qdmi; assert not sys._is_gil_enabled()"',
+  "pytest -n 0 test/python/test_init.py test/python/test_main.py",
+]
+test-requires = [ "mqt-core>=4.2.1", "pytest>=9.0.1", "pytest-console-scripts>=1.4.1", "pytest-xdist>=3.8" ]
 
 
 [tool.ruff]
