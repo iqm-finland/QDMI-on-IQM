@@ -24,7 +24,7 @@ Updating a bundled library requires rebuilding the wheel.
 
 ## Optional Python integrations
 
-The base package requires Python 3.11 or newer and has no Python runtime
+The base package requires Python 3.11.5 or newer and has no Python runtime
 dependencies. Python execution uses [MQT Core]'s QDMI client. Framework extras
 install packages into the Python environment, not into the device wheel.
 
@@ -40,7 +40,7 @@ The native C/C++ library does not depend on MQT Core or a Python framework.
 
 ## Build dependencies
 
-Native builds require a C++20 compiler, CMake 3.24 or newer, and Git. Linux
+Native builds require a C++20 compiler, CMake 3.28 or newer, and Git. Linux
 builds also require OpenSSL development headers. Python packaging uses
 `scikit-build-core`; documentation uses Sphinx and Doxygen. The `build`, `test`,
 and `docs` dependency groups install tools for their respective tasks. See

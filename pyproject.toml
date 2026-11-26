@@ -22,12 +22,12 @@ requires = [ "scikit-build-core>=1.1" ]
 
 [project]
 name = "iqm-qdmi"
-version = "1.6.0"
+version = "1.6.1"
 description = "Implementation of a QDMI device for IQM Quantum Computers"
 readme = "README.md"
 license = "Apache-2.0 WITH LLVM-exception"
 license-files = [ "LICENSE" ]
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Information Technology",
@@ -55,11 +55,11 @@ email = "developers@iqm.tech"
 [project.optional-dependencies]
 pulla = [
   "iqm-client>=36,<37; python_version<'3.15'",
-  "mqt-core>=4.2",
+  "mqt-core>=4.2.1",
 ]
-pennylane = [ "mqt-core[pennylane]>=4.2" ]
+pennylane = [ "mqt-core[pennylane]>=4.2.1" ]
 qiskit = [
-  "mqt-core[qiskit]>=4.2",
+  "mqt-core[qiskit]>=4.2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
   "numpy>=2.5.2; python_version>='3.15'",
@@ -92,7 +92,7 @@ dev = [
   "nox>=2026.4.10",
 ]
 test = [
-  "mqt-core[pennylane]>=4.2",
+  "mqt-core[pennylane]>=4.2.1",
   "pytest>=9.0.1",
   "pytest-console-scripts>=1.4.1",
   "pytest-cov>=7.1",
@@ -101,7 +101,7 @@ test = [
   { include-group = "qiskit" },
 ]
 docs = [
-  "mqt-core[pennylane]>=4.2",
+  "mqt-core[pennylane]>=4.2.1",
   { include-group = "qiskit" },
   "furo>=2025.12.19",
   "myst-nb>=1.4",
@@ -113,7 +113,7 @@ docs = [
 ]
 build = [ "scikit-build-core>=1.1" ]
 qiskit = [
-  "mqt-core[qiskit]>=4.2",
+  "mqt-core[qiskit]>=4.2.1",
   "numpy>=2.1",
   "numpy>=2.1; python_version>='3.13'",
   "numpy>=2.3.2; python_version>='3.14'",
@@ -179,9 +179,9 @@ iqm-qdmi = { workspace = true }
 [tool.cibuildwheel]
 build = "cp3*"
 test-skip = [
-  "*-win_arm64",   # no Windows ARM64 wheels for qiskit and dependencies
-  "cp3??t-*",      # no freethreading qiskit wheels
-  "*-musllinux_*", # no musllinux wheels for qiskit and dependencies
+  "cp3??-win_arm64", # no Windows ARM64 wheels for qiskit and dependencies
+  "cp314t-*",        # MQT Core supports free-threaded CPython from 3.15
+  "*-musllinux_*",   # no musllinux wheels for MQT Core
 ]
 archs = "auto64"
 build-frontend = "uv"
@@ -204,6 +204,15 @@ before-all = "yum install -y openssl3-devel zlib-devel"
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux*"
 before-all = "apk add openssl-dev zlib-dev"
+
+[[tool.cibuildwheel.overrides]]
+select = "cp3??t-*"
+before-test = ""
+test-command = [
+  'python -c "import sys, iqm.qdmi, mqt.core.qdmi; assert not sys._is_gil_enabled()"',
+  "pytest -n 0 test/python/test_init.py test/python/test_main.py",
+]
+test-requires = [ "mqt-core>=4.2.1", "pytest>=9.0.1", "pytest-console-scripts>=1.4.1", "pytest-xdist>=3.8" ]
 
 
 [tool.ruff]
