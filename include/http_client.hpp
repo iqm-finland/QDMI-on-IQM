@@ -87,7 +87,7 @@ cpr::Response Get(const cpr::Url &url,
                   std::chrono::milliseconds timeout = std::chrono::hours{1},
                   Rate_limit_budget *rate_limit = nullptr);
 
-/// @brief Perform an HTTP POST request with a JSON content type and body.
+/// @brief Perform an HTTP POST request with a body and optional headers.
 ///
 /// The request waits when @p rate_limit reports the remaining quota running
 /// low, and HTTP 429 responses are retried according to Retry-After.
@@ -96,6 +96,7 @@ cpr::Response Get(const cpr::Url &url,
 /// @param bearer_token Bearer token used for authentication, if configured.
 /// @param connection_pool Connection pool shared by the owning device session.
 /// @param data Body borrowed for this synchronous call, including retries.
+/// @param additional_headers Headers added to the default JSON content type.
 /// @param timeout Overall timeout for the request, the rate-limit wait, and any
 /// rate-limit retries.
 /// @param rate_limit Quota the calling session last saw, updated in place.
@@ -105,6 +106,7 @@ cpr::Response Post(const cpr::Url &url,
                    const std::optional<cpr::Bearer> &bearer_token,
                    const cpr::ConnectionPool &connection_pool,
                    std::string_view data,
+                   const cpr::Header &additional_headers = {},
                    std::chrono::milliseconds timeout = std::chrono::hours{1},
                    Rate_limit_budget *rate_limit = nullptr);
 

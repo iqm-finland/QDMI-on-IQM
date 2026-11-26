@@ -10,8 +10,19 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Submit pulse-level `RunDefinition` programs and retrieve raw sweep results,
+  including after reopening a job by ID ([#200]) ([**@marcelwa**],
+  [**@burgholzer**]).
+- ✨ Add a PulLA 15 example for compiling and executing pulse programs ([#200])
+  ([**@marcelwa**], [**@burgholzer**]).
+
 ### Changed
 
+- 🐛 Return the HTTP-derived QDMI error for failed circuit and calibration
+  submissions instead of always returning `QDMI_ERROR_FATAL` ([#200])
+  ([**@marcelwa**], [**@burgholzer**]).
 - ⬆️ Require CMake 3.28 or newer for source builds ([#355]) ([**@denialhaag**])
 
 ## [1.6.1] - 2026-11-15
@@ -422,6 +433,7 @@ Compatible with QDMI `v1.3.0`.
 [#205]: https://github.com/iqm-finland/QDMI-on-IQM/pull/205
 [#204]: https://github.com/iqm-finland/QDMI-on-IQM/pull/204
 [#202]: https://github.com/iqm-finland/QDMI-on-IQM/pull/202
+[#200]: https://github.com/iqm-finland/QDMI-on-IQM/pull/200
 [#199]: https://github.com/iqm-finland/QDMI-on-IQM/pull/199
 [#195]: https://github.com/iqm-finland/QDMI-on-IQM/pull/195
 [#190]: https://github.com/iqm-finland/QDMI-on-IQM/pull/190

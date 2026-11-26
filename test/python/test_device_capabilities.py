@@ -38,8 +38,8 @@ from iqm.qdmi.qiskit import IQMBackend
 
 pytestmark = pytest.mark.live
 
-# Every IQM quantum computer accepts these two.
-BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON}
+# The device transports circuit payloads and binary pulse programs.
+BASE_PROGRAM_FORMATS = {ProgramFormat.QIR_BASE_STRING, ProgramFormat.IQM_JSON, ProgramFormat.CUSTOM1}
 
 
 def _skip_without_iqm_access() -> None:
@@ -86,7 +86,7 @@ def circuit() -> QuantumCircuit:
 
 
 def test_device_advertises_exactly_its_supported_formats(device: Device) -> None:
-    """The device advertises QIR and IQM JSON; calibration has a separate API."""
+    """The device advertises QIR, IQM JSON, and binary pulse programs."""
     formats = set(device.supported_program_formats())
 
     assert formats == BASE_PROGRAM_FORMATS

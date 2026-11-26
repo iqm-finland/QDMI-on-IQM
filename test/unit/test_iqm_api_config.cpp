@@ -25,6 +25,8 @@ TEST(APIConfigTest, UnifiedApiUrl) {
   const iqm::APIConfig config("http://test.url");
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::SUBMIT_CIRCUIT_JOB, "qc_id"),
             "http://test.url/api/v1/jobs/qc_id/circuit");
+  EXPECT_EQ(config.url(iqm::API_ENDPOINT::SUBMIT_RUN_JOB, "qc_id"),
+            "http://test.url/api/v1/jobs/qc_id/run");
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::GET_JOB_STATUS, "123"),
             "http://test.url/api/v1/jobs/123");
   EXPECT_EQ(
@@ -32,6 +34,9 @@ TEST(APIConfigTest, UnifiedApiUrl) {
       "http://test.url/api/v1/jobs/123/artifacts/measurement_counts");
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, "123"),
             "http://test.url/api/v1/jobs/123/artifacts/measurements");
+  EXPECT_EQ(
+      config.url(iqm::API_ENDPOINT::GET_JOB_ARTIFACT_SWEEP_RESULTS, "123"),
+      "http://test.url/api/v1/jobs/123/artifacts/sweep_results");
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::CANCEL_JOB, "123"),
             "http://test.url/api/v1/jobs/123/cancel");
   EXPECT_EQ(config.url(iqm::API_ENDPOINT::GET_QUANTUM_COMPUTERS),
