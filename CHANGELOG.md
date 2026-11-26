@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- ✨ Add an example to discover IQM quantum computers and select the largest
+  matching `--min-qubits` ([#146]) ([**@marcelwa**]).
+
 ### Changed
 
 - ⬆️ Require CMake 3.28 or newer for source builds ([#355]) ([**@denialhaag**])
@@ -441,6 +446,7 @@ Compatible with QDMI `v1.3.0`.
 [#159]: https://github.com/iqm-finland/QDMI-on-IQM/pull/159
 [#158]: https://github.com/iqm-finland/QDMI-on-IQM/pull/158
 [#147]: https://github.com/iqm-finland/QDMI-on-IQM/pull/147
+[#146]: https://github.com/iqm-finland/QDMI-on-IQM/pull/146
 [#140]: https://github.com/iqm-finland/QDMI-on-IQM/pull/140
 [#136]: https://github.com/iqm-finland/QDMI-on-IQM/pull/136
 [#134]: https://github.com/iqm-finland/QDMI-on-IQM/pull/134
