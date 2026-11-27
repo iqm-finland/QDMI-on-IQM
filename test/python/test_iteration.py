@@ -20,19 +20,19 @@
 from __future__ import annotations
 
 import json
-import pickle  # ruff:ignore[suspicious-pickle-import] Round-trip a locally constructed exception.
+import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from threading import Thread
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 from uuid import UUID
 
 import pytest
+from mqt.core.qdmi import Device, Job, ProgramFormat
 from qiskit import QuantumCircuit
 
-from iqm.qdmi import iteration
-from iqm.qdmi.iteration import IterationClient, IterationError, IterationResult
+from iqm.qdmi.iteration import reservation
 from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
@@ -98,18 +98,19 @@ def iteration_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, lis
             requests.append(f"POST {self.path}")
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
             if self.path == ITERATIONS:
-                qc = json.loads(body)["qc"]
-                if qc == "uncertain":
-                    self._reply(500, {"request_id": "uncertain-request"})
-                else:
-                    result_state = "unrecognized\nstate" if qc == "partial" else state
-                    self._reply(200, {"id": ITERATION_ID, "status": result_state})
-                    state = "active"
+                request = json.loads(body)
+                if request["max_duration_seconds"] != 60 or request["idle_timeout_seconds"] != 30:
+                    self.send_error(400)
+                    return
+                self._reply(200, {"id": ITERATION_ID, "status": state})
             elif self.path == f"{ITERATION}/end":
                 self._reply(202, {"id": ITERATION_ID, "status": state})
                 state = "completed"
             elif self.path.split("?", 1)[0] == CIRCUIT_JOBS:
                 payload = json.loads(body)
+                if payload.get("dd_mode") != "disabled":
+                    self.send_error(400)
+                    return
                 job_id = f"job-{len(jobs) + 1}"
                 key = payload["circuits"][0]["instructions"][-1]["args"]["key"]
                 jobs[f"/api/v1/jobs/{job_id}"] = (key, payload["shots"])
@@ -133,108 +134,70 @@ def iteration_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, lis
             worker.join()
 
 
-def test_manage_iteration_and_attach_independent_backends(iteration_server: tuple[str, list[str]]) -> None:
-    """Send both direct and primitive jobs into one reservation created before any session."""
+def test_reserved_runs_and_primitives(iteration_server: tuple[str, list[str]]) -> None:
+    """Exercise creation, per-job attachment and graceful end through the installed device."""
     base_url, requests = iteration_server
-    with IterationClient(base_url=base_url) as client:
-        assert client.create("default", 60) == IterationResult(ITERATION_ID, "waiting", 200)
-        assert client.get(UUID(ITERATION_ID)).state == "active"
-        first = IQMBackend(base_url=base_url, qc_alias="default", iteration_id=ITERATION_ID.upper())
-        second = IQMBackend(base_url=base_url, qc_alias="default", iteration_id=UUID(ITERATION_ID))
-        ordinary = IQMBackend(base_url=base_url, qc_alias="default")
-        circuit = QuantumCircuit(1)
-        circuit.measure_all()
-        assert first.run(circuit, shots=2).result().get_counts() == {"0": 2}
-        assert second.sampler().run([circuit], shots=3).result()[0].data["meas"].get_counts() == {"0": 3}
-        assert ordinary.run(circuit, shots=1).result().get_counts() == {"0": 1}
-        assert client.end(ITERATION_ID) == IterationResult(ITERATION_ID, "active", 202)
-        assert client.get(ITERATION_ID).state == "completed"
+    backend = IQMBackend(base_url=base_url, qc_alias="default")
+    backend.set_options(run_request_options={"dd_mode": "disabled"})
+    circuit = QuantumCircuit(1)
+    circuit.measure_all()
+    requests.clear()
+    with backend.reservation(max_duration_seconds=60, idle_timeout_seconds=30) as reserved:
+        assert requests == [f"POST {ITERATIONS}"]
+        assert reserved.device is backend.device
+        assert reserved.options.reservation_id == ITERATION_ID
+        assert reserved.run(circuit, shots=2).result().get_counts() == {"0": 2}
+        assert reserved.sampler().run([circuit], shots=3).result()[0].data["meas"].get_counts() == {"0": 3}
+        assert backend.run(circuit, shots=1).result().get_counts() == {"0": 1}
+        assert backend.run(circuit, shots=1, reservation_id=UUID(ITERATION_ID)).result().get_counts() == {"0": 1}
 
     attached = f"POST {CIRCUIT_JOBS}?iteration_id={ITERATION_ID}"
     assert [request for request in requests if request.startswith(f"POST {CIRCUIT_JOBS}")] == [
         attached,
         attached,
         f"POST {CIRCUIT_JOBS}",
+        attached,
     ]
-    assert requests[:2] == [f"POST {ITERATIONS}", f"GET {ITERATION}"]
-    assert requests[-2:] == [f"POST {ITERATION}/end", f"GET {ITERATION}"]
+    assert requests.count(f"POST {ITERATION}/end") == 1
+    assert requests.index(f"POST {ITERATION}/end") < requests.index(f"GET {ITERATION}")
+    assert backend.options.reservation_id is None
 
 
-def test_failed_creation_keeps_recovery_information(iteration_server: tuple[str, list[str]]) -> None:
-    """Keep a confirmed ID and copy error diagnostics before another request."""
-    base_url, requests = iteration_server
-    with IterationClient(base_url=base_url) as client:
-        with pytest.raises(IterationError) as partial:
-            client.create("partial", 60)
-        with pytest.raises(IterationError) as uncertain:
-            client.create("uncertain", 60)
-        assert partial.value.qdmi_status != 0
-        assert partial.value.result == IterationResult(ITERATION_ID, None, 200)
-        assert partial.value.diagnostics["message"] == "Unknown iteration state: unrecognized\nstate"
-        assert r"unrecognized\nstate" in str(partial.value)
-        assert "\n" not in str(partial.value)
-        assert uncertain.value.result.iteration_id is None
-        assert uncertain.value.diagnostics["creation_uncertain"] is True
-        restored = pickle.loads(pickle.dumps(partial.value))  # ruff: ignore[suspicious-pickle-usage] -- Round-trip our own exception.
-        assert restored.result == partial.value.result
-        assert restored.diagnostics == partial.value.diagnostics
-
-    client.close()
-    with pytest.raises(RuntimeError, match="closed"):
-        client.get(ITERATION_ID)
-    assert requests == [f"POST {ITERATIONS}", f"POST {ITERATIONS}"]
+def test_bare_device_reservation(caplog: pytest.LogCaptureFixture) -> None:
+    """The MQT context submits just the create and end jobs, then waits for end."""
+    device = Mock(spec=Device)
+    create_job = Mock(spec=Job, id=ITERATION_ID)
+    end_job = Mock(spec=Job)
+    device.submit_job.side_effect = [create_job, end_job]
+    caplog.set_level(logging.INFO, logger="iqm.qdmi.iteration")
+    with reservation(device, max_duration_seconds=60) as reservation_id:
+        assert ITERATION_ID in caplog.text
+        assert reservation_id == ITERATION_ID
+        assert not create_job.method_calls
+    assert device.submit_job.call_args_list == [
+        call(json.dumps({"max_duration_seconds": 60}), ProgramFormat.CUSTOM2),
+        call(json.dumps({"end": ITERATION_ID}), ProgramFormat.CUSTOM2),
+    ]
+    create_job.wait.assert_called_once_with(300)
 
 
-@pytest.mark.parametrize("confirmed", [False, True])
-def test_interrupted_creation_exposes_recovery_details(
-    iteration_server: tuple[str, list[str]], monkeypatch: pytest.MonkeyPatch, *, confirmed: bool
-) -> None:
-    """Keep the ID when Python interrupts a completed native call."""
-    base_url, requests = iteration_server
-    lib = iteration._load_library()  # ruff:ignore[private-member-access] Patch the native call boundary.
-    create = lib.IQM_QDMI_iteration_create
-
-    def interrupted(*args: object) -> int:
-        if confirmed:
-            assert create(*args) == 0
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(lib, "IQM_QDMI_iteration_create", interrupted)
-    with IterationClient(base_url=base_url) as client:
-        with pytest.raises(KeyboardInterrupt) as error:
-            client.create("default", 60)
-        result = error.value.__dict__["result"]
-        if confirmed:
-            assert result.iteration_id == ITERATION_ID
-            assert ITERATION_ID in str(error.value.__notes__)
-            client.end(ITERATION_ID)
-        else:
-            assert result.iteration_id is None
-            assert "listing" in str(error.value.__notes__)
-
-    assert requests == ([f"POST {ITERATIONS}", f"POST {ITERATION}/end"] if confirmed else [])
+@pytest.mark.parametrize(
+    ("completed", "error"),
+    [(False, TimeoutError), (True, RuntimeError)],
+)
+def test_cleanup_failure_keeps_id(*, completed: bool, error: type[Exception]) -> None:
+    """Expose the reservation UUID on a timeout or failed terminal state."""
+    device = Mock(spec=Device)
+    create_job = Mock(id=ITERATION_ID, wait=Mock(return_value=completed), check=Mock(return_value=Job.Status.FAILED))
+    device.submit_job.side_effect = [create_job, Mock()]
+    with pytest.raises(error, match=ITERATION_ID), reservation(device, max_duration_seconds=60):
+        pass
 
 
-def test_iteration_rejects_invalid_values_before_transport(iteration_server: tuple[str, list[str]]) -> None:
-    """Prevent integer wrapping, invalid paths and C string truncation."""
-    base_url, requests = iteration_server
-    with pytest.raises(IterationError, match="client allocation") as rejected:
-        IterationClient(base_url=base_url, request_timeout_ms=2**64 - 1)
-    assert rejected.value.result.http_status == 0
-    with IterationClient(base_url=base_url) as client:
-        with pytest.raises(ValueError, match="quantum computer UUID or alias"):
-            client.create("", 60)
-        with pytest.raises(ValueError, match="max_duration_seconds"):
-            client.create("default", 2**32 + 1)
-        with pytest.raises(ValueError, match="idle_timeout_seconds"):
-            client.create("default", 60, idle_timeout_seconds=-1)
-        with pytest.raises(ValueError, match="timeout_ms"):
-            client.get(ITERATION_ID, timeout_ms=2**64 + 1)
-        with pytest.raises(ValueError, match="UUID"):
-            client.end("../other")
-        with pytest.raises(ValueError, match="NUL"):
-            client.create("default\0other", 60)
-        with pytest.raises(ValueError, match="already-open device"):
-            IQMBackend(device=Mock(), iteration_id=ITERATION_ID)
-
-    assert requests == []
+def test_failed_cleanup_preserves_workload_error() -> None:
+    """Report both failures when end submission fails during unwinding."""
+    device = Mock(spec=Device)
+    device.submit_job.side_effect = [Mock(id=ITERATION_ID), RuntimeError("end refused")]
+    with pytest.raises(KeyboardInterrupt) as error, reservation(device, max_duration_seconds=60):
+        Mock(side_effect=KeyboardInterrupt)()
+    assert error.value.__notes__ == [f"Ending IQM reservation {ITERATION_ID}: end refused"]

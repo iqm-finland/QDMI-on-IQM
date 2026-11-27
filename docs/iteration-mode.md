@@ -20,56 +20,38 @@ Your token needs `job_execution` scope and access to the quantum computer. Use
 its alias, such as `emerald:mock`, or its UUID when creating an iteration. Your
 server must support iteration mode.
 
-## Use an iteration from Python
+## Use a reservation from Python
 
-The `iqm-qdmi` package includes an iteration management client. Install
-`iqm-qdmi[qiskit]` to submit Qiskit circuits within the reservation.
+Install `iqm-qdmi[qiskit]` and open your backend. The context yields a backend
+whose circuit jobs and primitives use the reservation. You can submit work as
+soon as the server assigns the UUID. The original backend keeps its defaults.
 
 ```python
-from iqm.qdmi.iteration import IterationClient, IterationError
 from iqm.qdmi.qiskit import IQMBackend
 from qiskit import QuantumCircuit
 
-with IterationClient() as client:
-    try:
-        iteration = client.create("emerald:mock", 60, idle_timeout_seconds=60)
-    except IterationError as error:
-        # Save this ID for recovery if the server confirmed creation.
-        print(error.result.iteration_id)
-        raise
+backend = IQMBackend(qc_alias="emerald:mock")
+circuit = QuantumCircuit(1)
+circuit.h(0)
+circuit.measure_all()
 
-    iteration_id = iteration.iteration_id
-    assert iteration_id is not None
-    print(iteration_id)
-    try:
-        backend = IQMBackend(qc_alias="emerald:mock", iteration_id=iteration_id)
-        circuit = QuantumCircuit(1)
-        circuit.h(0)
-        circuit.measure_all()
-        print(backend.run(backend.compile(circuit), shots=128).result().get_counts())
-    finally:
-        ended = client.end(iteration_id)
-        print(f"End requested for {iteration_id} (HTTP {ended.http_status})")
+with backend.reservation(max_duration_seconds=60, idle_timeout_seconds=30) as reserved:
+    print(reserved.options.reservation_id)
+    print(reserved.run(reserved.compile(circuit), shots=128).result().get_counts())
 ```
 
-Set the same server URL, credentials, and quantum computer for management and
-execution. You can attach another backend to the same ID. Its sampler and
-estimator share the reservation through that backend's device session.
+To attach a single run to an existing reservation, pass its UUID as
+`backend.run(circuit, reservation_id=reservation_id)`. With a bare MQT Core
+device, import `reservation` from `iqm.qdmi.iteration`. Use
+`with reservation(device, max_duration_seconds=60) as reservation_id:` and pass
+`custom2=reservation_id` when submitting each circuit job.
 
-Closing the client or backend leaves the reservation on the server. Call
-`client.end(iteration_id)` explicitly. If the state is still `waiting` or
-`active`, use `client.get(iteration_id)` with a delay and an overall deadline
-until it is `completed`, `cancelled`, or `failed`. You can use a new client to
-finish cleanup later. Calling `end()` again is safe if the first request failed.
-Let signal handlers request shutdown and perform cleanup in normal Python
-control flow after the current client call returns.
-
-When creation fails, use any ID in `error.result` to inspect or end the
-reservation. A `KeyboardInterrupt` at the native call boundary also carries the
-available result and includes any confirmed ID in its traceback. If the ID is
-absent and `error.diagnostics.get("creation_uncertain")` is true, check the
-server's iteration listing before making another creation request. See
-[Handle failures](iteration-mode.md#handle-failures) for recovery help.
+Both contexts request graceful termination on exit, including when your work
+raises an exception. They wait up to 300 seconds for the reservation to end. A
+timeout or transport error carries the reservation UUID so you can check the
+server and finish cleanup. A failed terminal state raises an error even though
+the reservation has ended. If your workload also failed, its exception carries
+the cleanup error as a note.
 
 ## Create an iteration
 

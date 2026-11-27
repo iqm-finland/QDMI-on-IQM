@@ -12,8 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
-- ✨ Manage IQM iterations from Python and attach Qiskit backends to an existing
-  reservation. ([#357]) ([**@marcelwa**])
+- ✨ Reserve an IQM device with a Python context manager and attach Qiskit runs
+  or primitives to the reservation. ([#357]) ([**@marcelwa**])
 - ✨ Submit circuit jobs within an IQM iteration from C and C++. ([#345])
   ([**@marcelwa**])
 - ✨ Create, inspect, and end IQM iterations from C or C++ without opening a
