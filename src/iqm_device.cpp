@@ -76,7 +76,6 @@ struct IQM_QDMI_Site_impl_d;
 
 namespace {
 enum class IQM_QDMI_DEVICE_SESSION_STATUS : uint8_t { ALLOCATED, INITIALIZED };
-}
 
 /**
  * @brief Transport, configuration, and device data shared by a session and its
@@ -180,6 +179,7 @@ struct Session_state {
                                         double, Pair_hash>>
       operations_two_qubit_fidelity_map_;
 };
+} // namespace
 
 /// The caller and each outstanding job independently own the session state.
 struct IQM_QDMI_Device_Session_impl_d {
@@ -1037,7 +1037,7 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session handle,
 
 int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session handle,
                                               IQM_QDMI_Device_Job *job) {
-  auto *session = handle == nullptr ? nullptr : handle->state_.get();
+  const auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
