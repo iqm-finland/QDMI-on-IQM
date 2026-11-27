@@ -102,7 +102,7 @@ def iteration_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, lis
                 if qc == "uncertain":
                     self._reply(500, {"request_id": "uncertain-request"})
                 else:
-                    result_state = "unrecognized" if qc == "partial" else state
+                    result_state = "unrecognized\nstate" if qc == "partial" else state
                     self._reply(200, {"id": ITERATION_ID, "status": result_state})
                     state = "active"
             elif self.path == f"{ITERATION}/end":
@@ -170,7 +170,9 @@ def test_failed_creation_keeps_recovery_information(iteration_server: tuple[str,
             client.create("uncertain", 60)
         assert partial.value.qdmi_status != 0
         assert partial.value.result == IterationResult(ITERATION_ID, None, 200)
-        assert partial.value.diagnostics["message"] == "Unknown iteration state: unrecognized"
+        assert partial.value.diagnostics["message"] == "Unknown iteration state: unrecognized\nstate"
+        assert r"unrecognized\nstate" in str(partial.value)
+        assert "\n" not in str(partial.value)
         assert uncertain.value.result.iteration_id is None
         assert uncertain.value.diagnostics["creation_uncertain"] is True
         restored = pickle.loads(pickle.dumps(partial.value))  # ruff: ignore[suspicious-pickle-usage] -- Round-trip our own exception.
@@ -183,8 +185,9 @@ def test_failed_creation_keeps_recovery_information(iteration_server: tuple[str,
     assert requests == [f"POST {ITERATIONS}", f"POST {ITERATIONS}"]
 
 
-def test_interrupted_creation_exposes_confirmed_id(
-    iteration_server: tuple[str, list[str]], monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("confirmed", [False, True])
+def test_interrupted_creation_exposes_recovery_details(
+    iteration_server: tuple[str, list[str]], monkeypatch: pytest.MonkeyPatch, *, confirmed: bool
 ) -> None:
     """Keep the ID when Python interrupts a completed native call."""
     base_url, requests = iteration_server
@@ -192,24 +195,35 @@ def test_interrupted_creation_exposes_confirmed_id(
     create = lib.IQM_QDMI_iteration_create
 
     def interrupted(*args: object) -> int:
-        assert create(*args) == 0
+        if confirmed:
+            assert create(*args) == 0
         raise KeyboardInterrupt
 
     monkeypatch.setattr(lib, "IQM_QDMI_iteration_create", interrupted)
     with IterationClient(base_url=base_url) as client:
         with pytest.raises(KeyboardInterrupt) as error:
             client.create("default", 60)
-        assert error.value.__dict__["result"].iteration_id == ITERATION_ID
-        assert ITERATION_ID in str(error.value.__notes__)
-        client.end(ITERATION_ID)
+        result = error.value.__dict__["result"]
+        if confirmed:
+            assert result.iteration_id == ITERATION_ID
+            assert ITERATION_ID in str(error.value.__notes__)
+            client.end(ITERATION_ID)
+        else:
+            assert result.iteration_id is None
+            assert "listing" in str(error.value.__notes__)
 
-    assert requests == [f"POST {ITERATIONS}", f"POST {ITERATION}/end"]
+    assert requests == ([f"POST {ITERATIONS}", f"POST {ITERATION}/end"] if confirmed else [])
 
 
 def test_iteration_rejects_invalid_values_before_transport(iteration_server: tuple[str, list[str]]) -> None:
     """Prevent integer wrapping, invalid paths and C string truncation."""
     base_url, requests = iteration_server
+    with pytest.raises(IterationError, match="client allocation") as rejected:
+        IterationClient(base_url=base_url, request_timeout_ms=2**64 - 1)
+    assert rejected.value.result.http_status == 0
     with IterationClient(base_url=base_url) as client:
+        with pytest.raises(ValueError, match="quantum computer UUID or alias"):
+            client.create("", 60)
         with pytest.raises(ValueError, match="max_duration_seconds"):
             client.create("default", 2**32 + 1)
         with pytest.raises(ValueError, match="idle_timeout_seconds"):
