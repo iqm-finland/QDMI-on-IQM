@@ -31,17 +31,10 @@ if(WIN32)
       $<TARGET_FILE_DIR:integration_tests>)
 endif()
 
-# Run the reservation workload once on the Emerald mock. The installation matrix
-# checks the same device library on three platforms.
-if(USE_INSTALLED_IQM_QDMI_DEVICE)
-  set(installation_filter
-      TEST_FILTER "-QDMIIntegrationTest.ReservationLifecycleOnEmeraldMock")
-endif()
-
 # These tests need a live IQM backend, so they carry a CTest label that lets a
 # caller select them with `ctest -L live` or skip them with `-LE`.
 gtest_discover_tests(
-  integration_tests ${installation_filter}
+  integration_tests
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" LABELS
              live DISCOVERY_TIMEOUT 60)

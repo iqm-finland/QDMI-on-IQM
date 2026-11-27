@@ -929,12 +929,7 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
             shots_num);
 }
 
-TEST_F(QDMIIntegrationTest, ReservationLifecycleOnEmeraldMock) {
-  constexpr std::string_view target = "emerald:mock";
-  if (requested_qc_alias != target || client.get_name() != target) {
-    GTEST_SKIP() << "Reservation integration coverage targets " << target;
-  }
-
+TEST_F(QDMIIntegrationTest, ReservationLifecycle) {
   const auto owner = client.prepare_job(
       R"({"max_duration_seconds":60,"idle_timeout_seconds":15})",
       QDMI_PROGRAM_FORMAT_CUSTOM2);
