@@ -47,6 +47,7 @@
 #include <limits>
 #include <memory>
 #include <new>
+#include <numbers>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -3283,7 +3284,7 @@ TEST_F(ReservationJobTest, SlurmRunsDependentCircuitsAndClearsLedger) {
       .queue_post(202);
   http_stub.queue_get(200, reply("waiting"))
       .queue_get(200, R"({"status":"ready"})")
-      .queue_get(200, R"([{"measurement_keys":["m"],"counts":{"0":16}}])")
+      .queue_get(200, R"([{"measurement_keys":["m"],"counts":{"0":9,"1":7}}])")
       .queue_get(200, R"({"status":"ready"})")
       .queue_get(200, R"([{"measurement_keys":["m"],"counts":{"1":16}}])")
       .queue_get(200, reply("active"))
@@ -3306,6 +3307,8 @@ TEST_F(ReservationJobTest, SlurmRunsDependentCircuitsAndClearsLedger) {
                                 .at(0)
                                 .at("instructions");
   EXPECT_EQ(instructions.at(0).at("name"), "prx");
+  EXPECT_DOUBLE_EQ(instructions.at(0).at("args").at("angle").get<double>(),
+                   std::numbers::pi);
 }
 
 TEST_F(ReservationJobTest, SlurmCleanupRemovesOnlyConfirmedIds) {
