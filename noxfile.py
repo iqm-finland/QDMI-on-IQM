@@ -168,6 +168,17 @@ def examples(session: nox.Session) -> None:
         env=env,
         external=True,
     )
+    session.run(
+        Path("examples/qaoa.py"),
+        "--backend",
+        args.backend,
+        "--shots",
+        "128",
+        "--maxiter",
+        "8",
+        env=env,
+        external=True,
+    )
 
 
 @nox.session(python="3.14", reuse_venv=True)

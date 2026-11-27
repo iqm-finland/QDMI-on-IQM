@@ -43,7 +43,6 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import scipy.linalg as sla
-from mqt.core.plugins.qiskit.backend import QDMIBackend
 from pyscf import ao2mo, gto, scf
 from qiskit.compiler import transpile
 from qiskit_algorithms.minimum_eigensolvers.vqe import VQE
@@ -53,10 +52,16 @@ from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import eigs
-
-from iqm.qdmi.qiskit import IQMBackend
+from showcase_backend import (
+    add_backend_arguments,
+    measure_logical_qubits,
+    showcase_backend,
+    validate_backend_arguments,
+)
 
 if TYPE_CHECKING:
+    from mqt.core.plugins.qiskit.backend import QDMIBackend
+    from qiskit import QuantumCircuit
     from qiskit.quantum_info import SparsePauliOp
 
 log = logging.getLogger(__name__)
@@ -78,11 +83,12 @@ def main() -> None:
         sys.exit("QSCI requires PySCF, which is not supported on Windows.")
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend", choices=("iqm", "sim"), default="iqm")
+    add_backend_arguments(parser)
     parser.add_argument("--shots", type=int, default=8192)
     parser.add_argument("--maxiter", type=int, default=30)
     parser.add_argument("--cutoff", type=int, default=10)
     args = parser.parse_args()
+    validate_backend_arguments(parser, args)
     if args.shots <= 0:
         parser.error("--shots must be positive")
     log.info(
@@ -92,10 +98,6 @@ def main() -> None:
         args.maxiter,
         args.cutoff,
     )
-
-    log.info("Initialising '%s' backend...", args.backend)
-    backend = IQMBackend() if args.backend == "iqm" else QDMIBackend.from_device_id("mqt.ddsim.default")
-    log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
 
     log.info("Setting up H2 problem (atom='%s', basis='%s')...", ATOM.strip(), BASIS)
     driver = PySCFDriver(atom=ATOM, basis=BASIS)
@@ -119,50 +121,13 @@ def main() -> None:
         ansatz.num_qubits,
     )
 
-    if backend.num_qubits < ansatz.num_qubits:
-        sys.exit(
-            f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI example needs {ansatz.num_qubits}."
-        )
+    observable = cast("SparsePauliOp", mapper.map(problem.hamiltonian.second_q_op()))
+    log.info("Mapped Hamiltonian to %d-term qubit observable.", len(observable))
 
-    log.info("Transpiling UCCSD ansatz for '%s'...", backend.name)
-    ansatz = transpile(ansatz, backend=backend)
-    log.info(
-        "Transpiled ansatz: %d qubits, %d gates, depth %d",
-        ansatz.num_qubits,
-        ansatz.size(),
-        ansatz.depth(),
-    )
-
-    hamiltonian = problem.hamiltonian
-    second_q_operator = hamiltonian.second_q_op()
-    observable = cast("SparsePauliOp", mapper.map(second_q_operator))
-    log.info(
-        "Mapped Hamiltonian to %d-term qubit observable.",
-        len(observable),
-    )
-
-    log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", args.maxiter, args.shots)
-    estimator = backend.estimator(default_precision=1 / np.sqrt(args.shots))
-    vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=args.maxiter))
-    result = vqe.compute_minimum_eigenvalue(operator=observable)
-    optimal_parameters = result.optimal_parameters
-    if optimal_parameters is None:
-        sys.exit("VQE must return optimal parameters.")
-    log.info(
-        "VQE converged. Eigenvalue estimate: %.6f (function evaluations: %s)",
-        result.eigenvalue,
-        result.optimizer_evals,
-    )
-
-    log.info("Assigning optimal parameters and adding measurements to ansatz...")
-    ansatz.assign_parameters(optimal_parameters, inplace=True)
-    ansatz.measure_active()
-
-    log.info("Submitting sampling job to '%s' (%d shots)...", backend.name, args.shots)
-    sampler = backend.sampler(default_shots=args.shots)
-    job = sampler.run([(ansatz,)])
-    counts = job.result()[0].data["meas"].get_counts()
-    log.info("Job completed. Collected %d shots across %d distinct bitstrings.", sum(counts.values()), len(counts))
+    log.info("Initialising '%s' backend...", args.backend)
+    with showcase_backend(args.backend, num_qubits=ansatz.num_qubits, iteration_mode=args.iteration_mode) as backend:
+        log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
+        counts = _optimize_and_sample(backend, ansatz, observable, shots=args.shots, maxiter=args.maxiter)
 
     log.info("Running QSCI post-processing (cutoff=%d)...", args.cutoff)
     eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
@@ -176,6 +141,48 @@ def main() -> None:
         energy_difference,
     )
     log.info("Done.")
+
+
+def _optimize_and_sample(
+    backend: QDMIBackend, ansatz: QuantumCircuit, observable: SparsePauliOp, *, shots: int, maxiter: int
+) -> dict[str, int]:
+    logical_qubits = ansatz.num_qubits
+    if backend.num_qubits < logical_qubits:
+        sys.exit(f"Selected backend exposes {backend.num_qubits} qubits, but the QSCI example needs {logical_qubits}.")
+
+    log.info("Transpiling UCCSD ansatz for '%s'...", backend.name)
+    ansatz = transpile(ansatz, backend=backend)
+    log.info(
+        "Transpiled ansatz: %d qubits, %d gates, depth %d",
+        ansatz.num_qubits,
+        ansatz.size(),
+        ansatz.depth(),
+    )
+
+    log.info("Running VQE (optimizer=L-BFGS-B, maxiter=%d, shots=%d)...", maxiter, shots)
+    estimator = backend.estimator(default_precision=1 / np.sqrt(shots))
+    vqe = VQE(estimator, ansatz, L_BFGS_B(maxiter=maxiter))
+    result = vqe.compute_minimum_eigenvalue(operator=observable)
+    optimal_parameters = result.optimal_parameters
+    if optimal_parameters is None:
+        sys.exit("VQE must return optimal parameters.")
+    log.info(
+        "VQE converged. Eigenvalue estimate: %.6f (function evaluations: %s)",
+        result.eigenvalue,
+        result.optimizer_evals,
+    )
+
+    log.info("Assigning optimal parameters and adding measurements to ansatz...")
+    ansatz.assign_parameters(optimal_parameters, inplace=True)
+    measure_logical_qubits(ansatz, logical_qubits)
+
+    log.info("Submitting sampling job to '%s' (%d shots)...", backend.name, shots)
+    sampler = backend.sampler(default_shots=shots)
+    job = sampler.run([(ansatz,)])
+    counts = job.result()[0].data["meas"].get_counts()
+    log.info("Job completed. Collected %d shots across %d distinct bitstrings.", sum(counts.values()), len(counts))
+
+    return counts
 
 
 def _full_mbh_canonical_from_qsci(
