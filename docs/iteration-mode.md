@@ -49,7 +49,7 @@ with IterationClient() as client:
         print(backend.run(backend.compile(circuit), shots=128).result().get_counts())
     finally:
         ended = client.end(iteration_id)
-        print(ended.state)
+        print(f"End requested for {iteration_id} (HTTP {ended.http_status})")
 ```
 
 Set the same server URL, credentials, and quantum computer for management and
@@ -63,9 +63,11 @@ until it is `completed`, `cancelled`, or `failed`. You can use a new client to
 finish cleanup later.
 
 When creation fails, use any ID in `error.result` to inspect or end the
-reservation. If the ID is absent and
-`error.diagnostics.get("creation_uncertain")` is true, check the server's
-iteration listing before making another creation request.
+reservation. A `KeyboardInterrupt` at the native call boundary also carries the
+available result and includes any confirmed ID in its traceback. If the ID is
+absent and `error.diagnostics.get("creation_uncertain")` is true, check the
+server's iteration listing before making another creation request. See
+[Handle failures](iteration-mode.md#handle-failures) for recovery help.
 
 ## Create an iteration
 

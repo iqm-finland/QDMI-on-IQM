@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import json
+import pickle  # ruff:ignore[suspicious-pickle-import] Round-trip a locally constructed exception.
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from threading import Thread
@@ -30,6 +31,7 @@ from uuid import UUID
 import pytest
 from qiskit import QuantumCircuit
 
+from iqm.qdmi import iteration
 from iqm.qdmi.iteration import IterationClient, IterationError, IterationResult
 from iqm.qdmi.qiskit import IQMBackend
 
@@ -171,11 +173,37 @@ def test_failed_creation_keeps_recovery_information(iteration_server: tuple[str,
         assert partial.value.diagnostics["message"] == "Unknown iteration state: unrecognized"
         assert uncertain.value.result.iteration_id is None
         assert uncertain.value.diagnostics["creation_uncertain"] is True
+        restored = pickle.loads(pickle.dumps(partial.value))  # ruff: ignore[suspicious-pickle-usage] -- Round-trip our own exception.
+        assert restored.result == partial.value.result
+        assert restored.diagnostics == partial.value.diagnostics
 
     client.close()
     with pytest.raises(RuntimeError, match="closed"):
         client.get(ITERATION_ID)
     assert requests == [f"POST {ITERATIONS}", f"POST {ITERATIONS}"]
+
+
+def test_interrupted_creation_exposes_confirmed_id(
+    iteration_server: tuple[str, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep the ID when Python interrupts a completed native call."""
+    base_url, requests = iteration_server
+    lib = iteration._load_library()  # ruff:ignore[private-member-access] Patch the native call boundary.
+    create = lib.IQM_QDMI_iteration_create
+
+    def interrupted(*args: object) -> int:
+        assert create(*args) == 0
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(lib, "IQM_QDMI_iteration_create", interrupted)
+    with IterationClient(base_url=base_url) as client:
+        with pytest.raises(KeyboardInterrupt) as error:
+            client.create("default", 60)
+        assert error.value.__dict__["result"].iteration_id == ITERATION_ID
+        assert ITERATION_ID in str(error.value.__notes__)
+        client.end(ITERATION_ID)
+
+    assert requests == [f"POST {ITERATIONS}", f"POST {ITERATION}/end"]
 
 
 def test_iteration_rejects_invalid_values_before_transport(iteration_server: tuple[str, list[str]]) -> None:
