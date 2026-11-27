@@ -1,25 +1,31 @@
-# Reserve a quantum computer with QDMI jobs
+# Run a circuit loop with IQM iteration mode
 
-An IQM reservation groups circuit jobs on one quantum computer. Open a QDMI
-device session, submit a reservation job, and read its ID. Each circuit you
-attach to that ID keeps its own job handle, status, and results.
+Suppose an optimizer runs a circuit, reads the result, and uses it to choose the
+next circuit. IQM's *iteration mode* lets you reserve time on one quantum
+computer for that loop. You can submit each circuit as soon as it is ready.
+
+A QDMI **session** supplies your credentials and selects the computer. A
+**reservation job** requests time there and gives you a reservation ID. Each
+**circuit job** you submit with that ID has its own status and results. Leave
+the ID unset to run a circuit on demand.
 
 ## Before you start
 
-Select an iteration-enabled target with `IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`
-and configure `IQM_SERVER_URL`. Provide a workspace token with `job_execution`
-scope through `IQM_TOKEN` or `IQM_TOKENS_FILE`. Initialize the device session as
-usual. The reservation uses that session's credentials and target. The device
-advertises the reservation format. The server determines whether the selected
-quantum computer accepts it.
+Choose a target that supports iteration mode, such as `emerald:mock` on
+Resonance. Follow the [session setup guide](usage.md#session-configuration) to
+select the server and target. For authentication, use a workspace token with
+`job_execution` scope. See
+[authentication methods](usage.md#authentication-methods).
+
+Choose [Python](#use-a-reservation-from-python) for Qiskit or MQT Core, or
+[the C device API](#use-the-c-device-api) for native code. For a batch job, see
+[Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
 
 ## Use a reservation from Python
 
-Install `iqm-qdmi[qiskit]` and open your backend. The context yields a backend
-whose circuit jobs and primitives use the reservation. You can submit work as
-soon as the server assigns the UUID. Use the reserved backend and its primitives
-inside the `with` block. They keep the reservation ID after exit. For later
-jobs, use the original backend, which keeps its defaults.
+Install `iqm-qdmi[qiskit]` as shown in the [Qiskit guide](qiskit.md). Compile
+your first circuit before requesting time. Inside the `with` block, use
+`reserved` to run circuits on the reservation.
 
 ```python
 from iqm.qdmi.qiskit import IQMBackend
@@ -29,31 +35,38 @@ backend = IQMBackend(qc_alias="emerald:mock")
 circuit = QuantumCircuit(1)
 circuit.h(0)
 circuit.measure_all()
+compiled = backend.compile(circuit)
 
 with backend.reservation(max_duration_seconds=60, idle_timeout_seconds=30) as reserved:
     print(reserved.options.reservation_id)
-    print(reserved.run(reserved.compile(circuit), shots=128).result().get_counts())
+    counts = reserved.run(compiled, shots=128).result().get_counts()
+    print(counts)
 ```
 
-To attach a single run to an existing reservation, pass its UUID as
-`backend.run(circuit, reservation_id=reservation_id)`. With a bare MQT Core
-device, import `reservation` from `iqm.qdmi.iteration`. Use
-`with reservation(device, max_duration_seconds=60) as reservation_id:` and pass
-`custom2=reservation_id` when submitting each circuit job.
+Use `counts` to choose the next circuit inside the block. On exit, the context
+requests graceful end and waits up to 300 seconds for confirmation, including
+when your code raises an exception. The original `backend` runs on demand.
 
-Both contexts request graceful termination on exit, including when your work
-raises an exception. They wait up to 300 seconds for the reservation to end. A
-timeout or transport error carries the reservation UUID so you can check the
-server and finish cleanup. A failed terminal state raises an error even though
-the reservation has ended. If your workload also failed, its exception carries
-the cleanup error as a note.
+To join an existing reservation, pass its UUID to
+`backend.run(compiled, reservation_id=reservation_id)`. If you use
+[MQT Core directly](python_package.md#querying-the-device-directly), import
+`reservation` from `iqm.qdmi.iteration`. The context
+`with reservation(device, max_duration_seconds=60) as reservation_id:` yields
+the UUID to pass as `custom2=reservation_id` on each circuit submission.
 
-## Request a reservation
+If cleanup fails, keep the UUID from the error for [recovery](#handle-failures).
+If the workload also raised an exception, its cleanup details appear in a note
+on that exception.
 
-Use `QDMI_PROGRAM_FORMAT_CUSTOM2` with one NUL-terminated JSON program. Specify
-`max_duration_seconds` from 1 through 2700. Omit `idle_timeout_seconds` or use
-zero for the server default. A positive idle timeout must fit within the maximum
-duration. Both limits start at activation.
+## Use the C device API
+
+### Request a reservation
+
+With your session initialized, submit a reservation job. This request reserves
+up to 60 seconds and releases the computer after 15 seconds of inactivity. Both
+limits start at activation. Choose a maximum duration of 1 to 2700 seconds. Omit
+the idle timeout or set it to zero for the server default. A positive idle
+timeout must fit within the maximum duration.
 
 ```c
 #include <iqm_qdmi/device.h>
@@ -70,22 +83,24 @@ if (status == QDMI_SUCCESS)
         owner, QDMI_PROGRAM_FORMAT_CUSTOM2, 1, sizes, programs);
 if (status == QDMI_SUCCESS)
     status = IQM_QDMI_device_job_submit(owner);
+
+char id[37];
+if (status == QDMI_SUCCESS)
+    status = IQM_QDMI_device_job_query_property(
+        owner, QDMI_DEVICE_JOB_PROPERTY_ID, sizeof(id), id, NULL);
 ```
 
-Read `QDMI_DEVICE_JOB_PROPERTY_ID` into a 37-byte character buffer. Persist the
-UUID if the application needs to recover after a restart. Keep the owner handle
-alive throughout the workload.
+Save the UUID if you may need to recover after a restart. Keep `owner` alive
+while you use the reservation.
 
-## Submit circuits
+### Submit circuits
 
-Set `QDMI_DEVICE_JOB_PARAMETER_CUSTOM2` on each participating circuit job,
-before submission. The value is the lowercase reservation UUID, including the
-trailing NUL. This works with IQM JSON and QIR circuits.
+Submit the first circuit as soon as you have the ID. The device forwards the
+request to IQM immediately.
+[Prepare an IQM JSON or QIR circuit job](usage.md#submitting-jobs), called
+`circuit` below, and attach the ID before submission.
 
 ```c
-char id[37];
-status = IQM_QDMI_device_job_query_property(
-    owner, QDMI_DEVICE_JOB_PROPERTY_ID, sizeof(id), id, NULL);
 if (status == QDMI_SUCCESS)
     status = IQM_QDMI_device_job_set_parameter(
         circuit, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, strlen(id) + 1, id);
@@ -93,45 +108,36 @@ if (status == QDMI_SUCCESS)
     status = IQM_QDMI_device_job_submit(circuit);
 ```
 
-The device forwards the submission to IQM immediately. An ordinary circuit
-without the ID uses on-demand execution. The same session can submit both kinds.
-Another session with access to the same target can also use the UUID.
+Wait on the **circuit job** and
+[read its results](usage.md#retrieving-job-results) to choose the next circuit.
+Attach the same ID to each new circuit. You can also use it from another session
+with access to the same target.
 
-Use `job_check` on the reservation to distinguish `QUEUED` (waiting for IQM)
-from `RUNNING` (active). Use `job_wait` on a **circuit** to wait for its
-results. Waiting on the **reservation** waits for its terminal state.
+To see whether the reservation is queued (`QUEUED`) or active (`RUNNING`), call
+`job_check`. Calling `job_wait` on the **reservation job** waits for the
+reservation to end.
 
-For a shared-cluster example, see
-[Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
+### End the reservation
 
-## End the reservation
-
-For checked cleanup, submit a second `CUSTOM2` job with one JSON program of the
-form `{"end":"<uuid>"}`. IQM allows running work to finish. Use a finite
-`job_wait` on the returned handle to confirm termination. An HTTP 202
-acknowledgement can arrive while the reservation is still active.
-
-Freeing the creating handle makes a bounded best-effort request to end an
-unfinished reservation, with a maximum HTTP budget of 30 seconds. For recovery,
-use the saved UUID with `IQM_QDMI_device_session_retrieve_device_job_by_id` in a
-fresh session. Freeing a retrieved handle releases it locally. Use the explicit
-end program to end the reservation from that session. Circuit cancellation
-remains a separate operation.
+When the loop finishes, submit another `QDMI_PROGRAM_FORMAT_CUSTOM2` job with
+`{"end":"<uuid>"}`. Running work can finish. Use `job_wait` on the returned
+handle with a finite timeout to confirm termination, then free the handles.
+Freeing the owner of an open reservation requests graceful end on a best-effort
+basis, with a 30-second HTTP budget.
 
 ## Handle failures
 
-After a failed submission, check whether the owner exposes a confirmed UUID.
-Keep that ID for cleanup. If the server may have accepted creation but no ID was
-returned, ask the service administrator to reconcile the request using the
-target and request time before creating another reservation. A queued
-reservation can outlive its submitting process.
+If your process restarts, open a fresh session on the same target and retrieve
+the reservation with `IQM_QDMI_device_session_retrieve_device_job_by_id`. If it
+is still open, use the saved ID to [end it](#end-the-reservation). Freeing a
+retrieved handle only releases that handle. Keep the ID until IQM reports
+`DONE`, `CANCELED`, or `FAILED`.
+
+If creation reports an error, check whether the owner still exposes a UUID and
+save it for cleanup. If the request may have reached IQM and you have no UUID,
+ask the service administrator to reconcile it using the target and request time
+before creating another reservation.
 
 Submitting a circuit to an ended reservation returns
-`QDMI_ERROR_INVALIDARGUMENT` (HTTP 409). Authentication and timeout failures
+`QDMI_ERROR_INVALIDARGUMENT` (HTTP 409). Authentication and timeout errors
 return `QDMI_ERROR_PERMISSIONDENIED` and `QDMI_ERROR_TIMEOUT`, respectively.
-Result downloads use the session's normal request timeout.
-
-On an end or wait error, retain the UUID, inspect the reservation, and retry
-cleanup within a deadline. Redacted device diagnostics include the server's
-request ID when available. Clear a persisted UUID only after observing `DONE`,
-`CANCELED`, or `FAILED`.
