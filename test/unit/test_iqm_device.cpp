@@ -3349,9 +3349,10 @@ TEST_F(IterationJobMockTest,
 }
 
 TEST_F(IterationJobMockTest, ReservedCircuitSubmissionMapsConflictAndTimeout) {
-  for (const auto &[http, status] :
-       std::array{std::pair{409, QDMI_ERROR_INVALIDARGUMENT},
-                  std::pair{504, QDMI_ERROR_TIMEOUT}}) {
+  for (const auto &[http, status] : std::array{
+           std::pair{409, QDMI_ERROR_INVALIDARGUMENT},
+           std::pair{504, QDMI_ERROR_TIMEOUT},
+       }) {
     const auto circuit = iqm::test_support::Create_job(session);
     ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
                   circuit.get(), QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
