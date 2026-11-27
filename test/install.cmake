@@ -24,33 +24,36 @@ string(
   LENGTH 8
   ALPHABET 0123456789abcdef suffix)
 set(prefix "${work}/prefix-${suffix}")
-set(relocated "${work}/relocated-${suffix}")
-set(consumer "${work}/consumer")
+set(consumer "${work}/consumer-${suffix}")
 
 function(run)
   execute_process(COMMAND ${ARGV} COMMAND_ERROR_IS_FATAL ANY)
 endfunction()
 
-run("${CMAKE_COMMAND}"
-    -S
-    "${source}"
-    -B
-    "${work}/producer"
-    -DCMAKE_BUILD_TYPE=Release
-    -DBUILD_IQM_QDMI_TESTS=OFF)
-run("${CMAKE_COMMAND}" --build "${work}/producer" --config Release)
-foreach(component Runtime Development)
+if(NOT DEFINED installed_prefix)
+  set(installed_prefix "${work}/relocated-${suffix}")
   run("${CMAKE_COMMAND}"
-      --install
+      --preset
+      release
+      -S
+      "${source}"
+      -B
       "${work}/producer"
-      --config
-      Release
-      --prefix
-      "${prefix}"
-      --component
-      "${package}_${component}")
-endforeach()
-file(RENAME "${prefix}" "${relocated}")
+      -DBUILD_IQM_QDMI_TESTS=OFF)
+  run("${CMAKE_COMMAND}" --build "${work}/producer" --config Release)
+  foreach(component Runtime Development)
+    run("${CMAKE_COMMAND}"
+        --install
+        "${work}/producer"
+        --config
+        Release
+        --prefix
+        "${prefix}"
+        --component
+        "${package}_${component}")
+  endforeach()
+  file(RENAME "${prefix}" "${installed_prefix}")
+endif()
 
 file(
   WRITE "${consumer}/main.c"
@@ -68,27 +71,26 @@ file(
   "${consumer}/CMakeLists.txt"
   CONTENT
   [=[
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 project(installed-consumer LANGUAGES C)
-find_package(@package@ REQUIRED CONFIG PATHS "@relocated@" NO_DEFAULT_PATH)
+find_package(@package@ REQUIRED CONFIG PATHS "@installed_prefix@" NO_DEFAULT_PATH)
 add_executable(consumer main.c)
 target_compile_features(consumer PRIVATE c_std_11)
 target_link_libraries(consumer PRIVATE iqm-qdmi-device)
-if(WIN32)
-  add_custom_command(TARGET consumer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      $<TARGET_FILE:iqm-qdmi-device> $<TARGET_FILE_DIR:consumer>)
-endif()
 enable_testing()
 add_test(NAME installed-consumer COMMAND consumer)
+if(WIN32)
+  set_tests_properties(installed-consumer PROPERTIES ENVIRONMENT_MODIFICATION
+    "PATH=path_list_prepend:$<TARGET_FILE_DIR:iqm-qdmi-device>")
+endif()
 ]=]
   @ONLY)
-run("${CMAKE_COMMAND}" -S "${consumer}" -B "${work}/consumer-${suffix}"
+run("${CMAKE_COMMAND}" -S "${consumer}" -B "${consumer}"
     -DCMAKE_BUILD_TYPE=Release)
-run("${CMAKE_COMMAND}" --build "${work}/consumer-${suffix}" --config Release)
+run("${CMAKE_COMMAND}" --build "${consumer}" --config Release)
 run("${CMAKE_CTEST_COMMAND}"
     --test-dir
-    "${work}/consumer-${suffix}"
+    "${consumer}"
     -C
     Release
     --output-on-failure

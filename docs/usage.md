@@ -9,6 +9,21 @@ with IQM's quantum computing hardware. See the
 The QDMI device connects to the unified IQM Server API to communicate with IQM's
 quantum computing hardware.
 
+### Prebuilt C++ device
+
+Download the `iqm-qdmi-device_*.tar.gz` archive for your operating system and
+CPU from the [Releases page] and extract it. Set `CMAKE_PREFIX_PATH` to the
+extracted `iqm-qdmi-device/` directory when configuring your project.
+
+```cmake
+find_package(iqm-qdmi-device CONFIG REQUIRED)
+target_link_libraries(my-application PRIVATE iqm-qdmi-device)
+```
+
+On Windows, add the archive's `bin/` directory to `PATH` before running your
+application. Linux archives require glibc 2.28 or newer, and macOS archives
+require macOS 13.3 or newer.
+
 ### Authentication Methods
 
 The QDMI device supports multiple authentication methods:
@@ -674,3 +689,4 @@ using the same token spend from the same quota, so the device still honors the
 `Retry-After` header of an HTTP 429 response.
 
 [MQT Core installation guide]: https://mqt.readthedocs.io/projects/core/en/latest/installation.html#integrating-mqt-core-into-your-project
+[Releases page]: https://github.com/iqm-finland/QDMI-on-IQM/releases

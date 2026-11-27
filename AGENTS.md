@@ -6,6 +6,7 @@
 - Build: `cmake --build --preset release`
 - Run offline tests: `ctest --preset release`
 - Run a single unit test binary: `./build/release/test/unit/unit_tests`
+- Check installation with `cmake -P test/install.cmake`.
 - Run live tests only when explicitly intended:
   `ctest --test-dir build/release -L live --output-on-failure`
 - For debug builds, replace the `release` preset with `debug`.

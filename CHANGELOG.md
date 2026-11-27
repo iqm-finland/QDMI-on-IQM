@@ -10,6 +10,11 @@ releases may include breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- 📦 Ship installable C++ archives for Linux, macOS, and Windows with GitHub
+  Releases ([#270]) ([**@marcelwa**], [**@denialhaag**])
+
 ### Changed
 
 - ⬆️ Require CMake 3.28 or newer for source builds ([#355]) ([**@denialhaag**])
@@ -404,6 +409,7 @@ Compatible with QDMI `v1.3.0`.
 [#273]: https://github.com/iqm-finland/QDMI-on-IQM/pull/273
 [#272]: https://github.com/iqm-finland/QDMI-on-IQM/pull/272
 [#271]: https://github.com/iqm-finland/QDMI-on-IQM/pull/271
+[#270]: https://github.com/iqm-finland/QDMI-on-IQM/pull/270
 [#268]: https://github.com/iqm-finland/QDMI-on-IQM/pull/268
 [#266]: https://github.com/iqm-finland/QDMI-on-IQM/pull/266
 [#265]: https://github.com/iqm-finland/QDMI-on-IQM/pull/265

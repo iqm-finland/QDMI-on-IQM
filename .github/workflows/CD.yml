@@ -1,41 +1,98 @@
 name: CD 🚀
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (X.Y.Z)
+        required: true
+        type: string
 
 permissions: {}
 
+concurrency:
+  group: release
+  queue: max
+  cancel-in-progress: false
+
 jobs:
-  build-sdist:
-    name: 🚀 CD
+  check-release:
+    name: 🔍 Check release
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-sdist.yml@4e380c0bb1774aa8b9dd53194f4a7f6575cc3d42 # v2.5.10
+    runs-on: ubuntu-slim
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-  build-wheel:
-    name: 🚀 CD
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+
+      - name: Check branch and project version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          version=$(uv version --short)
+          if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ || "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Release requires a stable X.Y.Z version on main." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_VERSION" != "$version" ]]; then
+            echo "Requested version $RELEASE_VERSION does not match project version $version." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build-python:
+    name: 📦 Package Python distributions
+    needs: check-release
+    permissions:
+      contents: read
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-cibuildwheel.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
+
+  build-cpp:
+    name: 📦 Package C++ binaries
+    needs: build-python
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         runs-on:
-          [
-            ubuntu-26.04,
-            ubuntu-26.04-arm,
-            macos-26,
-            windows-2025,
-            windows-11-arm,
-          ]
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-wheel-cibuildwheel.yml@4e380c0bb1774aa8b9dd53194f4a7f6575cc3d42 # v2.5.10
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - macos-26
+          - windows-2025
+          - windows-11-arm
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
     with:
       runs-on: ${{ matrix.runs-on }}
 
-  deploy:
-    name: 🚀 Publish
-    needs: [build-sdist, build-wheel]
-    if: github.event_name == 'release' && github.event.action == 'published'
+  approve-release:
+    name: 🔐 Approve release
+    needs: [build-python, build-cpp]
+    runs-on: ubuntu-slim
+    environment: release
+    steps:
+      - run: echo "Release approved."
+
+  publish-github:
+    name: 🚀 Publish to GitHub
+    needs: [check-release, approve-release]
+    permissions:
+      contents: write
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
+    with:
+      version: ${{ needs.check-release.outputs.version }}
+      release-name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
+
+  publish-pypi:
+    name: 🚀 Publish to PyPI
+    needs: [build-python, publish-github]
     permissions:
       attestations: write
       contents: read

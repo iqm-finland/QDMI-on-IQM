@@ -17,6 +17,20 @@
 
 include(GNUInstallDirs)
 
+if(APPLE)
+  set(BASEPOINT @loader_path)
+else()
+  set(BASEPOINT $ORIGIN)
+endif()
+set(CMAKE_INSTALL_RPATH ${BASEPOINT} ${BASEPOINT}/${CMAKE_INSTALL_LIBDIR}
+                        ${BASEPOINT}/../${CMAKE_INSTALL_LIBDIR})
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+if(APPLE)
+  # Avoid invalidating code signatures by rewriting Mach-O libraries during
+  # installation.
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+endif()
+
 # Copy notices from the dependencies bundled into this build.
 set(LICENSE_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/licenses/${QDMI_TARGET_NAME}")
 # scikit-build-core packages LICENSE, including OpenSSL 3's Apache-2.0 text.
