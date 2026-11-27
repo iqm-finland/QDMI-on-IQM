@@ -262,11 +262,6 @@ export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
 ```
 
-The reservation integration test on `emerald:mock` submits two dependent
-circuits. It records whether the reservation was waiting or active before the
-first submission, confirms graceful end, and checks that IQM rejects another
-circuit after termination.
-
 **Generating code coverage:**
 
 On Linux, use the coverage preset to instrument the native implementation and

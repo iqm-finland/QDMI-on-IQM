@@ -93,4 +93,6 @@ if(BUILD_IQM_QDMI_TESTS)
   add_subdirectory(test)
 endif()
 
-add_subdirectory(examples/slurm)
+if(IQM_QDMI_MASTER_PROJECT)
+  add_subdirectory(examples/slurm)
+endif()
