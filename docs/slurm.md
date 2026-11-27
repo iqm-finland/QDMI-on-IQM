@@ -89,11 +89,11 @@ srun --partition=quantum --licenses=iqm.emerald.mock:1 \
   IQM_LOG_LEVEL=ERROR "$smoke" --circuits
 ```
 
-Slurm grants the resource before the workload creates the 60-second reservation.
-IQM controls activation and billing. The workload reads the first circuit's
-result, uses it to choose the second circuit, and retrieves that result from a
-new QDMI session. It ends the reservation and verifies that IQM refuses a
-further submission with HTTP `409`.
+After Slurm grants the resource, the workload submits a 60-second reservation
+job and saves its UUID on shared storage. It attaches that ID to the first
+circuit immediately and uses the result to choose the second circuit. Both
+circuits have their own job handles. The workload requests graceful end,
+confirms termination, and checks that IQM refuses another attached circuit.
 
 Check the allocation with
 `sacct -X --name=iqm-iteration-smoke --format=JobID,State,ExitCode,AllocTRES%60`.
