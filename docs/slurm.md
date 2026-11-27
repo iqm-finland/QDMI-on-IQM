@@ -50,6 +50,98 @@ JSON and QIR. The
 [MQT Core PennyLane device](https://mqt.readthedocs.io/projects/core/en/latest/qdmi/pennylane_device.html)
 also compiles to IQM JSON and reconstructs the requested measurement results.
 
+## Run an IQM iteration on Slurm
+
+Use a disposable [MQSC Orchestrator test cluster][orchestrator-deployment] with
+access to the iteration-enabled Emerald mock. In its `build/slurm` runtime
+directory, copy the `iqm.emerald` entry in `resources.yaml` and name the copy
+`iqm.emerald.mock`. Add `license/iqm.emerald.mock` to `AccountingStorageTRES` in
+`slurm.conf` and ensure the mock is enabled in `qdmi.json`. Start the cluster
+and check `scontrol show licenses iqm.emerald.mock`. Wait for the `quantum`
+layer to report both `DisableHRES=false` and `DisableLayer=false`. The
+controller probe uses the site's credentials in `qdmi.env`. Give the job its own
+credentials as described in
+[Before you start](iteration-mode.md#before-you-start).
+
+Build from a checkout on shared storage, such as a private directory under
+`/jobs` in the reference deployment. Use a Linux build environment compatible
+with the quantum access node. Orchestrator's runtime image requires a separate
+build environment with a C++ toolchain, CMake, and Ninja.
+
+```bash
+cmake --preset release
+cmake --build --preset release --target slurm_reservation
+```
+
+From the same checkout on the login node, submit one task. The fixed Slurm
+resource `iqm.emerald.mock` corresponds to the IQM alias `emerald:mock`.
+Clearing `IQM_QC_ID` prevents a configured UUID from overriding that alias.
+
+```bash
+workload="$PWD/build/release/examples/slurm/slurm_reservation"
+state_dir="$(mktemp -d /jobs/iqm-iteration.XXXXXXXX)"
+printf 'Recovery directory: %s\n' "$state_dir"
+export IQM_ITERATION_SCRATCH_FILE="${state_dir:?}/ids"
+export IQM_SERVER_URL=https://resonance.iqm.tech
+
+srun --partition=quantum --licenses=iqm.emerald.mock:1 \
+  --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-smoke \
+  --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
+  IQM_LOG_LEVEL=ERROR "$workload" --circuits
+```
+
+After Slurm grants the resource, the workload submits a 60-second reservation
+job and saves its UUID on shared storage. It attaches that ID to the first
+circuit immediately and uses the result to choose the second circuit. Both
+circuits have their own job handles. The workload requests graceful end and
+confirms termination.
+
+Check the allocation state, exit code, and granted license for the past week:
+
+```bash
+sacct -X --starttime=now-7days --name=iqm-iteration-smoke,iqm-iteration-cleanup \
+  --format=JobID,JobName%24,State,ExitCode,AllocTRES%60
+```
+
+Use an earlier start time for older allocations. The recovery job is named
+`iqm-iteration-cleanup`. A successful workload reports that it retrieved both
+circuit results and leaves an empty ID file.
+
+If cancellation or node loss interrupts cleanup, keep the ID file. After the
+original Slurm job ends, request a new allocation from the login node. In a
+fresh shell, return to the shared checkout, restore the same IQM credentials,
+and set `state_dir` to the recovery directory printed above. The recovery task
+uses the same server and Emerald mock as the original task.
+
+```bash
+(
+  workload="$PWD/build/release/examples/slurm/slurm_reservation"
+  export IQM_ITERATION_SCRATCH_FILE="${state_dir:?Set state_dir to the original recovery directory}/ids"
+  export IQM_SERVER_URL=https://resonance.iqm.tech
+  if [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
+    srun --partition=quantum --licenses=iqm.emerald.mock:1 \
+      --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-cleanup \
+      --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
+      IQM_LOG_LEVEL=ERROR "$workload" --cleanup-only
+  else
+    printf 'No saved reservation IDs at %s. Check the recovery directory if creation was interrupted.\n' \
+      "$IQM_ITERATION_SCRATCH_FILE" >&2
+  fi
+)
+```
+
+Cleanup removes each saved ID after confirming that its reservation has ended.
+If cleanup exits nonzero, keep the file and retry. If creation was interrupted
+or reported as uncertain and no ID was saved, ask the service administrator to
+reconcile the reservation before creating another. See
+[Handle failures](iteration-mode.md#handle-failures).
+
+This proof of concept uses one fixed mock resource. Site deployment requires
+matching the resource to the IQM target, providing shared storage, and granting
+the quantum access node outbound access to IQM.
+
+[orchestrator-deployment]: https://github.com/munich-quantum-software/orchestrator/blob/main/docs/deployment.md
+
 ## Prepare the cluster
 
 Install the [Python package](python_package.md) with its Qiskit adapter in the

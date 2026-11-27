@@ -39,6 +39,10 @@ git clone https://github.com/iqm-finland/QDMI-on-IQM.git
 
 :::
 
+For a native C++ workload that submits two dependent circuits in one reservation
+and recovers it after an interruption, see
+[Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
+
 ## Configure Your Environment
 
 The IQM-backed path relies on a small environment-variable contract to

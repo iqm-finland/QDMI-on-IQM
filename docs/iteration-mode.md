@@ -17,6 +17,9 @@ select the server and target. For authentication, use a workspace token with
 `job_execution` scope. See
 [authentication methods](usage.md#authentication-methods).
 
+For a batch job, see
+[Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
+
 ## Use the C device API
 
 ### Request a reservation

@@ -92,3 +92,7 @@ if(BUILD_IQM_QDMI_TESTS)
   include(GoogleTest)
   add_subdirectory(test)
 endif()
+
+if(IQM_QDMI_MASTER_PROJECT)
+  add_subdirectory(examples/slurm)
+endif()

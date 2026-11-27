@@ -20,6 +20,7 @@
 #include "iqm_qdmi/calibration.h"
 #include "iqm_qdmi/device.h"
 
+#include "../../examples/slurm/reservation.hpp"
 #include "http_client.hpp"
 #include "http_stub.hpp"
 #include "iqm_auth.hpp"
@@ -40,10 +41,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <new>
+#include <numbers>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -2969,6 +2973,13 @@ protected:
     return IQM_QDMI_device_job_set_programs(target, QDMI_PROGRAM_FORMAT_CUSTOM2,
                                             1, &size, &program);
   }
+
+  static auto scratch_file() {
+    return std::filesystem::temp_directory_path() /
+           (std::string("iqm-reservation-") +
+            testing::UnitTest::GetInstance()->current_test_info()->name() +
+            ".txt");
+  }
 };
 
 TEST_F(ReservationJobTest, ValidatesOneReservationCommandBeforeNetwork) {
@@ -3248,6 +3259,82 @@ TEST_F(ReservationJobTest, FreshSessionRetrievesAndEndsReservationById) {
   ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
   ASSERT_EQ(IQM_QDMI_device_job_wait(job, 3), QDMI_SUCCESS);
   EXPECT_EQ(http_stub.post_urls().size(), 3U);
+}
+
+TEST_F(ReservationJobTest, SlurmSavesConfirmedIdOnCreationError) {
+  const auto scratch = scratch_file();
+  std::filesystem::remove(scratch);
+  http_stub.queue_post(200, reply("unexpected")).queue_post_connection_error();
+  EXPECT_THROW(iqm::slurm::Run_circuits(session, scratch.string()),
+               std::runtime_error);
+  std::ifstream ledger{scratch};
+  std::string persisted;
+  std::getline(ledger, persisted);
+  EXPECT_EQ(persisted, ID);
+  ledger.close();
+  std::filesystem::remove(scratch);
+}
+
+TEST_F(ReservationJobTest, SlurmRunsDependentCircuitsAndClearsLedger) {
+  const auto scratch = scratch_file();
+  std::filesystem::remove(scratch);
+  http_stub.queue_post(200, reply("waiting"))
+      .queue_post(200, R"({"id":"first"})")
+      .queue_post(200, R"({"id":"second"})")
+      .queue_post(202);
+  http_stub.queue_get(200, reply("waiting"))
+      .queue_get(200, R"({"status":"ready"})")
+      .queue_get(200, R"([{"measurement_keys":["m"],"counts":{"0":9,"1":7}}])")
+      .queue_get(200, R"({"status":"ready"})")
+      .queue_get(200, R"([{"measurement_keys":["m"],"counts":{"1":16}}])")
+      .queue_get(200, reply("active"))
+      .queue_get(200, reply("completed"))
+      .queue_get(200, reply("completed"));
+  EXPECT_NO_THROW(iqm::slurm::Run_circuits(session, scratch.string()));
+  EXPECT_EQ(std::filesystem::file_size(scratch), 0U);
+  std::filesystem::remove(scratch);
+  ASSERT_EQ(http_stub.post_urls().size(), 4U);
+  EXPECT_EQ(http_stub.post_urls().at(1), http_stub.post_urls().at(2));
+  EXPECT_TRUE(http_stub.post_urls().at(1).ends_with(
+      std::string("/circuit?iteration_id=") + ID));
+  const auto result_reads =
+      std::ranges::count_if(http_stub.get_urls(), [](const auto &url) {
+        return url.ends_with("/artifacts/measurement_counts");
+      });
+  EXPECT_EQ(result_reads, 2);
+  const auto instructions = nlohmann::json::parse(http_stub.post_bodies().at(2))
+                                .at("circuits")
+                                .at(0)
+                                .at("instructions");
+  EXPECT_EQ(instructions.at(0).at("name"), "prx");
+  EXPECT_DOUBLE_EQ(instructions.at(0).at("args").at("angle").get<double>(),
+                   std::numbers::pi);
+}
+
+TEST_F(ReservationJobTest, SlurmCleanupRemovesOnlyConfirmedIds) {
+  constexpr auto inaccessible = "87654321-4321-4321-abcd-123456789abc";
+  const auto scratch = scratch_file();
+  {
+    std::ofstream ledger{scratch, std::ios::binary};
+    ledger << ID << "\r\n" << inaccessible << "\n../../invalid\n";
+  }
+  http_stub.queue_get(404)
+      .queue_get(200, reply("active"))
+      .queue_get(200, reply("active"))
+      .queue_get(200, reply("cancelled"))
+      .queue_get(403);
+  http_stub.queue_post(202);
+  EXPECT_THROW(iqm::slurm::Cleanup(session, scratch.string()),
+               std::runtime_error);
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+  std::ifstream ledger{scratch};
+  std::string retained;
+  std::getline(ledger, retained);
+  EXPECT_EQ(retained, inaccessible);
+  std::getline(ledger, retained);
+  EXPECT_EQ(retained, "../../invalid");
+  ledger.close();
+  std::filesystem::remove(scratch);
 }
 
 TEST_F(IterationJobMockTest,
