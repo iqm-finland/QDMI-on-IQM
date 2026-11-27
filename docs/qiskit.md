@@ -68,6 +68,12 @@ environment variables cannot redirect them. Authentication uses the token or
 token-file defaults. Explicit arguments and driver configuration can override
 manifest values.
 
+Use `backend.reservation(...)` to run circuits and primitives on a reserved
+quantum computer. To submit one run to an existing reservation, pass its UUID as
+`backend.run(..., reservation_id=...)`. See
+[Use a reservation from Python](iteration-mode.md#use-a-reservation-from-python)
+for a complete example.
+
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields, as specified by
 [IQM Client](https://docs.iqm.tech/iqm-client/). Applications submitting IQM

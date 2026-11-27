@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Reserve an IQM device with a Python context manager and attach Qiskit runs
+  or primitives to the reservation. ([#357]) ([**@marcelwa**])
 - ✨ Run dependent circuits in an IQM reservation on Slurm and recover an
   interrupted reservation from a new allocation. ([#347]) ([**@marcelwa**])
 - ✨ Reserve an IQM quantum computer and submit circuits to it through QDMI
@@ -392,6 +394,7 @@ Compatible with QDMI `v1.3.0`.
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#357]: https://github.com/iqm-finland/QDMI-on-IQM/pull/357
 [#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321
 [#311]: https://github.com/iqm-finland/QDMI-on-IQM/pull/311

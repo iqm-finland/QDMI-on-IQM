@@ -17,8 +17,46 @@ select the server and target. For authentication, use a workspace token with
 `job_execution` scope. See
 [authentication methods](usage.md#authentication-methods).
 
-For a batch job, see
+Choose [Python](#use-a-reservation-from-python) for Qiskit or MQT Core, or
+[the C device API](#use-the-c-device-api) for native code. For a batch job, see
 [Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
+
+## Use a reservation from Python
+
+Install `iqm-qdmi[qiskit]` as shown in the [Qiskit guide](qiskit.md). Compile
+your first circuit before requesting time. Inside the `with` block, use
+`reserved` to run circuits on the reservation.
+
+```python
+from iqm.qdmi.qiskit import IQMBackend
+from qiskit import QuantumCircuit
+
+backend = IQMBackend(qc_alias="emerald:mock")
+circuit = QuantumCircuit(1)
+circuit.h(0)
+circuit.measure_all()
+compiled = backend.compile(circuit)
+
+with backend.reservation(max_duration_seconds=60, idle_timeout_seconds=30) as reserved:
+    print(reserved.options.reservation_id)
+    counts = reserved.run(compiled, shots=128).result().get_counts()
+    print(counts)
+```
+
+Use `counts` to choose the next circuit inside the block. On exit, the context
+requests graceful end and waits up to 300 seconds for confirmation, including
+when your code raises an exception. The original `backend` runs on demand.
+
+To join an existing reservation, pass its UUID to
+`backend.run(compiled, reservation_id=reservation_id)`. If you use
+[MQT Core directly](python_package.md#querying-the-device-directly), import
+`reservation` from `iqm.qdmi.iteration`. The context
+`with reservation(device, max_duration_seconds=60) as reservation_id:` yields
+the UUID to pass as `custom2=reservation_id` on each circuit submission.
+
+If cleanup fails, keep the UUID from the error for [recovery](#handle-failures).
+If the workload also raised an exception, its cleanup details appear in a note
+on that exception.
 
 ## Use the C device API
 
@@ -90,11 +128,19 @@ basis, with a 30-second HTTP budget.
 
 ## Handle failures
 
-If your process restarts, open a fresh session on the same target and retrieve
-the reservation with `IQM_QDMI_device_session_retrieve_device_job_by_id`. If it
-is still open, use the saved ID to [end it](#end-the-reservation). Freeing a
-retrieved handle only releases that handle. Keep the ID until IQM reports
-`DONE`, `CANCELED`, or `FAILED`.
+In Python, reopen the same target and call
+`backend.device.retrieve_job_by_id(reservation_id).check()`. If the reservation
+is still open, use
+`backend.device.submit_job(json.dumps({"end": reservation_id}), ProgramFormat.CUSTOM2)`
+and call `wait(300)` on the returned job. Import `json` and `ProgramFormat` from
+the standard library and `mqt.core.qdmi`, respectively. Keep the UUID if the
+wait times out.
+
+In C, open a fresh session on the same target and retrieve the reservation with
+`IQM_QDMI_device_session_retrieve_device_job_by_id`. If it is still open, use
+the saved ID to [end it](#end-the-reservation). Freeing a retrieved handle only
+releases that handle. Keep the ID until IQM reports `DONE`, `CANCELED`, or
+`FAILED`.
 
 If creation reports an error, check whether the owner still exposes a UUID and
 save it for cleanup. If the request may have reached IQM and you have no UUID,
