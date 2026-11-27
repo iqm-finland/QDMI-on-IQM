@@ -115,15 +115,20 @@ and set `state_dir` to the recovery directory printed above. The recovery task
 uses the same server and Emerald mock as the original task.
 
 ```bash
-smoke="$PWD/build/release/test/iteration/iteration_smoke"
-export IQM_ITERATION_SCRATCH_FILE="${state_dir:?Set state_dir to the original recovery directory}/ids"
-export IQM_SERVER_URL=https://resonance.iqm.tech
-if [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
-  srun --partition=quantum --licenses=iqm.emerald.mock:1 \
-    --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-cleanup \
-    --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
-    IQM_LOG_LEVEL=ERROR "$smoke" --cleanup-only
-fi
+(
+  smoke="$PWD/build/release/test/iteration/iteration_smoke"
+  export IQM_ITERATION_SCRATCH_FILE="${state_dir:?Set state_dir to the original recovery directory}/ids"
+  export IQM_SERVER_URL=https://resonance.iqm.tech
+  if [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
+    srun --partition=quantum --licenses=iqm.emerald.mock:1 \
+      --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-cleanup \
+      --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
+      IQM_LOG_LEVEL=ERROR "$smoke" --cleanup-only
+  else
+    printf 'No saved reservation IDs at %s. Check the recovery directory if creation was interrupted.\n' \
+      "$IQM_ITERATION_SCRATCH_FILE" >&2
+  fi
+)
 ```
 
 Cleanup removes each saved ID after confirming that its reservation has ended.
