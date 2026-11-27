@@ -135,7 +135,14 @@ def main() -> None:
     finally:
         if counts is not None:
             log.info("Running QSCI post-processing (cutoff=%d)...", args.cutoff)
-            eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
+            cleanup_error = sys.exception()
+            try:
+                eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
+            except Exception as postprocessing_error:
+                if cleanup_error is None:
+                    raise
+                cleanup_error.add_note(f"QSCI post-processing also failed: {postprocessing_error}")
+                raise cleanup_error from postprocessing_error
             qsci_energy = eigval + (problem.hamiltonian.nuclear_repulsion_energy or 0.0)
             log.info("QSCI total energy: %.6f Ha", qsci_energy)
             log.info(

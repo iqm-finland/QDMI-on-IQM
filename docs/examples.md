@@ -93,9 +93,10 @@ on Resonance. The target must support iteration mode.
 ```
 
 Each run requests one reservation for up to 15 minutes with a two-minute idle
-timeout. The optimizer submits its first circuit as soon as the reservation has
-an ID. On exit, the backend requests graceful end and waits for confirmation.
-Retain the UUID reported on cleanup failure for recovery.
+timeout. The optimizer can submit circuits without waiting for activation.
+Transpilation and classical work count toward the idle timeout once the
+reservation is active. On exit, the backend requests graceful end and waits for
+confirmation. Retain the UUID reported on cleanup failure for recovery.
 
 Use `--backend sim` for a local run without a reservation.
 
