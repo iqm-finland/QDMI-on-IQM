@@ -96,7 +96,7 @@ Each run waits up to five minutes for activation. Once active, the reservation
 lasts up to 15 minutes and expires after two idle minutes. The script requests
 termination at the end of the quantum workload and waits up to five and a half
 minutes to confirm it. Keep the logged ID to recover an iteration whose
-termination could not be confirmed.
+termination could not be confirmed, including after a forced process stop.
 
 Use `--backend sim` for a local run without a reservation.
 
@@ -200,11 +200,11 @@ looks on real hardware. Remember to set the required environment variables for
 authentication before running the script.
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
-[qaoa]: https://arxiv.org/abs/1411.4028
 [ghz-state]: https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state
 [graph-state]: https://en.wikipedia.org/wiki/Graph_state
 [measurement-based-quantum-computing]: https://en.wikipedia.org/wiki/Measurement-based_quantum_computation
 [mqt-bench]: https://mqt.readthedocs.io/projects/bench/
+[qaoa]: https://arxiv.org/abs/1411.4028
 [qiskit-nature]: https://qiskit-community.github.io/qiskit-nature/
 [qsci]: https://arxiv.org/abs/2302.11320
 [quantum-fourier-transform]: https://en.wikipedia.org/wiki/Quantum_Fourier_transform

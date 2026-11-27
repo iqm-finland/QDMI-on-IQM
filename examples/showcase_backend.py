@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
     from qiskit import QuantumCircuit
 
+    from iqm.qdmi.iteration import IterationResult
+
 log = logging.getLogger(__name__)
 _TERMINAL_STATES = frozenset({"completed", "cancelled", "failed"})
 
@@ -54,16 +56,29 @@ def validate_backend_arguments(parser: argparse.ArgumentParser, args: argparse.N
         parser.error("--iteration-mode requires --backend iqm")
 
 
+def _request_timeout(iteration_id: str, deadline: float) -> int:
+    timeout_ms = min(30_000, ceil((deadline - monotonic()) * 1000))
+    if timeout_ms <= 0:
+        msg = f"Timed out waiting for iteration {iteration_id}"
+        raise TimeoutError(msg)
+    return timeout_ms
+
+
+def _can_retry(error: IterationError) -> bool:
+    status = error.result.http_status
+    return status in {0, 429} or 500 <= status < 600
+
+
 def _wait_for_state(
     client: IterationClient, iteration_id: str, state: str | None, states: frozenset[str], deadline: float
 ) -> str | None:
     while state not in states:
         sleep(min(2, max(0, deadline - monotonic())))
-        timeout_ms = min(30_000, ceil((deadline - monotonic()) * 1000))
-        if timeout_ms <= 0:
-            msg = f"Timed out waiting for iteration {iteration_id} (last state {state})"
-            raise TimeoutError(msg)
-        state = client.get(iteration_id, timeout_ms=timeout_ms).state
+        try:
+            state = client.get(iteration_id, timeout_ms=_request_timeout(iteration_id, deadline)).state
+        except IterationError as error:
+            if not _can_retry(error):
+                raise
     return state
 
 
@@ -74,10 +89,20 @@ def _wait_for_activation(client: IterationClient, iteration_id: str, initial_sta
         raise RuntimeError(msg)
 
 
+def _request_end(client: IterationClient, iteration_id: str, deadline: float) -> IterationResult:
+    while True:
+        try:
+            return client.end(iteration_id, timeout_ms=_request_timeout(iteration_id, deadline))
+        except IterationError as error:
+            if not _can_retry(error):
+                raise
+        sleep(min(2, max(0, deadline - monotonic())))
+
+
 def _end_iteration(client: IterationClient, iteration_id: str, workload_error: BaseException | None = None) -> None:
     deadline = monotonic() + 330
     try:
-        finished = client.end(iteration_id)
+        finished = _request_end(client, iteration_id, deadline)
         state = _wait_for_state(client, iteration_id, finished.state, _TERMINAL_STATES, deadline)
     except BaseException:
         msg = f"Could not confirm termination of IQM iteration {iteration_id}. Keep this ID for recovery."

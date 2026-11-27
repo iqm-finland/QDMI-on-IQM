@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import importlib
 from contextlib import nullcontext
+from itertools import chain, repeat
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock
@@ -30,6 +31,7 @@ import pytest
 from qiskit import QuantumCircuit, transpile
 from qiskit.primitives import StatevectorSampler
 from qiskit.providers.fake_provider import GenericBackendV2
+from qiskit.transpiler import CouplingMap
 
 from iqm.qdmi.iteration import IterationError, IterationResult
 
@@ -92,7 +94,7 @@ def test_showcase_ends_reservation(
         base_url="https://unit.example", qc_id=None, qc_alias="emerald:mock", iteration_id=ITERATION_ID
     )
     client.create.assert_called_once_with("emerald:mock", 900, idle_timeout_seconds=120)
-    client.end.assert_called_once_with(ITERATION_ID)
+    client.end.assert_called_once_with(ITERATION_ID, timeout_ms=30_000)
     assert [call.args for call in client.get.call_args_list] == [(ITERATION_ID,), (ITERATION_ID,)]
 
 
@@ -102,14 +104,14 @@ def test_expired_activation_still_ends_reservation(
     """An activation deadline never opens a backend and still cancels the reservation."""
     client, backend = reservation
     client.end.return_value = IterationResult(ITERATION_ID, "cancelled", 200)
-    monkeypatch.setattr(showcase, "monotonic", Mock(side_effect=[0, 301, 301, 301]))
+    monkeypatch.setattr(showcase, "monotonic", Mock(side_effect=chain((0,), repeat(301))))
 
     with pytest.raises(TimeoutError), showcase.showcase_backend("iqm", num_qubits=4, iteration_mode=True):
         pytest.fail("No backend should open after the activation deadline.")
 
     backend.assert_not_called()
     client.get.assert_not_called()
-    client.end.assert_called_once_with(ITERATION_ID)
+    client.end.assert_called_once_with(ITERATION_ID, timeout_ms=30_000)
 
 
 @pytest.mark.parametrize("interrupted", [False, True])
@@ -127,7 +129,7 @@ def test_showcase_ends_partially_created_reservation(
     with pytest.raises(type(error)) as raised, showcase.showcase_backend("iqm", num_qubits=4, iteration_mode=True):
         pytest.fail("A partial reservation cannot be used.")
     assert raised.value is error
-    client.end.assert_called_once_with(ITERATION_ID)
+    client.end.assert_called_once_with(ITERATION_ID, timeout_ms=30_000)
     backend.assert_not_called()
 
 
@@ -145,6 +147,25 @@ def test_reports_id_when_cleanup_fails(
     assert ITERATION_ID in caplog.text
 
 
+def test_retries_end_and_status_requests_during_cleanup(
+    showcase: ModuleType, reservation: tuple[MagicMock, Mock]
+) -> None:
+    """Retry a transient end failure and poll an acknowledged end through a transient GET failure."""
+    client, _ = reservation
+    transient = IterationError("request", -1, IterationResult(ITERATION_ID, None, 503), {})
+    client.end.side_effect = [transient, IterationResult(ITERATION_ID, "active", 202)]
+    client.get.side_effect = [
+        IterationResult(ITERATION_ID, "active", 200),
+        transient,
+        IterationResult(ITERATION_ID, "completed", 200),
+    ]
+    with showcase.showcase_backend("iqm", num_qubits=4, iteration_mode=True):
+        pass
+
+    assert client.end.call_count == 2
+    assert client.get.call_count == 3
+
+
 def test_rejects_iteration_mode_on_simulator(showcase: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
     """Reject an IQM reservation request through the shared CLI parser."""
     parser = argparse.ArgumentParser()
@@ -160,9 +181,12 @@ def test_qsci_reads_every_logical_qubit_in_order(showcase: ModuleType) -> None:
     """Read logical sites in order, including idle sites and excluding hardware ancillas."""
     logical = QuantumCircuit(4)
     logical.x([0, 1])
-    target = GenericBackendV2(num_qubits=6, seed=1)
+    logical.cx(0, 2)
+    target = GenericBackendV2(num_qubits=6, coupling_map=CouplingMap.from_line(6), seed=1)
     routed = transpile(logical, backend=target, initial_layout=[5, 3, 1, 0])
+    assert routed.layout is not None
+    assert routed.layout.final_layout is not None
     showcase.measure_logical_qubits(routed, logical.num_qubits)
 
     result = StatevectorSampler(default_shots=16, seed=1).run([routed]).result()
-    assert result[0].data["meas"].get_counts() == {"0011": 16}
+    assert result[0].data["meas"].get_counts() == {"0111": 16}

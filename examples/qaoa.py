@@ -80,8 +80,7 @@ def main() -> None:
             ) / sum(counts.values())
 
         result = COBYLA(maxiter=args.maxiter).minimize(evaluate, np.array([0.3, 0.6]))
-
-    log.info("QAOA estimated cut size %.3f out of 4 (%s objective evaluations).", -result.fun, result.nfev)
+        log.info("QAOA best sampled mean cut size %.3f out of 4 (%s evaluations).", -result.fun, result.nfev)
 
 
 if __name__ == "__main__":

@@ -125,21 +125,24 @@ def main() -> None:
     log.info("Mapped Hamiltonian to %d-term qubit observable.", len(observable))
 
     log.info("Initialising '%s' backend...", args.backend)
-    with showcase_backend(args.backend, num_qubits=ansatz.num_qubits, iteration_mode=args.iteration_mode) as backend:
-        log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
-        counts = _optimize_and_sample(backend, ansatz, observable, shots=args.shots, maxiter=args.maxiter)
-
-    log.info("Running QSCI post-processing (cutoff=%d)...", args.cutoff)
-    eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
-    qsci_energy = eigval + (problem.hamiltonian.nuclear_repulsion_energy or 0.0)
-    energy_difference = abs(EXPECTED_ENERGY - qsci_energy)
-
-    log.info("QSCI total energy: %.6f Ha", qsci_energy)
-    log.info(
-        "Absolute energy difference from expected (%.6f Ha): %.6f Ha",
-        EXPECTED_ENERGY,
-        energy_difference,
-    )
+    counts = None
+    try:
+        with showcase_backend(
+            args.backend, num_qubits=ansatz.num_qubits, iteration_mode=args.iteration_mode
+        ) as backend:
+            log.info("Backend ready: '%s' | %d qubits", backend.name, backend.num_qubits)
+            counts = _optimize_and_sample(backend, ansatz, observable, shots=args.shots, maxiter=args.maxiter)
+    finally:
+        if counts is not None:
+            log.info("Running QSCI post-processing (cutoff=%d)...", args.cutoff)
+            eigval = _postprocess_counts(ATOM, BASIS, counts, cutoff=args.cutoff)
+            qsci_energy = eigval + (problem.hamiltonian.nuclear_repulsion_energy or 0.0)
+            log.info("QSCI total energy: %.6f Ha", qsci_energy)
+            log.info(
+                "Absolute energy difference from expected (%.6f Ha): %.6f Ha",
+                EXPECTED_ENERGY,
+                abs(EXPECTED_ENERGY - qsci_energy),
+            )
     log.info("Done.")
 
 
