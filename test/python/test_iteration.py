@@ -29,6 +29,7 @@ from unittest.mock import Mock, call
 from uuid import UUID
 
 import pytest
+from mqt.core.plugins.qiskit import CircuitValidationError
 from mqt.core.qdmi import Device, Job, ProgramFormat
 from qiskit import QuantumCircuit
 
@@ -163,6 +164,14 @@ def test_reserved_runs_and_primitives(iteration_server: tuple[str, list[str]]) -
     assert backend.options.reservation_id is None
 
 
+@pytest.mark.parametrize("value", ["invalid", 17])
+def test_invalid_reservation_id(offline_backend: IQMBackend, offline_submissions: list[dict], value: object) -> None:
+    """Reject an invalid per-run reservation ID before circuit submission."""
+    with pytest.raises(CircuitValidationError, match="reservation_id"):
+        offline_backend.run(QuantumCircuit(1), reservation_id=value)
+    assert not offline_submissions
+
+
 def test_bare_device_reservation(caplog: pytest.LogCaptureFixture) -> None:
     """The MQT context submits just the create and end jobs, then waits for end."""
     device = Mock(spec=Device)
@@ -194,10 +203,17 @@ def test_cleanup_failure_keeps_id(*, completed: bool, error: type[Exception]) ->
         pass
 
 
-def test_failed_cleanup_preserves_workload_error() -> None:
-    """Report both failures when end submission fails during unwinding."""
+@pytest.mark.parametrize(
+    ("cleanup_error", "detail"),
+    [(RuntimeError("end refused"), "end refused"), (KeyboardInterrupt(), "KeyboardInterrupt")],
+)
+def test_failed_cleanup_preserves_workload_error(cleanup_error: BaseException, detail: str) -> None:
+    """Keep the original error if waiting for graceful end fails or is interrupted."""
     device = Mock(spec=Device)
-    device.submit_job.side_effect = [Mock(id=ITERATION_ID), RuntimeError("end refused")]
-    with pytest.raises(KeyboardInterrupt) as error, reservation(device, max_duration_seconds=60):
-        Mock(side_effect=KeyboardInterrupt)()
-    assert error.value.__notes__ == [f"Ending IQM reservation {ITERATION_ID}: end refused"]
+    creator = Mock(id=ITERATION_ID, wait=Mock(side_effect=cleanup_error))
+    device.submit_job.side_effect = [creator, Mock()]
+    workload_error = ValueError("workload failed")
+    with pytest.raises(ValueError, match="workload failed") as error, reservation(device, max_duration_seconds=60):
+        Mock(side_effect=workload_error)()
+    assert error.value is workload_error
+    assert error.value.__notes__ == [f"Ending IQM reservation {ITERATION_ID}: {detail}"]

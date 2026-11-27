@@ -60,7 +60,7 @@ bool Run_circuit(IQM_QDMI_Device_Session session, const std::string &id,
     const int submitted = IQM_QDMI_device_job_submit(job.get());
     std::cerr.rdbuf(previous);
     std::cerr << diagnostics.str();
-    if (submitted != QDMI_ERROR_FATAL ||
+    if (submitted != QDMI_ERROR_INVALIDARGUMENT ||
         diagnostics.view().find(R"("http_status":409)") == std::string::npos) {
       throw std::runtime_error("Expected an HTTP 409 for the ended iteration");
     }

@@ -76,12 +76,12 @@ struct IQM_QDMI_Site_impl_d;
 
 namespace {
 enum class IQM_QDMI_DEVICE_SESSION_STATUS : uint8_t { ALLOCATED, INITIALIZED };
-}
 
 /**
- * @brief Implementation of the IQM_QDMI_Device_Session structure.
+ * @brief Transport, configuration, and device data shared by a session and its
+ * jobs.
  */
-struct IQM_QDMI_Device_Session_impl_d {
+struct Session_state {
   /// Base URL of the device.
   std::string base_url_;
 
@@ -179,13 +179,19 @@ struct IQM_QDMI_Device_Session_impl_d {
                                         double, Pair_hash>>
       operations_two_qubit_fidelity_map_;
 };
+} // namespace
+
+/// The caller and each outstanding job independently own the session state.
+struct IQM_QDMI_Device_Session_impl_d {
+  std::shared_ptr<Session_state> state_ = std::make_shared<Session_state>();
+};
 
 /**
  * @brief Implementation of the IQM_QDMI_Device_Job structure.
  */
 struct IQM_QDMI_Device_Job_impl_d {
   /// The session this job belongs to.
-  IQM_QDMI_Device_Session session_ = nullptr;
+  std::shared_ptr<Session_state> session_;
   /// The job ID as returned by the API.
   std::string job_id_;
   /// Whether this handle was opened for an existing remote job.
@@ -303,13 +309,19 @@ int IQM_QDMI_device_initialize() { return QDMI_SUCCESS; }
 
 int IQM_QDMI_device_finalize() { return QDMI_SUCCESS; }
 
-int IQM_QDMI_device_session_alloc(IQM_QDMI_Device_Session *session) {
+int IQM_QDMI_device_session_alloc(IQM_QDMI_Device_Session *session) try {
   if (session == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
-  *session = new IQM_QDMI_Device_Session_impl_d();
+  *session = nullptr;
+  auto allocated = std::make_unique<IQM_QDMI_Device_Session_impl_d>();
   LOG_INFO("Allocated new device session");
+  *session = allocated.release();
   return QDMI_SUCCESS;
+} catch (const std::bad_alloc &) {
+  return QDMI_ERROR_OUTOFMEM;
+} catch (...) {
+  return QDMI_ERROR_FATAL;
 }
 
 namespace {
@@ -321,7 +333,7 @@ std::optional<std::string> Get_nonempty_env_var(const char *name) {
   return std::nullopt;
 }
 
-void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
+void Apply_environment_session_defaults(Session_state *session) {
   auto env_base_url = Get_nonempty_env_var("IQM_SERVER_URL");
   if (!env_base_url.has_value()) {
     env_base_url = Get_nonempty_env_var("IQM_BASE_URL");
@@ -356,7 +368,7 @@ void Apply_environment_session_defaults(IQM_QDMI_Device_Session session) {
   }
 }
 
-int Process_static_quantum_architecture(IQM_QDMI_Device_Session session) {
+int Process_static_quantum_architecture(Session_state *session) {
   LOG_INFO("Processing static quantum architecture");
 
   const auto qc_list_url =
@@ -551,7 +563,7 @@ bool Loci_are_describable(
   return true;
 }
 
-int Process_calibrated_gates(IQM_QDMI_Device_Session session) {
+int Process_calibrated_gates(Session_state *session) {
   LOG_INFO("Processing calibrated gates");
   const auto bearer_token = session->token_manager_->get_bearer_token();
   const auto dyn_arch_url = session->api_config_->url(
@@ -687,7 +699,7 @@ bool Gate_has_arity(
   return false;
 }
 
-int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
+int Process_calibration_metrics(Session_state *session) {
   LOG_INFO(
       "Processing calibration set quality metrics for calibration set ID: " +
       session->calibration_set_id_);
@@ -807,7 +819,7 @@ int Process_calibration_metrics(IQM_QDMI_Device_Session session) {
   return QDMI_SUCCESS;
 }
 
-int Initialize_device_session(IQM_QDMI_Device_Session session) {
+int Initialize_device_session(Session_state *session) {
   LOG_INFO("Initializing device session");
   Apply_environment_session_defaults(session);
   if (session->base_url_.empty()) {
@@ -856,7 +868,8 @@ int Initialize_device_session(IQM_QDMI_Device_Session session) {
 }
 } // namespace
 
-int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
+int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session handle) try {
+  auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -865,7 +878,7 @@ int IQM_QDMI_device_session_init(IQM_QDMI_Device_Session session) try {
     return QDMI_ERROR_BADSTATE;
   }
 
-  auto initialized = IQM_QDMI_Device_Session_impl_d{};
+  auto initialized = Session_state{};
   initialized.base_url_ = session->base_url_;
   initialized.token_ = session->token_;
   initialized.tokens_file_ = session->tokens_file_;
@@ -962,10 +975,11 @@ Parse_request_timeout(const size_t size, const void *value) {
 }
 } // namespace
 
-int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
+int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session handle,
                                           QDMI_Device_Session_Parameter param,
                                           const size_t size,
                                           const void *value) try {
+  auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || (value != nullptr && size == 0) ||
       QDMI_IS_INVALID_ENUM_VALUE(param, QDMI_DEVICE_SESSION_PARAMETER)) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -1021,8 +1035,9 @@ int IQM_QDMI_device_session_set_parameter(IQM_QDMI_Device_Session session,
   return QDMI_ERROR_FATAL;
 }
 
-int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
+int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session handle,
                                               IQM_QDMI_Device_Job *job) {
+  const auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
   }
@@ -1032,7 +1047,7 @@ int IQM_QDMI_device_session_create_device_job(IQM_QDMI_Device_Session session,
   }
 
   *job = new IQM_QDMI_Device_Job_impl_d;
-  (*job)->session_ = session;
+  (*job)->session_ = handle->state_;
   (*job)->status_ = QDMI_JOB_STATUS_CREATED;
   LOG_INFO("Created new device job");
   return QDMI_SUCCESS;
@@ -1196,6 +1211,31 @@ std::string Decode_iteration_response(IQM_QDMI_Device_Job job,
   return "Unknown iteration state: " + text;
 }
 
+/// Map provider and transport failures after logging the sanitized reason.
+int Map_iteration_failure(const cpr::Response &response, const cpr::Url &url) {
+  if (response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT) {
+    return QDMI_ERROR_TIMEOUT;
+  }
+  if (response.status_code / 100 == 2 || response.error) {
+    return QDMI_ERROR_FATAL;
+  }
+  // Map the HTTP status without logging untrusted response content.
+  cpr::Response sanitized;
+  sanitized.status_code = response.status_code;
+  sanitized.url = url;
+  return iqm::http::Handle_response(sanitized);
+}
+
+Job_wait_clock::time_point
+Iteration_deadline(std::chrono::milliseconds timeout,
+                   std::optional<Job_wait_clock::time_point> deadline) {
+  const auto now = iqm::http::internal::Get_hooks().now();
+  const auto available = std::chrono::duration_cast<std::chrono::milliseconds>(
+      Job_wait_clock::time_point::max() - now);
+  const auto request_deadline = now + std::min(timeout, available);
+  return std::min(deadline.value_or(request_deadline), request_deadline);
+}
+
 /// Send one reservation operation using the owning session's credentials and
 /// quota.
 int Request_iteration(
@@ -1207,12 +1247,7 @@ int Request_iteration(
       job->owns_iteration_ && endpoint == iqm::API_ENDPOINT::END_ITERATION
           ? std::min(Job_request_timeout(job), ITERATION_TIMEOUT)
           : Job_request_timeout(job);
-  const auto now = iqm::http::internal::Get_hooks().now();
-  const auto available = std::chrono::duration_cast<std::chrono::milliseconds>(
-      Job_wait_clock::time_point::max() - now);
-  const auto request_deadline = now + std::min(timeout, available);
-  const auto limit =
-      std::min(deadline.value_or(request_deadline), request_deadline);
+  const auto limit = Iteration_deadline(timeout, deadline);
   const auto url = session.api_config_->url(endpoint, job->job_id_);
   const auto token = session.token_manager_->get_bearer_token();
   const bool create = endpoint == iqm::API_ENDPOINT::CREATE_ITERATION;
@@ -1239,17 +1274,7 @@ int Request_iteration(
       response, token, error,
       create && job->job_id_.empty() &&
           (response.error || response.status_code / 100 != 4));
-  if (response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT) {
-    return QDMI_ERROR_TIMEOUT;
-  }
-  if (success || response.error) {
-    return QDMI_ERROR_FATAL;
-  }
-  // Map the HTTP status without logging untrusted response content.
-  cpr::Response sanitized;
-  sanitized.status_code = response.status_code;
-  sanitized.url = url;
-  return iqm::http::Handle_response(sanitized);
+  return Map_iteration_failure(response, url);
 }
 
 int Set_job_status(IQM_QDMI_Device_Job job, const nlohmann::json &response) {
@@ -1344,8 +1369,9 @@ bool Set_output_layout(IQM_QDMI_Device_Job_impl_d::Program_results &result,
 } // namespace
 
 int IQM_QDMI_device_session_retrieve_device_job_by_id(
-    IQM_QDMI_Device_Session session, const char *job_id,
+    IQM_QDMI_Device_Session handle, const char *job_id,
     IQM_QDMI_Device_Job *job) {
+  auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || job_id == nullptr || job_id[0] == '\0' ||
       job == nullptr) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -1363,7 +1389,7 @@ int IQM_QDMI_device_session_retrieve_device_job_by_id(
         *session->connection_pool_, session->request_timeout_,
         &session->rate_limit_);
     auto retrieved_job = std::make_unique<IQM_QDMI_Device_Job_impl_d>();
-    retrieved_job->session_ = session;
+    retrieved_job->session_ = handle->state_;
     retrieved_job->job_id_ = job_id;
     retrieved_job->retrieved_ = true;
     if (!job_status_response.error && job_status_response.status_code == 404 &&
@@ -1739,7 +1765,7 @@ int IQM_QDMI_device_job_submit_circuit(IQM_QDMI_Device_Job job) {
        job_submission_response.status_code / 100 != 2)) {
     Log_iteration_failure("Iteration circuit submission failed",
                           job_submission_response, token);
-    return QDMI_ERROR_FATAL;
+    return Map_iteration_failure(job_submission_response, job_submission_url);
   }
   const auto status = iqm::http::Handle_response(job_submission_response);
   if (status != QDMI_SUCCESS) {
@@ -1854,7 +1880,7 @@ int IQM_QDMI_device_job_submit(IQM_QDMI_Device_Job job) try {
   if (Is_reservation(job)) {
     auto program =
         nlohmann::json::parse(Program_contents(job->programs_.front()));
-    if (auto end = program.find("end"); end != program.end()) {
+    if (const auto end = program.find("end"); end != program.end()) {
       job->job_id_ = end->get<std::string>();
       return Request_iteration(job, iqm::API_ENDPOINT::END_ITERATION);
     }
@@ -1993,19 +2019,20 @@ int Check_job(IQM_QDMI_Device_Job job, QDMI_Job_Status *status,
                                             job->job_id_);
   auto &session = *job->session_;
   const auto token = session.token_manager_->get_bearer_token();
+  const auto timeout = Job_request_timeout(job);
   const auto job_status_response =
-      deadline.has_value()
+      job->iteration_id_.has_value()
           ? iqm::http::Get(job_status_url, token, *session.connection_pool_,
-                           Job_request_timeout(job), *deadline,
+                           timeout, Iteration_deadline(timeout, deadline),
                            &session.rate_limit_)
           : iqm::http::Get(job_status_url, token, *session.connection_pool_,
-                           Job_request_timeout(job), &session.rate_limit_);
-  if (deadline.has_value() &&
-      job_status_response.error.code == cpr::ErrorCode::OPERATION_TIMEDOUT &&
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          *deadline - iqm::http::internal::Get_hooks().now()) <=
-          std::chrono::milliseconds::zero()) {
-    return QDMI_ERROR_TIMEOUT;
+                           session.request_timeout_, &session.rate_limit_);
+  if (job->iteration_id_.has_value() &&
+      (job_status_response.error ||
+       job_status_response.status_code / 100 != 2)) {
+    Log_iteration_failure("Iteration circuit status failed",
+                          job_status_response, token);
+    return Map_iteration_failure(job_status_response, job_status_url);
   }
   const auto status_code = iqm::http::Handle_response(job_status_response);
   if (status_code != QDMI_SUCCESS) {
@@ -2130,7 +2157,7 @@ int IQM_QDMI_device_job_get_results_hist(IQM_QDMI_Device_Job job,
             iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENT_COUNTS,
             job->job_id_),
         job->session_->token_manager_->get_bearer_token(),
-        *job->session_->connection_pool_, Job_request_timeout(job),
+        *job->session_->connection_pool_, job->session_->request_timeout_,
         &job->session_->rate_limit_);
     if (const auto status = iqm::http::Handle_response(response);
         status != QDMI_SUCCESS) {
@@ -2256,7 +2283,7 @@ int IQM_QDMI_device_job_get_results_calibration_id(IQM_QDMI_Device_Job job,
         iqm::API_ENDPOINT::GET_CALIBRATION_JOB_STATUS, job->job_id_);
     const auto job_calibration_response = iqm::http::Get(
         job_calibration_url, job->session_->token_manager_->get_bearer_token(),
-        *job->session_->connection_pool_, Job_request_timeout(job),
+        *job->session_->connection_pool_, job->session_->request_timeout_,
         &job->session_->rate_limit_);
     const auto status = iqm::http::Handle_response(job_calibration_response);
     if (status != QDMI_SUCCESS) {
@@ -2317,7 +2344,7 @@ int IQM_QDMI_device_job_get_results_shots(IQM_QDMI_Device_Job job,
         job->session_->api_config_->url(
             iqm::API_ENDPOINT::GET_JOB_ARTIFACT_MEASUREMENTS, job->job_id_),
         job->session_->token_manager_->get_bearer_token(),
-        *job->session_->connection_pool_, Job_request_timeout(job),
+        *job->session_->connection_pool_, job->session_->request_timeout_,
         &job->session_->rate_limit_);
     if (const auto status = iqm::http::Handle_response(response);
         status != QDMI_SUCCESS) {
@@ -2526,7 +2553,7 @@ struct Queue_availability {
  *         is only meaningful for @c PROBE_OUTCOME::ANSWERED.
  */
 std::pair<PROBE_OUTCOME, nlohmann::json>
-Probe_quantum_computer(IQM_QDMI_Device_Session session,
+Probe_quantum_computer(Session_state *session,
                        const iqm::API_ENDPOINT endpoint) {
   if (!session->quantum_computer_id_.has_value()) {
     return {PROBE_OUTCOME::UNSUPPORTED, {}};
@@ -2564,8 +2591,7 @@ Probe_quantum_computer(IQM_QDMI_Device_Session session,
  * @return Whether the quantum computer reported itself healthy, paired with the
  *         outcome of the probe.
  */
-std::pair<PROBE_OUTCOME, bool>
-Get_device_health(IQM_QDMI_Device_Session session) {
+std::pair<PROBE_OUTCOME, bool> Get_device_health(Session_state *session) {
   const auto [outcome, response] = Probe_quantum_computer(
       session, iqm::API_ENDPOINT::GET_QUANTUM_COMPUTER_HEALTH);
   if (outcome != PROBE_OUTCOME::ANSWERED) {
@@ -2585,7 +2611,7 @@ Get_device_health(IQM_QDMI_Device_Session session) {
  * @return The queue availability, paired with the outcome of the probe.
  */
 std::pair<PROBE_OUTCOME, Queue_availability>
-Get_queue_availability(IQM_QDMI_Device_Session session) {
+Get_queue_availability(Session_state *session) {
   const auto [outcome, response] = Probe_quantum_computer(
       session, iqm::API_ENDPOINT::GET_QUEUE_AVAILABILITY);
   if (outcome != PROBE_OUTCOME::ANSWERED) {
@@ -2607,7 +2633,7 @@ Get_queue_availability(IQM_QDMI_Device_Session session) {
   return {PROBE_OUTCOME::ANSWERED, availability};
 }
 
-std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
+std::optional<size_t> Get_queue_length(Session_state *session) {
   return Get_queue_availability(session).second.queue_length;
 }
 
@@ -2619,7 +2645,7 @@ std::optional<size_t> Get_queue_length(IQM_QDMI_Device_Session session) {
  * @param session Initialized device session
  * @return The status to report through @c QDMI_DEVICE_PROPERTY_STATUS
  */
-QDMI_Device_Status Get_device_status(IQM_QDMI_Device_Session session) {
+QDMI_Device_Status Get_device_status(Session_state *session) {
   const auto [health_outcome, healthy] = Get_device_health(session);
   if (health_outcome == PROBE_OUTCOME::ANSWERED && !healthy) {
     return QDMI_DEVICE_STATUS_MAINTENANCE;
@@ -2650,8 +2676,9 @@ QDMI_Device_Status Get_device_status(IQM_QDMI_Device_Session session) {
 } // namespace
 
 int IQM_QDMI_device_session_query_device_property(
-    IQM_QDMI_Device_Session session, const QDMI_Device_Property prop,
+    IQM_QDMI_Device_Session handle, const QDMI_Device_Property prop,
     const size_t size, void *value, size_t *size_ret) try {
+  auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || (value != nullptr && size == 0) ||
       QDMI_IS_INVALID_ENUM_VALUE(prop, QDMI_DEVICE_PROPERTY)) {
     return QDMI_ERROR_INVALIDARGUMENT;
@@ -2742,10 +2769,11 @@ int IQM_QDMI_device_session_query_site_property(IQM_QDMI_Device_Session session,
 }
 
 int IQM_QDMI_device_session_query_operation_property(
-    IQM_QDMI_Device_Session session, IQM_QDMI_Operation operation,
+    IQM_QDMI_Device_Session handle, IQM_QDMI_Operation operation,
     const size_t num_sites, const IQM_QDMI_Site *sites, const size_t num_params,
     const double *params, const QDMI_Operation_Property prop, const size_t size,
     void *value, size_t *size_ret) {
+  auto *session = handle == nullptr ? nullptr : handle->state_.get();
   if (session == nullptr || operation == nullptr ||
       (sites != nullptr && num_sites == 0) ||
       (params != nullptr && num_params == 0) ||

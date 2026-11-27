@@ -82,10 +82,10 @@ parameters for the session:
 - **Quantum Computer Alias** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM2`): Optional
   alias of the specific quantum computer to use. If not set, falls back to
   `IQM_QUANTUM_COMPUTER`, then the legacy `IQM_QC_ALIAS` alias.
-- **HTTP Request Timeout** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3`): Optional
-  positive `uint64_t` duration in milliseconds applied to every HTTP request
-  made by the session. If not set, each request uses the default one-hour
-  timeout.
+- **HTTP Request Timeout** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3`): Set a
+  positive `uint64_t` duration in milliseconds or a NUL-terminated string such
+  as `timeout_ms:5000`. Ordinary session requests default to one hour.
+  Reservation control requests default to 30 seconds.
 - **Calibration Set ID** (`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4`): Optional
   null-terminated canonical UUID string (lowercase hexadecimal). Set it before
   session initialization to select and pin the architecture, quality metrics,
