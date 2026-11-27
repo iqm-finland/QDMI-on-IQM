@@ -12,10 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
-- ✨ Submit circuit jobs within an IQM iteration from C and C++. ([#345])
-  ([**@marcelwa**])
-- ✨ Create, inspect, and end IQM iterations from C or C++ without opening a
-  device session. ([#326]) ([**@marcelwa**])
+- ✨ Reserve an IQM quantum computer and submit circuits to it through QDMI
+  jobs. ([#326]) ([**@marcelwa**])
 
 ## [1.6.1] - 2026-11-15
 
@@ -387,7 +385,6 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
-[#345]: https://github.com/iqm-finland/QDMI-on-IQM/pull/345
 [#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333

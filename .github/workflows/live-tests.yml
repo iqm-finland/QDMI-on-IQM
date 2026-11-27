@@ -165,7 +165,7 @@ jobs:
         if: ${{ success() && !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
 
-      - name: Configure standalone live target
+      - name: Configure the live device smoke test
         if: ${{ success() && !cancelled() }}
         run: cmake --preset release
 
@@ -174,7 +174,7 @@ jobs:
         if: ${{ success() && !cancelled() }}
         run: cmake --build --preset release --target iteration_smoke
 
-      - name: Create, inspect, and end without a device session
+      - name: Create, inspect, and end a reservation job
         id: management
         if: always() && steps.build.outcome == 'success'
         env: &iteration-live
@@ -187,7 +187,7 @@ jobs:
           fi
           ./build/release/test/iteration/iteration_smoke
 
-      - name: Run dependent circuits across two sessions
+      - name: Submit dependent circuits to a reservation
         if: always() && steps.management.outcome == 'success'
         env: *iteration-live
         run: |

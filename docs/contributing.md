@@ -264,8 +264,8 @@ ctest --test-dir build/release -L live --output-on-failure
 
 **Checking iteration management and circuit execution:**
 
-The live-test workflow checks iteration management and runs dependent circuits
-across two sessions on `emerald:mock`. To run these checks, configure the
+The live-test workflow runs two dependent circuits in one reservation on
+`emerald:mock` and exercises recovery by ID. To run these checks, configure the
 credentials described above, then run:
 
 ```console
@@ -279,11 +279,11 @@ IQM_LOG_LEVEL=ERROR ./build/release/test/iteration/iteration_smoke --circuits
 ./build/release/test/iteration/iteration_smoke --cleanup-only
 ```
 
-Each live check creates a reservation with a 60-second duration, waits up to 120
-seconds for activation, then tries to end it. Build the target explicitly. The
-file records created IDs until cleanup confirms they have ended. Keep it if
-cleanup fails, and rerun `--cleanup-only` with the same credentials. Cleanup has
-a separate 30-second budget.
+The circuit check submits the first circuit immediately after obtaining the
+reservation UUID and records the observed state. A run that first sees an active
+reservation only exercises active submission. Keep the ID file when cleanup
+fails. Run `--cleanup-only` with the same target and credentials to recover the
+reservation and confirm its terminal state.
 
 CI serializes this check across runs and attempts cleanup even after
 cancellation. Runner loss or force cancellation can still leave reservations
