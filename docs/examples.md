@@ -17,11 +17,13 @@ driving real quantum workloads on IQM systems using QDMI-on-IQM and the packaged
 
 Whether you want to estimate molecular ground-state energies with [QSCI][qsci]
 or benchmark hardware with [MQT Bench][mqt-bench], the example scripts in this
-repository provide a practical starting point. This tutorial focuses on two
+repository provide a practical starting point. The examples cover three
 application areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature]
   to estimate the ground-state energy of an H2 molecule.
+- **Combinatorial optimization:** using [QAOA][qaoa] to approximate Max-Cut on a
+  four-vertex cycle.
 - **Benchmarking:** running [MQT Bench][mqt-bench] programs such as
   [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
   [QFT][quantum-fourier-transform], [graph states][graph-state],
@@ -74,8 +76,33 @@ uvx nox -s examples
 
 # Run specific examples
 ./examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
+./examples/qaoa.py --backend sim --shots 128 --maxiter 8
 ./examples/mqt_bench.py --benchmark ghz --shots 128
 ```
+
+## Reserve a quantum computer for a showcase
+
+QSCI and QAOA submit circuits repeatedly as their classical optimizers choose
+new parameters. Use `--iteration-mode` to run those jobs in one
+[IQM iteration](iteration-mode.md#use-a-reservation-from-python).
+
+Set `IQM_SERVER_URL`, configure `IQM_TOKEN` or `IQM_TOKENS_FILE`, and select a
+quantum computer using `IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`. Choose a target
+with at least four qubits and direct qubit connectivity, such as `emerald:mock`
+on Resonance. The target must support iteration mode.
+
+```console
+./examples/qsci_h2.py --backend iqm --iteration-mode --shots 256 --maxiter 5
+./examples/qaoa.py --backend iqm --iteration-mode --shots 128 --maxiter 8
+```
+
+Each run requests one reservation for up to 15 minutes with a two-minute idle
+timeout. The optimizer can submit circuits without waiting for activation.
+Transpilation and classical work count toward the idle timeout once the
+reservation is active. On exit, the backend requests graceful end and waits for
+confirmation. Retain the UUID reported on cleanup failure for recovery.
+
+Use `--backend sim` for a local run without a reservation.
 
 ## Quantum Chemistry
 
@@ -181,6 +208,7 @@ authentication before running the script.
 [graph-state]: https://en.wikipedia.org/wiki/Graph_state
 [measurement-based-quantum-computing]: https://en.wikipedia.org/wiki/Measurement-based_quantum_computation
 [mqt-bench]: https://mqt.readthedocs.io/projects/bench/
+[qaoa]: https://arxiv.org/abs/1411.4028
 [qiskit-nature]: https://qiskit-community.github.io/qiskit-nature/
 [qsci]: https://arxiv.org/abs/2302.11320
 [quantum-fourier-transform]: https://en.wikipedia.org/wiki/Quantum_Fourier_transform

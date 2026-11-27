@@ -183,7 +183,7 @@ archs = "auto64"
 build-frontend = "uv"
 before-test = 'uv pip install --group "{project}/pyproject.toml:test"'
 test-command = "pytest test/python"
-test-sources = [ "test/python", "pyproject.toml" ]
+test-sources = [ "test/python", "examples", "pyproject.toml" ]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }

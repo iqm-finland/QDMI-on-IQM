@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Run the QSCI and Max-Cut QAOA examples inside an IQM iteration with
+  `--iteration-mode`. ([#358]) ([**@marcelwa**])
 - ✨ Reserve an IQM device with a Python context manager and attach Qiskit runs
   or primitives to the reservation. ([#357]) ([**@marcelwa**])
 - ✨ Run dependent circuits in an IQM reservation on Slurm and recover an
@@ -394,6 +396,7 @@ Compatible with QDMI `v1.3.0`.
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
 [#327]: https://github.com/iqm-finland/QDMI-on-IQM/pull/327
+[#358]: https://github.com/iqm-finland/QDMI-on-IQM/pull/358
 [#357]: https://github.com/iqm-finland/QDMI-on-IQM/pull/357
 [#326]: https://github.com/iqm-finland/QDMI-on-IQM/pull/326
 [#321]: https://github.com/iqm-finland/QDMI-on-IQM/pull/321

@@ -45,7 +45,9 @@ with backend.reservation(max_duration_seconds=60, idle_timeout_seconds=30) as re
 
 Use `counts` to choose the next circuit inside the block. On exit, the context
 requests graceful end and waits up to 300 seconds for confirmation, including
-when your code raises an exception. The original `backend` runs on demand.
+when your code raises an exception. The original `backend` runs on demand. The
+[QAOA and QSCI examples](examples.md#reserve-a-quantum-computer-for-a-showcase)
+show complete optimization loops using this context.
 
 To join an existing reservation, pass its UUID to
 `backend.run(compiled, reservation_id=reservation_id)`. If you use
