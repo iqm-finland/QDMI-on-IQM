@@ -96,11 +96,17 @@ circuit immediately and uses the result to choose the second circuit. Both
 circuits have their own job handles. The workload requests graceful end,
 confirms termination, and checks that IQM refuses another attached circuit.
 
-Check the allocation state, exit code, and granted license with
-`sacct -X --name=iqm-iteration-smoke --format=JobID,State,ExitCode,AllocTRES%60`.
-The smoke program's output reports whether it retrieved both circuit results and
-whether IQM rejected the post-end submission. A successful run leaves an empty
-ID file.
+Check the allocation state, exit code, and granted license for the past week:
+
+```bash
+sacct -X --starttime=now-7days --name=iqm-iteration-smoke,iqm-iteration-cleanup \
+  --format=JobID,JobName%24,State,ExitCode,AllocTRES%60
+```
+
+Use an earlier start time for older allocations. The recovery job is named
+`iqm-iteration-cleanup`. The smoke program's output reports whether it retrieved
+both circuit results and whether IQM rejected the post-end submission. A
+successful run leaves an empty ID file.
 
 If cancellation or node loss interrupts cleanup, keep the ID file. After the
 original Slurm job ends, request a new allocation from the login node. In a
@@ -112,11 +118,12 @@ uses the same server and Emerald mock as the original task.
 smoke="$PWD/build/release/test/iteration/iteration_smoke"
 export IQM_ITERATION_SCRATCH_FILE="${state_dir:?Set state_dir to the original recovery directory}/ids"
 export IQM_SERVER_URL=https://resonance.iqm.tech
-test -f "$IQM_ITERATION_SCRATCH_FILE" &&
+if [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
   srun --partition=quantum --licenses=iqm.emerald.mock:1 \
     --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-cleanup \
     --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
     IQM_LOG_LEVEL=ERROR "$smoke" --cleanup-only
+fi
 ```
 
 Cleanup removes each saved ID after confirming that its reservation has ended.
