@@ -60,19 +60,38 @@ class IterationError(RuntimeError):
         self, operation: str, qdmi_status: int, result: IterationResult, diagnostics: dict[str, str | int | bool]
     ) -> None:
         """Keep recovery information even when creation fails."""
-        message = f"IQM iteration {operation} failed (QDMI status {qdmi_status}, HTTP status {result.http_status})"
-        if detail := diagnostics.get("message"):
-            message += f". {detail}"
-        super().__init__(message)
+        super().__init__(operation, qdmi_status, result, diagnostics)
+        self.operation = operation
         self.qdmi_status = qdmi_status
         self.result = result
         self.diagnostics = diagnostics
+
+    def __str__(self) -> str:
+        """Describe the failure.
+
+        Returns:
+            The failing operation, status codes, and an escaped diagnostic.
+        """
+        message = (
+            f"IQM iteration {self.operation} failed"
+            f" (QDMI status {self.qdmi_status}, HTTP status {self.result.http_status})"
+        )
+        detail = self.diagnostics.get("message")
+        return f"{message}. {detail[:500]!r}" if isinstance(detail, str) and detail else message
 
 
 class _NativeResult(ctypes.Structure):
     """Match the caller-owned result in the installed iteration.h."""
 
     _fields_ = [("iteration_id", ctypes.c_char * 37), ("state", ctypes.c_char * 16), ("http_status", ctypes.c_int)]
+
+    def to_result(self) -> IterationResult:
+        """Copy the caller-owned fields.
+
+        Returns:
+            A Python result that owns its data.
+        """
+        return IterationResult(self.iteration_id.decode() or None, self.state.decode() or None, self.http_status)
 
 
 @cache
@@ -164,6 +183,7 @@ class IterationClient:
             operation = "client allocation"
             raise IterationError(operation, status, IterationResult(None, None, 0), {"message": msg})
         self._free = finalize(self, self._lib.IQM_QDMI_iteration_client_free, self._handle)
+        self._free.atexit = False
 
     def __enter__(self) -> Self:
         """Return the open client."""
@@ -193,10 +213,18 @@ class IterationClient:
             self._require_open()
             native = _NativeResult()
             function = getattr(self._lib, f"IQM_QDMI_iteration_{operation}")
-            status = function(self._handle, *args, timeout_ms, ctypes.byref(native))
-            result = IterationResult(
-                native.iteration_id.decode() or None, native.state.decode() or None, native.http_status
-            )
+            try:
+                status = function(self._handle, *args, timeout_ms, ctypes.byref(native))
+                result = native.to_result()
+            except KeyboardInterrupt as error:
+                if operation == "create":
+                    result = native.to_result()
+                    error.__dict__["result"] = result
+                    if result.iteration_id is not None:
+                        error.add_note(f"IQM confirmed iteration {result.iteration_id}. Keep this ID for recovery.")
+                    else:
+                        error.add_note("Check the server's iteration listing before requesting another reservation.")
+                raise
             if status:
                 raw = self._lib.IQM_QDMI_iteration_client_diagnostics(self._handle)
                 raise IterationError(operation, status, result, json.loads(raw) if raw else {})
@@ -213,7 +241,8 @@ class IterationClient:
         """Request an iteration for a quantum computer UUID or alias.
 
         If an `IterationError` carries an ID in its partial result, keep the
-        ID so you can end the reservation.
+        ID so you can end the reservation. An interrupt at the native call
+        boundary also carries the available result on the `KeyboardInterrupt`.
 
         Args:
             qc: Quantum computer UUID or alias.
