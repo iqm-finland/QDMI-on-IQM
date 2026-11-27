@@ -53,6 +53,16 @@ endforeach()
 file(RENAME "${prefix}" "${relocated}")
 
 file(
+  WRITE "${consumer}/main.c"
+  [=[
+#include "iqm_qdmi/device.h"
+
+int main(void) {
+  return IQM_QDMI_device_initialize() != QDMI_SUCCESS ||
+         IQM_QDMI_device_finalize() != QDMI_SUCCESS;
+}
+]=])
+file(
   CONFIGURE
   OUTPUT
   "${consumer}/CMakeLists.txt"
@@ -61,7 +71,7 @@ file(
 cmake_minimum_required(VERSION 3.24)
 project(installed-consumer LANGUAGES C)
 find_package(@package@ REQUIRED CONFIG PATHS "@relocated@" NO_DEFAULT_PATH)
-add_executable(consumer "@source@/test/iteration/iteration_exports.c")
+add_executable(consumer main.c)
 target_compile_features(consumer PRIVATE c_std_11)
 target_link_libraries(consumer PRIVATE iqm-qdmi-device)
 if(WIN32)

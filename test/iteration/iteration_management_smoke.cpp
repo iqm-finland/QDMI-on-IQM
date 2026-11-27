@@ -19,32 +19,34 @@
 
 #include "iteration_management_smoke.hpp"
 
-#include "iqm_qdmi/constants.h"
-#include "iqm_qdmi/iteration.h"
-
-#include <algorithm>
-#include <chrono>
-#include <cstdint>
+#include <array>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <thread>
 #include <vector>
 
 namespace iqm::test_support {
-namespace {
-using Clock = std::chrono::steady_clock;
-using std::chrono::milliseconds;
-using std::chrono::seconds;
+void Require_success(const int status, const std::string &operation) {
+  if (status != QDMI_SUCCESS) {
+    throw std::runtime_error(operation + " returned " + std::to_string(status));
+  }
+}
 
+Job Create_job(IQM_QDMI_Device_Session session) {
+  IQM_QDMI_Device_Job raw = nullptr;
+  Require_success(IQM_QDMI_device_session_create_device_job(session, &raw),
+                  "Create job");
+  return Job{raw, IQM_QDMI_device_job_free};
+}
+
+namespace {
 bool Canonical_id(const std::string &id) {
   if (id.size() != 36) {
     return false;
@@ -60,22 +62,6 @@ bool Canonical_id(const std::string &id) {
     }
   }
   return true;
-}
-bool Terminal(const IQM_QDMI_Iteration_Result &result) {
-  const std::string_view state{result.state};
-  return state == "completed" || state == "cancelled" || state == "failed";
-}
-uint64_t Budget(const Clock::time_point deadline) {
-  const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-      deadline - Clock::now());
-  return static_cast<uint64_t>(
-      std::clamp(remaining, milliseconds{0}, milliseconds{10000}).count());
-}
-void Report(IQM_QDMI_Iteration_Client client,
-            const IQM_QDMI_Iteration_Result &result) {
-  std::cout << "id=" << result.iteration_id << " state=" << result.state
-            << " http=" << result.http_status << '\n'
-            << IQM_QDMI_iteration_client_diagnostics(client) << '\n';
 }
 std::vector<std::string> Read_ids(const std::string &path) {
   const auto status = std::filesystem::status(path);
@@ -131,185 +117,172 @@ void Remove_id(const std::string &path, const std::string &id) {
   }
 }
 
-bool Cleanup(IQM_QDMI_Iteration_Client client, const std::string &id,
-             const Clock::time_point deadline) {
-  bool end_accepted = false;
-  auto delay = seconds{1};
-  while (Budget(deadline) > 0) {
-    IQM_QDMI_Iteration_Result result{};
-    const auto status =
-        IQM_QDMI_iteration_get(client, id.c_str(), Budget(deadline), &result);
-    Report(client, result);
-    if (result.http_status == 401 || result.http_status == 403 ||
-        result.http_status == 404) {
-      return false;
-    }
-    if (status == QDMI_SUCCESS && Terminal(result)) {
-      return true;
-    }
-    if (!end_accepted && Budget(deadline) > 0) {
-      const auto ended =
-          IQM_QDMI_iteration_end(client, id.c_str(), Budget(deadline), &result);
-      Report(client, result);
-      if (result.http_status == 401 || result.http_status == 403 ||
-          result.http_status == 404) {
-        return false;
-      }
-      if (ended == QDMI_SUCCESS) {
-        if (Terminal(result)) {
-          return true;
-        }
-        end_accepted = true;
-        continue; // Inspect immediately after an accepted asynchronous end.
-      }
-    }
-    const auto remaining = deadline - Clock::now();
-    if (remaining <= Clock::duration::zero()) {
-      break;
-    }
-    std::this_thread::sleep_for(std::min(Clock::duration{delay}, remaining));
-    delay = std::min(delay * 2, seconds{5});
+bool Terminal(const QDMI_Job_Status state) {
+  return state == QDMI_JOB_STATUS_DONE || state == QDMI_JOB_STATUS_FAILED ||
+         state == QDMI_JOB_STATUS_CANCELED;
+}
+
+QDMI_Job_Status Check(IQM_QDMI_Device_Job job) {
+  QDMI_Job_Status status{};
+  Require_success(IQM_QDMI_device_job_check(job, &status),
+                  "Inspect reservation");
+  return status;
+}
+
+void Set_reservation(IQM_QDMI_Device_Job job, const std::string &command) {
+  const size_t size = command.size() + 1;
+  const void *program = command.c_str();
+  Require_success(IQM_QDMI_device_job_set_programs(
+                      job, QDMI_PROGRAM_FORMAT_CUSTOM2, 1, &size, &program),
+                  "Set reservation program");
+}
+
+void End(IQM_QDMI_Device_Session session, const std::string &id) {
+  const auto end = Create_job(session);
+  Set_reservation(end.get(), R"({"end":")" + id + R"("})");
+  Require_success(IQM_QDMI_device_job_submit(end.get()),
+                  "End reservation " + id);
+  Require_success(IQM_QDMI_device_job_wait(end.get(), 30),
+                  "Wait for termination of " + id);
+  if (!Terminal(Check(end.get()))) {
+    throw std::runtime_error("Termination unconfirmed for " + id);
   }
-  std::cerr << "Termination unconfirmed for " << id << '\n';
-  return false;
+}
+
+void Reconcile(IQM_QDMI_Device_Session session, const std::string &id) {
+  if (!Canonical_id(id)) {
+    throw std::runtime_error("Invalid scratch ID");
+  }
+  IQM_QDMI_Device_Job raw = nullptr;
+  Require_success(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                      session, id.c_str(), &raw),
+                  "Retrieve reservation " + id);
+  const Job observer{raw, IQM_QDMI_device_job_free};
+  QDMI_Program_Format format{};
+  Require_success(IQM_QDMI_device_job_query_property(
+                      raw, QDMI_DEVICE_JOB_PROPERTY_PROGRAMFORMAT,
+                      sizeof(format), &format, nullptr),
+                  "Read retrieved job format");
+  if (format != QDMI_PROGRAM_FORMAT_CUSTOM2) {
+    throw std::runtime_error("Scratch ID belongs to a different kind of job");
+  }
+  if (!Terminal(Check(raw))) {
+    End(session, id);
+  }
 }
 } // namespace
 
-int Iteration_management_smoke(const bool cleanup_only,
-                               void (*check_circuits)(const char *qc,
-                                                      bool qc_is_id,
-                                                      const std::string &id,
-                                                      bool ended)) {
-  try {
-    const auto *scratch = std::getenv("IQM_ITERATION_SCRATCH_FILE");
-    if (scratch == nullptr || *scratch == '\0') {
-      std::cerr << "Set IQM_ITERATION_SCRATCH_FILE to runner-local ID recovery "
-                   "state\n";
-      return 1;
-    }
-    IQM_QDMI_Iteration_Client raw = nullptr;
-    const auto allocated =
-        IQM_QDMI_iteration_client_alloc(nullptr, nullptr, nullptr, 10000, &raw);
-    if (allocated != QDMI_SUCCESS) {
-      std::cerr << "Cannot allocate iteration client: " << allocated << '\n';
-      return 1;
-    }
-    const std::unique_ptr<IQM_QDMI_Iteration_Client_impl,
-                          decltype(&IQM_QDMI_iteration_client_free)>
-        client{raw, IQM_QDMI_iteration_client_free};
-    if (cleanup_only) {
-      const auto deadline = Clock::now() + seconds{30};
-      bool clean = true;
-      const auto ids = Read_ids(scratch);
-      auto remaining = std::ssize(ids);
-      for (const auto &id : ids) {
-        const auto now = Clock::now();
-        const auto until = now + (deadline - now) / remaining--;
-
-        if (!Canonical_id(id)) {
-          std::cerr << "Invalid scratch ID; no request issued\n";
-          clean = false;
-        } else if (Budget(until) > 0 && Cleanup(raw, id, until)) {
-          try {
-            Remove_id(scratch, id);
-          } catch (const std::exception &error) {
-            std::cerr << error.what() << '\n';
-            clean = false;
-          }
-        } else {
-          clean = false;
-        }
-      }
-      return clean ? 0 : 1;
-    }
-    const char *qc = std::getenv("IQM_QC_ID");
-    const bool qc_is_id = qc != nullptr && *qc != '\0';
-    if (!qc_is_id) {
-      qc = std::getenv("IQM_QUANTUM_COMPUTER");
-    }
-    if (qc == nullptr || *qc == '\0') {
-      qc = std::getenv("IQM_QC_ALIAS");
-    }
-    if (qc == nullptr || *qc == '\0') {
-      qc = "emerald:mock";
-    }
-    IQM_QDMI_Iteration_Result result{};
-    std::string id;
-    bool success = false;
-    try {
-      std::ofstream ledger{scratch, std::ios::app};
-      if (!ledger) {
-        throw std::runtime_error("Cannot open scratch file before creation");
-      }
-      const auto created =
-          IQM_QDMI_iteration_create(raw, qc, 60, 60, 30000, &result);
-      if (*result.iteration_id != '\0') {
-        id = result.iteration_id;
-        ledger << id << '\n';
-        ledger.close();
-        if (!ledger) {
-          throw std::runtime_error("Cannot persist confirmed iteration ID");
-        }
-      }
-      Report(raw, result);
-      if (created == QDMI_SUCCESS) {
-        const auto deadline = Clock::now() + seconds{120};
-        auto delay = seconds{1};
-        while (Budget(deadline) > 0) {
-          const auto inspected = IQM_QDMI_iteration_get(
-              raw, id.c_str(), Budget(deadline), &result);
-          Report(raw, result);
-          if (inspected != QDMI_SUCCESS) {
-            break;
-          }
-          if (std::string_view{result.state} == "active") {
-            if (check_circuits != nullptr) {
-              check_circuits(qc, qc_is_id, id, false);
-            }
-            success = true;
-            break;
-          }
-          if (Terminal(result)) {
-            break;
-          }
-          std::this_thread::sleep_for(
-              std::min(Clock::duration{delay}, deadline - Clock::now()));
-          delay = std::min(delay * 2, seconds{5});
-        }
-      }
-    } catch (const std::exception &error) {
-      std::cerr << error.what() << '\n';
-      success = false;
-    }
-    if (!id.empty()) {
-      if (Cleanup(raw, id, Clock::now() + seconds{30})) {
+void Iteration_management_smoke(IQM_QDMI_Device_Session session,
+                                const std::string &scratch,
+                                const bool cleanup_only,
+                                void (*check_circuits)(IQM_QDMI_Device_Session,
+                                                       const std::string &,
+                                                       bool)) {
+  if (cleanup_only) {
+    bool clean = true;
+    for (const auto &id : Read_ids(scratch)) {
+      try {
+        Reconcile(session, id);
         Remove_id(scratch, id);
-        if (success && check_circuits != nullptr) {
-          check_circuits(qc, qc_is_id, id, true);
-        }
-      } else {
-        success = false;
+      } catch (const std::exception &error) {
+        std::cerr << error.what() << '\n';
+        clean = false;
       }
     }
-    return success ? 0 : 1;
-  } catch (const std::exception &error) {
-    std::cerr << error.what() << '\n';
-    return 1;
+    if (!clean) {
+      throw std::runtime_error("Unconfirmed IDs remain in the scratch file");
+    }
+    return;
+  }
+
+  std::ofstream ledger{scratch, std::ios::app};
+  if (!ledger) {
+    throw std::runtime_error("Cannot open scratch file before creation");
+  }
+  const auto owner = Create_job(session);
+  Set_reservation(owner.get(),
+                  R"({"max_duration_seconds":60,"idle_timeout_seconds":15})");
+  const auto created = IQM_QDMI_device_job_submit(owner.get());
+  // A malformed status can follow a confirmed creation. Save its ID even then.
+  std::array<char, 37> buffer{};
+  const int queried = IQM_QDMI_device_job_query_property(
+      owner.get(), QDMI_DEVICE_JOB_PROPERTY_ID, buffer.size(), buffer.data(),
+      nullptr);
+  const std::string id{buffer.data()};
+  if (queried == QDMI_SUCCESS && Canonical_id(id)) {
+    ledger << id << '\n';
+    ledger.close();
+    if (!ledger) {
+      throw std::runtime_error("Cannot persist confirmed reservation ID " + id);
+    }
+    std::cout << "Reservation " << id << '\n';
+  }
+  Require_success(created, "Create reservation");
+  if (queried != QDMI_SUCCESS || !Canonical_id(id)) {
+    throw std::runtime_error(
+        "Creation did not return a canonical reservation ID");
+  }
+  const auto state = Check(owner.get());
+  if (state != QDMI_JOB_STATUS_QUEUED && state != QDMI_JOB_STATUS_RUNNING) {
+    throw std::runtime_error("Reservation ended before the smoke test");
+  }
+  if (check_circuits != nullptr) {
+    std::cout << "Reservation observed "
+              << (state == QDMI_JOB_STATUS_QUEUED ? "waiting" : "active")
+              << " immediately before the first circuit submission\n";
+    check_circuits(session, id, false);
+  }
+  End(session, id);
+  if (!Terminal(Check(owner.get()))) {
+    throw std::runtime_error("Owner did not observe the terminal reservation");
+  }
+  Remove_id(scratch, id);
+  if (check_circuits != nullptr) {
+    check_circuits(session, id, true);
   }
 }
 } // namespace iqm::test_support
 
 #ifndef IQM_ITERATION_SMOKE_NO_MAIN
-// Keep the portable main signature used by every supported compiler.
 // NOLINTNEXTLINE(misc-const-correctness)
 int main(const int argc, char **argv) {
-  if (argc == 2 && std::string_view{argv[1]} == "--circuits") {
-    return iqm::test_support::Run_iteration_circuits();
-  }
-  if (argc > 2 ||
-      (argc == 2 && std::string_view{argv[1]} != "--cleanup-only")) {
+  using namespace iqm::test_support;
+  const bool cleanup =
+      argc == 2 && std::string_view{argv[1]} == "--cleanup-only";
+  const bool circuits = argc == 2 && std::string_view{argv[1]} == "--circuits";
+  if (argc != 1 && !cleanup && !circuits) {
     return 1;
   }
-  return iqm::test_support::Iteration_management_smoke(argc == 2);
+  try {
+    const auto *scratch = std::getenv("IQM_ITERATION_SCRATCH_FILE");
+    if (scratch == nullptr || *scratch == '\0') {
+      throw std::runtime_error(
+          "Set IQM_ITERATION_SCRATCH_FILE to runner-local ID recovery state");
+    }
+    if (cleanup && Read_ids(scratch).empty()) {
+      return 0;
+    }
+    Require_success(IQM_QDMI_device_initialize(), "Initialize device");
+    {
+      IQM_QDMI_Device_Session raw = nullptr;
+      Require_success(IQM_QDMI_device_session_alloc(&raw), "Allocate session");
+      const std::unique_ptr<IQM_QDMI_Device_Session_impl_d,
+                            decltype(&IQM_QDMI_device_session_free)>
+          session{raw, IQM_QDMI_device_session_free};
+      constexpr std::string_view timeout = "timeout_ms:5000";
+      Require_success(IQM_QDMI_device_session_set_parameter(
+                          raw, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                          timeout.size() + 1, timeout.data()),
+                      "Set session timeout");
+      Require_success(IQM_QDMI_device_session_init(raw), "Initialize session");
+      Iteration_management_smoke(raw, scratch, cleanup,
+                                 circuits ? Check_circuits : nullptr);
+    }
+    Require_success(IQM_QDMI_device_finalize(), "Finalize device");
+    return 0;
+  } catch (const std::exception &error) {
+    std::cerr << error.what() << '\n';
+    return 1;
+  }
 }
 #endif
