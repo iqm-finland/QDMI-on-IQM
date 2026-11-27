@@ -42,9 +42,8 @@ set_target_properties(
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN 1)
 target_sources(
-  ${QDMI_INTERNAL_TARGET_NAME}
-  PRIVATE ${INTERNAL_SRC_FILES} ${PROJECT_SOURCE_DIR}/src/iqm_device.cpp
-          ${PROJECT_SOURCE_DIR}/src/iqm_iteration.cpp)
+  ${QDMI_INTERNAL_TARGET_NAME} PRIVATE ${INTERNAL_SRC_FILES}
+                                       ${PROJECT_SOURCE_DIR}/src/iqm_device.cpp)
 target_sources(
   ${QDMI_INTERNAL_TARGET_NAME}
   PUBLIC FILE_SET

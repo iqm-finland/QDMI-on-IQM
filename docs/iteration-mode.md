@@ -1,195 +1,95 @@
-# Manage an IQM iteration
+# Reserve a quantum computer with QDMI jobs
 
-Use an iteration to reserve a quantum computer for a limited time. From C or
-C++, you can create a reservation, check its status, and end it without opening
-a QDMI device session.
-
-The management functions are available in `iqm_qdmi/iteration.h`, included with
-the native library and Python wheels. Use the QDMI device interface to submit
-circuits within a reservation. See the [C/C++ API reference](capi/index.md) for
-the function signatures.
+An IQM reservation groups circuit jobs on one quantum computer. Open a QDMI
+device session, submit a reservation job, and read its ID. Each circuit you
+attach to that ID keeps its own job handle, status, and results.
 
 ## Before you start
 
-Set `IQM_SERVER_URL` to your IQM server, for example
-`https://resonance.iqm.tech`. Provide your personal workspace token through
-`IQM_TOKEN`, or set `IQM_TOKENS_FILE` to your token file. Use only one token
-source and keep tokens out of logs and command arguments.
+Select an iteration-enabled target with `IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`
+and configure `IQM_SERVER_URL`. Provide a workspace token with `job_execution`
+scope through `IQM_TOKEN` or `IQM_TOKENS_FILE`. Initialize the device session as
+usual. The reservation uses that session's credentials and target.
 
-Your token needs `job_execution` scope and access to the quantum computer. Use
-its alias, such as `emerald:mock`, or its UUID when creating an iteration. Your
-server must support iteration mode.
+## Request a reservation
 
-## Create an iteration
-
-Allocate a client, then request a reservation. This example allows up to 60
-seconds of use and ends the reservation after 60 idle seconds. Each request has
-a 30-second timeout.
-
-```c
-#include <iqm_qdmi/iteration.h>
-#include <stdio.h>
-#include <string.h>
-
-IQM_QDMI_Iteration_Client client = NULL;
-IQM_QDMI_Iteration_Result result = {0};
-int status = IQM_QDMI_iteration_client_alloc(NULL, NULL, NULL, 30000, &client);
-if (status != QDMI_SUCCESS) {
-    return 1;
-}
-
-status = IQM_QDMI_iteration_create(client, "emerald:mock", 60, 60,
-                                  30000, &result);
-if (result.iteration_id[0] != '\0') {
-    /* Save this ID so you can inspect or end the reservation later. */
-    printf("Iteration ID: %s\n", result.iteration_id);
-}
-if (status != QDMI_SUCCESS) {
-    fprintf(stderr, "%s\n", IQM_QDMI_iteration_client_diagnostics(client));
-}
-```
-
-Keep the returned ID even if creation reports an error: the reservation may
-already exist. Save it somewhere your application can recover after a restart.
-Continue with the examples below only when `result.iteration_id` is nonempty.
-Otherwise, follow the recovery steps under
-[Handle failures](iteration-mode.md#handle-failures).
-
-Choose a maximum duration between 1 and 2,700 seconds. Choose an idle timeout
-between 1 second and that maximum, or use `0` for the server default. Idle time
-includes your application's calculations while no job is running or queued. Both
-limits apply after activation; they do not limit time spent waiting for the
-quantum computer.
-
-## Check whether it is ready
-
-Pass the saved ID to `IQM_QDMI_iteration_get`. You can reuse `result` as shown:
-
-```c
-status = IQM_QDMI_iteration_get(client, result.iteration_id, 30000, &result);
-if (status == QDMI_SUCCESS) {
-    printf("Iteration status: %s\n", result.state);
-}
-```
-
-| Status                             | What to do                                                                   |
-| ---------------------------------- | ---------------------------------------------------------------------------- |
-| `waiting`                          | Wait, then check again. The server activates the reservation automatically.  |
-| `active`                           | The reservation is active. It may still stop accepting jobs if it is ending. |
-| `completed`, `cancelled`, `failed` | The reservation has ended.                                                   |
-
-Leave a delay between checks and set an overall waiting limit in your
-application. If you stop waiting, end the reservation so it does not activate
-later when you no longer need it.
-
-## Run circuits within the reservation
-
-Allocate a device session for the same quantum computer and set
-`QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5` before initializing it. Pass the
-lowercase iteration UUID as 36 characters followed by a NUL.
+Use `QDMI_PROGRAM_FORMAT_CUSTOM2` with one NUL-terminated JSON program. Specify
+`max_duration_seconds` from 1 through 2700. Omit `idle_timeout_seconds` or use
+zero for the server default. A positive idle timeout must fit within the maximum
+duration. Both limits start at activation.
 
 ```c
 #include <iqm_qdmi/device.h>
 #include <string.h>
 
-status = IQM_QDMI_device_initialize();
-if (status != QDMI_SUCCESS) {
-    return 1;
-}
-
-/* Set IQM_QUANTUM_COMPUTER to the alias used to create the iteration. */
-IQM_QDMI_Device_Session session = NULL;
-status = IQM_QDMI_device_session_alloc(&session);
-if (status == QDMI_SUCCESS) {
-    status = IQM_QDMI_device_session_set_parameter(
-        session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5,
-        strlen(result.iteration_id) + 1, result.iteration_id);
-}
-if (status == QDMI_SUCCESS) {
-    status = IQM_QDMI_device_session_init(session);
-}
-/* On success, submit and retrieve circuit results through the QDMI job API. */
-IQM_QDMI_device_session_free(session);
-IQM_QDMI_device_finalize();
+/* session is an initialized IQM_QDMI_Device_Session. */
+IQM_QDMI_Device_Job owner = NULL;
+const char request[] = "{\"max_duration_seconds\":60,\"idle_timeout_seconds\":15}";
+const void *programs[] = {request};
+const size_t sizes[] = {sizeof(request)};
+int status = IQM_QDMI_device_session_create_device_job(session, &owner);
+if (status == QDMI_SUCCESS)
+    status = IQM_QDMI_device_job_set_programs(
+        owner, QDMI_PROGRAM_FORMAT_CUSTOM2, 1, sizes, programs);
+if (status == QDMI_SUCCESS)
+    status = IQM_QDMI_device_job_submit(owner);
 ```
 
-You can submit IQM JSON or QIR circuits while the iteration is waiting or
-active. To use the same reservation in another session, set the same ID on that
-session. If the server refuses an iteration submission, check the device log for
-the server's error and request ID.
+Read `QDMI_DEVICE_JOB_PROPERTY_ID` into a 37-byte character buffer. Persist the
+UUID if the application needs to recover after a restart. Keep the owner handle
+alive throughout the workload.
+
+## Submit circuits
+
+Set `QDMI_DEVICE_JOB_PARAMETER_CUSTOM2` on each participating circuit job,
+before submission. The value is the lowercase reservation UUID, including the
+trailing NUL. This works with IQM JSON and QIR circuits.
+
+```c
+char id[37];
+status = IQM_QDMI_device_job_query_property(
+    owner, QDMI_DEVICE_JOB_PROPERTY_ID, sizeof(id), id, NULL);
+if (status == QDMI_SUCCESS)
+    status = IQM_QDMI_device_job_set_parameter(
+        circuit, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, strlen(id) + 1, id);
+if (status == QDMI_SUCCESS)
+    status = IQM_QDMI_device_job_submit(circuit);
+```
+
+The device forwards the submission to IQM immediately. An ordinary circuit
+without the ID uses on-demand execution. The same session can submit both kinds.
+Another session with access to the same target can also use the UUID.
+
+Use `job_check` on the reservation to distinguish `QUEUED` (waiting for IQM)
+from `RUNNING` (active). Use `job_wait` on a **circuit** to wait for its
+results. Waiting on the **reservation** waits for its terminal state.
 
 For a shared-cluster example, see
 [Run an IQM iteration on Slurm](slurm.md#run-an-iqm-iteration-on-slurm).
 
-If submission fails before you receive a job ID, check the server before
-resubmitting. A transfer timeout can occur after the server accepts the job.
-
-An iteration session defaults to a 30-second HTTP timeout. To override it, set
-session `CUSTOM3` before initialization with a positive `uint64_t` millisecond
-value or a NUL-terminated string such as `timeout_ms:5000`. The native job wait
-polls at intervals of up to five seconds. A finite wait limits its polling and
-HTTP budget. If the wait times out, check the job or wait again.
-
 ## End the reservation
 
-Call `IQM_QDMI_iteration_end` when you finish, including after an error or
-cancellation if you have an iteration ID:
+For checked cleanup, submit a second `CUSTOM2` job with one JSON program of the
+form `{"end":"<uuid>"}`. IQM allows running work to finish. Use a finite
+`job_wait` on the returned handle to confirm termination. An HTTP 202
+acknowledgement can arrive while the reservation is still active.
 
-```c
-status = IQM_QDMI_iteration_end(client, result.iteration_id, 30000, &result);
-if (status != QDMI_SUCCESS) {
-    fprintf(stderr, "%s\n", IQM_QDMI_iteration_client_diagnostics(client));
-} else if (strcmp(result.state, "active") == 0 || strcmp(result.state, "waiting") == 0) {
-    /* Check this ID with iteration_get until its status shows it has ended. */
-    printf("Waiting for running work to finish\n");
-}
-```
-
-HTTP status `202` acknowledges an asynchronous end request. Confirm termination
-from the returned state, polling if necessary until it is `completed`,
-`cancelled`, or `failed`. Start with a one-second delay and increase it to at
-most five seconds between checks. Set a cleanup deadline; running work can take
-up to five minutes to finish.
-
-If ending fails, keep the ID and retry within your cleanup deadline. Ending an
-iteration more than once is safe. Once an end request succeeds with `202`, keep
-checking its status instead of sending more end requests.
-
-Release the client when you no longer need it:
-
-```c
-IQM_QDMI_iteration_client_free(client);
-```
-
-:::{important}
-Freeing a client or device session does not end an iteration. Keep any ID whose
-cleanup is unfinished, and use it with a new client to check or end the
-reservation later. Server timeouts do not cancel a queued reservation.
-:::
+Freeing the creating handle makes a bounded best-effort request to end an
+unfinished reservation. For recovery, use the saved UUID with
+`IQM_QDMI_device_session_retrieve_device_job_by_id` in a fresh session. Freeing
+a retrieved handle releases it locally. Use the explicit end program to end the
+reservation from that session. Circuit cancellation remains a separate
+operation.
 
 ## Handle failures
 
-Check each function's return value against `QDMI_SUCCESS`. Call
-`IQM_QDMI_iteration_client_diagnostics(client)` for details, and copy its text
-before the next operation or before freeing the client.
+After a failed submission, check whether the owner exposes a confirmed UUID.
+Keep that ID for cleanup. If the server may have accepted creation but no ID was
+returned, ask the service administrator to reconcile the request using the
+target and request time before creating another reservation. A queued
+reservation can outlive its submitting process.
 
-- **Permission denied:** check the token, its `job_execution` scope, and access
-  to the selected quantum computer.
-- **Not found:** check the iteration ID and the server you connected to.
-- **Invalid argument:** check the alias, durations, and timeouts. This result
-  can also mean a rate limit; inspect the diagnostic message.
-- **Timeout:** the operation did not finish within its request budget. Keep any
-  returned ID and check its status before deciding what to do next.
-- **Server or response error:** keep any returned ID and check its status. If
-  the error persists, contact your service administrator with the diagnostic
-  message.
-- **Creation failed without an ID:** if diagnostics contain
-  `creation_uncertain: true`, do not create another reservation immediately. The
-  server may already have accepted the first request. Ask your service
-  administrator to identify it, using your target and request time. Never guess
-  an ID or end another user's reservation.
-
-Use positive timeouts in milliseconds. They cover network requests and
-rate-limit waits, but local token-file reads and response processing can extend
-the call. Use one client for sequential calls; allocate separate clients for
-concurrent work.
+On an end or wait error, retain the UUID, inspect the reservation, and retry
+cleanup within a deadline. Redacted device diagnostics include the server's
+request ID when available. Clear a persisted UUID only after observing `DONE`,
+`CANCELED`, or `FAILED`.
