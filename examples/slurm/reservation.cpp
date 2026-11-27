@@ -186,7 +186,7 @@ bool Run_circuit(IQM_QDMI_Device_Session session, const std::string &id,
   std::string circuit = R"({"name":"slurm-reservation","instructions":[)";
   if (flip) {
     circuit +=
-        R"({"name":"prx","locus":["QB1"],"args":{"angle":0.5,"phase":0.0}},)";
+        R"({"name":"prx","locus":["QB1"],"args":{"angle":3.141592653589793,"phase":0.0}},)";
   }
   circuit += R"({"name":"measure","locus":["QB1"],"args":{"key":"m"}}]})";
   const size_t size = circuit.size() + 1;
