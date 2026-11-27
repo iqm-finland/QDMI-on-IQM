@@ -25,6 +25,7 @@
 
 #include "cpr/connection_pool.h"
 #include "cpr/cprtypes.h"
+#include "cpr/error.h"
 #include "cpr/response.h"
 #include "gtest/gtest.h"
 
@@ -396,10 +397,11 @@ TEST(HttpClientTest, PostBorrowsBodyAcrossRetriesWithoutRequestingContinue) {
     auto stub_post = post_hook;
     post_hook = [&](const auto &url, const auto &token, const auto &pool,
                     const auto &headers, const std::string_view body,
-                    const auto timeout) {
+                    const auto timeout, const auto follow_redirects) {
       EXPECT_EQ(body.data(), payload.data());
       EXPECT_EQ(body, payload);
-      return stub_post(url, token, pool, headers, body, timeout);
+      return stub_post(url, token, pool, headers, body, timeout,
+                       follow_redirects);
     };
 
     EXPECT_EQ(iqm::http::Post("https://example.test/jobs", std::nullopt,
@@ -676,6 +678,20 @@ TEST_F(RateLimitTest, AMalformedThresholdFallsBackToTheDefault) {
   EXPECT_NE(logger_capture.str().find(
                 "must be a whole percentage between 0 and 100; using 10"),
             std::string::npos);
+}
+
+TEST(HttpDeadline, SubMillisecondRemainderDoesNotStartRequest) {
+  // Hooks must record unexpected requests through their captured mutable this.
+  // NOLINTNEXTLINE(misc-const-correctness)
+  iqm::test_support::HttpStub http;
+  const cpr::ConnectionPool pool;
+  const auto deadline =
+      iqm::http::internal::Get_hooks().now() + std::chrono::microseconds{500};
+  const auto response =
+      iqm::http::Get("https://example.test", std::nullopt, pool,
+                     std::chrono::seconds{10}, deadline, nullptr);
+  EXPECT_EQ(response.error.code, cpr::ErrorCode::OPERATION_TIMEDOUT);
+  EXPECT_TRUE(http.get_urls().empty());
 }
 
 } // namespace

@@ -100,13 +100,13 @@ cpr::Response Get(const cpr::Url &url,
 /// rate-limit retries.
 /// @param rate_limit Quota the calling session last saw, updated in place.
 /// A request belonging to no session passes nullptr and relies on Retry-After.
+/// @param follow_redirects Whether to follow server redirects.
 /// @return CPR response object.
-cpr::Response Post(const cpr::Url &url,
-                   const std::optional<cpr::Bearer> &bearer_token,
-                   const cpr::ConnectionPool &connection_pool,
-                   std::string_view data,
-                   std::chrono::milliseconds timeout = std::chrono::hours{1},
-                   Rate_limit_budget *rate_limit = nullptr);
+cpr::Response
+Post(const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
+     const cpr::ConnectionPool &connection_pool, std::string_view data,
+     std::chrono::milliseconds timeout = std::chrono::hours{1},
+     Rate_limit_budget *rate_limit = nullptr, bool follow_redirects = true);
 
 /**
  * @brief Classify an HTTP response and log diagnostics.
@@ -116,6 +116,24 @@ cpr::Response Post(const cpr::Url &url,
 QDMI_STATUS Handle_response(
     const cpr::Response &response,
     ERROR_LOG_POLICY error_log_policy = ERROR_LOG_POLICY::LOG_AS_ERROR);
+
+/// @brief GET with an attempt cap and absolute operation deadline; no
+/// redirects.
+cpr::Response Get(const cpr::Url &url,
+                  const std::optional<cpr::Bearer> &bearer_token,
+                  const cpr::ConnectionPool &connection_pool,
+                  std::chrono::milliseconds request_timeout,
+                  std::chrono::steady_clock::time_point deadline,
+                  Rate_limit_budget *rate_limit);
+/// @brief POST with an attempt cap and absolute operation deadline; no
+/// redirects.
+cpr::Response Post(const cpr::Url &url,
+                   const std::optional<cpr::Bearer> &bearer_token,
+                   const cpr::ConnectionPool &connection_pool,
+                   std::string_view data,
+                   std::chrono::milliseconds request_timeout,
+                   std::chrono::steady_clock::time_point deadline,
+                   Rate_limit_budget *rate_limit);
 
 namespace internal {
 /// Resolve CURL_CA_BUNDLE, then SSL_CERT_FILE, then a readable Linux system
@@ -162,16 +180,17 @@ struct Hooks {
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      std::chrono::milliseconds timeout)>
+      std::chrono::milliseconds timeout, bool follow_redirects)>
       get;
   /// Hook for POST requests.
   std::function<cpr::Response(
       const cpr::Url &url, const std::optional<cpr::Bearer> &bearer_token,
       const cpr::ConnectionPool &connection_pool, const cpr::Header &headers,
-      std::string_view body, std::chrono::milliseconds timeout)>
+      std::string_view body, std::chrono::milliseconds timeout,
+      bool follow_redirects)>
       post;
-  /// Hook for the retry backoff delay, given a delay in seconds.
-  std::function<void(int)> sleep;
+  /// Hook for retry and job-polling delays.
+  std::function<void(std::chrono::milliseconds)> sleep;
   /// Hook for the monotonic clock behind request deadlines and the rate-limit
   /// window. Tests replace it with one the stubbed sleep advances.
   std::function<std::chrono::steady_clock::time_point()> now;

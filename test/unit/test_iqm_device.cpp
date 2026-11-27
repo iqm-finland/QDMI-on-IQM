@@ -26,6 +26,7 @@
 #include "logging.hpp"
 #include "qdmi_client.hpp"
 
+#include "cpr/error.h"
 #include "cpr/response.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -40,11 +41,14 @@
 #include <cstring>
 #include <exception>
 #include <iostream>
+#include <limits>
+#include <memory>
 #include <new>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -480,7 +484,9 @@ protected:
       "warnings": []
     })";
 
-  void SetUp() override {
+  void SetUp() override { allocate_local_session(); }
+
+  void allocate_local_session() {
     EXPECT_EQ(IQM_QDMI_device_initialize(), QDMI_SUCCESS);
     EXPECT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
     const std::string base_url = "https://localhost";
@@ -554,7 +560,10 @@ protected:
 
   void SetUp() override {
     DeviceIntegrationMockTest::SetUp();
+    initialize_job();
+  }
 
+  void initialize_job() {
     queue_successful_initialization();
 
     ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
@@ -568,6 +577,26 @@ protected:
       IQM_QDMI_device_job_free(job);
     }
     DeviceIntegrationMockTest::TearDown();
+  }
+};
+
+class IterationJobMockTest : public DeviceJobMockTest {
+protected:
+  static constexpr std::string_view ITERATION_ID =
+      "4286b859-30a7-4036-8c25-1e42ddd85c0e";
+  static constexpr std::string_view TEST_TOKEN = "example-iteration-test-token";
+
+  void SetUp() override {
+    allocate_local_session();
+    ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                  session, QDMI_DEVICE_SESSION_PARAMETER_TOKEN,
+                  TEST_TOKEN.size() + 1, TEST_TOKEN.data()),
+              QDMI_SUCCESS);
+    initialize_job();
+    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                  job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                  ITERATION_ID.size() + 1, ITERATION_ID.data()),
+              QDMI_SUCCESS);
   }
 };
 
@@ -1008,15 +1037,10 @@ TEST_F(DeviceTest, SessionParameterInvalidArguments) {
             QDMI_ERROR_INVALIDARGUMENT);
 }
 
-TEST_F(DeviceTest, SessionParameterUnsupportedParameters) {
-  // Test unsupported custom parameters
+TEST_F(DeviceTest, SessionParameterInvalidValues) {
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4, 6, "value"),
             QDMI_ERROR_INVALIDARGUMENT);
-  EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
-                session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM5, 6, "value"),
-            QDMI_ERROR_NOTSUPPORTED);
-
   // Test MAX parameter
   EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
                 session, QDMI_DEVICE_SESSION_PARAMETER_MAX, 6, "value"),
@@ -1300,7 +1324,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
   auto &get_hook = iqm::http::internal::Get_hooks().get;
 
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     throw iqm::ClientAuthenticationError{"expired token"};
   };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1310,6 +1334,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
+                const auto,
                 const auto) -> cpr::Response { throw std::bad_alloc{}; };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
                 session, "job-123", &retrieved_job),
@@ -1318,7 +1343,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     throw std::runtime_error{"transport hook failed"};
   };
   EXPECT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
@@ -1328,7 +1353,7 @@ TEST_F(DeviceJobMockTest, RetrieveExistingJobContainsBoundaryExceptions) {
 
   retrieved_job = job;
   get_hook = [](const auto &, const auto &, const auto &, const auto &,
-                const auto) -> cpr::Response {
+                const auto, const auto) -> cpr::Response {
     // Exercise the C ABI's catch-all handler for non-standard exceptions.
     // NOLINTNEXTLINE(bugprone-std-exception-baseclass)
     throw 42;
@@ -1532,6 +1557,112 @@ TEST_F(DeviceJobMockTest, JobWaitRemainsRetryableAfterTransportFailure) {
   QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
   EXPECT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
   EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+}
+
+TEST_F(IterationJobMockTest, WaitClampsStatusRequestsAndSleepToDeadline) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  http_stub.queue_get(429, {}, {{"Retry-After", "1"}});
+  http_stub.queue_get(200, R"({"status":"running"})");
+  const auto &hooks = iqm::http::internal::Get_hooks();
+  const auto start = hooks.now();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 2), QDMI_ERROR_TIMEOUT);
+  EXPECT_EQ(hooks.now() - start, std::chrono::seconds{2});
+  const auto &timeouts = http_stub.get_timeouts();
+  ASSERT_EQ(timeouts.size(), 7U);
+  EXPECT_EQ(timeouts.at(5), std::chrono::seconds{2});
+  EXPECT_EQ(timeouts.at(6), std::chrono::seconds{1});
+}
+
+TEST_F(IterationJobMockTest, StatusRequestThatUsesRemainingTimeTimesOut) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get_connection_error();
+  auto &hooks = iqm::http::internal::Get_hooks();
+  hooks.get = [this, get = hooks.get](const auto &...args) {
+    http_stub.advance(std::chrono::seconds{2});
+    auto response = get(args...);
+    response.error.code = cpr::ErrorCode::OPERATION_TIMEDOUT;
+    return response;
+  };
+  const auto start = hooks.now();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 2), QDMI_ERROR_TIMEOUT);
+  EXPECT_EQ(hooks.now() - start, std::chrono::seconds{2});
+  EXPECT_EQ(http_stub.get_timeouts().back(), std::chrono::seconds{2});
+}
+
+TEST_F(IterationJobMockTest, WaitDoesNotRoundSleepPastDeadline) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"status":"running"})");
+  constexpr auto transfer_time = std::chrono::microseconds{1999500};
+  auto &hooks = iqm::http::internal::Get_hooks();
+  hooks.get = [this, get = hooks.get, transfer_time](const auto &...args) {
+    http_stub.advance(transfer_time);
+    return get(args...);
+  };
+  const auto start = hooks.now();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 2), QDMI_ERROR_TIMEOUT);
+  EXPECT_EQ(hooks.now() - start, transfer_time);
+  EXPECT_EQ(http_stub.sleep_call_count(), 0U);
+}
+
+TEST_F(IterationJobMockTest, CompletionObservedAtDeadlineIsKept) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  auto &hooks = iqm::http::internal::Get_hooks();
+  hooks.get = [this, get = hooks.get](const auto &...args) {
+    http_stub.advance(std::chrono::seconds{2});
+    return get(args...);
+  };
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 2), QDMI_SUCCESS);
+  QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &status), QDMI_SUCCESS);
+  EXPECT_EQ(status, QDMI_JOB_STATUS_DONE);
+  EXPECT_EQ(http_stub.get_urls().size(), 6U);
+}
+
+TEST_F(IterationJobMockTest, WaitPollsWithinFiveSecondsAfterBackoff) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  for (size_t poll = 0; poll < 5; ++poll) {
+    http_stub.queue_get(200, R"({"status":"running"})");
+  }
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  const auto &hooks = iqm::http::internal::Get_hooks();
+  const auto start = hooks.now();
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  EXPECT_EQ(hooks.now() - start, std::chrono::seconds{17});
+  EXPECT_EQ(http_stub.get_urls().size(), 11U);
+}
+
+TEST_F(IterationJobMockTest, LargeFiniteWaitKeepsRequestTimeout) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, std::numeric_limits<size_t>::max()),
+            QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_timeouts().back(), std::chrono::seconds{30});
 }
 
 TEST_F(DeviceJobMockTest, FullLifecycle) {
@@ -2567,7 +2698,8 @@ TEST_F(DeviceIntegrationMockTest, SessionInitializationContainsCxxExceptions) {
   const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
                                            const int expected_status) {
     get_hook = [exception](const auto &, const auto &, const auto &,
-                           const auto &, const auto) -> cpr::Response {
+                           const auto &, const auto,
+                           const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     EXPECT_EQ(IQM_QDMI_device_session_init(session), expected_status);
@@ -2819,6 +2951,416 @@ private:
   std::stringstream stream_;
   iqm::LOG_LEVEL previous_level_;
 };
+
+class ReservationJobTest : public DeviceJobMockTest {
+protected:
+  static constexpr const char *ID = "12345678-1234-1234-abcd-123456789abc";
+  static constexpr const char *CREATE =
+      R"({"max_duration_seconds":60,"idle_timeout_seconds":15})";
+
+  static std::string reply(const std::string &state) {
+    return nlohmann::json{{"id", ID}, {"status", state}}.dump();
+  }
+
+  static int set_command(IQM_QDMI_Device_Job target,
+                         const std::string &command) {
+    const size_t size = command.size() + 1;
+    const void *program = command.c_str();
+    return IQM_QDMI_device_job_set_programs(target, QDMI_PROGRAM_FORMAT_CUSTOM2,
+                                            1, &size, &program);
+  }
+};
+
+TEST_F(ReservationJobTest, ValidatesOneReservationCommandBeforeNetwork) {
+  const auto formats = QDMIClient{session}.get_supported_program_formats();
+  EXPECT_NE(std::ranges::find(formats, QDMI_PROGRAM_FORMAT_CUSTOM2),
+            formats.end());
+  EXPECT_EQ(IQM_QDMI_device_job_set_programs(job, QDMI_PROGRAM_FORMAT_CUSTOM2,
+                                             2, nullptr, nullptr),
+            QDMI_ERROR_INVALIDARGUMENT);
+  for (
+      const auto *invalid : {
+          "{}",
+          "null",
+          "?",
+          R"({"max_duration_seconds":0})",
+          R"({"max_duration_seconds":2701})",
+          R"({"max_duration_seconds":false})",
+          R"({"max_duration_seconds":60,"idle_timeout_seconds":61})",
+          R"({"max_duration_seconds":60,"unexpected":1})",
+          R"({"end":"../../other"})",
+          R"({"end":"12345678-1234-1234-abcd-123456789abc","max_duration_seconds":1})",
+      }) {
+    EXPECT_EQ(set_command(job, invalid), QDMI_ERROR_INVALIDARGUMENT) << invalid;
+  }
+  EXPECT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, strlen(ID) + 1, ID),
+            QDMI_ERROR_NOTSUPPORTED);
+  EXPECT_TRUE(http_stub.post_urls().empty());
+}
+
+TEST_F(ReservationJobTest,
+       WaitingReservationAllowsAssociatedAndOrdinaryCircuits) {
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  http_stub.queue_post(200, reply("waiting"));
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(QDMIClient::get_job_id(job), ID);
+  const auto body = nlohmann::json::parse(http_stub.post_bodies().at(0));
+  EXPECT_EQ(body.at("max_duration_seconds"), 60);
+  EXPECT_EQ(body.at("idle_timeout_seconds"), 15);
+  EXPECT_EQ(body.at("qc"), "01966208-f3ec-73b7-890d-100000000000");
+  QDMI_Job_Status state{};
+  http_stub.queue_get(200, reply("waiting"));
+  ASSERT_EQ(IQM_QDMI_device_job_check(job, &state), QDMI_SUCCESS);
+  EXPECT_EQ(state, QDMI_JOB_STATUS_QUEUED);
+
+  const auto reads = http_stub.get_urls().size();
+  for (const bool associated : {true, false}) {
+    const auto circuit = QDMIClient{session}.create_job();
+    if (associated) {
+      ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                    circuit.get(), QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                    strlen(ID) + 1, ID),
+                QDMI_SUCCESS);
+    }
+    ASSERT_EQ(Set_program(circuit.get(), strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
+    http_stub.queue_post(200, R"({"id":"circuit-job"})");
+    EXPECT_EQ(IQM_QDMI_device_job_submit(circuit.get()), QDMI_SUCCESS);
+    EXPECT_EQ(
+        http_stub.post_urls().back(),
+        "https://localhost/api/v1/jobs/default/circuit" +
+            (associated ? std::string("?iteration_id=") + ID : std::string{}));
+  }
+  EXPECT_EQ(http_stub.get_urls().size(), reads);
+
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(job), QDMI_ERROR_NOTSUPPORTED);
+  http_stub.queue_get(200, reply("active"));
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &state), QDMI_SUCCESS);
+  EXPECT_EQ(state, QDMI_JOB_STATUS_RUNNING);
+  http_stub.queue_get(200, reply("active"));
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 1), QDMI_ERROR_TIMEOUT);
+  http_stub.queue_get(200, reply("completed"));
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 3), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_check(job, &state), QDMI_SUCCESS);
+  EXPECT_EQ(state, QDMI_JOB_STATUS_DONE);
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_SHOTS, 0,
+                                            nullptr, nullptr),
+            QDMI_ERROR_NOTSUPPORTED);
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(http_stub.post_urls().size(), 3U);
+}
+
+TEST_F(ReservationJobTest, RecoveryFallsBackOnlyOnCircuitNotFound) {
+  IQM_QDMI_Device_Job recovered = nullptr;
+  for (const auto code : {401, 403, 500}) {
+    const auto reads = http_stub.get_urls().size();
+    http_stub.queue_get(code);
+    EXPECT_NE(IQM_QDMI_device_session_retrieve_device_job_by_id(session, ID,
+                                                                &recovered),
+              QDMI_SUCCESS);
+    EXPECT_EQ(http_stub.get_urls().size(), reads + 1);
+    EXPECT_EQ(recovered, nullptr);
+  }
+  const auto circuit_reads = http_stub.get_urls().size();
+  http_stub.queue_get(200, R"({"type":"circuit","status":"completed"})")
+      .queue_get(200, R"({"circuits":[{"instructions":[]}],"shots":1})");
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, ID,
+                                                              &recovered),
+            QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_urls().size(), circuit_reads + 2);
+  EXPECT_TRUE(http_stub.get_urls().back().ends_with("/payload"));
+  IQM_QDMI_device_job_free(recovered);
+  recovered = nullptr;
+  http_stub.queue_get(404).queue_get(200, reply("active"));
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, ID,
+                                                              &recovered),
+            QDMI_SUCCESS);
+  const auto &urls = http_stub.get_urls();
+  EXPECT_EQ(urls.at(urls.size() - 2),
+            std::string("https://localhost/api/v1/jobs/") + ID);
+  EXPECT_EQ(urls.back(),
+            std::string("https://localhost/api/v1/iterations/") + ID);
+  EXPECT_EQ(QDMIClient::get_job_id(recovered), ID);
+  EXPECT_EQ(IQM_QDMI_device_job_cancel(recovered), QDMI_ERROR_NOTSUPPORTED);
+  IQM_QDMI_device_job_free(recovered);
+  EXPECT_TRUE(http_stub.post_urls().empty());
+}
+
+TEST_F(ReservationJobTest, FreeOwnerMakesOneBoundedEndRequest) {
+  http_stub.queue_post(200, reply("active")).queue_post(202, "");
+  const auto reads = http_stub.get_urls().size();
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(http_stub.post_urls().size(), 2U);
+  EXPECT_EQ(http_stub.post_urls().back(),
+            std::string("https://localhost/api/v1/iterations/") + ID + "/end");
+  EXPECT_EQ(http_stub.get_urls().size(), reads);
+  EXPECT_LE(http_stub.post_timeouts().back(), std::chrono::seconds{30});
+}
+
+TEST_F(ReservationJobTest, JobsRetainTheirTransportAfterClosingTheSession) {
+  http_stub.queue_post(200, reply("active")).queue_post(202);
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  http_stub.queue_get(404).queue_get(200, reply("active"));
+  IQM_QDMI_Device_Job recovered = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(session, ID,
+                                                              &recovered),
+            QDMI_SUCCESS);
+  IQM_QDMI_device_session_free(session);
+  session = nullptr;
+
+  // Releasing the original owner still sends the end request with its
+  // transport.
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  ASSERT_EQ(http_stub.post_urls().size(), 2U);
+  EXPECT_TRUE(http_stub.post_urls().back().ends_with("/end"));
+  EXPECT_EQ(http_stub.post_connection_pools().front(),
+            http_stub.post_connection_pools().back());
+
+  http_stub.queue_get(200, reply("completed"));
+  QDMI_Job_Status state{};
+  EXPECT_EQ(IQM_QDMI_device_job_check(recovered, &state), QDMI_SUCCESS);
+  EXPECT_EQ(state, QDMI_JOB_STATUS_DONE);
+  IQM_QDMI_device_job_free(recovered);
+  EXPECT_EQ(http_stub.post_urls().size(), 2U);
+}
+
+TEST_F(ReservationJobTest, AmbiguousCreationCannotBeReplayedOnTheSameHandle) {
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  http_stub.queue_post_connection_error();
+  const ScopedLogCapture capture;
+  EXPECT_NE(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_NE(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_NE(capture.str().find("uncertain"), std::string::npos);
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+}
+
+TEST_F(ReservationJobTest, CreateRetriesOnlyExplicitRateLimitRefusals) {
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  http_stub.queue_post(429, "", {{"Retry-After", "1"}})
+      .queue_post(200, reply("completed"));
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.sleep_durations(), (std::vector<int>{1}));
+  EXPECT_EQ(http_stub.post_urls().size(), 2U);
+  for (const auto &[http, expected] : std::array{
+           std::pair{403, QDMI_ERROR_PERMISSIONDENIED},
+           std::pair{500, QDMI_ERROR_FATAL},
+           std::pair{504, QDMI_ERROR_TIMEOUT},
+       }) {
+    const auto creation = QDMIClient{session}.create_job();
+    ASSERT_EQ(set_command(creation.get(), CREATE), QDMI_SUCCESS);
+    const auto posts = http_stub.post_urls().size();
+    const ScopedLogCapture capture;
+    http_stub.queue_post(http, R"({"request_id":"trace-id"})");
+    EXPECT_EQ(IQM_QDMI_device_job_submit(creation.get()), expected);
+    EXPECT_NE(capture.str().find("trace-id"), std::string::npos);
+    EXPECT_EQ(capture.str().find("creation_uncertain") != std::string::npos,
+              http >= 500);
+    EXPECT_EQ(http_stub.post_urls().size(), posts + 1);
+  }
+}
+
+TEST_F(ReservationJobTest, MalformedStatusPreservesConfirmedIdAndOwnership) {
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  http_stub
+      .queue_post(
+          200,
+          R"({"id":"12345678-1234-1234-ABCD-123456789ABC","status":"unexpected"})")
+      .queue_post(200, reply("completed"));
+  EXPECT_NE(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(QDMIClient::get_job_id(job), ID);
+  EXPECT_NE(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(http_stub.post_urls().size(), 2U);
+  EXPECT_TRUE(http_stub.post_urls().back().ends_with("/end"));
+}
+
+TEST_F(ReservationJobTest, ExplicitEndDoesNotIssueAnotherEndWhenFreed) {
+  ASSERT_EQ(set_command(job, nlohmann::json{{"end", ID}}.dump()), QDMI_SUCCESS);
+  http_stub.queue_post(202);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  EXPECT_EQ(QDMIClient::get_job_id(job), ID);
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+}
+
+TEST_F(ReservationJobTest, TerminalStatesAreCachedWithoutCleanupTraffic) {
+  for (const auto &[native, mapped] : std::array{
+           std::pair{"completed", QDMI_JOB_STATUS_DONE},
+           std::pair{"cancelled", QDMI_JOB_STATUS_CANCELED},
+           std::pair{"failed", QDMI_JOB_STATUS_FAILED},
+       }) {
+    const auto owner = QDMIClient{session}.create_job();
+    ASSERT_EQ(set_command(owner.get(), CREATE), QDMI_SUCCESS);
+    http_stub.queue_post(200, reply(native));
+    ASSERT_EQ(IQM_QDMI_device_job_submit(owner.get()), QDMI_SUCCESS);
+    const auto reads = http_stub.get_urls().size();
+    QDMI_Job_Status status{};
+    EXPECT_EQ(IQM_QDMI_device_job_check(owner.get(), &status), QDMI_SUCCESS);
+    EXPECT_EQ(status, mapped);
+    EXPECT_EQ(IQM_QDMI_device_job_wait(owner.get(), 1), QDMI_SUCCESS);
+    EXPECT_EQ(http_stub.get_urls().size(), reads);
+  }
+  EXPECT_EQ(http_stub.post_urls().size(), 3U);
+}
+
+TEST_F(ReservationJobTest, FreshSessionRetrievesAndEndsReservationById) {
+  http_stub.queue_post(200, reply("waiting"));
+  ASSERT_EQ(set_command(job, CREATE), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  const auto id = QDMIClient::get_job_id(job);
+
+  // The creating process could not confirm cleanup before its session closed.
+  http_stub.queue_post_connection_error();
+  IQM_QDMI_device_job_free(job);
+  job = nullptr;
+  IQM_QDMI_device_session_free(session);
+  session = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
+  constexpr std::string_view url = "https://localhost";
+  ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL, url.size() + 1,
+                url.data()),
+            QDMI_SUCCESS);
+  ASSERT_NO_FATAL_FAILURE(initialize_job());
+
+  http_stub.queue_get(404).queue_get(200, reply("active"));
+  IQM_QDMI_Device_Job recovered = nullptr;
+  ASSERT_EQ(IQM_QDMI_device_session_retrieve_device_job_by_id(
+                session, id.c_str(), &recovered),
+            QDMI_SUCCESS);
+  EXPECT_EQ(QDMIClient::get_job_id(recovered), id);
+  IQM_QDMI_device_job_free(recovered);
+  http_stub.queue_post(202).queue_get(200, reply("completed"));
+  ASSERT_EQ(set_command(job, nlohmann::json{{"end", id}}.dump()), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_wait(job, 3), QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.post_urls().size(), 3U);
+}
+
+TEST_F(IterationJobMockTest,
+       QirSubmissionLogsSanitizedRejectionWithoutFallback) {
+  constexpr std::string_view program = "legacy QIR";
+  const void *data = program.data();
+  const size_t size = program.size() + 1;
+  ASSERT_EQ(IQM_QDMI_device_job_set_programs(
+                job, QDMI_PROGRAM_FORMAT_QIRBASESTRING, 1, &size, &data),
+            QDMI_SUCCESS);
+  http_stub.queue_post(
+      404,
+      R"({"error_code":"iteration_not_found","message":"Missing\niteration","request_id":"request-1"})");
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_NOTFOUND);
+  ASSERT_EQ(http_stub.post_urls().size(), 1U);
+  EXPECT_EQ(http_stub.post_urls().front(),
+            "https://localhost/api/v1/jobs/default/circuit?"
+            "iteration_id=4286b859-30a7-4036-8c25-1e42ddd85c0e");
+  EXPECT_NE(log_capture.str().find("iteration_not_found"), std::string::npos);
+  EXPECT_NE(log_capture.str().find("request-1"), std::string::npos);
+  EXPECT_NE(log_capture.str().find("Missing\\niteration"), std::string::npos);
+}
+
+TEST_F(IterationJobMockTest, ReservedCircuitSubmissionMapsConflictAndTimeout) {
+  for (const auto &[http, status] : std::array{
+           std::pair{409, QDMI_ERROR_INVALIDARGUMENT},
+           std::pair{504, QDMI_ERROR_TIMEOUT},
+       }) {
+    const auto circuit = QDMIClient{session}.create_job();
+    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                  circuit.get(), QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                  ITERATION_ID.size() + 1, ITERATION_ID.data()),
+              QDMI_SUCCESS);
+    ASSERT_EQ(Set_program(circuit.get(), strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
+    http_stub.queue_post(http);
+    EXPECT_EQ(IQM_QDMI_device_job_submit(circuit.get()), status);
+  }
+}
+
+TEST_F(IterationJobMockTest,
+       ReservedStatusDoesNotRedirectAndArtifactsUseSessionTimeout) {
+  http_stub.queue_post(200, R"({"id":"iteration-job"})");
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+
+  auto &hooks = iqm::http::internal::Get_hooks();
+  hooks.get = [get = hooks.get](const auto &url, const auto &token,
+                                const auto &pool, const auto &headers,
+                                const auto timeout,
+                                const bool follow_redirects) {
+    if (url.str().ends_with("/iteration-job")) {
+      EXPECT_FALSE(follow_redirects);
+    }
+    return get(url, token, pool, headers, timeout, follow_redirects);
+  };
+  http_stub.queue_get(200, R"({"status":"running"})");
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 1), QDMI_ERROR_TIMEOUT);
+  http_stub.queue_get(200, R"({"status":"ready"})");
+  EXPECT_EQ(IQM_QDMI_device_job_wait(job, 0), QDMI_SUCCESS);
+  http_stub.queue_get(
+      200, R"([{"measurement_keys":["meas_2_0_0"],"counts":{"0":1}}])");
+  size_t size = 0;
+  EXPECT_EQ(IQM_QDMI_device_job_get_results(job, 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                            0, nullptr, &size),
+            QDMI_SUCCESS);
+  EXPECT_EQ(http_stub.get_timeouts().back(), std::chrono::hours{1});
+}
+
+TEST_F(IterationJobMockTest, TransportFailureKeepsDiagnostic) {
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post_connection_error();
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+  EXPECT_NE(log_capture.str().find("Failed to connect to host"),
+            std::string::npos);
+}
+
+TEST_F(IterationJobMockTest, AuthorizationRejectionRedactsBearer) {
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post(
+      401,
+      R"({"errors":[{"message":"Rejected example-iteration-test-token"}],"request_id":"request-2"})");
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_PERMISSIONDENIED);
+  EXPECT_EQ(http_stub.post_urls().size(), 1U);
+  EXPECT_EQ(log_capture.str().find(TEST_TOKEN), std::string::npos);
+  EXPECT_NE(log_capture.str().find("[redacted]"), std::string::npos);
+  EXPECT_NE(log_capture.str().find("request-2"), std::string::npos);
+}
+
+TEST_F(IterationJobMockTest, NonJsonFailureLogsMetadataOnly) {
+  ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                        TEST_CIRCUIT_IQM_JSON),
+            QDMI_SUCCESS);
+  http_stub.queue_post(502, "<html>upstream error</html>",
+                       {{"Content-Type", "text/html"}});
+  const ScopedLogCapture log_capture;
+  EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_ERROR_FATAL);
+  const auto log = log_capture.str();
+  EXPECT_NE(log.find(R"("response_bytes":27)"), std::string::npos);
+  EXPECT_NE(log.find(R"("content_type":"text/html")"), std::string::npos);
+  EXPECT_EQ(log.find("upstream error"), std::string::npos);
+}
 
 TEST_F(DeviceJobMockTest,
        BackendFailureMessagesAreLoggedWhenRetrievingOrPolling) {
@@ -3277,7 +3819,8 @@ TEST_F(DeviceIntegrationMockTest, QueueLengthQueryContainsCxxExceptions) {
   const auto expect_mapped_exception = [&](const std::exception_ptr &exception,
                                            const int expected_status) {
     get_hook = [exception](const auto &, const auto &, const auto &,
-                           const auto &, const auto) -> cpr::Response {
+                           const auto &, const auto,
+                           const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     size_t queue_length = 0;
@@ -3442,11 +3985,12 @@ TEST_F(DeviceJobMockTest, JobEntryPointsContainCxxExceptions) {
   auto stub_post = hooks.post;
   const auto throw_from_transport = [&](const std::exception_ptr &exception) {
     hooks.get = [exception](const auto &, const auto &, const auto &,
-                            const auto &, const auto) -> cpr::Response {
+                            const auto &, const auto,
+                            const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
     hooks.post = [exception](const auto &, const auto &, const auto &,
-                             const auto &, const auto &,
+                             const auto &, const auto &, const auto,
                              const auto) -> cpr::Response {
       std::rethrow_exception(exception);
     };
@@ -3566,7 +4110,7 @@ TEST_F(DeviceJobMockTest, CalibrationResultsRejectMalformedStatusResponses) {
 
 TEST_F(DeviceJobMockTest, JobParameterValidation) {
   EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
-                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, 0, nullptr),
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM3, 0, nullptr),
             QDMI_ERROR_NOTSUPPORTED);
   // Test null job parameter
   EXPECT_EQ(Set_program(nullptr, 1, "test"), QDMI_ERROR_INVALIDARGUMENT);
@@ -3745,6 +4289,114 @@ TEST_F(DeviceTest, CalibrationSelectorValidatesInput) {
       IQM_QDMI_device_session_set_parameter(
           session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM4, 37, unterminated),
       QDMI_ERROR_INVALIDARGUMENT);
+}
+
+TEST_F(DeviceJobMockTest, IterationIdValidation) {
+  constexpr std::string_view valid = "4286b859-30a7-4036-8c25-1e42ddd85c0e";
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, 0, nullptr),
+            QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_set_parameter(job,
+                                              QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                                              valid.size() + 1, valid.data()),
+            QDMI_SUCCESS);
+  for (const auto *invalid : {
+           "",
+           "4286B859-30a7-4036-8c25-1e42ddd85c0e",
+           "4286b859/30a7-4036-8c25-1e42ddd85c0e",
+           "4286b859-30a7-4036-8c25-1e42ddd85c0ex",
+       }) {
+    EXPECT_EQ(IQM_QDMI_device_job_set_parameter(
+                  job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, strlen(invalid) + 1,
+                  invalid),
+              QDMI_ERROR_INVALIDARGUMENT);
+  }
+  auto malformed = std::string{valid};
+  malformed.push_back('\0');
+  malformed[10] = '\0';
+  EXPECT_EQ(
+      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                                        malformed.size(), malformed.data()),
+      QDMI_ERROR_INVALIDARGUMENT);
+  malformed[10] = '0';
+  malformed.back() = '0';
+  EXPECT_EQ(
+      IQM_QDMI_device_job_set_parameter(job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                                        malformed.size(), malformed.data()),
+      QDMI_ERROR_INVALIDARGUMENT);
+}
+
+TEST_F(DeviceTest, TextTimeoutRejectsInvalidValues) {
+  for (const auto *invalid : {
+           "timeout_ms:0",
+           "timeout_ms:010",
+           "timeout_ms:+10",
+           "timeout_ms:10 ",
+           "timeout_ms:9223372036854775808",
+           "timeout_ms:18446744073709551616",
+       }) {
+    EXPECT_EQ(IQM_QDMI_device_session_set_parameter(
+                  session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                  strlen(invalid) + 1, invalid),
+              QDMI_ERROR_INVALIDARGUMENT);
+  }
+}
+
+TEST_F(DeviceIntegrationMockTest, IterationReuseHonorsExplicitTimeouts) {
+  constexpr std::string_view iteration_id =
+      "4286b859-30a7-4036-8c25-1e42ddd85c0e";
+  constexpr std::string_view text_timeout = "timeout_ms:7501";
+  constexpr uint64_t binary_timeout = 6402;
+  for (const bool use_text : {false, true}) {
+    if (use_text) {
+      IQM_QDMI_device_session_free(session);
+      session = nullptr;
+      ASSERT_EQ(IQM_QDMI_device_session_alloc(&session), QDMI_SUCCESS);
+      constexpr std::string_view base_url = "https://localhost";
+      ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                    session, QDMI_DEVICE_SESSION_PARAMETER_BASEURL,
+                    base_url.size() + 1, base_url.data()),
+                QDMI_SUCCESS);
+    } else {
+      ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                    session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                    sizeof(binary_timeout), &binary_timeout),
+                QDMI_SUCCESS);
+    }
+    if (use_text) {
+      ASSERT_EQ(IQM_QDMI_device_session_set_parameter(
+                    session, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
+                    text_timeout.size() + 1, text_timeout.data()),
+                QDMI_SUCCESS);
+    }
+    queue_successful_initialization();
+    ASSERT_EQ(IQM_QDMI_device_session_init(session), QDMI_SUCCESS);
+    const auto expected_timeout = use_text ? std::chrono::milliseconds{7501}
+                                           : std::chrono::milliseconds{6402};
+    EXPECT_EQ(http_stub.get_timeouts().back(), expected_timeout);
+
+    IQM_QDMI_Device_Job job = nullptr;
+    ASSERT_EQ(IQM_QDMI_device_session_create_device_job(session, &job),
+              QDMI_SUCCESS);
+    const std::unique_ptr<IQM_QDMI_Device_Job_impl_d,
+                          decltype(&IQM_QDMI_device_job_free)>
+        free_job{job, IQM_QDMI_device_job_free};
+    ASSERT_EQ(IQM_QDMI_device_job_set_parameter(
+                  job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                  iteration_id.size() + 1, iteration_id.data()),
+              QDMI_SUCCESS);
+    ASSERT_EQ(Set_program(job, strlen(TEST_CIRCUIT_IQM_JSON) + 1,
+                          TEST_CIRCUIT_IQM_JSON),
+              QDMI_SUCCESS);
+    http_stub.queue_post(200, R"({"id":"iteration-job"})");
+    EXPECT_EQ(IQM_QDMI_device_job_submit(job), QDMI_SUCCESS);
+    EXPECT_EQ(http_stub.post_timeouts().back(), expected_timeout);
+  }
+  EXPECT_EQ(
+      http_stub.post_urls(),
+      (std::vector<std::string>(2, "https://localhost/api/v1/jobs/default/"
+                                   "circuit?iteration_id="
+                                   "4286b859-30a7-4036-8c25-1e42ddd85c0e")));
 }
 
 TEST_F(DeviceIntegrationMockTest,

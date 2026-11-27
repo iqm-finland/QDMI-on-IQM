@@ -340,9 +340,10 @@ attributes #1 = { "irreversible" }
 )";
   }
 
-  static auto wait_for_done(IQM_QDMI_Device_Job job) -> QDMI_Job_Status {
-    const auto wait_status =
-        IQM_QDMI_device_job_wait(job, DEFAULT_JOB_WAIT_TIMEOUT);
+  static auto wait_for_done(IQM_QDMI_Device_Job job,
+                            const size_t timeout = DEFAULT_JOB_WAIT_TIMEOUT)
+      -> QDMI_Job_Status {
+    const auto wait_status = IQM_QDMI_device_job_wait(job, timeout);
     EXPECT_EQ(wait_status, QDMI_SUCCESS);
 
     QDMI_Job_Status status = QDMI_JOB_STATUS_CREATED;
@@ -928,6 +929,68 @@ TEST_F(QDMIIntegrationTest, JobCycle) {
             shots_num);
 }
 
+TEST_F(QDMIIntegrationTest, ReservationLifecycle) {
+  const auto owner = client.prepare_job(
+      R"({"max_duration_seconds":60,"idle_timeout_seconds":15})",
+      QDMI_PROGRAM_FORMAT_CUSTOM2);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(owner.get()), QDMI_SUCCESS);
+  const auto id = QDMIClient::get_job_id(owner.get());
+  constexpr size_t shots = 16;
+  const auto prepare_circuit = [&](const bool flip) {
+    std::string program = R"({"name":"feedback","instructions":[)";
+    if (flip) {
+      program +=
+          R"({"name":"prx","locus":["QB1"],"args":{"angle":3.141592653589793,"phase":0.0}},)";
+    }
+    program += R"({"name":"measure","locus":["QB1"],"args":{"key":"m"}}]})";
+    auto &job = jobs.emplace_back();
+    job = client.prepare_job(program, QDMI_PROGRAM_FORMAT_IQMJSON, shots)
+              .release();
+    return IQM_QDMI_device_job_set_parameter(
+        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM2, id.size() + 1, id.c_str());
+  };
+
+  bool flip = false;
+  for (size_t step = 0; step < 2; ++step) {
+    ASSERT_EQ(prepare_circuit(flip), QDMI_SUCCESS);
+    auto *const circuit = jobs.back();
+    if (step == 0) {
+      QDMI_Job_Status state{};
+      ASSERT_EQ(IQM_QDMI_device_job_check(owner.get(), &state), QDMI_SUCCESS);
+      ASSERT_TRUE(state == QDMI_JOB_STATUS_QUEUED ||
+                  state == QDMI_JOB_STATUS_RUNNING)
+          << state;
+      const auto *observed =
+          state == QDMI_JOB_STATUS_QUEUED ? "waiting" : "active";
+      RecordProperty("reservation_before_first_submit", observed);
+      GTEST_LOG_(INFO) << "Reservation before first circuit submission: "
+                       << observed;
+    }
+    ASSERT_EQ(IQM_QDMI_device_job_submit(circuit), QDMI_SUCCESS);
+    ASSERT_EQ(wait_for_done(circuit, 90), QDMI_JOB_STATUS_DONE);
+    auto counts = QDMIClient::get_histogram(circuit);
+    const auto zeros = counts["0"];
+    const auto ones = counts["1"];
+    ASSERT_EQ(zeros + ones, shots);
+    flip = zeros >= ones;
+  }
+
+  const auto end = client.prepare_job(nlohmann::json{{"end", id}}.dump(),
+                                      QDMI_PROGRAM_FORMAT_CUSTOM2);
+  ASSERT_EQ(IQM_QDMI_device_job_submit(end.get()), QDMI_SUCCESS);
+  const auto terminal = wait_for_done(end.get(), 30);
+  ASSERT_TRUE(terminal == QDMI_JOB_STATUS_DONE ||
+              terminal == QDMI_JOB_STATUS_CANCELED)
+      << terminal;
+  QDMI_Job_Status state{};
+  ASSERT_EQ(IQM_QDMI_device_job_check(owner.get(), &state), QDMI_SUCCESS);
+  ASSERT_EQ(state, terminal);
+
+  ASSERT_EQ(prepare_circuit(false), QDMI_SUCCESS);
+  EXPECT_EQ(IQM_QDMI_device_job_submit(jobs.back()),
+            QDMI_ERROR_INVALIDARGUMENT);
+}
+
 TEST_F(QDMIIntegrationTest, JobCancellation) {
   constexpr size_t shots_num = 64;
   const auto circuit = build_iqm_json_test_circuit();
@@ -984,7 +1047,6 @@ TEST_F(QDMIIntegrationTest, JobCycleCornerCases) {
       QDMI_PROGRAM_FORMAT_QIRADAPTIVEMODULE,
       QDMI_PROGRAM_FORMAT_QPY,
       QDMI_PROGRAM_FORMAT_CUSTOM1,
-      QDMI_PROGRAM_FORMAT_CUSTOM2,
       QDMI_PROGRAM_FORMAT_CUSTOM3,
       QDMI_PROGRAM_FORMAT_CUSTOM4,
       QDMI_PROGRAM_FORMAT_CUSTOM5,
