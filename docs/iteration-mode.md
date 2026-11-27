@@ -60,7 +60,9 @@ Closing the client or backend leaves the reservation on the server. Call
 `client.end(iteration_id)` explicitly. If the state is still `waiting` or
 `active`, use `client.get(iteration_id)` with a delay and an overall deadline
 until it is `completed`, `cancelled`, or `failed`. You can use a new client to
-finish cleanup later.
+finish cleanup later. Calling `end()` again is safe if the first request failed.
+Let signal handlers request shutdown and perform cleanup in normal Python
+control flow after the current client call returns.
 
 When creation fails, use any ID in `error.result` to inspect or end the
 reservation. A `KeyboardInterrupt` at the native call boundary also carries the

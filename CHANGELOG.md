@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Manage IQM iterations from Python and attach Qiskit backends to an existing
+  reservation. ([#357]) ([**@marcelwa**])
 - ✨ Submit circuit jobs within an IQM iteration from C and C++. ([#345])
   ([**@marcelwa**])
 - ✨ Create, inspect, and end IQM iterations from C or C++ without opening a
@@ -387,6 +389,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#357]: https://github.com/iqm-finland/QDMI-on-IQM/pull/357
 [#345]: https://github.com/iqm-finland/QDMI-on-IQM/pull/345
 [#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
