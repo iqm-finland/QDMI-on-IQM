@@ -1,8 +1,8 @@
 # Manage an IQM iteration
 
-Use an iteration to reserve a quantum computer for a limited time. From C or
-C++, you can create a reservation, check its status, and end it without opening
-a QDMI device session.
+Use an iteration to reserve a quantum computer for a limited time. From C, C++,
+or Python, you can create a reservation, check its status, and end it without
+opening a QDMI device session.
 
 The management functions are available in `iqm_qdmi/iteration.h`, included with
 the native library and Python wheels. Use the QDMI device interface to submit
@@ -19,6 +19,53 @@ source and keep tokens out of logs and command arguments.
 Your token needs `job_execution` scope and access to the quantum computer. Use
 its alias, such as `emerald:mock`, or its UUID when creating an iteration. Your
 server must support iteration mode.
+
+## Use an iteration from Python
+
+The `iqm-qdmi` package includes an iteration management client. Install
+`iqm-qdmi[qiskit]` to submit Qiskit circuits within the reservation.
+
+```python
+from iqm.qdmi.iteration import IterationClient, IterationError
+from iqm.qdmi.qiskit import IQMBackend
+from qiskit import QuantumCircuit
+
+with IterationClient() as client:
+    try:
+        iteration = client.create("emerald:mock", 60, idle_timeout_seconds=60)
+    except IterationError as error:
+        # Save this ID for recovery if the server confirmed creation.
+        print(error.result.iteration_id)
+        raise
+
+    iteration_id = iteration.iteration_id
+    assert iteration_id is not None
+    print(iteration_id)
+    try:
+        backend = IQMBackend(qc_alias="emerald:mock", iteration_id=iteration_id)
+        circuit = QuantumCircuit(1)
+        circuit.h(0)
+        circuit.measure_all()
+        print(backend.run(backend.compile(circuit), shots=128).result().get_counts())
+    finally:
+        ended = client.end(iteration_id)
+        print(ended.state)
+```
+
+Set the same server URL, credentials, and quantum computer for management and
+execution. You can attach another backend to the same ID. Its sampler and
+estimator share the reservation through that backend's device session.
+
+Closing the client or backend leaves the reservation on the server. Call
+`client.end(iteration_id)` explicitly. If the state is still `waiting` or
+`active`, use `client.get(iteration_id)` with a delay and an overall deadline
+until it is `completed`, `cancelled`, or `failed`. You can use a new client to
+finish cleanup later.
+
+When creation fails, use any ID in `error.result` to inspect or end the
+reservation. If the ID is absent and
+`error.diagnostics.get("creation_uncertain")` is true, check the server's
+iteration listing before making another creation request.
 
 ## Create an iteration
 

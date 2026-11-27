@@ -68,6 +68,12 @@ environment variables cannot redirect them. Authentication uses the token or
 token-file defaults. Explicit arguments and driver configuration can override
 manifest values.
 
+Pass `IQMBackend(iteration_id=...)` to run circuits within an existing IQM
+iteration for the selected server and quantum computer. The backend and its
+primitives share that reservation. See
+[Use an iteration from Python](iteration-mode.md#use-an-iteration-from-python)
+for creation and cleanup.
+
 IQM JSON represents PRX rotation and phase angles in radians, using the `angle`
 and `phase` fields, as specified by
 [IQM Client](https://docs.iqm.tech/iqm-client/). Applications submitting IQM
