@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Run the QSCI and Max-Cut QAOA examples inside an IQM iteration with
+  `--iteration-mode`. ([#358]) ([**@marcelwa**])
 - ✨ Manage IQM iterations from Python and attach Qiskit backends to an existing
   reservation. ([#357]) ([**@marcelwa**])
 - ✨ Submit circuit jobs within an IQM iteration from C and C++. ([#345])
@@ -389,6 +391,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#358]: https://github.com/iqm-finland/QDMI-on-IQM/pull/358
 [#357]: https://github.com/iqm-finland/QDMI-on-IQM/pull/357
 [#345]: https://github.com/iqm-finland/QDMI-on-IQM/pull/345
 [#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
