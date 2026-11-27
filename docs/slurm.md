@@ -70,7 +70,7 @@ build environment with a C++ toolchain, CMake, and Ninja.
 
 ```bash
 cmake --preset release
-cmake --build --preset release --target iteration_smoke
+cmake --build --preset release --target slurm_reservation
 ```
 
 From the same checkout on the login node, submit one task. The fixed Slurm
@@ -78,7 +78,7 @@ resource `iqm.emerald.mock` corresponds to the IQM alias `emerald:mock`.
 Clearing `IQM_QC_ID` prevents a configured UUID from overriding that alias.
 
 ```bash
-smoke="$PWD/build/release/test/iteration/iteration_smoke"
+workload="$PWD/build/release/examples/slurm/slurm_reservation"
 state_dir="$(mktemp -d /jobs/iqm-iteration.XXXXXXXX)"
 printf 'Recovery directory: %s\n' "$state_dir"
 export IQM_ITERATION_SCRATCH_FILE="${state_dir:?}/ids"
@@ -87,14 +87,14 @@ export IQM_SERVER_URL=https://resonance.iqm.tech
 srun --partition=quantum --licenses=iqm.emerald.mock:1 \
   --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-smoke \
   --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
-  IQM_LOG_LEVEL=ERROR "$smoke" --circuits
+  IQM_LOG_LEVEL=ERROR "$workload" --circuits
 ```
 
 After Slurm grants the resource, the workload submits a 60-second reservation
 job and saves its UUID on shared storage. It attaches that ID to the first
 circuit immediately and uses the result to choose the second circuit. Both
-circuits have their own job handles. The workload requests graceful end,
-confirms termination, and checks that IQM refuses another attached circuit.
+circuits have their own job handles. The workload requests graceful end and
+confirms termination.
 
 Check the allocation state, exit code, and granted license for the past week:
 
@@ -104,9 +104,8 @@ sacct -X --starttime=now-7days --name=iqm-iteration-smoke,iqm-iteration-cleanup 
 ```
 
 Use an earlier start time for older allocations. The recovery job is named
-`iqm-iteration-cleanup`. The smoke program's output reports whether it retrieved
-both circuit results and whether IQM rejected the post-end submission. A
-successful run leaves an empty ID file.
+`iqm-iteration-cleanup`. A successful workload reports that it retrieved both
+circuit results and leaves an empty ID file.
 
 If cancellation or node loss interrupts cleanup, keep the ID file. After the
 original Slurm job ends, request a new allocation from the login node. In a
@@ -116,14 +115,14 @@ uses the same server and Emerald mock as the original task.
 
 ```bash
 (
-  smoke="$PWD/build/release/test/iteration/iteration_smoke"
+  workload="$PWD/build/release/examples/slurm/slurm_reservation"
   export IQM_ITERATION_SCRATCH_FILE="${state_dir:?Set state_dir to the original recovery directory}/ids"
   export IQM_SERVER_URL=https://resonance.iqm.tech
   if [[ -s "$IQM_ITERATION_SCRATCH_FILE" ]]; then
     srun --partition=quantum --licenses=iqm.emerald.mock:1 \
       --nodes=1 --ntasks=1 --time=00:10:00 --job-name=iqm-iteration-cleanup \
       --export=ALL env -u IQM_QC_ID IQM_QUANTUM_COMPUTER=emerald:mock \
-      IQM_LOG_LEVEL=ERROR "$smoke" --cleanup-only
+      IQM_LOG_LEVEL=ERROR "$workload" --cleanup-only
   else
     printf 'No saved reservation IDs at %s. Check the recovery directory if creation was interrupted.\n' \
       "$IQM_ITERATION_SCRATCH_FILE" >&2

@@ -12,6 +12,8 @@ releases may include breaking changes.
 
 ### Added
 
+- ✨ Run dependent circuits in an IQM reservation on Slurm and recover an
+  interrupted reservation from a new allocation. ([#347]) ([**@marcelwa**])
 - ✨ Reserve an IQM quantum computer and submit circuits to it through QDMI
   jobs. ([#326]) ([**@marcelwa**])
 
@@ -385,6 +387,7 @@ Compatible with QDMI `v1.3.0`.
 
 <!-- PR links -->
 
+[#347]: https://github.com/iqm-finland/QDMI-on-IQM/pull/347
 [#341]: https://github.com/iqm-finland/QDMI-on-IQM/pull/341
 [#334]: https://github.com/iqm-finland/QDMI-on-IQM/pull/334
 [#333]: https://github.com/iqm-finland/QDMI-on-IQM/pull/333
