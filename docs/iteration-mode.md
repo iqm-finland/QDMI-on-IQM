@@ -79,8 +79,9 @@ reservation to end.
 ### End the reservation
 
 When the loop finishes, submit another `QDMI_PROGRAM_FORMAT_CUSTOM2` job with
-`{"end":"<uuid>"}`. Running work can finish. Use `job_wait` on the returned
-handle with a finite timeout to confirm termination, then free the handles.
+`{"end":"<uuid>"}`. Running work can finish. Use `job_wait` with a finite
+timeout on `owner` to confirm termination, then free both handles with
+`IQM_QDMI_device_job_free`. From a fresh session, wait on the end job instead.
 Freeing the owner of an open reservation requests graceful end on a best-effort
 basis, with a 30-second HTTP budget.
 
