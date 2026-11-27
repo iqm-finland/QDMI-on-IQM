@@ -179,7 +179,8 @@ class IQMBackend(QDMIBackend):
             idle_timeout_seconds: Idle limit in seconds, or zero or None for the server default.
 
         Yields:
-            A backend whose runs and primitives use the reservation by default.
+            A backend for runs and primitives inside the context. It retains the
+            reservation ID after exit. Use the original backend for later jobs.
         """
         with reservation(
             self.device, max_duration_seconds=max_duration_seconds, idle_timeout_seconds=idle_timeout_seconds

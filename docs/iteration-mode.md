@@ -15,7 +15,9 @@ usual. The reservation uses that session's credentials and target.
 
 Install `iqm-qdmi[qiskit]` and open your backend. The context yields a backend
 whose circuit jobs and primitives use the reservation. You can submit work as
-soon as the server assigns the UUID. The original backend keeps its defaults.
+soon as the server assigns the UUID. Use the reserved backend and its primitives
+inside the `with` block. They keep the reservation ID after exit. For later
+jobs, use the original backend, which keeps its defaults.
 
 ```python
 from iqm.qdmi.qiskit import IQMBackend

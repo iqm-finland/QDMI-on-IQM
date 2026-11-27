@@ -81,4 +81,5 @@ def reservation(
             if workload_error is None:
                 cleanup_error.add_note(f"IQM reservation {reservation_id}")
                 raise
-            workload_error.add_note(f"Ending IQM reservation {reservation_id}: {cleanup_error}")
+            detail = str(cleanup_error) or type(cleanup_error).__name__
+            workload_error.add_note(f"Ending IQM reservation {reservation_id}: {detail}")
