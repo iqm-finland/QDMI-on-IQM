@@ -73,6 +73,8 @@ class IQMBackend(QDMIBackend):
             `IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias.
         calibration_set_id: Optional calibration UUID to use for target construction
             and execution. When omitted, resolve the server default at initialization.
+        iteration_id: Optional UUID of an existing iteration for this quantum
+            computer. Circuit jobs submitted by this backend use that reservation.
 
     Environment defaults for the endpoint and quantum computer apply only to
     `iqm.default`. An explicit ID or alias takes precedence over either selector
@@ -131,6 +133,7 @@ class IQMBackend(QDMIBackend):
         qc_id: str | None = None,
         qc_alias: str | None = None,
         calibration_set_id: str | UUID | None = None,
+        iteration_id: str | UUID | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend.
 
@@ -138,7 +141,10 @@ class IQMBackend(QDMIBackend):
             ValueError: If an already-open device is combined with session overrides.
         """
         if device is not None:
-            if any(value is not None for value in (base_url, token, tokens_file, qc_id, qc_alias, calibration_set_id)):
+            if any(
+                value is not None
+                for value in (base_url, token, tokens_file, qc_id, qc_alias, calibration_set_id, iteration_id)
+            ):
                 msg = "An already-open device cannot be combined with session overrides."
                 raise ValueError(msg)
         else:
@@ -153,6 +159,7 @@ class IQMBackend(QDMIBackend):
                     qc_id=qc_id,
                     qc_alias=qc_alias,
                     calibration_set_id=calibration_set_id,
+                    iteration_id=iteration_id,
                 ),
             )
         super().__init__(device=device, provider=provider, device_id=device_id)

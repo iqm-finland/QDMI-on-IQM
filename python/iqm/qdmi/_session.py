@@ -39,6 +39,7 @@ def session_parameters(
     qc_id: str | None = None,
     qc_alias: str | None = None,
     calibration_set_id: str | UUID | None = None,
+    iteration_id: str | UUID | None = None,
 ) -> QDMISessionParameters:
     """Resolve IQM environment defaults and explicit session settings.
 
@@ -52,7 +53,7 @@ def session_parameters(
             qc_id = os.getenv("IQM_QC_ID")
             qc_alias = os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS")
     tokens_file_value = tokens_file or os.getenv("IQM_TOKENS_FILE")
-    return {
+    parameters: QDMISessionParameters = {
         "base_url": base_url or None,
         "token": token or os.getenv("IQM_TOKEN") or None,
         "auth_file": Path(tokens_file_value) if tokens_file_value else None,
@@ -60,3 +61,6 @@ def session_parameters(
         "custom2": qc_alias,
         "custom4": calibration_id,
     }
+    if iteration_id is not None:
+        parameters["custom5"] = str(UUID(str(iteration_id)))
+    return parameters
