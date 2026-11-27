@@ -52,7 +52,7 @@ jobs:
     needs: check-release
     permissions:
       contents: read
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-cibuildwheel.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-python-packaging-cibuildwheel.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
 
   build-cpp:
     name: 📦 Package C++ binaries
@@ -68,7 +68,7 @@ jobs:
           - macos-26
           - windows-2025
           - windows-11-arm
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-cpp-packaging.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
     with:
       runs-on: ${{ matrix.runs-on }}
 
@@ -85,7 +85,7 @@ jobs:
     needs: [check-release, approve-release]
     permissions:
       contents: write
-    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@85eef7c1358086e8669ceda13b27d1a9caf095c1 # main
+    uses: munich-quantum-toolkit/workflows/.github/workflows/reusable-github-release.yml@ffe0f2765a034310f50e3e17715e744daf9789b1 # v3.0.0
     with:
       version: ${{ needs.check-release.outputs.version }}
       release-name: QDMI on IQM ${{ needs.check-release.outputs.version }} Release
