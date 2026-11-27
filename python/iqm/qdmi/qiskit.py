@@ -20,8 +20,11 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
+from copy import copy
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 try:
     from mqt.core.plugins.qiskit.backend import QDMIBackend
@@ -37,10 +40,10 @@ except ImportError as e:
 
 from . import IQM_QDMI_DEVICE_ID
 from ._session import session_parameters
+from .iteration import reservation
 
 if TYPE_CHECKING:
     import os
-    from uuid import UUID
 
     from mqt.core.plugins.qiskit.provider import QDMIProvider
     from mqt.core.qdmi import Device
@@ -73,8 +76,6 @@ class IQMBackend(QDMIBackend):
             `IQM_QUANTUM_COMPUTER`, then its `IQM_QC_ALIAS` alias.
         calibration_set_id: Optional calibration UUID to use for target construction
             and execution. When omitted, resolve the server default at initialization.
-        iteration_id: Optional UUID of an existing iteration for this quantum
-            computer. Circuit jobs submitted by this backend use that reservation.
 
     Environment defaults for the endpoint and quantum computer apply only to
     `iqm.default`. An explicit ID or alias takes precedence over either selector
@@ -89,11 +90,11 @@ class IQMBackend(QDMIBackend):
             Backend defaults; ``None`` leaves server options at their defaults.
         """
         options = super()._default_options()
-        options.update_options(memory=True, run_request_options=None)
+        options.update_options(memory=True, run_request_options=None, reservation_id=None)
         return options
 
     def _job_parameters(self, options: Mapping[str, object]) -> QDMIJobParameters:  # ruff:ignore[no-self-use]
-        """Serialize the run-request mapping into QDMI ``custom1``.
+        """Encode the IQM run-request options and reservation ID as QDMI job parameters.
 
         Returns:
             Custom job parameters shared by every circuit in the run.
@@ -102,9 +103,16 @@ class IQMBackend(QDMIBackend):
             CircuitValidationError: The options contain reserved fields,
                 invalid JSON values, or shot-discarding heralding.
         """
+        parameters: QDMIJobParameters = {}
+        if (reservation_id := options.get("reservation_id")) is not None:
+            try:
+                parameters["custom2"] = str(UUID(str(reservation_id)))
+            except ValueError as exc:
+                msg = "'reservation_id' must be a UUID"
+                raise CircuitValidationError(msg) from exc
         request_options = options.get("run_request_options")
         if request_options is None:
-            return {}
+            return parameters
         if not isinstance(request_options, Mapping):
             msg = "'run_request_options' must be a JSON object"
             raise CircuitValidationError(msg)
@@ -119,7 +127,8 @@ class IQMBackend(QDMIBackend):
         if request_options.get("heralding_mode") == "zeros":
             msg = "IQM heralding_mode='zeros' is unsupported because it may discard shots."
             raise CircuitValidationError(msg)
-        return {"custom1": payload}
+        parameters["custom1"] = payload
+        return parameters
 
     def __init__(
         self,
@@ -133,7 +142,6 @@ class IQMBackend(QDMIBackend):
         qc_id: str | None = None,
         qc_alias: str | None = None,
         calibration_set_id: str | UUID | None = None,
-        iteration_id: str | UUID | None = None,
     ) -> None:
         """Initialize the IQM Qiskit backend.
 
@@ -141,10 +149,7 @@ class IQMBackend(QDMIBackend):
             ValueError: If an already-open device is combined with session overrides.
         """
         if device is not None:
-            if any(
-                value is not None
-                for value in (base_url, token, tokens_file, qc_id, qc_alias, calibration_set_id, iteration_id)
-            ):
+            if any(value is not None for value in (base_url, token, tokens_file, qc_id, qc_alias, calibration_set_id)):
                 msg = "An already-open device cannot be combined with session overrides."
                 raise ValueError(msg)
         else:
@@ -159,10 +164,32 @@ class IQMBackend(QDMIBackend):
                     qc_id=qc_id,
                     qc_alias=qc_alias,
                     calibration_set_id=calibration_set_id,
-                    iteration_id=iteration_id,
                 ),
             )
         super().__init__(device=device, provider=provider, device_id=device_id)
+
+    @contextmanager
+    def reservation(
+        self, *, max_duration_seconds: int, idle_timeout_seconds: int | None = None
+    ) -> Generator[IQMBackend, None, None]:
+        """Reserve the quantum computer using this backend's open device.
+
+        Args:
+            max_duration_seconds: Maximum active duration, from 1 to 2700 seconds.
+            idle_timeout_seconds: Idle limit in seconds, or zero or None for the server default.
+
+        Yields:
+            A backend whose runs and primitives use the reservation by default.
+        """
+        with reservation(
+            self.device, max_duration_seconds=max_duration_seconds, idle_timeout_seconds=idle_timeout_seconds
+        ) as reservation_id:
+            reserved = copy(self)
+            # BackendV2 exposes options read-only. Give the copy its own defaults.
+            reserved._options = copy(self.options)  # ruff:ignore[private-member-access]
+            reserved.set_options(reservation_id=reservation_id)
+            reserved.last_job = None
+            yield reserved
 
     @property
     def calibration_set_id(self) -> str:

@@ -80,7 +80,7 @@ uvx nox -s examples
 
 QSCI and QAOA submit circuits repeatedly as their classical optimizers choose
 new parameters. Use `--iteration-mode` to run those jobs in one
-[IQM iteration](iteration-mode.md#use-an-iteration-from-python).
+[IQM iteration](iteration-mode.md#use-a-reservation-from-python).
 
 Set `IQM_SERVER_URL`, configure `IQM_TOKEN` or `IQM_TOKENS_FILE`, and select a
 quantum computer using `IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`. Choose a target
@@ -92,11 +92,10 @@ on Resonance. The target must support iteration mode.
 ./examples/qaoa.py --backend iqm --iteration-mode --shots 128 --maxiter 8
 ```
 
-Each run waits up to five minutes for activation. Once active, the reservation
-lasts up to 15 minutes and expires after two idle minutes. The script requests
-termination at the end of the quantum workload and waits up to five and a half
-minutes to confirm it. Keep the logged ID to recover an iteration whose
-termination could not be confirmed, including after a forced process stop.
+Each run requests one reservation for up to 15 minutes with a two-minute idle
+timeout. The optimizer submits its first circuit as soon as the reservation has
+an ID. On exit, the backend requests graceful end and waits for confirmation.
+Retain the UUID reported on cleanup failure for recovery.
 
 Use `--backend sim` for a local run without a reservation.
 

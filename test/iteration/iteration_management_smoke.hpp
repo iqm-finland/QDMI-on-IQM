@@ -19,15 +19,23 @@
 
 #pragma once
 
+#include "iqm_qdmi/device.h"
+
+#include <memory>
 #include <string>
 
 namespace iqm::test_support {
-/// Run the opt-in lifecycle or runner-local reconciliation path.
-int Iteration_management_smoke(bool cleanup_only,
-                               void (*check_circuits)(const char *qc,
-                                                      bool qc_is_id,
-                                                      const std::string &id,
-                                                      bool ended) = nullptr);
-/// Run the live circuit scenario with a device session.
-int Run_iteration_circuits();
+using Job = std::unique_ptr<IQM_QDMI_Device_Job_impl_d,
+                            decltype(&IQM_QDMI_device_job_free)>;
+
+void Require_success(int status, const std::string &operation);
+Job Create_job(IQM_QDMI_Device_Session session);
+/// Run the opt-in lifecycle or reconcile IDs saved by an interrupted run.
+void Iteration_management_smoke(IQM_QDMI_Device_Session session,
+                                const std::string &scratch, bool cleanup_only,
+                                void (*check_circuits)(IQM_QDMI_Device_Session,
+                                                       const std::string &,
+                                                       bool ended) = nullptr);
+void Check_circuits(IQM_QDMI_Device_Session session, const std::string &id,
+                    bool ended);
 } // namespace iqm::test_support

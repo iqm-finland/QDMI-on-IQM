@@ -19,17 +19,12 @@
 
 from __future__ import annotations
 
-import logging
-import os
 from contextlib import contextmanager
-from math import ceil
-from time import monotonic, sleep
 from typing import TYPE_CHECKING
 
 from mqt.core.plugins.qiskit.backend import QDMIBackend
 from qiskit import ClassicalRegister
 
-from iqm.qdmi.iteration import IterationClient, IterationError
 from iqm.qdmi.qiskit import IQMBackend
 
 if TYPE_CHECKING:
@@ -37,11 +32,6 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from qiskit import QuantumCircuit
-
-    from iqm.qdmi.iteration import IterationResult
-
-log = logging.getLogger(__name__)
-_TERMINAL_STATES = frozenset({"completed", "cancelled", "failed"})
 
 
 def add_backend_arguments(parser: argparse.ArgumentParser) -> None:
@@ -56,64 +46,6 @@ def validate_backend_arguments(parser: argparse.ArgumentParser, args: argparse.N
         parser.error("--iteration-mode requires --backend iqm")
 
 
-def _request_timeout(iteration_id: str, deadline: float) -> int:
-    timeout_ms = min(30_000, ceil((deadline - monotonic()) * 1000))
-    if timeout_ms <= 0:
-        msg = f"Timed out waiting for iteration {iteration_id}"
-        raise TimeoutError(msg)
-    return timeout_ms
-
-
-def _can_retry(error: IterationError) -> bool:
-    status = error.result.http_status
-    return status in {0, 429} or 500 <= status < 600
-
-
-def _wait_for_state(
-    client: IterationClient, iteration_id: str, state: str | None, states: frozenset[str], deadline: float
-) -> str | None:
-    while state not in states:
-        sleep(min(2, max(0, deadline - monotonic())))
-        try:
-            state = client.get(iteration_id, timeout_ms=_request_timeout(iteration_id, deadline)).state
-        except IterationError as error:
-            if not _can_retry(error):
-                raise
-    return state
-
-
-def _wait_for_activation(client: IterationClient, iteration_id: str, initial_state: str | None) -> None:
-    state = _wait_for_state(client, iteration_id, initial_state, _TERMINAL_STATES | {"active"}, monotonic() + 300)
-    if state != "active":
-        msg = f"IQM iteration {iteration_id} ended in state {state} before activation"
-        raise RuntimeError(msg)
-
-
-def _request_end(client: IterationClient, iteration_id: str, deadline: float) -> IterationResult:
-    while True:
-        try:
-            return client.end(iteration_id, timeout_ms=_request_timeout(iteration_id, deadline))
-        except IterationError as error:
-            if not _can_retry(error):
-                raise
-        sleep(min(2, max(0, deadline - monotonic())))
-
-
-def _end_iteration(client: IterationClient, iteration_id: str, workload_error: BaseException | None = None) -> None:
-    deadline = monotonic() + 330
-    try:
-        finished = _request_end(client, iteration_id, deadline)
-        state = _wait_for_state(client, iteration_id, finished.state, _TERMINAL_STATES, deadline)
-    except BaseException:
-        msg = f"Could not confirm termination of IQM iteration {iteration_id}. Keep this ID for recovery."
-        log.exception(msg)
-        if workload_error is None:
-            raise
-        workload_error.add_note(msg)
-    else:
-        log.info("IQM iteration %s ended in state %s", iteration_id, state)
-
-
 @contextmanager
 def showcase_backend(backend: str, *, num_qubits: int, iteration_mode: bool) -> Generator[QDMIBackend, None, None]:
     """Open the showcase backend for the duration of the quantum workload.
@@ -121,49 +53,16 @@ def showcase_backend(backend: str, *, num_qubits: int, iteration_mode: bool) -> 
     Yields:
         The backend, attached to a reservation when requested.
 
-    Raises:
-        ValueError: Required IQM routing settings are missing.
-        IterationError: The server could not confirm a usable reservation.
-        KeyboardInterrupt: The user interrupted execution.
     """
     if backend == "sim":
         yield QDMIBackend.from_device_id("mqt.ddsim.default", custom1=str(num_qubits))
         return
-    if not iteration_mode:
-        yield IQMBackend()
-        return
-
-    base_url = os.getenv("IQM_SERVER_URL") or os.getenv("IQM_BASE_URL")
-    qc_id = os.getenv("IQM_QC_ID") or None
-    qc_alias = None if qc_id else (os.getenv("IQM_QUANTUM_COMPUTER") or os.getenv("IQM_QC_ALIAS"))
-    qc = qc_id or qc_alias
-    if not base_url or not qc:
-        msg = "Iteration mode requires an IQM server URL and a quantum computer ID or alias"
-        raise ValueError(msg)
-
-    with IterationClient(base_url=base_url) as client:
-        try:
-            reservation = client.create(qc, 900, idle_timeout_seconds=120)
-        except (IterationError, KeyboardInterrupt) as error:
-            partial = error.result if isinstance(error, IterationError) else error.__dict__.get("result")
-            if partial is not None and partial.iteration_id is not None:
-                log.info("The server confirmed iteration %s", partial.iteration_id)
-                _end_iteration(client, partial.iteration_id, error)
-            elif isinstance(error, IterationError) and error.diagnostics.get("creation_uncertain"):
-                log.warning("Check the server's iteration listing before requesting another reservation.")
-            raise
-
-        iteration_id = reservation.iteration_id
-        assert iteration_id is not None
-        try:
-            log.info("Requested IQM iteration %s", iteration_id)
-            _wait_for_activation(client, iteration_id, reservation.state)
-            yield IQMBackend(base_url=base_url, qc_id=qc_id, qc_alias=qc_alias, iteration_id=iteration_id)
-        except BaseException as error:
-            _end_iteration(client, iteration_id, error)
-            raise
-        else:
-            _end_iteration(client, iteration_id)
+    iqm = IQMBackend()
+    if iteration_mode:
+        with iqm.reservation(max_duration_seconds=900, idle_timeout_seconds=120) as reserved:
+            yield reserved
+    else:
+        yield iqm
 
 
 def measure_logical_qubits(circuit: QuantumCircuit, num_qubits: int) -> None:

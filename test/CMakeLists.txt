@@ -15,17 +15,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_executable(iteration_exports iteration/iteration_exports.c)
-target_link_libraries(iteration_exports PRIVATE ${QDMI_TARGET_NAME})
-add_test(NAME IterationExports COMMAND iteration_exports)
-if(WIN32)
-  add_custom_command(
-    TARGET iteration_exports
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${QDMI_TARGET_NAME}>
-      $<TARGET_FILE_DIR:iteration_exports>)
-endif()
 add_subdirectory(qdmi_client)
 add_subdirectory(integration)
 
