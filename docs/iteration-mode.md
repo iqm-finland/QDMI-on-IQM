@@ -120,18 +120,27 @@ reservation to end.
 ### End the reservation
 
 When the loop finishes, submit another `QDMI_PROGRAM_FORMAT_CUSTOM2` job with
-`{"end":"<uuid>"}`. Running work can finish. Use `job_wait` on the returned
-handle with a finite timeout to confirm termination, then free the handles.
+`{"end":"<uuid>"}`. Running work can finish. Use `job_wait` with a finite
+timeout on `owner` to confirm termination, then free both handles with
+`IQM_QDMI_device_job_free`. From a fresh session, wait on the end job instead.
 Freeing the owner of an open reservation requests graceful end on a best-effort
 basis, with a 30-second HTTP budget.
 
 ## Handle failures
 
-If your process restarts, open a fresh session on the same target and retrieve
-the reservation with `IQM_QDMI_device_session_retrieve_device_job_by_id`. If it
-is still open, use the saved ID to [end it](#end-the-reservation). Freeing a
-retrieved handle only releases that handle. Keep the ID until IQM reports
-`DONE`, `CANCELED`, or `FAILED`.
+In Python, reopen the same target and call
+`backend.device.retrieve_job_by_id(reservation_id).check()`. If the reservation
+is still open, use
+`backend.device.submit_job(json.dumps({"end": reservation_id}), ProgramFormat.CUSTOM2)`
+and call `wait(300)` on the returned job. Import `json` and `ProgramFormat` from
+the standard library and `mqt.core.qdmi`, respectively. Keep the UUID if the
+wait times out.
+
+In C, open a fresh session on the same target and retrieve the reservation with
+`IQM_QDMI_device_session_retrieve_device_job_by_id`. If it is still open, use
+the saved ID to [end it](#end-the-reservation). Freeing a retrieved handle only
+releases that handle. Keep the ID until IQM reports `DONE`, `CANCELED`, or
+`FAILED`.
 
 If creation reports an error, check whether the owner still exposes a UUID and
 save it for cleanup. If the request may have reached IQM and you have no UUID,
