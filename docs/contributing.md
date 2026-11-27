@@ -262,32 +262,10 @@ export IQM_TOKEN="your-api-key"
 ctest --test-dir build/release -L live --output-on-failure
 ```
 
-**Checking iteration management and circuit execution:**
-
-The live-test workflow runs two dependent circuits in one reservation on
-`emerald:mock` and exercises recovery by ID. To run these checks, configure the
-credentials described above, then run:
-
-```console
-cmake --preset release
-cmake --build --preset release --target iteration_smoke
-unset IQM_QC_ID
-export IQM_QUANTUM_COMPUTER="emerald:mock"
-export IQM_ITERATION_SCRATCH_FILE="$(pwd)/build/iteration-ids.txt"
-./build/release/test/iteration/iteration_smoke
-IQM_LOG_LEVEL=ERROR ./build/release/test/iteration/iteration_smoke --circuits
-./build/release/test/iteration/iteration_smoke --cleanup-only
-```
-
-The circuit check submits the first circuit immediately after obtaining the
-reservation UUID and records the observed state. A run that first sees an active
-reservation only exercises active submission. Keep the ID file when cleanup
-fails. Run `--cleanup-only` with the same target and credentials to recover the
-reservation and confirm its terminal state.
-
-CI serializes this check across runs and attempts cleanup even after
-cancellation. Runner loss or force cancellation can still leave reservations
-behind; ask the service administrator to reconcile them if the ID file is lost.
+The reservation integration test on `emerald:mock` submits two dependent
+circuits. It records whether the reservation was waiting or active before the
+first submission, confirms graceful end, and checks that IQM rejects another
+circuit after termination.
 
 **Generating code coverage:**
 

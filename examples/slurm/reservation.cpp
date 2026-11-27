@@ -17,12 +17,12 @@
  * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  */
 
-#include "iteration_management_smoke.hpp"
+#include "reservation.hpp"
 
 #include "iqm_qdmi/device.h"
 
 #include <array>
-#include <cstdlib>
+#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -34,12 +34,16 @@
 #include <system_error>
 #include <vector>
 
-namespace iqm::test_support {
+namespace iqm::slurm {
 void Require_success(const int status, const std::string &operation) {
   if (status != QDMI_SUCCESS) {
     throw std::runtime_error(operation + " returned " + std::to_string(status));
   }
 }
+
+namespace {
+using Job = std::unique_ptr<IQM_QDMI_Device_Job_impl_d,
+                            decltype(&IQM_QDMI_device_job_free)>;
 
 Job Create_job(IQM_QDMI_Device_Session session) {
   IQM_QDMI_Device_Job raw = nullptr;
@@ -48,7 +52,6 @@ Job Create_job(IQM_QDMI_Device_Session session) {
   return Job{raw, IQM_QDMI_device_job_free};
 }
 
-namespace {
 bool Canonical_id(const std::string_view id) {
   if (id.size() != 36) {
     return false;
@@ -172,31 +175,72 @@ void Reconcile(IQM_QDMI_Device_Session session, const std::string &id) {
     End(session, id);
   }
 }
+
+bool Run_circuit(IQM_QDMI_Device_Session session, const std::string &id,
+                 const bool flip) {
+  const auto job = Create_job(session);
+  Require_success(IQM_QDMI_device_job_set_parameter(
+                      job.get(), QDMI_DEVICE_JOB_PARAMETER_CUSTOM2,
+                      id.size() + 1, id.c_str()),
+                  "Set iteration ID");
+  std::string circuit = R"({"name":"slurm-reservation","instructions":[)";
+  if (flip) {
+    circuit +=
+        R"({"name":"prx","locus":["QB1"],"args":{"angle":0.5,"phase":0.0}},)";
+  }
+  circuit += R"({"name":"measure","locus":["QB1"],"args":{"key":"m"}}]})";
+  const size_t size = circuit.size() + 1;
+  const void *program = circuit.c_str();
+  Require_success(IQM_QDMI_device_job_set_programs(job.get(),
+                                                   QDMI_PROGRAM_FORMAT_IQMJSON,
+                                                   1, &size, &program),
+                  "Set circuit");
+  constexpr size_t shots = 16;
+  Require_success(
+      IQM_QDMI_device_job_set_parameter(
+          job.get(), QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(shots), &shots),
+      "Set shots");
+  Require_success(IQM_QDMI_device_job_submit(job.get()), "Submit circuit");
+  Require_success(IQM_QDMI_device_job_wait(job.get(), 90), "Wait for circuit");
+  // One measured qubit has at most two histogram keys ("0,1").
+  std::array<char, 4> keys{};
+  std::array<size_t, 2> counts{};
+  Require_success(
+      IQM_QDMI_device_job_get_results(job.get(), 0, QDMI_JOB_RESULT_HIST_KEYS,
+                                      keys.size(), keys.data(), nullptr),
+      "Read histogram keys");
+  Require_success(
+      IQM_QDMI_device_job_get_results(job.get(), 0, QDMI_JOB_RESULT_HIST_VALUES,
+                                      sizeof(counts), counts.data(), nullptr),
+      "Read histogram counts");
+  const std::string_view outcomes{keys.data()};
+  if ((outcomes != "0" && outcomes != "1" && outcomes != "0,1" &&
+       outcomes != "1,0") ||
+      counts[0] + counts[1] != shots) {
+    throw std::runtime_error("Circuit returned an unexpected histogram");
+  }
+  const auto ones = outcomes.front() == '1' ? counts[0] : counts[1];
+  return ones > shots / 2;
+}
 } // namespace
 
-void Iteration_management_smoke(IQM_QDMI_Device_Session session,
-                                const std::string &scratch,
-                                const bool cleanup_only,
-                                void (*check_circuits)(IQM_QDMI_Device_Session,
-                                                       const std::string &,
-                                                       bool)) {
-  if (cleanup_only) {
-    bool clean = true;
-    for (const auto &id : Read_ids(scratch)) {
-      try {
-        Reconcile(session, id);
-        Remove_id(scratch, id);
-      } catch (const std::exception &error) {
-        std::cerr << error.what() << '\n';
-        clean = false;
-      }
+void Cleanup(IQM_QDMI_Device_Session session, const std::string &scratch) {
+  bool clean = true;
+  for (const auto &id : Read_ids(scratch)) {
+    try {
+      Reconcile(session, id);
+      Remove_id(scratch, id);
+    } catch (const std::exception &error) {
+      std::cerr << error.what() << '\n';
+      clean = false;
     }
-    if (!clean) {
-      throw std::runtime_error("Unconfirmed IDs remain in the scratch file");
-    }
-    return;
   }
+  if (!clean) {
+    throw std::runtime_error("Unconfirmed IDs remain in the scratch file");
+  }
+}
 
+void Run_circuits(IQM_QDMI_Device_Session session, const std::string &scratch) {
   std::ofstream ledger{scratch, std::ios::app};
   if (!ledger) {
     throw std::runtime_error("Cannot open scratch file before creation");
@@ -226,65 +270,18 @@ void Iteration_management_smoke(IQM_QDMI_Device_Session session,
   }
   const auto state = Check(owner.get());
   if (state != QDMI_JOB_STATUS_QUEUED && state != QDMI_JOB_STATUS_RUNNING) {
-    throw std::runtime_error("Reservation ended before the smoke test");
+    throw std::runtime_error("Reservation ended before circuit submission");
   }
-  if (check_circuits != nullptr) {
-    std::cout << "Reservation observed "
-              << (state == QDMI_JOB_STATUS_QUEUED ? "waiting" : "active")
-              << " immediately before the first circuit submission\n";
-    check_circuits(session, id, false);
-  }
+  std::cout << "Reservation observed "
+            << (state == QDMI_JOB_STATUS_QUEUED ? "waiting" : "active")
+            << " immediately before the first circuit submission\n";
+  const bool measured_one = Run_circuit(session, id, false);
+  Run_circuit(session, id, !measured_one);
+  std::cout << "Retrieved both circuit results from iteration " << id << '\n';
   End(session, id);
   if (!Terminal(Check(owner.get()))) {
     throw std::runtime_error("Owner did not observe the terminal reservation");
   }
   Remove_id(scratch, id);
-  if (check_circuits != nullptr) {
-    check_circuits(session, id, true);
-  }
 }
-} // namespace iqm::test_support
-
-#ifndef IQM_ITERATION_SMOKE_NO_MAIN
-// NOLINTNEXTLINE(misc-const-correctness)
-int main(const int argc, char **argv) {
-  using namespace iqm::test_support;
-  const bool cleanup =
-      argc == 2 && std::string_view{argv[1]} == "--cleanup-only";
-  const bool circuits = argc == 2 && std::string_view{argv[1]} == "--circuits";
-  if (argc != 1 && !cleanup && !circuits) {
-    return 1;
-  }
-  try {
-    const auto *scratch = std::getenv("IQM_ITERATION_SCRATCH_FILE");
-    if (scratch == nullptr || *scratch == '\0') {
-      throw std::runtime_error(
-          "Set IQM_ITERATION_SCRATCH_FILE to runner-local ID recovery state");
-    }
-    if (cleanup && Read_ids(scratch).empty()) {
-      return 0;
-    }
-    Require_success(IQM_QDMI_device_initialize(), "Initialize device");
-    {
-      IQM_QDMI_Device_Session raw = nullptr;
-      Require_success(IQM_QDMI_device_session_alloc(&raw), "Allocate session");
-      const std::unique_ptr<IQM_QDMI_Device_Session_impl_d,
-                            decltype(&IQM_QDMI_device_session_free)>
-          session{raw, IQM_QDMI_device_session_free};
-      constexpr std::string_view timeout = "timeout_ms:5000";
-      Require_success(IQM_QDMI_device_session_set_parameter(
-                          raw, QDMI_DEVICE_SESSION_PARAMETER_CUSTOM3,
-                          timeout.size() + 1, timeout.data()),
-                      "Set session timeout");
-      Require_success(IQM_QDMI_device_session_init(raw), "Initialize session");
-      Iteration_management_smoke(raw, scratch, cleanup,
-                                 circuits ? Check_circuits : nullptr);
-    }
-    Require_success(IQM_QDMI_device_finalize(), "Finalize device");
-    return 0;
-  } catch (const std::exception &error) {
-    std::cerr << error.what() << '\n';
-    return 1;
-  }
-}
-#endif
+} // namespace iqm::slurm
