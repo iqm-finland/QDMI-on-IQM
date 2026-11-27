@@ -17,6 +17,7 @@
 
 add_executable(
   unit_tests
+  ../../examples/slurm/reservation.cpp
   ../qdmi_client/qdmi_client.cpp
   http_stub.cpp
   test_http_client.cpp
