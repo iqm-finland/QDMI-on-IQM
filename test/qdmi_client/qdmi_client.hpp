@@ -28,8 +28,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -42,6 +44,9 @@ class QDMIClient {
   static auto throw_if_error(int status, const std::string &message) -> void;
 
 public:
+  using Job = std::unique_ptr<std::remove_pointer_t<IQM_QDMI_Device_Job>,
+                              decltype(&IQM_QDMI_device_job_free)>;
+
   /// Initialize a device session and transfer ownership to the caller.
   static auto
   get_iqm_session(const std::string &base_url,
@@ -112,6 +117,13 @@ public:
 
   [[nodiscard]] auto get_supported_program_formats() const
       -> std::vector<QDMI_Program_Format>;
+
+  [[nodiscard]] auto create_job() const -> Job;
+
+  /// Prepare one textual program for submission through the device API.
+  [[nodiscard]] auto
+  prepare_job(const std::string &program, QDMI_Program_Format format,
+              std::optional<size_t> num_shots = std::nullopt) const -> Job;
 
   /// Submit one textual program and transfer job ownership to the caller.
   [[nodiscard]] auto

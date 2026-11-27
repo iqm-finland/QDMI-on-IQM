@@ -21,21 +21,12 @@
 
 #include "iqm_qdmi/device.h"
 
-#include <memory>
 #include <string>
 
-namespace iqm::test_support {
-using Job = std::unique_ptr<IQM_QDMI_Device_Job_impl_d,
-                            decltype(&IQM_QDMI_device_job_free)>;
-
+namespace iqm::slurm {
 void Require_success(int status, const std::string &operation);
-Job Create_job(IQM_QDMI_Device_Session session);
-/// Run the opt-in lifecycle or reconcile IDs saved by an interrupted run.
-void Iteration_management_smoke(IQM_QDMI_Device_Session session,
-                                const std::string &scratch, bool cleanup_only,
-                                void (*check_circuits)(IQM_QDMI_Device_Session,
-                                                       const std::string &,
-                                                       bool ended) = nullptr);
-void Check_circuits(IQM_QDMI_Device_Session session, const std::string &id,
-                    bool ended);
-} // namespace iqm::test_support
+/// Persist the reservation ID before submitting the first dependent circuit.
+void Run_circuits(IQM_QDMI_Device_Session session, const std::string &scratch);
+/// Remove each saved ID only after observing a terminal reservation state.
+void Cleanup(IQM_QDMI_Device_Session session, const std::string &scratch);
+} // namespace iqm::slurm

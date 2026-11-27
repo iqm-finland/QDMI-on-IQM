@@ -393,34 +393,47 @@ auto QDMIClient::get_supported_program_formats() const
   return formats;
 }
 
+auto QDMIClient::create_job() const -> Job {
+  IQM_QDMI_Device_Job job = nullptr;
+  const auto ret = IQM_QDMI_device_session_create_device_job(session_, &job);
+  throw_if_error(ret, "Failed to create a job");
+  return Job{job, IQM_QDMI_device_job_free};
+}
+
+auto QDMIClient::prepare_job(const std::string &program,
+                             const QDMI_Program_Format format,
+                             const std::optional<size_t> num_shots) const
+    -> Job {
+  auto job = create_job();
+  const size_t program_size = program.size() + 1;
+  const void *program_data = program.c_str();
+  auto ret = IQM_QDMI_device_job_set_programs(job.get(), format, 1,
+                                              &program_size, &program_data);
+  throw_if_error(ret, "Failed to set the program");
+  if (num_shots.has_value()) {
+    ret = IQM_QDMI_device_job_set_parameter(job.get(),
+                                            QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM,
+                                            sizeof(size_t), &*num_shots);
+    throw_if_error(ret, "Failed to set the number of shots");
+  }
+  return job;
+}
+
 auto QDMIClient::submit_job(
     const std::string &program, const QDMI_Program_Format format,
     const size_t num_shots,
     const std::optional<std::string> &run_request_options) const
     -> IQM_QDMI_Device_Job {
-  IQM_QDMI_Device_Job job = nullptr;
-  int ret = IQM_QDMI_device_session_create_device_job(session_, &job);
-  throw_if_error(ret, "Failed to create a job");
-  std::unique_ptr<std::remove_pointer_t<IQM_QDMI_Device_Job>,
-                  decltype(&IQM_QDMI_device_job_free)>
-      guard{job, IQM_QDMI_device_job_free};
-  const size_t program_size = program.size() + 1;
-  const void *program_data = program.c_str();
-  ret = IQM_QDMI_device_job_set_programs(job, format, 1, &program_size,
-                                         &program_data);
-  throw_if_error(ret, "Failed to set the program");
-  ret = IQM_QDMI_device_job_set_parameter(
-      job, QDMI_DEVICE_JOB_PARAMETER_SHOTSNUM, sizeof(size_t), &num_shots);
-  throw_if_error(ret, "Failed to set the number of shots");
+  auto job = prepare_job(program, format, num_shots);
   if (run_request_options.has_value()) {
-    ret = IQM_QDMI_device_job_set_parameter(
-        job, QDMI_DEVICE_JOB_PARAMETER_CUSTOM1, run_request_options->size() + 1,
-        run_request_options->c_str());
+    const auto ret = IQM_QDMI_device_job_set_parameter(
+        job.get(), QDMI_DEVICE_JOB_PARAMETER_CUSTOM1,
+        run_request_options->size() + 1, run_request_options->c_str());
     throw_if_error(ret, "Failed to set the run-request options");
   }
-  ret = IQM_QDMI_device_job_submit(job);
+  const auto ret = IQM_QDMI_device_job_submit(job.get());
   throw_if_error(ret, "Failed to submit the job");
-  return guard.release();
+  return job.release();
 }
 
 auto QDMIClient::get_job_id(IQM_QDMI_Device_Job job) -> std::string {
