@@ -17,11 +17,13 @@ driving real quantum workloads on IQM systems using QDMI-on-IQM and the packaged
 
 Whether you want to estimate molecular ground-state energies with [QSCI][qsci]
 or benchmark hardware with [MQT Bench][mqt-bench], the example scripts in this
-repository provide a practical starting point. This tutorial focuses on two
+repository provide a practical starting point. The examples cover three
 application areas:
 
 - **Quantum chemistry:** using [QSCI][qsci] and [Qiskit Nature][qiskit-nature]
   to estimate the ground-state energy of an H2 molecule.
+- **Combinatorial optimization:** using [QAOA][qaoa] to approximate Max-Cut on a
+  four-vertex cycle.
 - **Benchmarking:** running [MQT Bench][mqt-bench] programs such as
   [GHZ states][ghz-state], [Deutsch-Jozsa][deutsch-jozsa],
   [QFT][quantum-fourier-transform], [graph states][graph-state],
@@ -70,8 +72,33 @@ uvx nox -s examples
 
 # Run specific examples
 ./examples/qsci_h2.py --shots 256 --maxiter 5 --cutoff 4
+./examples/qaoa.py --backend sim --shots 128 --maxiter 8
 ./examples/mqt_bench.py --benchmark ghz --shots 128
 ```
+
+## Reserve a quantum computer for a showcase
+
+QSCI and QAOA submit circuits repeatedly as their classical optimizers choose
+new parameters. Use `--iteration-mode` to run those jobs in one
+[IQM iteration](iteration-mode.md#use-an-iteration-from-python).
+
+Set `IQM_SERVER_URL`, configure `IQM_TOKEN` or `IQM_TOKENS_FILE`, and select a
+quantum computer using `IQM_QUANTUM_COMPUTER` or `IQM_QC_ID`. Choose a target
+with at least four qubits and direct qubit connectivity, such as `emerald:mock`
+on Resonance. The target must support iteration mode.
+
+```console
+./examples/qsci_h2.py --backend iqm --iteration-mode --shots 256 --maxiter 5
+./examples/qaoa.py --backend iqm --iteration-mode --shots 128 --maxiter 8
+```
+
+Each run waits up to five minutes for activation. Once active, the reservation
+lasts up to 15 minutes and expires after two idle minutes. The script requests
+termination at the end of the quantum workload and waits up to five and a half
+minutes to confirm it. Keep the logged ID to recover an iteration whose
+termination could not be confirmed.
+
+Use `--backend sim` for a local run without a reservation.
 
 ## Quantum Chemistry
 
@@ -173,6 +200,7 @@ looks on real hardware. Remember to set the required environment variables for
 authentication before running the script.
 
 [deutsch-jozsa]: https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm
+[qaoa]: https://arxiv.org/abs/1411.4028
 [ghz-state]: https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state
 [graph-state]: https://en.wikipedia.org/wiki/Graph_state
 [measurement-based-quantum-computing]: https://en.wikipedia.org/wiki/Measurement-based_quantum_computation
