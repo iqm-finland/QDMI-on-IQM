@@ -19,6 +19,8 @@
 
 #include "iteration_management_smoke.hpp"
 
+#include "iqm_qdmi/device.h"
+
 #include <array>
 #include <cstdlib>
 #include <exception>
@@ -47,7 +49,7 @@ Job Create_job(IQM_QDMI_Device_Session session) {
 }
 
 namespace {
-bool Canonical_id(const std::string &id) {
+bool Canonical_id(const std::string_view id) {
   if (id.size() != 36) {
     return false;
   }
