@@ -109,18 +109,24 @@ explicit invocation, valid credentials, and an appropriate target.
 
 - Agents MAY create, submit, and edit pull requests and MAY comment on pull
   requests when doing so is part of the requested task.
+
 - When the repository provides a GitHub pull request template, agents MUST use
   and follow that template when creating or editing a pull request.
+
 - Every agent-authored or agent-edited text submitted to a pull request MUST
   begin with the following disclaimer:
 
   `🤖 *AI text below* 🤖`
+
 - This requirement applies to pull request descriptions, review bodies, inline
   review comments, issue-style comments, replies, and other agent-produced text
   bodies. Pull request titles are exempt and MUST NOT include the disclaimer.
+
 - Put the disclaimer on the first line of every applicable text body.
+
 - When editing existing human-authored text, preserve the original content and
   add the disclaimer at the very beginning of the edited field.
+
 - The disclaimer MUST be visible in the submitted text; do not hide it in an
   HTML comment, metadata field, attachment, or linked document.
 

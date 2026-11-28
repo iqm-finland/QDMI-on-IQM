@@ -8,6 +8,7 @@ install it in your Spack environment.
 
 - Spack is installed and initialized (see the
   [Spack Getting Started guide](https://spack.readthedocs.io/en/latest/getting_started.html)).
+
 - Your compiler and basic build tools (`cmake`, `git`, `make`) are discoverable
   by Spack. If they are not, run:
 
